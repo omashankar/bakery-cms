@@ -27,7 +27,7 @@ export function DeliveryPartnerCard({
   className,
 }: DeliveryPartnerCardProps) {
   return (
-    <div className={cn("rounded-xl border border-border bg-white p-5 shadow-sm", className)}>
+    <div className={cn("rounded-xl border border-border bg-card p-5 shadow-sm", className)}>
       <div className="flex items-start gap-4">
         <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-cream-100 text-bakery-700">
           <Truck className="size-5" />

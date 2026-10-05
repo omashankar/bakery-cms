@@ -7,6 +7,7 @@ import { ArrowLeft, Image as ImageIcon, Loader2, Mail, MapPin, Phone, Printer } 
 import { toast } from "sonner";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { Input } from "@/components/ui/input";
+import { cartLineChoices } from "@/features/cart/lib/cart";
 import { AdminOrderStatusBadge } from "@/apps/admin/commerce/components/admin-order-status-badge";
 import { AdminPaymentStatusBadge } from "@/apps/admin/commerce/components/admin-payment-status-badge";
 import { CancelOrderDialog } from "@/apps/admin/commerce/components/cancel-order-dialog";
@@ -40,6 +41,7 @@ import { Label } from "@/components/ui/label";
 import { routes } from "@/constants/routes";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { reportedAsSignedOut, reportedAsSignedOutOnRead } from "@/apps/admin/lib/report-write";
+import { addressLines } from "@/features/orders/lib/address-format";
 
 interface OrderDetailPageProps {
   orderId: string;
@@ -308,9 +310,22 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
                     <p className="font-medium">{item.name}</p>
                     <p className="text-sm text-muted-foreground">
                       {item.quantity} × {formatCurrency(item.price)}
-                      {item.weight ? ` · ${item.weight}` : ""}
-                      {item.shape ? ` · ${item.shape}` : ""}
                     </p>
+                    {/*
+                      Everything the customer chose, on one line.
+
+                      This showed the weight and the shape and stopped there —
+                      the flavour was omitted, and `variantSummary` (the shop's
+                      own option groups, and what the customer was actually
+                      charged for) was never rendered anywhere in the admin at
+                      all. Whoever has to make this order was reading a shorter
+                      list than the one the customer paid for.
+                    */}
+                    {cartLineChoices(item).length > 0 ? (
+                      <p className="mt-0.5 text-sm text-foreground">
+                        {cartLineChoices(item).join(" · ")}
+                      </p>
+                    ) : null}
                     {item.message ? (
                       <p className="mt-1 text-sm text-muted-foreground">
                         Message: {item.message}
@@ -355,6 +370,55 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
             <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
               <h2 className="font-heading text-lg font-semibold">Customer instructions</h2>
               <p className="mt-2 text-sm text-muted-foreground">{order.orderNotes}</p>
+            </div>
+          ) : null}
+
+          {/*
+            What the customer asked for on the Personalize screen.
+
+            A separate card from "Customer instructions" on purpose: those are
+            for the shop, and this is what goes to whoever opens the parcel.
+            Absent entirely on orders placed before the screen existed, and on
+            orders where the customer filled none of it in.
+          */}
+          {order.personalisation ? (
+            <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+              <h2 className="font-heading text-lg font-semibold">Personalisation</h2>
+              <dl className="mt-3 space-y-3 text-sm">
+                {order.personalisation.occasion ? (
+                  <div>
+                    <dt className="text-muted-foreground">Occasion</dt>
+                    <dd className="font-medium">{order.personalisation.occasion}</dd>
+                  </div>
+                ) : null}
+                {order.personalisation.message ? (
+                  <div>
+                    <dt className="text-muted-foreground">Message for the recipient</dt>
+                    <dd className="whitespace-pre-wrap">{order.personalisation.message}</dd>
+                  </div>
+                ) : null}
+                {order.personalisation.sender ? (
+                  <div>
+                    <dt className="text-muted-foreground">From</dt>
+                    <dd>
+                      {[order.personalisation.sender.name, order.personalisation.sender.phone]
+                        .filter(Boolean)
+                        .join(" · ")}
+                      {/*
+                        Said plainly, because it changes what staff may write on
+                        the parcel. The shop still holds the sender's details —
+                        it has to, to reach whoever paid — so this is an
+                        instruction, not a redaction.
+                      */}
+                      {order.personalisation.sender.hideFromRecipient ? (
+                        <span className="mt-1 block text-xs font-medium text-amber-700">
+                          Keep this off anything the recipient sees
+                        </span>
+                      ) : null}
+                    </dd>
+                  </div>
+                ) : null}
+              </dl>
             </div>
           ) : null}
 
@@ -453,11 +517,18 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
             <div className="mt-4 flex gap-2 text-sm text-muted-foreground">
               <MapPin className="mt-0.5 size-4 shrink-0" />
               <div>
-                <p>{order.address.addressLine1}</p>
-                {order.address.addressLine2 ? <p>{order.address.addressLine2}</p> : null}
-                <p>
-                  {order.address.city}, {order.address.state} {order.address.pincode}
-                </p>
+                {/*
+                  The screen staff pack from, so it shows every line the
+                  customer gave — landmark included, which is the one a rider
+                  asks for. Field-by-field before, so each new field was a
+                  hand edit; the shared helper drops blanks itself.
+                */}
+                {addressLines(order.address).map((line) => (
+                  <p key={line}>{line}</p>
+                ))}
+                {order.address.altPhone?.trim() ? (
+                  <p className="mt-2">Also on {order.address.altPhone}</p>
+                ) : null}
                 <p className="mt-2">Est. delivery: {formatDate(order.estimatedDelivery)}</p>
               </div>
             </div>

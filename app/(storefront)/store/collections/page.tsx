@@ -16,17 +16,30 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 interface PageProps {
-  searchParams: Promise<{ category?: string }>;
+  /**
+   * `q` IS THE HEADER'S SEARCH BOX, arriving here by GET.
+   *
+   * The shop asked for the separate /store/search page to go: type in the
+   * header, land on results. This is where they land. Reading it here — on
+   * the server — is what puts the matches in the FIRST HTML, which is what
+   * the deleted page did and what a plain form post has to keep doing.
+   */
+  searchParams: Promise<{ category?: string; q?: string }>;
 }
 
 export default async function Page(props: PageProps) {
-  const [{ category }, catalog, categories] = await Promise.all([
+  const [{ category, q }, catalog, categories] = await Promise.all([
     props.searchParams,
     getStorefrontProductCards(),
     getStorefrontCategories(),
   ]);
 
   return (
-    <CollectionsPage categorySlug={category ?? ""} catalog={catalog} categories={categories} />
+    <CollectionsPage
+      categorySlug={category ?? ""}
+      initialSearch={q ?? ""}
+      catalog={catalog}
+      categories={categories}
+    />
   );
 }

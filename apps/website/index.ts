@@ -4,12 +4,10 @@ export { ContactForm } from "@/components/shared/contact-form";
 export { StoreHomePage } from "./pages/store-home-page";
 export { CollectionsPage } from "./pages/collections-page";
 export { ProductDetailPage } from "./pages/product-detail-page";
-export { WeddingPage } from "./pages/wedding-page";
-export { AboutPage } from "./pages/about-page";
+
 export { ContactPage } from "./pages/contact-page";
-export { GalleryPage } from "./pages/gallery-page";
+
 export { FaqPage } from "./pages/faq-page";
-export { SearchPage } from "./pages/search-page";
 export { PrivacyPage } from "./pages/privacy-page";
 export { TermsPage } from "./pages/terms-page";
 export { ThankYouPage } from "./pages/thank-you-page";

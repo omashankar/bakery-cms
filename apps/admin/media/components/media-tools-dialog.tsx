@@ -36,7 +36,11 @@ export function MediaToolsDialog({
         <DialogHeader>
           <DialogTitle>Media tools</DialogTitle>
           <DialogDescription>
-            Duplicate finder and compression utilities for the media library.
+            {/* Names only what works. Compression below is a disabled button
+                with "(coming soon)" on it — the repo's honest pattern — but a
+                heading that promises "compression utilities" turns an
+                admitted gap back into a claim. */}
+            Find duplicate files in the media library.
           </DialogDescription>
         </DialogHeader>
 
@@ -48,8 +52,8 @@ export function MediaToolsDialog({
             <div className="flex-1 space-y-2">
               <p className="text-sm font-medium">Image compression</p>
               <p className="text-xs text-muted-foreground">
-                Placeholder for future WebP conversion and size optimization. Backend image
-                processing will plug in here.
+                Not available yet. Uploaded images are stored at the size they
+                arrive in.
               </p>
               <Button variant="outline" size="sm" disabled>
                 Compress selected (coming soon)

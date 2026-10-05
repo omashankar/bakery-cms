@@ -9,7 +9,7 @@ import { SettingsPlaceholder } from "./settings-placeholder";
 export function PermissionsSettingsPage() {
   return (
     <SettingsPlaceholder
-      title="Roles & Permissions"
+      title="Permissions"
       description="Manage team access when multi-user admin support is enabled."
       icon={ShieldCheck}
       features={[

@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import type { DeliveryZone, DeliveryZoneFormData } from "@/types/delivery";
 import {
   filterDeliveryZones,
@@ -23,7 +24,7 @@ function emitUpdated(): void {
 /** Local-only write (localStorage + event). No server dual-write. */
 function lowPersist(zones: DeliveryZone[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(zones));
+  safeSetItem(STORAGE_KEY, JSON.stringify(zones));
   emitUpdated();
 }
 
@@ -64,7 +65,7 @@ async function persist(zones: DeliveryZone[]): Promise<boolean> {
     const stillOurs = localStorage.getItem(STORAGE_KEY) === JSON.stringify(zones);
     if (stillOurs) {
       if (previous === null) localStorage.removeItem(STORAGE_KEY);
-      else localStorage.setItem(STORAGE_KEY, previous);
+      else safeSetItem(STORAGE_KEY, previous);
       emitUpdated();
     }
   }

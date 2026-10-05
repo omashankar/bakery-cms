@@ -5,10 +5,41 @@ import { computeTaxAmount } from "@/features/commerce/lib/tax-utils";
 import { calculateDeliveryQuote } from "@/features/orders/lib/delivery-pricing";
 import type { CartLineItem } from "@/features/cart/lib/cart";
 
+/**
+ * What the shop says these lines used to cost, minus what they cost now.
+ *
+ * ONLY from compare-at prices the shop actually typed. A saving computed
+ * from anything else is a claim about the past nobody made — the rule that
+ * had an invented MRP (`price > 1000 ? price * 1.1 : undefined`) taken out
+ * of the product repository, where it wore a permanent "9% OFF" against a
+ * price no customer had ever been charged.
+ *
+ * Lived in the cart page and was about to be copied into the summary panel.
+ * One copy, so the two can never disagree about what a customer saved.
+ */
+export function compareAtSavings(items: CartLineItem[]): number {
+  return items.reduce(
+    (sum, item) =>
+      sum +
+      (item.compareAtPrice && item.compareAtPrice > item.price
+        ? (item.compareAtPrice - item.price) * item.quantity
+        : 0),
+    0,
+  );
+}
+
 export interface CartTotalsInput {
   items: CartLineItem[];
   discount?: number;
   giftWrap?: boolean;
+  /**
+   * WHICH tier, never what it costs.
+   *
+   * The price is looked up in the shop's own settings here, so a browser
+   * cannot name its own surcharge — the same reason gift wrap takes a boolean
+   * and reads `commerce.giftWrapFee` rather than taking an amount.
+   */
+  deliveryTierId?: string;
   deliveryAddress?: {
     city?: string;
     pincode?: string;
@@ -31,6 +62,10 @@ export interface CartTotals {
   discount: number;
   platformCharge: number;
   giftWrapFee: number;
+  /** What the chosen speed added. 0 when no tier is chosen, or the tier is free. */
+  deliveryTierFee: number;
+  /** The shop's word for the chosen speed, so a stored order can name it. */
+  deliveryTierLabel?: string;
   taxableAmount?: number;
   /**
    * The rate and label this order's tax was computed under, frozen at placement.
@@ -94,6 +129,7 @@ export function calculateCartTotals({
   items,
   discount = 0,
   giftWrap = false,
+  deliveryTierId,
   deliveryAddress,
   commerceOverride,
   // Was declared on the input type and never taken out of it.
@@ -131,16 +167,29 @@ export function calculateCartTotals({
           zonesOverride
         );
   const delivery = deliveryQuote.delivery;
+  // Matched from the shop's list, so an id nobody offers prices nothing
+  // rather than throwing — an order is not the place to discover a stale
+  // draft names a tier that was deleted while the customer was typing.
+  const tier =
+    deliveryTierId && items.length > 0
+      ? commerce.deliveryTiers?.find((entry) => entry.id === deliveryTierId)
+      : undefined;
+  const deliveryTierFee = tier?.fee ?? 0;
   const { taxableAmount, tax, platformCharge, taxRate } = computeTaxAmount(commerce, {
     subtotal,
     discount,
-    delivery,
+    // The surcharge IS delivery as far as tax is concerned — it is the same
+    // supply, charged faster.
+    delivery: delivery + deliveryTierFee,
     // Gift wrap is part of the supply being taxed. It used to be added to the
     // total after tax and left out of the base entirely.
     giftWrapFee,
     currency: resolveCurrency(currencyOverride),
   });
-  const total = Math.max(subtotal - discount + delivery + tax + platformCharge + giftWrapFee, 0);
+  const total = Math.max(
+    subtotal - discount + delivery + deliveryTierFee + tax + platformCharge + giftWrapFee,
+    0,
+  );
 
   return {
     subtotal,
@@ -149,6 +198,8 @@ export function calculateCartTotals({
     discount,
     platformCharge,
     giftWrapFee,
+    deliveryTierFee,
+    deliveryTierLabel: tier?.label,
     taxableAmount,
     // Recorded WITH the amount, so the document can state the rate it was
     // actually charged at instead of reading back whatever the shop charges

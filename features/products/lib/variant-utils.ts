@@ -1,9 +1,9 @@
 import type {
   Product,
+  ProductBlockRender,
   ProductVariantGroup,
   ProductVariantGroupType,
   ProductVariantOption,
-  VariantOptionSemantic,
 } from "@/types/product";
 import type { LandingProduct } from "@/constants/landing-data";
 
@@ -11,46 +11,27 @@ export function createVariantOption(
   label: string,
   priceAdjustment = 0,
   isDefault = false,
-  semantic?: VariantOptionSemantic
 ): ProductVariantOption {
   return {
     id: `opt-${crypto.randomUUID().slice(0, 8)}`,
     label,
-    ...(semantic ? { semantic } : {}),
     priceAdjustment,
     isDefault,
   };
 }
 
-/**
- * One-time migration for options stored before `semantic` existed.
- *
- * This is the ONLY place a label may be inspected, and only to upgrade legacy
- * records. New code must read `option.semantic`.
- */
-function backfillSemantic(
-  option: ProductVariantOption,
-  groupType: ProductVariantGroupType
-): ProductVariantOption {
-  if (option.semantic) return option;
+/*
+  `backfillSemantic` and `backfillLegacyGroups` stood here: a one-time
+  migration that read an option's LABEL — the only place in the codebase
+  allowed to — so that options stored before `semantic` existed could be
+  upgraded to carry one.
 
-  const label = option.label.toLowerCase();
-  if (groupType === "egg" && label.includes("eggless")) {
-    return { ...option, semantic: "eggless" };
-  }
-  if (groupType === "photo" && label.includes("photo")) {
-    return { ...option, semantic: "photo-print" };
-  }
-  return option;
-}
-
-/** Upgrade stored groups to carry explicit semantics. Idempotent. */
-export function backfillLegacyGroups(groups: ProductVariantGroup[]): ProductVariantGroup[] {
-  return groups.map((group) => ({
-    ...group,
-    options: group.options.map((option) => backfillSemantic(option, group.type)),
-  }));
-}
+  There are no semantics left to backfill. Both values were bakery special
+  cases and both have gone, so an option is what its label and its price say
+  and nothing more. Stored options keep whatever `semantic` key they were
+  saved with; nothing reads it, and Mongoose keeps it because `variantGroups`
+  is Mixed.
+*/
 
 export function createVariantGroup(
   name: string,
@@ -58,55 +39,42 @@ export function createVariantGroup(
   options: ProductVariantOption[],
   required = true
 ): ProductVariantGroup {
-  const normalizedOptions =
-    options.length > 0 && !options.some((option) => option.isDefault)
-      ? options.map((option, index) => ({ ...option, isDefault: index === 0 }))
-      : options;
+  /*
+    NO DEFAULT IS INVENTED HERE ANY MORE.
+    
+    This promoted the first option whenever none was marked, which made every
+    group mandatory the moment it was created — the admin could add “Eggless
+    +₹80” and the page would charge for it before anybody ticked anything.
+    Both callers pass what they mean: the seeded egg and photo groups name
+    their default explicitly, and a group added by hand starts as an add-on.
+  */
 
   return {
     id: `group-${crypto.randomUUID().slice(0, 8)}`,
     name,
     type,
     required,
-    options: normalizedOptions,
+    options,
   };
 }
 
-export function createDefaultVariantGroups(input?: {
-  isEggless?: boolean;
-  isPhotoCake?: boolean;
-}): ProductVariantGroup[] {
-  const groups: ProductVariantGroup[] = [
-    createVariantGroup(
-      "Egg preference",
-      "egg",
-      [
-        createVariantOption("Regular", 0, !input?.isEggless),
-        createVariantOption("Eggless", 80, Boolean(input?.isEggless), "eggless"),
-      ]
-    ),
-  ];
-
-  if (input?.isPhotoCake) {
-    groups.push(
-      createVariantGroup(
-        "Photo cake",
-        "photo",
-        [
-          createVariantOption("Standard design", 0, true),
-          createVariantOption("Custom photo print", 250, false, "photo-print"),
-        ],
-        false
-      )
-    );
-  }
-
-  return groups;
-}
+/**
+ * The groups a brand-new product starts with.
+ *
+ * It used to open with an "Egg preference" row on every product a shop ever
+ * created — a bakery question asked of a charger, and a special case in the
+ * type system to carry it. A shop that wants to offer eggless makes an
+ * ordinary option named Eggless and prices it; the page renders any two-option
+ * group as a single tickbox already.
+ *
+ * So this now starts EMPTY unless a photo print was asked for.
+ */
 
 /**
  * The variant groups a storefront product is actually sold in: the ones the
- * merchant configured, or the shipped defaults.
+ * merchant configured, and only those. It no longer falls back to shipped
+ * defaults — see the note below on why that fallback was both wrong and a
+ * TypeError waiting to happen.
  *
  * This used to live at apps/website/lib/product-details.ts, next to the gallery
  * and badge formatters, because the product page was the first thing that had
@@ -117,35 +85,66 @@ export function createDefaultVariantGroups(input?: {
  * layer, and no other storefront could reuse the pricing at all.
  *
  * Not the same function as normalizeVariantGroups below, despite the shape.
- * That one runs backfillLegacyGroups and forces isDefault, and takes photo-ness
- * straight off Product.isPhotoCake; this one does neither and DERIVES photo-ness
- * from allowsPhotoUpload or the category name. They disagree on the pricing
- * path, so folding them together would change what customers are charged.
+ * That one forces isDefault; this one does not.
+ * Keep them separate — they sit on different paths and have disagreed before.
+ *
+ * IT NO LONGER INVENTS GROUPS FOR A PRODUCT THAT HAS NONE, for two reasons.
+ *
+ * The first is the point of the change: a shop selling a phone charger was
+ * handed an "Egg preference" group (Regular / Eggless +80) it never configured,
+ * on the picker, in the price, and on the order line. A product's options are
+ * the merchant's to declare; absent is a valid answer.
+ *
+ * The second is a latent crash this fallback was hiding. It read
+ * `cake.category`, but the pricing path calls this with a repository `Product`,
+ * which declares `categoryId` and has no `category` at all — so the branch was
+ * a TypeError waiting for the first product to arrive without stored groups,
+ * and `/api/checkout/quote` would have answered 500 rather than a clean 409.
+ * Every pricing fixture in the suite set `category` by hand, so nothing caught
+ * it. `tests/domain/a-product-that-is-not-a-cake.test.ts` now reproduces it.
+ *
+ * Verified against this shop's own data before changing: all 29 products carry
+ * stored `variantGroups`, so no live product's price moves.
  */
 export function getProductVariantGroups(cake: LandingProduct): ProductVariantGroup[] {
-  if (cake.variantGroups?.length) return cake.variantGroups;
-
-  return createDefaultVariantGroups({
-    isEggless: cake.isEggless,
-    isPhotoCake:
-      cake.allowsPhotoUpload === true || cake.category.toLowerCase().includes("photo"),
-  });
+  return cake.variantGroups ?? [];
 }
 
-export function normalizeVariantGroups(cake: Pick<Product, "variantGroups" | "isEggless" | "isPhotoCake">): ProductVariantGroup[] {
-  if (cake.variantGroups?.length) {
-    return backfillLegacyGroups(cake.variantGroups).map((group) => ({
+/**
+ * Stored groups, made safe to read — never invented ones.
+ *
+ * This runs on EVERY repository read (`normalizeCommerceFields`), so its old
+ * fallback is what put an "Egg preference" group on every product in the shop
+ * that had not configured its own, whatever that product was. The merchant
+ * declares a product's options; no options is a valid answer, and there is no
+ * longer any function that builds one nobody asked for — the two it used to
+ * build, egg preference and photo cake, were both bakery special cases.
+ */
+export function normalizeVariantGroups(cake: Pick<Product, "variantGroups">): ProductVariantGroup[] {
+  if (!cake.variantGroups?.length) return [];
+
+  return cake.variantGroups.map((group) => {
+    /**
+     * "First option wins" is a fallback for a group that names no default —
+     * not a vote each option casts on its own.
+     *
+     * This was `option.isDefault ?? index === 0` evaluated per option, so a
+     * group whose SECOND option was explicitly the default, and whose first
+     * simply omitted the key, came back with TWO options marked default. Every
+     * consumer resolves with `.find(o => o.isDefault)`, which returns the
+     * first — so the merchant's chosen default was silently replaced by the
+     * one above it, in the picker and in `calculateVariantAdjustment`, which
+     * is what a line is charged when the customer sends no selection.
+     */
+    const named = group.options.some((option) => option.isDefault);
+
+    return {
       ...group,
       options: group.options.map((option, index) => ({
         ...option,
-        isDefault: option.isDefault ?? index === 0,
+        isDefault: option.isDefault ?? (!named && index === 0),
       })),
-    }));
-  }
-
-  return createDefaultVariantGroups({
-    isEggless: cake.isEggless,
-    isPhotoCake: cake.isPhotoCake,
+    };
   });
 }
 
@@ -155,8 +154,21 @@ export function getDefaultVariantSelections(
   const selections: Record<string, string> = {};
 
   for (const group of groups) {
-    const defaultOption =
-      group.options.find((option) => option.isDefault) ?? group.options[0];
+    /**
+     * A group that names NO default starts with nothing selected.
+     *
+     * This fell back to the first option, so every group was always answered
+     * and always charged — which made an opt-in impossible to express. A shop
+     * adding one option, “Eggless +₹80”, and leaving Default clear means
+     * exactly what it looks like: the customer does not have it until they
+     * ask for it.
+     *
+     * Legacy data is unaffected. `normalizeVariantGroups` still marks the
+     * first option of a group whose options carry no `isDefault` KEY AT ALL,
+     * which is what an import or a pre-`createVariantOption` row looks like —
+     * so those keep the option they have always been charged for.
+     */
+    const defaultOption = group.options.find((option) => option.isDefault);
     if (defaultOption) {
       selections[group.id] = defaultOption.id;
     }
@@ -191,15 +203,287 @@ export function getVariantOption(
  * this reason: "an order line must not record a choice the customer was never
  * shown". These two were the ones left.
  */
+/**
+ * A group that is really a yes-or-no, or null.
+ *
+ * Two options, exactly one of which costs nothing and is the default. That is
+ * an ADD-ON — “make it eggless”, “make it a heart” — and a tick says it in one
+ * line where a titled row of two buttons needed three.
+ *
+ * Read off the data, not the group’s name: naming it “Eggless” is the shop’s
+ * business, and a rule keyed on that would break the moment somebody wrote
+ * “Egg preference”. A three-way choice stays buttons, because it is one.
+ *
+ * Here rather than inside the product page because it is a rule about VARIANT
+ * DATA, like every other function in this file, and the cart has to reach the
+ * same verdict about the same group.
+ */
+/**
+ * A legacy flat value — a `shape`, a `flavour` — matched onto a real option.
+ *
+ * `shapes: string[]` and `flavourOptions: string[]` were unpriced lists of
+ * names with their own hard-coded pickers; both are variant groups now. Two
+ * kinds of line still carry the old flat field: one built by Reorder from an
+ * order placed before the change, and one sitting in a browser’s localStorage
+ * cart from before the deploy — carts have no expiry, so those keep arriving.
+ *
+ * Returns null where there is nothing to map, which is the signal to LEAVE the
+ * old value alone: a shape or flavour the group cannot answer for is the
+ * customer’s own word, and deleting it bakes the default with no record that
+ * somebody asked for something else.
+ *
+ * Shared by the server pricing and the product page’s edit restore, because a
+ * line has to mean the same thing on both.
+ */
+export function mapLegacyChoice(
+  group: ProductVariantGroup | undefined,
+  value: string | undefined,
+  carried: Record<string, string>,
+): { groupId: string; optionId: string } | null {
+  const wanted = typeof value === "string" ? value.trim() : "";
+  // A real selection always wins: a line from AFTER the change carries one, and
+  // the legacy field must not override it.
+  if (!group || !wanted || carried[group.id]) return null;
+
+  const option = group.options.find(
+    (candidate) => candidate.label.trim().toLowerCase() === wanted.toLowerCase(),
+  );
+  return option ? { groupId: group.id, optionId: option.id } : null;
+}
+
+export function asAddOn(
+  group: ProductVariantGroup,
+): { off: ProductVariantOption | null; on: ProductVariantOption; extra: number } | null {
+  /**
+   * ONE OPTION AND NO DEFAULT is the plainest add-on there is.
+   *
+   * A shop types “Eggless”, puts ₹80 beside it, and leaves Default clear. The
+   * customer either wants it or does not; there is no second option because
+   * not-wanting-it is not a thing the shop sells. Unticked selects nothing at
+   * all and costs nothing, which is what `getDefaultVariantSelections` and
+   * `calculateVariantAdjustment` now mean by an unanswered group.
+   *
+   * One option WITH a default is not this. That is a fact about the product —
+   * it comes this way — and a box the customer cannot untick is not a choice.
+   */
+  if (group.options.length === 1) {
+    const only = group.options[0];
+    if (!only || only.isDefault) return null;
+    return { off: null, on: only, extra: only.priceAdjustment };
+  }
+
+  if (group.options.length !== 2) return null;
+
+  /**
+   * The OFF state is the group’s default, whatever it costs.
+   *
+   * This looked for an option priced at exactly zero and refused everything
+   * else — so a shop whose base option carries a small charge of its own
+   * (“Regular +₹3”, “Eggless +₹80”) got two buttons and a heading for what is
+   * plainly one yes-or-no question. Nothing about a tick needs the unticked
+   * side to be free; it needs to be what the customer gets by not ticking,
+   * which is the default and only the default.
+   */
+  const off = group.options.find((option) => option.isDefault) ?? group.options[0];
+  const on = group.options.find((option) => option !== off);
+  if (!on) return null;
+
+  /**
+   * What ticking actually ADDS — the difference, not the raw adjustment.
+   *
+   * With a default of +₹3 and an upgrade of +₹80 the box must say +₹77: the
+   * ₹3 is already inside the price shown above it, so printing +₹80 would
+   * overstate the upgrade by exactly the amount the customer is paying either
+   * way — and the total would then move by less than the label promised.
+   */
+  const extra = on.priceAdjustment - off.priceAdjustment;
+
+  /**
+   * Nothing to upgrade to, or an upgrade that costs less than the default.
+   *
+   * Both sides equal is a choice with no upgrade in it — Round or Square,
+   * neither costing more — and a tick would have to pick one of them to be
+   * “off” with nothing to say why. Cheaper-than-default is worse: the box
+   * would start unticked at the HIGHER price, so the page and the grid card,
+   * which prices each group’s default, would disagree by exactly that much.
+   */
+  if (extra <= 0) return null;
+
+  return { off, on, extra };
+}
+
+/**
+ * The rest of the sentence `asAddOn` starts three comments above.
+ *
+ * It says: “One option WITH a default is not this. That is a fact about the
+ * product — it comes this way — and a box the customer cannot untick is not a
+ * choice.” It then returns null and leaves the group to the picker path, where
+ * it renders as a bold heading over a single already-pressed button. The shop
+ * has been shown, on this page, a control that offers nothing to control.
+ *
+ * A shop describes a cake it only makes eggless by typing one option, Eggless,
+ * and ticking Default. That is not a question; it is the answer, and the
+ * reference storefront prints exactly that: a tick, and the word.
+ *
+ *   ✓ Eggless        ✓ Waterproof        ✓ Ships assembled
+ *
+ * The predicate is the EXACT complement of `asAddOn`'s one-option branch — that
+ * branch returns null precisely when `only.isDefault` is truthy, and its other
+ * branch needs two options — so a group lands in exactly one of the three
+ * buckets by construction rather than by the two of them agreeing to be careful.
+ * `asAddOn` is not touched: it is the fence that keeps a fact out of the tick
+ * path, where a customer could untick something the page called already true.
+ *
+ * Reads the option count, one boolean and whether the label is blank. Nothing
+ * else — not `group.type` (the union is "shape" | "custom" while live rows carry
+ * `egg` and `photo`, so a two-case switch typechecks as exhaustive and is wrong
+ * for most of the catalogue), not the name, not what the label SAYS, and not
+ * `required`, which is documented inert and is true on two live paid opt-ins.
+ */
+export function asStatement(group: ProductVariantGroup): ProductVariantOption | null {
+  if (group.options.length !== 1) return null;
+
+  const only = group.options[0];
+  if (!only?.isDefault) return null;
+  // A tick with nothing after it states nothing — the emptiness guard
+  // `OptionGroup` already applies to a group with no options to show.
+  if (typeof only.label !== "string" || !only.label.trim()) return null;
+
+  return only;
+}
+
+/**
+ * A tickbox the shop ASKED for, which is a slightly wider thing than one we
+ * inferred.
+ *
+ * `asAddOn` refuses a two-option group whose upgrade costs nothing (`extra <= 0`
+ * above), because with no price to tell them apart it cannot know which side is
+ * "off" and picking one would be an invention. When the shop has typed the
+ * answer into the dropdown that reasoning no longer applies to the RENDERING —
+ * "Gift wrap: No / Yes", both free, is a real tickbox — so the refusal is
+ * relaxed here and here only.
+ *
+ * What is NOT relaxed is the off-state. `asAddOn` falls back to `options[0]`
+ * when no default is named, and this change hands the shop arrows that move
+ * `options[0]`. A tick whose unticked meaning depends on array order would
+ * change what it charges when somebody tidies the list, so a declared two-option
+ * tick requires a NAMED default and reports itself unachievable without one.
+ *
+ * Never substituted into the derivation path: doing that would flip every
+ * two-option group in this shop from buttons to ticks on the day it shipped.
+ */
+function asTick(
+  group: ProductVariantGroup,
+): { off: ProductVariantOption | null; on: ProductVariantOption; extra: number } | null {
+  if (group.options.length === 1) {
+    const only = group.options[0];
+    if (!only || only.isDefault) return null;
+    return { off: null, on: only, extra: only.priceAdjustment };
+  }
+
+  if (group.options.length !== 2) return null;
+
+  const off = group.options.find((option) => option.isDefault);
+  if (!off) return null;
+  const on = group.options.find((option) => option.id !== off.id);
+  if (!on) return null;
+
+  const extra = on.priceAdjustment - off.priceAdjustment;
+  // A negative upgrade would start the box unticked at the HIGHER price, so the
+  // page and the grid card — which price each group's default — would disagree
+  // by exactly that much. Free is fine; cheaper-than-default is not.
+  if (extra < 0) return null;
+
+  return { off, on, extra };
+}
+
+/** What the shop typed into the dropdown, if it is a word we know. */
+function requestedBlockRender(group: ProductVariantGroup): ProductBlockRender | null {
+  return group.render === "buttons" || group.render === "checkbox" || group.render === "stated"
+    ? group.render
+    : null;
+}
+
+/**
+ * What a group with no stored answer looks like — the rule the storefront has
+ * always followed, written down.
+ *
+ * This is the whole migration. Every group stored before the dropdown existed
+ * resolves through here and renders exactly as it did yesterday.
+ */
+function deriveBlockRender(group: ProductVariantGroup): ProductBlockRender {
+  if (asStatement(group)) return "stated";
+  if (asAddOn(group)) return "checkbox";
+  return "buttons";
+}
+
+/**
+ * Can this block actually be drawn the way it was asked to be?
+ *
+ * Exported because the admin needs the same answer the storefront uses: an
+ * entry the page would refuse is offered disabled, with the reason, rather than
+ * accepted and then quietly ignored.
+ */
+export function blockRenderIsAchievable(
+  group: ProductVariantGroup,
+  render: ProductBlockRender,
+): boolean {
+  if (render === "stated") return asStatement(group) !== null;
+  if (render === "checkbox") return asTick(group) !== null;
+  // Buttons need something to press. One option is a statement or a tick, never
+  // a choice, and zero options is nothing at all.
+  return group.options.length > 1;
+}
+
+/**
+ * How this block is drawn, and — for a tickbox — the pair it is drawn from.
+ *
+ * ONE call answers both, deliberately. An earlier shape resolved the bucket from
+ * the stored value and the on/off pair from a second function reading the same
+ * group, and the two could disagree: a declared checkbox whose options carry no
+ * default landed in the tick bucket while the pair came back null, and the page
+ * dereferenced it. Carrying the pair out of the same decision makes that
+ * unrepresentable rather than merely tested.
+ *
+ * A request that cannot be honoured falls back to the derivation rather than
+ * rendering something impossible. The form is where the shop is told; a
+ * customer-facing page is not the place to argue with the data.
+ */
+export type ResolvedBlockRender =
+  | { render: "buttons" }
+  | { render: "checkbox"; tick: NonNullable<ReturnType<typeof asTick>> }
+  | { render: "stated"; stated: ProductVariantOption };
+
+export function resolveBlockRender(group: ProductVariantGroup): ResolvedBlockRender {
+  const requested = requestedBlockRender(group);
+  const render =
+    requested && blockRenderIsAchievable(group, requested) ? requested : deriveBlockRender(group);
+
+  if (render === "stated") {
+    const stated = asStatement(group);
+    if (stated) return { render: "stated", stated };
+  }
+  if (render === "checkbox") {
+    // `asTick` for a declared one, `asAddOn` for a derived one — the derivation
+    // must keep its own refusals, or every free two-option group in the shop
+    // becomes a tick.
+    const tick = requested === "checkbox" ? asTick(group) : asAddOn(group);
+    if (tick) return { render: "checkbox", tick };
+  }
+  return { render: "buttons" };
+}
+
 export function variantGroupsEnabledBy(
   groups: ProductVariantGroup[],
-  modules: { eggEggless: boolean; photoCake: boolean },
+  /**
+   * `shape` joined these when the flat `shapes: string[]` became a typed
+   * group. It is REQUIRED rather than optional: this function is the one gate
+   * the storefront, the card projection and the server’s pricing all share, so
+   * a caller that forgot to pass it would price a group the page had hidden.
+   */
+  modules: { shape: boolean },
 ): ProductVariantGroup[] {
-  return groups.filter(
-    (group) =>
-      (group.type !== "egg" || modules.eggEggless) &&
-      (group.type !== "photo" || modules.photoCake),
-  );
+  return groups.filter((group) => group.type !== "shape" || modules.shape);
 }
 
 export function calculateVariantAdjustment(
@@ -208,123 +492,56 @@ export function calculateVariantAdjustment(
 ): number {
   return groups.reduce((total, group) => {
     const optionId = selections[group.id];
+    /**
+     * No selection and no default means NOTHING, not the first option.
+     *
+     * The default is still substituted when there is one — a group the shop
+     * answers on the customer's behalf must be charged whether or not the
+     * browser sent the selection, which is what stops a crafted request
+     * dropping a surcharge. But falling through to `options[0]` charged for a
+     * choice nobody had made and no default claimed.
+     */
     const option =
       group.options.find((item) => item.id === optionId) ??
-      group.options.find((item) => item.isDefault) ??
-      group.options[0];
+      group.options.find((item) => item.isDefault);
 
     return total + (option?.priceAdjustment ?? 0);
   }, 0);
 }
 
-/** Resolve the option a selection points at, falling back to the group default. */
-function resolveSelectedOption(
-  group: ProductVariantGroup,
-  selections: Record<string, string>
-): ProductVariantOption | null {
-  const selectedId = selections[group.id];
-  return (
-    group.options.find((option) => option.id === selectedId) ??
-    group.options.find((option) => option.isDefault) ??
-    group.options[0] ??
-    null
-  );
-}
 
-/** True when the chosen option of this group carries the given meaning. */
-export function isSelectionSemantic(
-  groups: ProductVariantGroup[],
-  groupType: ProductVariantGroupType,
-  semantic: VariantOptionSemantic,
-  selections: Record<string, string>
-): boolean {
-  const group = groups.find((item) => item.type === groupType);
-  if (!group) return false;
-  return resolveSelectedOption(group, selections)?.semantic === semantic;
-}
+/*
+  `isSelectionSemantic` stood here, and its only caller was the egg branch of
+  `syncLegacyFlagsFromVariants` — the one that asked whether the option a
+  customer had landed on MEANT eggless. Nothing asks that any more: a shop
+  that sells an eggless version sells it as an option with a price, and a shop
+  whose product simply is eggless says so in its name.
+*/
 
-/** True when the product offers an option with the given meaning at all. */
-export function offersSemantic(
-  groups: ProductVariantGroup[],
-  semantic: VariantOptionSemantic
-): boolean {
-  return groups.some((group) => group.options.some((option) => option.semantic === semantic));
-}
+/*
+  `offersSemantic` stood here, and one call site left: it asked whether a
+  product offered a paid photo print, which is how `isPhotoCake` was derived.
+  A product that takes a photograph says so with `allowsPhotoUpload` and
+  prices it into its own price — there is no second option to offer.
+*/
 
-/**
- * Move a group's default onto (or off) the option carrying `semantic`.
- *
- * This is what keeps an admin toggle and the variant system in agreement: the
- * toggle expresses intent, and the variant data is updated to match it.
- * Returns the original array when the group or option is absent.
- */
-export function setGroupDefaultBySemantic(
-  groups: ProductVariantGroup[],
-  groupType: ProductVariantGroupType,
-  semantic: VariantOptionSemantic,
-  enabled: boolean
-): ProductVariantGroup[] {
-  const group = groups.find((item) => item.type === groupType);
-  if (!group) return groups;
+/*
+  `setGroupDefaultBySemantic` stood here. Its only caller was the admin's
+  "Eggless" tick, which moved a group's default onto the eggless option so the
+  flag and the variant data could not disagree. Both halves of that pair have
+  gone: the tick, and the flag it kept in step with.
+*/
 
-  const target = enabled
-    ? group.options.find((option) => option.semantic === semantic)
-    : group.options.find((option) => option.semantic !== semantic);
-  if (!target) return groups;
+/*
+  `syncLegacyFlagsFromVariants` stood here, and it derived two flags from what
+  a product's options MEANT: `isEggless` and `isPhotoCake`.
 
-  return groups.map((item) =>
-    item.id === group.id
-      ? {
-          ...item,
-          options: item.options.map((option) => ({
-            ...option,
-            isDefault: option.id === target.id,
-          })),
-        }
-      : item
-  );
-}
-
-/**
- * Derive the legacy product flags from the variant system.
- *
- * The two flags mean different things, which is why they are computed differently:
- *
- * - `isEggless` — the product ITSELF is eggless, i.e. its chosen/default egg
- *   option is the eggless one. A regular cake that merely offers an eggless
- *   upgrade is not an eggless cake.
- * - `isPhotoCake` — the product OFFERS photo printing. The photo group's default
- *   is deliberately "Standard design" (the print is a paid upsell), so deriving
- *   this from the default selection would make it permanently false.
- */
-/**
- * Derive the legacy flags from the variant data — but only where there IS any.
- *
- * `isEggless` was derived unconditionally, so a product with no egg variant
- * group had the tick overwritten with `false` on save: the admin ticked
- * "Eggless", saved, and it came back unticked, with the eggless filter and badge
- * never applying. Most products have no such group.
- *
- * `current` is what the form holds. Where the variants cannot answer, it stands.
- */
-export function syncLegacyFlagsFromVariants(
-  groups: ProductVariantGroup[],
-  selections: Record<string, string>,
-  current?: { isEggless?: boolean; isPhotoCake?: boolean }
-): { isEggless: boolean; isPhotoCake: boolean } {
-  // Groups are addressed by `type`, which is what `isSelectionSemantic` matches
-  // on — not by a `semantic` field, which groups do not carry.
-  const hasEggGroup = groups.some((group) => group.type === "egg");
-
-  return {
-    isEggless: hasEggGroup
-      ? isSelectionSemantic(groups, "egg", "eggless", selections)
-      : (current?.isEggless ?? false),
-    // Photo printing is an offer, not a selection: if no group offers it, the
-    // admin's own tick is the only statement there is.
-    isPhotoCake: offersSemantic(groups, "photo-print") || (current?.isPhotoCake ?? false),
-  };
-}
+  Both are gone, and the last one for the reason the shop gave: if a product
+  takes a photograph, it takes one — there is no second, dearer version to
+  choose between, and the price of printing is part of the price of the thing.
+  `allowsPhotoUpload` is the whole statement, and an admin tick is the only
+  place it can come from.
+*/
 
 export function formatPreparationTime(minutes?: number): string | null {
   if (!minutes || minutes <= 0) return null;

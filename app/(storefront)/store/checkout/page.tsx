@@ -6,7 +6,7 @@ import { getStorefrontChrome } from "@/apps/website/lib/storefront-chrome.server
 
 export const metadata: Metadata = {
   title: "Checkout",
-  description: "Complete your bakery order checkout.",
+  description: "Complete your order checkout.",
 };
 
 export default async function Page() {

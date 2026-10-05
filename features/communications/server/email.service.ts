@@ -44,17 +44,29 @@ export type EmailTemplateSlug =
  * anything pointing at the template page.
  */
 const FALLBACKS: Record<EmailTemplateSlug, { subject: string; body: string }> = {
+  /**
+   * The customer's copy has to name what they bought.
+   *
+   * This listed a total, a payment method and a date and no product at all,
+   * while `admin_new_order` below has carried `{{order_items}}` all along — the
+   * shop knew what the order was and the customer's own record did not. The
+   * seeded template was given the items; this was missed, and this is what
+   * actually sends whenever the stored row is paused, drafted, deleted, or the
+   * template read throws — `findTemplate` counts only `status: "active"`, and
+   * `sendTemplatedEmail` resolves `stored ?? FALLBACKS[slug]`.
+   */
   order_confirmation: {
     subject: "Order {{order_number}} confirmed",
     body:
       "Hi {{customer_name}},\n\nThank you for your order {{order_number}}.\n\n" +
+      "Items:\n{{order_items}}\n\n" +
       "Order total: {{order_total}}\nPayment: {{payment_method}}\n" +
       "Delivery: {{delivery_date}}\n\n— {{store_name}}",
   },
   order_shipped: {
     subject: "Your order {{order_number}} is on the way",
     body:
-      "Hi {{customer_name}},\n\nOrder {{order_number}} has left the bakery and is " +
+      "Hi {{customer_name}},\n\nOrder {{order_number}} has left our store and is " +
       "out for delivery.\n\nExpected: {{delivery_date}}\nAddress: {{delivery_address}}\n\n" +
       "Need help? Call {{store_phone}}\n\n— {{store_name}}",
   },
@@ -202,7 +214,7 @@ export function toEmailHtml(text: string, preheader?: string): string {
  * so customers received "Need help? Call {{store_phone}}".
  */
 async function storeIdentity(): Promise<Record<string, string>> {
-  const fallback = { store_name: "Our bakery", store_phone: "", store_email: "" };
+  const fallback = { store_name: "Our store", store_phone: "", store_email: "" };
   try {
     const settings = (await getSettings()) as {
       general?: GeneralSettings;

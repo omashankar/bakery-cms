@@ -16,6 +16,18 @@ export function AdminPage({ children, className }: AdminPageProps) {
 interface AdminPageHeaderProps {
   title: string;
   description?: string;
+  /**
+   * What the page currently SAYS — a value readout, not an explanation.
+   *
+   * Ten settings screens spent the description on one of these:
+   * `description={ready ? "3 of 4 integrations configured" : "Tracking IDs
+   * for analytics and marketing pixels."}`. The sentence saying what the
+   * page is FOR was rendered only until the settings read landed — so the
+   * one person who needed it, someone opening the screen for the first
+   * time, never got to read it. Both belong on the page: the explanation
+   * stays put, the readout sits under it.
+   */
+  status?: string;
   actions?: React.ReactNode;
   eyebrow?: string;
   className?: string;
@@ -25,6 +37,7 @@ interface AdminPageHeaderProps {
 export function AdminPageHeader({
   title,
   description,
+  status,
   actions,
   eyebrow,
   className,
@@ -45,6 +58,9 @@ export function AdminPageHeader({
         <h1 className="font-heading text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
         {description ? (
           <p className="max-w-2xl text-sm text-muted-foreground">{description}</p>
+        ) : null}
+        {status ? (
+          <p className="text-xs font-medium text-muted-foreground/80 tabular-nums">{status}</p>
         ) : null}
       </div>
       {actions ? (

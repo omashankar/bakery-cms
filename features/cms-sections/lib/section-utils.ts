@@ -1,4 +1,61 @@
 
+import type {
+  HeroCopySide,
+  HomepageSectionInstance,
+  SectionAlign,
+} from "@/types/homepage-builder";
+
+/**
+ * Which half of the picture the words sit in — LEFT unless the shop said right.
+ *
+ * An unrecognised value is not a request for something else, and every section
+ * stored before this key existed has no value at all.
+ */
+export function heroCopySideOf(
+  content: HomepageSectionInstance["content"],
+): HeroCopySide {
+  return content.copySide === "right" ? "right" : "left";
+}
+
+/**
+ * Which edge the shop asked this heading to sit against.
+ *
+ * THE FALLBACK IS THE CALLER'S, and that is the whole reason this takes
+ * one. Eleven section types draw their heading left and twelve draw it
+ * centred; every layout published before this key existed carries no
+ * `align` at all, so the fallback is not an edge case — it is what every
+ * band on every live page is using. A default baked in here would move
+ * eleven of them.
+ *
+ * An unrecognised value is not a request for something else.
+ */
+export function sectionAlignOf(
+  content: HomepageSectionInstance["content"],
+  fallback: SectionAlign,
+): SectionAlign {
+  const value = content.align;
+  return value === "left" || value === "center" || value === "right"
+    ? value
+    : fallback;
+}
+
+/**
+ * The slides worth drawing: the ones that have a picture.
+ *
+ * A hero slide IS its picture — drawn edge to edge with the words laid over
+ * it — so one with no image is a blank band the height of the hero, and the
+ * arrows and dots would still count it. Dropped instead.
+ *
+ * This used to take the layout as well, because the hero the shop could also
+ * choose was words in a column beside a frame, and there a slide with no
+ * picture was still worth drawing. That hero is gone.
+ */
+export function heroSlidesFor<T extends { headline: string; imageUrl: string }>(
+  slides: readonly T[],
+): T[] {
+  return slides.filter((slide) => Boolean(slide.imageUrl));
+}
+
 export function sortSections<T extends { order: number }>(sections: T[]): T[] {
   return [...sections]
     .sort((a, b) => a.order - b.order)

@@ -29,8 +29,8 @@ export type { ApplyAppearanceOptions };
 export const appearancePresets: AppearancePresetDefinition[] = [
   {
     id: "classic",
-    name: "Classic Bakery",
-    description: "Brown primary, cream surfaces, minimal gold accent.",
+    name: "Classic Cream",
+    description: "Warm brown primary, cream surfaces, a soft gold accent.",
     primaryColor: "#6f4e37",
     accentColor: "#d4a373",
     surfaceColor: "#faf8f4",
@@ -53,6 +53,62 @@ export const appearancePresets: AppearancePresetDefinition[] = [
     accentColor: "#d4a373",
     surfaceColor: "#fdf8f6",
     swatches: ["#7a4a3a", "#d4a373", "#fdf8f6", "#ffffff"],
+  },
+  /*
+    NOT BROWN, which is the whole reason these five are here.
+
+    Every primary is dark enough that `readableInkOn` answers white and the
+    button clears 4.5:1 with room to spare — measured, lowest is 7.3:1
+    across all eight — and every surface is light, because the storefront is
+    light-only and the Appearance screen says so.
+
+    Named for the colour, never for a trade: a shop that sells flowers
+    should not have to read past three kinds of cake to find its palette.
+  */
+  {
+    id: "ink",
+    name: "Ink",
+    description: "Deep navy with a muted gold accent on cool white.",
+    primaryColor: "#1f2a44",
+    accentColor: "#c8a04a",
+    surfaceColor: "#f5f7fa",
+    swatches: ["#1f2a44", "#c8a04a", "#f5f7fa", "#ffffff"],
+  },
+  {
+    id: "forest",
+    name: "Forest",
+    description: "Deep green with a warm amber accent on a soft green white.",
+    primaryColor: "#24543f",
+    accentColor: "#d99a3e",
+    surfaceColor: "#f3f8f4",
+    swatches: ["#24543f", "#d99a3e", "#f3f8f4", "#ffffff"],
+  },
+  {
+    id: "plum",
+    name: "Plum",
+    description: "Deep purple with a dusty rose accent on a pale blush.",
+    primaryColor: "#5b2e59",
+    accentColor: "#c97b9c",
+    surfaceColor: "#f8f3f7",
+    swatches: ["#5b2e59", "#c97b9c", "#f8f3f7", "#ffffff"],
+  },
+  {
+    id: "teal",
+    name: "Teal",
+    description: "Deep teal with a bright orange accent on a cool white.",
+    primaryColor: "#0f4c5c",
+    accentColor: "#e36414",
+    surfaceColor: "#f1f6f8",
+    swatches: ["#0f4c5c", "#e36414", "#f1f6f8", "#ffffff"],
+  },
+  {
+    id: "slate",
+    name: "Slate",
+    description: "Neutral grey-blue with a soft green accent. The quietest of these.",
+    primaryColor: "#33404d",
+    accentColor: "#5b8c85",
+    surfaceColor: "#f6f7f8",
+    swatches: ["#33404d", "#5b8c85", "#f6f7f8", "#ffffff"],
   },
 ];
 
@@ -133,40 +189,27 @@ export function applyAppearanceSettingsTo(
   }
 }
 
+/**
+ * Put every token this palette can write back to the stylesheet's own value.
+ *
+ * THE LIST IS ASKED FOR, NOT WRITTEN DOWN. It used to be twenty-eight names
+ * copied out by hand, which is a second copy of the token map with nothing
+ * holding the two in step: a token added to the generator and not to this
+ * array is a token Reset leaves painted on the page for the rest of the
+ * session, and the failure is silent — the shop presses Reset, most of the
+ * colours go back, and the ones that stay look like the stylesheet's.
+ *
+ * Asking the generator for the names cannot drift, because it IS the names.
+ * The default settings are only a vehicle for the keys; the values are
+ * discarded, and `removeProperty` uncovers whatever the stylesheet says.
+ */
 export function clearAppearanceOverrides(): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
-  const keys = [
-    "--brand-primary",
-    "--bakery-700",
-    "--bakery-600",
-    "--bakery-500",
-    "--bakery-800",
-    "--bakery-900",
-    "--brand-accent",
-    "--gold-300",
-    "--gold-400",
-    "--gold-500",
-    "--surface-cream",
-    "--cream-50",
-    "--cream-100",
-    "--cream-200",
-    "--beige",
-    "--radius",
-    "--primary",
-    "--primary-foreground",
-    "--sidebar-primary",
-    "--sidebar-primary-foreground",
-    "--ring",
-    "--sidebar-ring",
-    "--secondary",
-    "--secondary-foreground",
-    "--muted",
-    "--accent",
-    "--accent-foreground",
-    "--sidebar",
-  ];
-  keys.forEach((key) => root.style.removeProperty(key));
+
+  for (const key of Object.keys(appearanceCssVariables(defaultAppearanceSettings))) {
+    root.style.removeProperty(key);
+  }
 }
 
 export function notifyAppearanceUpdated(): void {

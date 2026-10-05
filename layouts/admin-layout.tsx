@@ -1,5 +1,6 @@
 "use client";
 
+import { safeSetItem } from "@/lib/safe-storage";
 import { useEffect, useId, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
@@ -122,9 +123,8 @@ export function AdminLayoutShell({ children, className }: AdminLayoutShellProps)
    */
   const backgroundDataReady = useIdle(1000);
   const pathname = usePathname();
-  const isBuilder =
-    pathname === routes.admin.builders.homepage ||
-    pathname === routes.admin.builders.wedding;
+  // One builder now; the wedding one was removed along with the page it published.
+  const isBuilder = pathname === routes.admin.builders.homepage;
   const mobileNavId = useId();
   // Must match the server render. The persisted preference is applied after
   // mount (below) — reading localStorage during the first render would disagree
@@ -167,7 +167,7 @@ export function AdminLayoutShell({ children, className }: AdminLayoutShellProps)
   useEffect(() => {
     if (!hydrated) return;
     try {
-      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(collapsed));
+      safeSetItem(SIDEBAR_COLLAPSED_KEY, String(collapsed));
     } catch {
       // ignore storage errors
     }

@@ -2,16 +2,45 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Bookmark, Heart, Lock, ShoppingBag, Trash2 } from "lucide-react";
+import {
+  Bookmark,
+  Heart,
+  Pencil,
+  ShieldCheck,
+  ShoppingBag,
+  Tag,
+  Trash2,
+  Truck,
+} from "lucide-react";
 import { toast } from "sonner";
+import {
+  DELIVERY_LOCATION_UPDATED_EVENT,
+  readDeliveryLocation,
+} from "@/features/commerce/lib/delivery-location";
 import { EmptyState } from "@/components/shared/empty-state";
 import { QuantityStepper } from "@/components/shared/quantity-stepper";
+import { FrameThumbnail } from "@/components/storefront/frame-thumbnail";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { CheckoutProgress } from "@/apps/website/checkout/components/checkout-progress";
+import { CouponInput } from "@/apps/website/checkout/components/coupon-input";
+import { applyCouponCode, type AppliedCoupon } from "@/features/orders/lib/coupons";
+import { offersForCart } from "@/features/commerce/lib/coupon-offers";
+import {
+  getActiveCoupons,
+  type StoredCoupon,
+} from "@/features/commerce/lib/coupons-repository";
+import { getFreeDeliveryThreshold } from "@/features/orders/lib/cart-totals";
+import { getDeliveryPromise } from "@/apps/website/lib/product-details";
+import { getCheckoutDraft, saveCheckoutDraft } from "@/features/orders/lib/checkout-draft";
 import { OrderSummaryPanel } from "@/apps/website/checkout/components/order-summary-panel";
-import { calculateCartTotals } from "@/features/orders/lib/cart-totals";
+import { calculateCartTotals, compareAtSavings } from "@/features/orders/lib/cart-totals";
+import {
+  validateCartAgainstCatalog,
+  type CartIssue,
+} from "@/features/orders/lib/cart-validation";
 import { ProductRailSection } from "@/apps/website/components/product-rail-section";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
@@ -22,9 +51,11 @@ import {
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import {
   addToCart,
+  cartLineToAddInput,
   CART_PREFERENCES_UPDATED_EVENT,
   getCartPreferences,
   getCartItems,
+  cartLineChoices,
   moveCartItemToSavedForLater,
   removeCartItem,
   restoreSavedItemToCart,
@@ -39,13 +70,15 @@ import {
   removeSavedForLaterItem,
   SAVED_FOR_LATER_UPDATED_EVENT,
 } from "@/features/cart/lib/saved-for-later";
-import { getRecentlyViewedProducts } from "@/apps/website/lib/recently-viewed";
+import { getRecentlyViewedProducts } from "@/features/products/lib/recently-viewed";
 import { addToWishlist } from "@/apps/website/lib/wishlist";
 import { hasCustomerSession } from "@/apps/website/account/lib/customer-session";
 import { openCustomerAuthModal } from "@/apps/website/account/components/customer-auth-modal";
 import { routes } from "@/constants/routes";
+import { storefrontHeading } from "@/constants/typography";
 import { layoutSpacing } from "@/constants/spacing";
 import { formatCurrency } from "@/utils/format";
+import { cn } from "@/lib/utils";
 import type { LandingProduct } from "@/constants/landing-data";
 
 interface CartPageProps {
@@ -63,6 +96,24 @@ export function CartPage({ catalog = [] }: CartPageProps) {
   const [commerce, setCommerce] = useState(defaultCommerceSettings);
   const [loaded, setLoaded] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
+  /**
+   * The coupon, read from the checkout draft rather than a second store.
+   *
+   * There is exactly one place a chosen code lives — the sessionStorage
+   * checkout draft — and checkout already reads and writes it there. A cart
+   * that kept its own copy would be a second source of truth for the one
+   * field on the page that changes what the customer pays.
+   */
+  const [coupon, setCoupon] = useState<AppliedCoupon | undefined>(undefined);
+  /**
+   * The shop's live coupons, read in `refresh` beside every other store.
+   *
+   * Not read during render: `getActiveCoupons` seeds localStorage and fires an
+   * event on a cold cache, and a render that writes is a render that can
+   * schedule its own next one. `refresh` already runs on mount and on every
+   * settings, cart and session event, which is exactly when this can change.
+   */
+  const [liveCoupons, setLiveCoupons] = useState<StoredCoupon[]>([]);
   const labels = useBusinessLabels();
 
   function refresh() {
@@ -71,6 +122,8 @@ export function CartPage({ catalog = [] }: CartPageProps) {
     setPreferences(getCartPreferences());
     setCommerce(getCommerceSettings());
     setSignedIn(hasCustomerSession());
+    setCoupon(getCheckoutDraft().coupon);
+    setLiveCoupons(getActiveCoupons());
   }
 
   useEffect(() => {
@@ -95,14 +148,167 @@ export function CartPage({ catalog = [] }: CartPageProps) {
   }, []);
 
 
-  const totals = useMemo(
-    () =>
+  /**
+   * The same number the navbar badge shows, which is total QUANTITY — two of
+   * one thing is two items to a customer. Counting lines instead would give
+   * the header and the page two different answers about one cart.
+   */
+  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+
+  /**
+   * Lines the shop can no longer fulfil, checked against the catalogue the
+   * SERVER sent.
+   *
+   * `validateCartAgainstCatalog` was written for this and the cart never
+   * called it, so a product deleted or taken out of stock after it was added
+   * sat in the cart looking perfectly orderable until checkout refused it.
+   *
+   * Skipped entirely when the catalogue is empty. Empty means “we were not
+   * told” — the prop defaults to `[]` — and answering that with “nothing you
+   * have is available” would condemn every line in the cart.
+   */
+  const issuesBySlug = useMemo(() => {
+    if (catalog.length === 0) return new Map<string, CartIssue>();
+    return new Map(
+      validateCartAgainstCatalog(items, catalog).map((issue) => [issue.productSlug, issue]),
+    );
+  }, [items, catalog]);
+
+  /**
+   * What the shop says these lines normally cost, less what it is charging.
+   *
+   * Only lines the SHOP gave a compare-at for count — `compareAtPrice` is
+   * absent unless an owner typed one above their own base price. A savings
+   * figure computed from anything else is a claim about the past that nobody
+   * made.
+   */
+  const savings = compareAtSavings(items);
+
+  /**
+   * Re-checked on every render, never trusted as stored.
+   *
+   * A coupon is validated against the cart it was applied to, and carts get
+   * edited: remove a line and a “₹200 off orders over ₹1,500” stops holding.
+   * Carrying the frozen discount would subtract money the shop never agreed
+   * to, and `Math.max(total, 0)` would quietly floor the damage at zero
+   * instead of showing it.
+   */
+  /*
+    A `subtotal` stood here and fed the coupon check and the offer list. Both
+    take the LINES now — a scoped coupon cannot tell plants from cake given one
+    number — and nothing else on this page read it, so it is gone rather than
+    left as the obvious wrong argument for the next person to pass.
+  */
+  /**
+   * The cart as a COUPON sees it: one entry per line, carrying every category
+   * the product is filed under.
+   *
+   * A coupon can be scoped now — "20% off plants" takes 20% of the plants in
+   * this basket and nothing off the cake beside them — and a bare subtotal
+   * cannot express which line is which. The ids come off the catalogue the
+   * server already sent for the stock check above; a line whose product is not
+   * in it gets no categories, so a scoped coupon simply will not match it.
+   */
+  const couponLines = useMemo(() => {
+    const bySlug = new Map(catalog.map((product) => [product.slug, product.categoryIds ?? []]));
+    return items.map((item) => ({
+      productSlug: item.productSlug,
+      categoryIds: bySlug.get(item.productSlug) ?? [],
+      price: item.price,
+      quantity: item.quantity,
+    }));
+  }, [items, catalog]);
+  /**
+   * Which outline each line's photograph was fitted to.
+   *
+   * Off the catalogue the server already sends for the stock check, NOT off a
+   * new field on the cart line: a line carries its photo as a URL and nothing
+   * else, and every extra thing it carries has to be threaded by hand through
+   * the quote, the order, the invoice and half a dozen lists between here and
+   * a saved order. A slug and a catalogue answer the same question for free.
+   *
+   * A line whose product is not in the catalogue — or a page that was sent no
+   * catalogue at all — gets `undefined`, which is the round frame every photo
+   * product used before there was a choice.
+   */
+  const frameBySlug = useMemo(
+    () => new Map(catalog.map((product) => [product.slug, product.photoFrameShape])),
+    [catalog],
+  );
+
+  const couponCheck = useMemo(
+    () => (coupon ? applyCouponCode(coupon.code, couponLines) : null),
+    [coupon, couponLines],
+  );
+  const validCoupon = couponCheck?.ok ? couponCheck.coupon : null;
+  const couponLapsedReason = couponCheck && !couponCheck.ok ? couponCheck.message : null;
+
+  function applyCoupon(next: AppliedCoupon | undefined) {
+    setCoupon(next);
+    saveCheckoutDraft({ ...getCheckoutDraft(), coupon: next });
+  }
+
+  /**
+   * Offers this basket has not taken yet, with what each still needs.
+   *
+   * Read from the same coupon store the box below applies from, so the page
+   * cannot advertise a code its own input would refuse. Empty is the common
+   * answer — every coupon this install ships is inactive until an owner turns
+   * it on — and an empty list renders nothing at all.
+   */
+  const offers = useMemo(
+    () => offersForCart(liveCoupons, couponLines, { exclude: coupon?.code }),
+    [liveCoupons, couponLines, coupon?.code],
+  );
+
+  /**
+   * What the shop has actually promised, in its own settings.
+   *
+   * Not a strip of badges. Every row is a value an owner typed or a rule they
+   * configured, and a row with nothing behind it does not render — the product
+   * page’s own trust rows were rewritten to that standard after one of them
+   * printed a fallback as a fact under every product in the shop.
+   */
+  const promise = loaded ? getDeliveryPromise() : "";
+  const freeDeliveryOver = loaded ? getFreeDeliveryThreshold() : 0;
+
+  /**
+   * THE PINCODE THE BUYER ALREADY GAVE THE HEADER.
+   *
+   * Without it the cart prices delivery with no address — no zone can
+   * match, so it uses the flat fallback — while the checkout one click
+   * later prices it against the zone. On a basket under the free-delivery
+   * threshold that moves the Delivery row and the Total while the buyer is
+   * typing their address, with only a zone name in small text to explain
+   * it.
+   *
+   * Read on mount rather than during render, because `readDeliveryLocation`
+   * reads the browser and a render-time call would differ between the
+   * server's HTML and the first client render. The header's button
+   * announces every change on `DELIVERY_LOCATION_UPDATED_EVENT`, and that
+   * button is in the header on this page.
+   */
+  const [deliveryPincode, setDeliveryPincode] = useState("");
+  useEffect(() => {
+    const sync = () => setDeliveryPincode(readDeliveryLocation()?.pincode ?? "");
+    sync();
+    window.addEventListener(DELIVERY_LOCATION_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(DELIVERY_LOCATION_UPDATED_EVENT, sync);
+  }, []);
+
+  const totals = useMemo(    () =>
       calculateCartTotals({
         items,
+        // The discount the coupon is worth for THIS cart, not the one it was
+        // worth when it was applied.
+        discount: validCoupon?.discountAmount ?? 0,
         giftWrap: preferences.giftWrap,
+        // The same basis the checkout uses, so the Delivery row does not
+        // move between the two screens.
+        deliveryAddress: deliveryPincode ? { pincode: deliveryPincode } : undefined,
         commerceOverride: commerce,
       }),
-    [items, preferences.giftWrap, commerce]
+    [items, validCoupon?.discountAmount, preferences.giftWrap, deliveryPincode, commerce]
   );
 
   const recentlyViewed = useMemo(
@@ -132,27 +338,10 @@ export function CartPage({ catalog = [] }: CartPageProps) {
       action: {
         label: "Undo",
         onClick: () => {
-          addToCart({
-            productSlug: item.productSlug,
-            name: item.name,
-            image: item.image,
-            price: item.price,
-            quantity: item.quantity,
-            weight: item.weight,
-            flavour: item.flavour,
-            shape: item.shape,
-            message: item.message,
-            // The uploaded photo, which this rebuild dropped. Undo restored the
-            // line with the cake, the size, the shape and the message, and no
-            // image — so a photo cake was placed and paid for with nothing for
-            // the baker to print. Its sibling `restoreSavedItemToCart` already
-            // carries this field.
-            photoUrl: item.photoUrl,
-            deliveryDate: item.deliveryDate,
-            deliveryTime: item.deliveryTime,
-            variantSelections: item.variantSelections,
-            variantSummary: item.variantSummary,
-          });
+          // Every field, from the one list that has them all. Written out here
+          // by hand, this rebuild dropped the uploaded photo — so a photo cake
+          // came back with nothing for the baker to print.
+          addToCart(cartLineToAddInput(item));
           toast.success("Item restored");
         },
       },
@@ -168,23 +357,23 @@ export function CartPage({ catalog = [] }: CartPageProps) {
   return (
     <>
       <StorePageHeader
-        title="Shopping Cart"
-        description="Review your items, gift options, and saved picks before checkout."
+        title={itemCount > 0 ? `Shopping Cart (${itemCount})` : "Shopping Cart"}
         breadcrumbs={[{ label: "Cart" }]}
       />
 
-      <section className={layoutSpacing.sectionY}>
+      {/* `pb-24` on a phone: the sticky checkout bar sits over the last of it. */}
+      <section className={cn(layoutSpacing.sectionY, "pb-28 lg:pb-16")}>
         <div className={layoutSpacing.container}>
           {!loaded ? (
             // The cart lives in this browser, so the server has nothing to
             // render. Mirror the real layout rather than showing one grey slab,
             // so the page does not visibly jump when the data arrives.
-            <div className="grid gap-8 lg:grid-cols-[1fr_320px]" aria-hidden>
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_320px]" aria-hidden>
               <div className="space-y-4">
                 {[0, 1].map((row) => (
                   <div
                     key={row}
-                    className="flex gap-4 rounded-xl border border-border bg-white p-4"
+                    className="flex gap-4 rounded-xl border border-border bg-card p-4"
                   >
                     <div className="size-20 shrink-0 animate-pulse rounded-lg bg-cream-100" />
                     <div className="flex-1 space-y-2 py-1">
@@ -203,7 +392,7 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                 className="border-border bg-cream-50"
                 icon={ShoppingBag}
                 title="Your cart is empty"
-                description={`Browse our delicious ${labels.productWordPlural.toLowerCase()} and add your favourites.`}
+                description={`Browse our ${labels.productWordPlural.toLowerCase()} and add your favourites.`}
                 action={
                   <Button variant="bakery" render={<Link href={routes.store.collections} />}>
                     {`Browse ${labels.productWordPlural}`}
@@ -226,13 +415,25 @@ export function CartPage({ catalog = [] }: CartPageProps) {
               ) : null}
             </div>
           ) : (
-            <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
+            <div className="space-y-8">
+              {/*
+                The cart IS a step, and the bar that says so started at
+                Delivery — so the screen a customer spends longest on showed no
+                progress, and the first thing the next screen told them was
+                that they were at the beginning.
+
+                Only here, never in the empty branch: a progress bar over an
+                empty cart implies a checkout that is not happening.
+              */}
+              <CheckoutProgress currentStep={0} className="mx-auto max-w-2xl" />
+
+              <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
               <div className="order-1 space-y-6 lg:order-none lg:col-start-1">
                 <div className="space-y-4">
                   {items.map((item) => (
                     <div
                       key={item.id}
-                      className="rounded-xl border border-border bg-white p-4"
+                      className="rounded-xl border border-border bg-card p-4"
                     >
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div className="flex min-w-0 gap-4">
@@ -257,13 +458,38 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                           >
                             {item.name}
                           </Link>
-                          <p className="text-sm text-muted-foreground">
-                            {[item.weight, item.flavour, item.shape].filter(Boolean).join(" · ")}
-                          </p>
-                          {item.variantSummary?.length ? (
-                            <p className="text-sm text-muted-foreground">
-                              {item.variantSummary.join(" · ")}
-                            </p>
+                          {/*
+                            One list, so this cannot drift from the invoice
+                            again — laid out as a grid rather than joined
+                            with dots. Four choices on one line wrap into a
+                            sentence nobody reads; in columns each is a
+                            label and an answer, which is what they are.
+                          */}
+                          {cartLineChoices(item).length > 0 ? (
+                            <dl className="mt-1 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+                              {cartLineChoices(item).map((choice) => {
+                                // Already "Label: Value" where there is a
+                                // label, and a bare stated fact where there
+                                // is not — a tick the shop set, which reads
+                                // as one thing and must not be split.
+                                const at = choice.indexOf(": ");
+                                if (at === -1) {
+                                  return (
+                                    <div key={choice} className="text-muted-foreground">
+                                      {choice}
+                                    </div>
+                                  );
+                                }
+                                return (
+                                  <div key={choice} className="flex gap-2">
+                                    <dt className="text-muted-foreground">
+                                      {choice.slice(0, at)}
+                                    </dt>
+                                    <dd className="font-medium">{choice.slice(at + 2)}</dd>
+                                  </div>
+                                );
+                              })}
+                            </dl>
                           ) : null}
                           {item.message ? (
                             <p className="text-sm text-muted-foreground">
@@ -276,6 +502,28 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                               {item.deliveryTime ? ` · ${item.deliveryTime}` : ""}
                             </p>
                           ) : null}
+                          {/*
+                            The photo the customer uploaded. The line has carried
+                            it since the day photo uploads shipped and no screen
+                            before the invoice ever showed it back — so the one
+                            thing a customer most wants to check before paying was
+                            the one thing they could not.
+                          */}
+                          {item.photoUrl ? (
+                            <span className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
+                              <FrameThumbnail
+                                src={item.photoUrl}
+                                shape={frameBySlug.get(item.productSlug)}
+                                size={40}
+                              />
+                              Your photo, to be printed on it
+                            </span>
+                          ) : null}
+                          {issuesBySlug.get(item.productSlug) ? (
+                            <p className="pt-1 text-xs font-medium text-destructive">
+                              {issuesBySlug.get(item.productSlug)?.message}
+                            </p>
+                          ) : null}
                           </div>
                         </div>
                         <div className="flex flex-wrap items-center justify-between gap-3 sm:justify-end sm:gap-4">
@@ -283,9 +531,34 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                             value={item.quantity}
                             onChange={(value) => updateCartItemQuantity(item.id, value)}
                           />
-                          <p className="font-semibold sm:min-w-20 sm:text-right">
-                            {formatCurrency(item.price * item.quantity)}
-                          </p>
+                          <div className="sm:min-w-28 sm:text-right">
+                            <p className="font-semibold">
+                              {formatCurrency(item.price * item.quantity)}
+                            </p>
+                            {/*
+                              The shop’s own compare-at, stamped on the line when
+                              it was added — the cart holds lines rather than
+                              products, and the catalogue it is handed carries a
+                              price already shifted by every default option, so
+                              recomputing here would strike a different number
+                              from the one the customer was shown.
+                            */}
+                            {item.compareAtPrice && item.compareAtPrice > item.price ? (
+                              <p className="text-xs text-muted-foreground">
+                                <span className="line-through">
+                                  {formatCurrency(item.compareAtPrice * item.quantity)}
+                                </span>{" "}
+                                <span className="font-medium text-bakery-700">
+                                  {Math.round((1 - item.price / item.compareAtPrice) * 100)}% off
+                                </span>
+                              </p>
+                            ) : null}
+                            {item.quantity > 1 ? (
+                              <p className="text-xs text-muted-foreground">
+                                {formatCurrency(item.price)} each
+                              </p>
+                            ) : null}
+                          </div>
                           <Button
                             type="button"
                             variant="ghost"
@@ -298,6 +571,26 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                         </div>
                       </div>
                       <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
+                        {/*
+                          Back to the product page with THIS line’s choices
+                          already made, and adding again replaces it rather than
+                          leaving a near-identical second line behind —
+                          `cartLineId` folds the choices into a line’s identity,
+                          so changing one necessarily makes a new line.
+                        */}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          render={
+                            <Link
+                              href={`${routes.store.cake(item.productSlug)}?line=${encodeURIComponent(item.id)}`}
+                            />
+                          }
+                        >
+                          <Pencil className="size-4" />
+                          Edit
+                        </Button>
                         <Button
                           type="button"
                           variant="outline"
@@ -320,6 +613,40 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                     </div>
                   ))}
                 </div>
+
+                {/*
+                  WHAT THIS BASKET COULD STILL GET, and what it needs.
+
+                  A list of codes on its own is an advertisement. With the
+                  subtotal in hand it is an answer — and the shortfall is the
+                  part that must be said, or a card sends somebody to a
+                  checkout that refuses the code.
+
+                  Nothing renders when the shop has no live coupons, which is
+                  every install until an owner switches one on.
+                */}
+                {offers.length > 0 ? (
+                  <div className="rounded-xl border border-dashed border-bakery-300 bg-card p-4">
+                    <p className="flex items-center gap-2 text-sm font-semibold text-bakery-700">
+                      <Tag className="size-4" />
+                      Offers you can use
+                    </p>
+                    <ul className="mt-2 space-y-1.5 text-sm text-muted-foreground">
+                      {offers.map((offer) => (
+                        <li key={offer.code} className="flex gap-2">
+                          <span aria-hidden className="text-bakery-700">•</span>
+                          <span>
+                            <span className="font-medium text-foreground">{offer.code}</span>{" "}
+                            — {offer.label}
+                            {offer.shortfall > 0
+                              ? ` · add ${formatCurrency(offer.shortfall)} more to use it`
+                              : ""}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
 
                 <div className="rounded-xl border border-border bg-cream-50 p-4">
                   <p className="text-sm font-medium">Order extras</p>
@@ -371,34 +698,142 @@ export function CartPage({ catalog = [] }: CartPageProps) {
               </div>
 
               <div className="order-2 space-y-4 lg:order-none lg:col-start-2 lg:sticky lg:top-24 lg:self-start">
+                {/*
+                  The SAME component checkout uses, writing to the same draft.
+                  A coupon box of its own here would be a second coupon system
+                  on the one screen where the customer decides what to pay.
+                */}
+                <div className="rounded-xl border border-border bg-card p-4">
+                  <p className="mb-3 text-sm font-medium">Have a coupon?</p>
+                  <CouponInput
+                    cart={couponLines}
+                    applied={coupon}
+                    lapsedReason={couponLapsedReason}
+                    onApply={applyCoupon}
+                    onRemove={() => applyCoupon(undefined)}
+                  />
+                </div>
                 <OrderSummaryPanel
                   items={items}
                   totals={totals}
                   showEditLink={false}
                   giftWrapLabel={commerce.giftWrapLabel}
                 />
+                {/*
+                  Only from compare-at prices the SHOP typed. Absent otherwise,
+                  because a saving computed from anything else is a claim about
+                  the past that nobody made — the same rule that had an invented
+                  MRP taken out of the repository.
+                */}
+                {savings > 0 ? (
+                  <p className="text-center text-sm font-medium text-bakery-700">
+                    You save {formatCurrency(savings)} on this order
+                  </p>
+                ) : null}
+                {/*
+                  THE SAME CONTROL, THE SAME SIZE, AS THE THREE STEPS AFTER
+                  THIS ONE — 48px and full width, directly under the totals.
+                  It was 32px, which is under every touch-target floor and
+                  the one place in the purchase where the way on was a
+                  different size from everywhere else.
+
+                  AND IT SAYS WHAT IT DOES. Signed out, this opens a dialog
+                  headed "Sign in" while the label still reads "Proceed to
+                  checkout" — the only hint being a padlock, which the
+                  payment step two screens later uses to mean "256-bit SSL".
+                  One glyph, two meanings, in one flow. Sign-in before
+                  checkout is the shop's decision and stays; the button
+                  naming it is the button describing itself, not a claim
+                  about the shop. The padlock goes with the ambiguity.
+                */}
                 <Button
-                  className="w-full"
+                  className="h-12 w-full text-base"
                   variant="bakery"
                   {...(signedIn
                     ? { render: <Link href={routes.store.checkout} /> }
                     : { onClick: () => openCustomerAuthModal("phone") })}
                 >
-                  {signedIn ? null : <Lock className="size-4" />}
-                  Proceed to checkout
+                  {signedIn ? "Proceed to checkout" : "Sign in to checkout"}
                 </Button>
                 <Button
-                  className="w-full"
+                  className="h-11 w-full"
                   variant="outline"
                   render={<Link href={routes.store.collections} />}
                 >
                   Continue shopping
                 </Button>
+
+                {/*
+                  Only what the shop has actually configured.
+
+                  No badge row of unsupported claims — “6000 cities”, “20M
+                  happy customers” — which is what this space is usually filled
+                  with. The delivery promise is the shop’s own sentence from
+                  its commerce settings, and the threshold is the rule its own
+                  totals apply. Neither is here when it has not been set.
+                */}
+                {promise || freeDeliveryOver > 0 ? (
+                  <ul className="space-y-2 rounded-xl border border-border bg-cream-50 p-3 text-xs text-muted-foreground">
+                    {promise ? (
+                      <li className="flex items-start gap-2">
+                        <Truck className="mt-0.5 size-3.5 shrink-0 text-bakery-700" />
+                        <span>{promise}</span>
+                      </li>
+                    ) : null}
+                    {freeDeliveryOver > 0 ? (
+                      <li className="flex items-start gap-2">
+                        <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-bakery-700" />
+                        <span>
+                          Free delivery on orders over {formatCurrency(freeDeliveryOver)}
+                        </span>
+                      </li>
+                    ) : null}
+                  </ul>
+                ) : null}
+              </div>
               </div>
             </div>
           )}
         </div>
       </section>
+
+      {/*
+        The total and the way forward, always reachable on a phone.
+
+        The summary is `lg:sticky` in the right-hand column, which does nothing
+        below that breakpoint: on a phone it sits at the very bottom, under the
+        lines, the extras, saved-for-later and a rail of recently viewed. A
+        customer scrolling their cart could not see what it came to, or get to
+        checkout, without scrolling to the end of the page.
+
+        Rendered only with a cart to check out, and hidden on lg where the real
+        summary is already pinned. `pb-24` on the section leaves room for it.
+      */}
+      {loaded && items.length > 0 ? (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card p-4 lg:hidden">
+          <div className="mx-auto flex max-w-lg items-center gap-3">
+            <div className="min-w-0">
+              <p className="font-semibold">{formatCurrency(totals.total)}</p>
+              {savings > 0 ? (
+                <p className="truncate text-xs font-medium text-bakery-700">
+                  You save {formatCurrency(savings)}
+                </p>
+              ) : null}
+            </div>
+            {/* The bar and the panel are the same control; they say and
+                measure the same thing. */}
+            <Button
+              className="h-12 flex-1 text-base"
+              variant="bakery"
+              {...(signedIn
+                ? { render: <Link href={routes.store.checkout} /> }
+                : { onClick: () => openCustomerAuthModal("phone") })}
+            >
+              {signedIn ? "Proceed to checkout" : "Sign in to checkout"}
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }
@@ -413,9 +848,9 @@ function SavedForLaterSection({
   onRemove: (savedId: string) => void;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-white p-4">
+    <div className="rounded-xl border border-border bg-card p-4">
       <div className="mb-4">
-        <h2 className="font-heading text-lg font-semibold">Saved for later</h2>
+        <h2 className={storefrontHeading.card}>Saved for later</h2>
         <p className="text-sm text-muted-foreground">
           Items you saved without losing your customization.
         </p>
@@ -428,9 +863,12 @@ function SavedForLaterSection({
           >
             <div className="min-w-0">
               <p className="font-medium">{item.name}</p>
-              <p className="text-sm text-muted-foreground">
-                {[item.weight, item.flavour, item.shape].filter(Boolean).join(" · ")}
-              </p>
+              {/* Saved for later, and it must say the same thing the cart said. */}
+              {cartLineChoices(item).length > 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  {cartLineChoices(item).join(" · ")}
+                </p>
+              ) : null}
               <p className="text-sm font-medium">{formatCurrency(item.price * item.quantity)}</p>
             </div>
             <div className="flex flex-wrap gap-2">

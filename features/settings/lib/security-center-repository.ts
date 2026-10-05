@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import type {
   ActiveSession,
   FailedLoginAttempt,
@@ -29,7 +30,7 @@ function notify(): void {
 
 function persist(state: SecurityCenterState): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  safeSetItem(STORAGE_KEY, JSON.stringify(state));
   notify();
 }
 
@@ -208,7 +209,7 @@ export function recordLoginSuccess(email: string): void {
     devices,
   });
 
-  localStorage.setItem(CURRENT_SESSION_KEY, sessionId);
+  safeSetItem(CURRENT_SESSION_KEY, sessionId);
 }
 
 export function recordFailedLogin(email: string, reason = "Invalid password"): void {

@@ -1,5 +1,6 @@
 "use client";
 
+import { safeSetItem } from "@/lib/safe-storage";
 import {
   PAYMENT_NOTIFICATION_TEMPLATES,
   type NotifChannel,
@@ -35,7 +36,7 @@ async function write(store: PrefStore): Promise<boolean> {
   if (typeof window === "undefined") return false;
 
   const previous = localStorage.getItem(KEY);
-  localStorage.setItem(KEY, JSON.stringify(store));
+  safeSetItem(KEY, JSON.stringify(store));
   // write() is only reached via genuine admin toggles (no seed/load path), so
   // dual-writing to the server here cannot clobber with defaults.
   const persisted = await replacePaymentNotifPrefsRequest(store);
@@ -53,7 +54,7 @@ async function write(store: PrefStore): Promise<boolean> {
     const stillOurs = localStorage.getItem(KEY) === JSON.stringify(store);
     if (stillOurs) {
       if (previous === null) localStorage.removeItem(KEY);
-      else localStorage.setItem(KEY, previous);
+      else safeSetItem(KEY, previous);
     }
   }
 
@@ -64,7 +65,7 @@ async function write(store: PrefStore): Promise<boolean> {
 /** Hydration: apply the server's notification prefs locally (no re-push). */
 export function persistServerNotifPrefs(store: Record<string, unknown>): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(KEY, JSON.stringify(store));
+  safeSetItem(KEY, JSON.stringify(store));
   window.dispatchEvent(new Event(NOTIF_PREFS_UPDATED_EVENT));
 }
 

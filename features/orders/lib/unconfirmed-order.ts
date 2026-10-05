@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import { ORDERS_STORAGE_KEY, type PlacedOrder } from "./orders";
 
 /**
@@ -81,7 +82,7 @@ export function saveUnconfirmedOrder(held: Omit<UnconfirmedOrder, "heldAt">): vo
   const payload = JSON.stringify({ ...held, heldAt: new Date().toISOString() });
 
   try {
-    localStorage.setItem(UNCONFIRMED_ORDER_KEY, payload);
+    safeSetItem(UNCONFIRMED_ORDER_KEY, payload);
   } catch {
     /**
      * This is a record of money that has ALREADY left the customer's account,
@@ -94,7 +95,7 @@ export function saveUnconfirmedOrder(held: Omit<UnconfirmedOrder, "heldAt">): vo
      */
     try {
       localStorage.removeItem(ORDERS_STORAGE_KEY);
-      localStorage.setItem(UNCONFIRMED_ORDER_KEY, payload);
+      safeSetItem(UNCONFIRMED_ORDER_KEY, payload);
     } catch {
       // Storage is refusing everything. The overlay still holds it in React
       // state for this pageview, which is all that is left to offer.

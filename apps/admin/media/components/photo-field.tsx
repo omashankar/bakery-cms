@@ -18,8 +18,29 @@ interface PhotoFieldProps {
   onChange: (value: string) => void;
   /** Placeholder for the URL box, which lives under Advanced. */
   placeholder?: string;
+  /**
+   * The size to export at, shown under the label and left there.
+   *
+   * NOT the `placeholder` above: that one belongs to the URL box folded
+   * away under Advanced, so it is invisible on the path almost everybody
+   * takes — and an input placeholder disappears the moment there is a
+   * value, which is exactly when somebody is checking whether they used
+   * the right picture.
+   */
+  hint?: string;
   /** Shape of the preview. A logo, a banner and a cake are not the same shape. */
   aspect?: "video" | "square" | "wide";
+  /**
+   * Whether the preview may crop what was uploaded.
+   *
+   * It always did, and for most fields that is right: a product photograph
+   * shown in a 16:9 tile is a thumbnail, and the page it appears on crops it
+   * the same way. For a BANNER it is not — the artwork carries its own
+   * headline and button, and "cover" in a 3:1 box hides the parts of a 4.8:1
+   * design that say what it is. An admin cannot check artwork the upload
+   * control will not show them.
+   */
+  fit?: "cover" | "contain";
   /**
    * A validation message from the caller.
    *
@@ -71,7 +92,9 @@ export function PhotoField({
   value,
   onChange,
   placeholder,
+  hint,
   aspect = "video",
+  fit = "cover",
   error,
 }: PhotoFieldProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -114,9 +137,14 @@ export function PhotoField({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <label htmlFor={id} className="text-sm font-medium">
-          {label}
-        </label>
+        <div className="min-w-0">
+          <label htmlFor={id} className="text-sm font-medium">
+            {label}
+          </label>
+          {hint ? (
+            <p className="text-xs text-muted-foreground">{hint}</p>
+          ) : null}
+        </div>
         <button
           type="button"
           className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
@@ -166,7 +194,16 @@ export function PhotoField({
         )}
       >
         {trimmed && !isUploading ? (
-          <SafeImage src={trimmed} alt={label} className="object-cover" />
+          <SafeImage
+            src={trimmed}
+            alt={label}
+            /*
+              SafeImage bakes `object-cover` into its own class list, so this
+              only wins because `cn` runs them through tailwind-merge and the
+              later one takes the conflict.
+            */
+            className={fit === "contain" ? "object-contain" : "object-cover"}
+          />
         ) : null}
 
         {isUploading ? (

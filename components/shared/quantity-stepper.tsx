@@ -23,6 +23,7 @@ export function QuantityStepper({
         type="button"
         variant="ghost"
         size="icon-sm"
+        className="relative after:absolute after:-inset-2 after:content-['']"
         onClick={() => onChange(Math.max(min, value - 1))}
         disabled={value <= min}
         aria-label="Decrease quantity"
@@ -34,6 +35,7 @@ export function QuantityStepper({
         type="button"
         variant="ghost"
         size="icon-sm"
+        className="relative after:absolute after:-inset-2 after:content-['']"
         onClick={() => onChange(Math.min(max, value + 1))}
         disabled={value >= max}
         aria-label="Increase quantity"

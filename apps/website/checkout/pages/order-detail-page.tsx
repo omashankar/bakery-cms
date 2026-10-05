@@ -6,7 +6,6 @@ import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { MapPin, Package, RefreshCw } from "lucide-react";
 import { DeliveryEstimatedCard } from "@/apps/website/checkout/components/delivery-estimated-card";
-import { DeliveryMapPlaceholder } from "@/apps/website/checkout/components/delivery-map-placeholder";
 import { DeliveryPartnerCard } from "@/apps/website/checkout/components/delivery-partner-card";
 import { OrderStatusTimeline } from "@/components/shared/order-status-timeline";
 import { OrderSummaryPanel } from "@/apps/website/checkout/components/order-summary-panel";
@@ -21,10 +20,11 @@ import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
+import { storefrontHeading } from "@/constants/typography";
 import { layoutSpacing } from "@/constants/spacing";
-import { formatCurrency, formatDate } from "@/utils/format";
-import { formatOrderDeliveryDay } from "@/features/orders/lib/delivery-tracking";
+import { formatCurrency } from "@/utils/format";
 import { settledRefundAmount } from "@/features/orders/lib/order-overviews";
+import { formatAddress } from "@/features/orders/lib/address-format";
 
 const paymentLabels = {
   cod: "Cash on Delivery",
@@ -147,6 +147,14 @@ export function OrderDetailPage() {
     () => (order ? getDeliveryTrackingSnapshot(order) : null),
     [order]
   );
+  /**
+   * Whether the right-hand column has anything to hold.
+   *
+   * Only a rider, and only once an admin has assigned one — which is why the
+   * grid below has to stop being a grid when there is none. It used to be
+   * guaranteed content by a fake map.
+   */
+  const hasPartner = Boolean(tracking?.showPartner && tracking?.partner);
 
   if (!ready) {
     return (
@@ -170,7 +178,6 @@ export function OrderDetailPage() {
       <>
         <StorePageHeader
           title="Order Not Found"
-          description="We couldn't find an order with that number."
           breadcrumbs={[
             { label: "Track Order", href: routes.store.orderTrack },
             { label: "Not Found" },
@@ -178,7 +185,7 @@ export function OrderDetailPage() {
         />
         <section className={layoutSpacing.sectionY}>
           <div className={layoutSpacing.containerNarrow}>
-            <div className="rounded-xl border border-border bg-white p-8 text-center">
+            <div className="rounded-xl border border-border bg-card p-8 text-center">
               <p className="text-muted-foreground">
                 Please check the order number, and look it up with the email used to
                 place it.
@@ -197,7 +204,6 @@ export function OrderDetailPage() {
     <>
       <StorePageHeader
         title={`Order ${order.orderNumber}`}
-        description={`Placed on ${formatDate(order.placedAt)}`}
         breadcrumbs={[
           { label: "Track Order", href: routes.store.orderTrack },
           { label: order.orderNumber },
@@ -228,62 +234,60 @@ export function OrderDetailPage() {
             className="mb-8"
           />
 
-          <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
             <div className="space-y-6">
-              <div className="grid gap-6 lg:grid-cols-2">
-                <div className="rounded-xl border border-border bg-white p-6 shadow-sm lg:col-span-1">
+              {/*
+                TWO COLUMNS ONLY WHEN THERE IS SOMETHING FOR THE SECOND.
+
+                The right-hand cell used to hold a fake map, so it always had
+                content. With the map gone its only occupant is the rider card,
+                which renders only once an admin has actually assigned somebody —
+                the common case is nobody. An empty grid item still claims its
+                track, so the timeline would sit squeezed into half the width
+                with a blank space beside it, looking like something failed to
+                load.
+              */}
+              <div className={hasPartner ? "grid gap-6 lg:grid-cols-2" : "space-y-6"}>
+                <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
                   <div className="flex items-center gap-2">
                     <Package className="size-5 text-bakery-700" />
-                    <h2 className="font-heading text-lg font-semibold">Order timeline</h2>
+                    <h2 className={storefrontHeading.card}>Order timeline</h2>
                   </div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {/* The booked day, like the card above it — these two
-                        disagreed for every shop west of UTC. */}
-                    Estimated delivery:{" "}
-                    {formatOrderDeliveryDay(order, {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })}
-                  </p>
+                  {/* The booked day, like the card above it — these two
+                      disagreed for every shop west of UTC. Absent entirely on a
+                      cancelled, refunded or delivered order, which used to read
+                      "Order cancelled" with a delivery date under it. */}
+                  {tracking.deliveryDateLine ? (
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Estimated delivery: {tracking.deliveryDateLine}
+                    </p>
+                  ) : null}
                   <div className="mt-6">
                     <OrderStatusTimeline steps={timeline} />
                   </div>
                 </div>
 
-                <div className="space-y-6">
-                  <DeliveryMapPlaceholder
-                    label={tracking.mapLabel}
-                    active={tracking.showLiveMap}
-                  />
-                  {tracking.showPartner && tracking.partner ? (
+                {hasPartner && tracking.partner ? (
+                  <div className="space-y-6">
                     <DeliveryPartnerCard
                       partner={tracking.partner}
                       delivered={order.status === "delivered"}
                     />
-                  ) : null}
-                </div>
+                  </div>
+                ) : null}
               </div>
 
-              <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
+              <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
                 <div className="flex items-center gap-2">
                   <MapPin className="size-5 text-bakery-700" />
-                  <h2 className="font-heading text-lg font-semibold">Delivery address</h2>
+                  <h2 className={storefrontHeading.card}>Delivery address</h2>
                 </div>
                 <div className="mt-4 text-sm text-muted-foreground">
                   <p className="font-medium text-foreground">{order.address.fullName}</p>
                   <p>{order.address.phone}</p>
                   <p>{order.address.email}</p>
                   <p className="mt-2">
-                    {[
-                      order.address.addressLine1,
-                      order.address.addressLine2,
-                      order.address.city,
-                      order.address.state,
-                      order.address.pincode,
-                    ]
-                      .filter(Boolean)
-                      .join(", ")}
+                    {formatAddress(order.address)}
                   </p>
                 </div>
               </div>
@@ -292,6 +296,27 @@ export function OrderDetailPage() {
                 <div className="rounded-xl border border-border bg-cream-50 p-5 text-sm">
                   <p className="font-medium text-foreground">Special instructions</p>
                   <p className="mt-2 text-muted-foreground">{order.orderNotes}</p>
+                </div>
+              ) : null}
+
+              {/*
+                The customer's own copy of what they asked for. The sender block
+                is deliberately not repeated here — this page is shown to the
+                person who placed the order, who knows who they are.
+              */}
+              {order.personalisation?.occasion || order.personalisation?.message ? (
+                <div className="rounded-xl border border-border bg-cream-50 p-5 text-sm">
+                  <p className="font-medium text-foreground">Personalisation</p>
+                  {order.personalisation.occasion ? (
+                    <p className="mt-2 text-muted-foreground">
+                      Occasion: {order.personalisation.occasion}
+                    </p>
+                  ) : null}
+                  {order.personalisation.message ? (
+                    <p className="mt-2 whitespace-pre-wrap text-muted-foreground">
+                      &ldquo;{order.personalisation.message}&rdquo;
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
             </div>

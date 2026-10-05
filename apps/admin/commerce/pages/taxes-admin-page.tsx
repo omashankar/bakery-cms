@@ -32,7 +32,7 @@ import { formatCurrency } from "@/utils/format";
 const SAMPLE_ITEM = {
   id: "preview",
   productSlug: "preview",
-  name: "Sample cake",
+  name: "Sample product",
   image: "",
   price: 850,
   quantity: 1,

@@ -46,7 +46,7 @@ export function AccountMenu({ name, phone, onSignOut }: AccountMenuProps) {
     router.push(routes.store.home);
     if (!endedOnServer) {
       toast.error("Signed out on this device", {
-        description: "We could not reach the bakery to end the session everywhere. Try again when you are back online.",
+        description: "We could not reach the store to end the session everywhere. Try again when you are back online.",
       });
     }
   }

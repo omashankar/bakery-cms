@@ -29,6 +29,12 @@ const reviewSchema = new mongoose.Schema(
     repliedAt: { type: String },
     reportReason: { type: String },
     orderNumber: { type: String },
+    deliveredCity: { type: String },
+    // `default: undefined` rather than `[]`: an empty array and a review with
+    // no photos should read the same, and a stored `[]` would make every old
+    // review look like one that had its photos removed.
+    photoUrls: { type: [String], default: undefined },
+    helpfulCount: { type: Number, default: 0 },
     createdAt: { type: String },
     updatedAt: { type: String },
   },

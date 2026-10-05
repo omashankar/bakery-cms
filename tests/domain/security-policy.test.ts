@@ -518,7 +518,11 @@ describe("a refused settings write", () => {
     // reads the store on SETTINGS_UPDATED_EVENT, so a silent restore left the
     // whole admin sitting on the value the server had refused.
     expect(repo).toMatch(
-      /localStorage\.setItem\(STORAGE_KEY, previousRaw\);[\s\S]{0,1200}?window\.dispatchEvent\(new CustomEvent\(SETTINGS_UPDATED_EVENT\)\);/,
+      // `safeSetItem`, not `localStorage.setItem`: a write that throws on a full
+      // quota must not take the page down, and the rollback least of all — it
+      // runs when the server has ALREADY refused, so a throw there would replace
+      // one error with a worse one.
+      /safeSetItem\(STORAGE_KEY, previousRaw\);[\s\S]{0,1200}?window\.dispatchEvent\(new CustomEvent\(SETTINGS_UPDATED_EVENT\)\);/,
     );
     expect(repo).toMatch(/if \(!persisted\) rollBackCache\(previousRaw, saved\);/);
     // The attempted value still goes back to the caller — it is the admin's

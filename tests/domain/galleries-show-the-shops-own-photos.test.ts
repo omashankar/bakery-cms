@@ -3,7 +3,6 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { HOMEPAGE_SECTION_REGISTRY } from "@/constants/section-registry";
-import { WEDDING_SECTION_REGISTRY } from "@/constants/wedding-section-registry";
 
 /**
  * A bakery's photographs are the thing customers choose it by.
@@ -25,14 +24,13 @@ const stripComments = (source: string) =>
 
 const SURFACES = [
   "features/cms-sections/homepage-section-renderer.tsx",
-  "features/cms-sections/wedding-section-renderer.tsx",
-  "apps/website/landing/components/landing-gallery.tsx",
-  // The dedicated gallery page and the route that feeds it. Both were missing
-  // here, and `GalleryPage` declares `photos` as an optional prop defaulting to
-  // `[]` — so dropping the wiring at the call site type-checks and degrades to
-  // "Photographs of our work are on their way." with nothing red anywhere.
-  "app/(storefront)/store/gallery/page.tsx",
-  "apps/website/pages/gallery-page.tsx",
+
+
+  /*
+    The dedicated gallery page and its route used to be on this list. The
+    shop asked for that page to go, so the surfaces that can show somebody
+    else's photographs as this shop's own are the two renderers above.
+  */
 ];
 
 /** One renderer function's own body, so an assertion cannot match a sibling's. */
@@ -54,53 +52,59 @@ describe("every surface that shows photographs", () => {
     }
   });
 
-  it("renders nothing rather than someone else's work", () => {
+  it("renders nothing rather than a heading over an empty grid", () => {
     /**
-     * Pinned to each SECTION's own body.
+     * PINNED TO EACH SECTION'S OWN BODY, which is the whole point.
      *
      * Counting the guards file-wide was already satisfied by two that predate
-     * this work (Menu Strip and Why Choose Us), so both gallery guards could be
+     * this work (Menu Strip and Why Choose Us), so a band's guard could be
      * deleted — restoring a heading over an empty grid — with this test, named
      * for exactly that, still green.
+     *
+     * THE TWO IT WAS WRITTEN FOR ARE GONE. `GallerySection` and
+     * `InstagramSection` were deleted with seven others. The property is not
+     * about them: it is about any band that holds the shop's photographs, and
+     * these seven do — every entry in the registry with an image column.
+     *
+     * Two spellings, because the strip counts first: `banners.length === 0`
+     * and `count === 0` are the same guard.
      */
     const homepage = stripComments(read(SURFACES[0]));
-    const wedding = stripComments(read(SURFACES[1]));
 
-    const sections = [
-      { body: bodyOf(homepage, "GallerySection"), key: "images", where: "the homepage gallery" },
-      { body: bodyOf(homepage, "InstagramSection"), key: "posts", where: "the Instagram strip" },
-      { body: bodyOf(wedding, "WeddingGallerySection"), key: "images", where: "the wedding gallery" },
+    const HOLDS_PHOTOS = [
+      "OurMenuSection",
+      "TileGridSection",
+      "BlogCardsSection",
+      "BannerGridSection",
+      "CategoryPriceCardsSection",
+      "BannerStripSection",
+      "WhyUsSection",
     ];
 
-    for (const { body, key, where } of sections) {
-      expect(body, `${where} no longer reads the shop's own "${key}"`).toContain(
-        `photoRows(c, "${key}")`,
-      );
-      expect(body, `${where} renders a heading over an empty grid`).toMatch(
-        /if \(\w+\.length === 0\) return null;/,
-      );
+    for (const component of HOLDS_PHOTOS) {
+      expect(
+        bodyOf(homepage, component),
+        `${component} draws a heading over an empty list`,
+      ).toMatch(/if \(\w+(?:\.length)? === 0\) return null;/);
     }
   });
 
-  it("does not let the homepage strip govern the standalone gallery page", () => {
+  it("reads a section's content without filtering it by visibility", () => {
     /**
      * Hiding a section means "not on the homepage", not "throw the content
-     * away". /store/gallery is a nav item of its own that sources its photos
-     * from the Gallery section because there is no second place to upload them
-     * — read through the visibility-filtered accessor, an admin who hid the
-     * homepage strip emptied a different page while the builder still showed
-     * every photo.
+     * away". A second surface reading the same section through the
+     * visibility-filtered accessor would go empty the moment an admin hid
+     * the homepage band, while the builder still showed every photo.
+     *
+     * The standalone gallery page was that second surface and this test was
+     * written for it. That page is gone, but the accessor is still the one
+     * anything else would reach for, and it is still the half that can be
+     * got wrong silently.
      */
-    const route = stripComments(read("app/(storefront)/store/gallery/page.tsx"));
-
-    expect(route, "the standalone page reads the visibility-filtered list").not.toContain(
-      "getPublishedHomepageSections",
-    );
-    expect(route).toContain('getPublishedSectionContent("gallery")');
-    expect(route, "the photos never reach the page").toMatch(/photos=\{photos\}/);
-
     const accessor = stripComments(read("features/cms-sections/data/homepage-sections.server.ts"));
     const body = accessor.slice(accessor.indexOf("export async function getPublishedSectionContent"));
+
+    expect(body, "the accessor is gone").not.toBe("");
     expect(body.slice(0, body.indexOf("\n}")), "the unfiltered accessor filters after all").not.toContain(
       "getVisibleSections",
     );
@@ -115,14 +119,28 @@ describe("the builder", () => {
         .map((field) => ({ section: entry.type, field })),
     );
 
-  it("offers a photo picker on every gallery section", () => {
-    const all = [...listFieldsOf(HOMEPAGE_SECTION_REGISTRY), ...listFieldsOf(WEDDING_SECTION_REGISTRY)];
+  it("offers a photo picker on every section that holds photographs", () => {
+    /*
+      `wedding-gallery` stood here until the wedding builder was removed, then
+      `gallery` and `instagram` until those two were deleted. Naming sections
+      that keep disappearing is how this case kept needing repair — so it asks
+      the REGISTRY which bands hold photographs and checks each of those.
 
-    for (const section of ["gallery", "instagram", "wedding-gallery"]) {
-      const match = all.find((entry) => entry.section === section);
-      expect(match, `${section} has no list field to upload photos into`).toBeTruthy();
+      A FLOOR, because "every section in an empty list" is true of nothing.
+    */
+    const all = listFieldsOf(HOMEPAGE_SECTION_REGISTRY);
+    const holdPhotos = all.filter((entry) =>
+      entry.field.itemFields?.some((column) => column.isImage),
+    );
+
+    expect(
+      holdPhotos.length,
+      "no section in the registry holds photographs at all",
+    ).toBeGreaterThan(3);
+
+    for (const { section, field } of holdPhotos) {
       expect(
-        match!.field.itemFields?.some((column) => column.isImage),
+        field.itemFields?.some((column) => column.isImage),
         `${section}'s list has no image column`,
       ).toBe(true);
     }

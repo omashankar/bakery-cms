@@ -62,7 +62,6 @@ function exportZonesToCsv(zones: DeliveryZone[]): void {
     "Name",
     "City",
     "Pincode",
-    "RadiusKm",
     "Charge",
     "MinDays",
     "EstDays",
@@ -74,7 +73,6 @@ function exportZonesToCsv(zones: DeliveryZone[]): void {
     zone.name,
     zone.city,
     zone.pincode,
-    String(zone.radiusKm),
     String(zone.deliveryCharge),
     String(zone.minDeliveryDays),
     String(zone.estimatedDeliveryDays),
@@ -420,7 +418,6 @@ export function DeliveryZonesAdminPage() {
                     {/* Zones match a full 6-digit pincode or a prefix — say so, or a
                         short value like "411" reads as broken data next to "400001". */}
                     <th className="px-4 py-3 font-medium">Pincode / prefix</th>
-                    <th className="px-4 py-3 font-medium">Radius</th>
                     <th className="px-4 py-3 font-medium">Charge</th>
                     <th className="px-4 py-3 font-medium">Delivery time</th>
                     <th className="px-4 py-3 font-medium">Priority</th>
@@ -445,7 +442,6 @@ export function DeliveryZonesAdminPage() {
                       <td className="px-4 py-3 font-medium">{zone.name}</td>
                       <td className="px-4 py-3">{zone.city}</td>
                       <td className="px-4 py-3 font-mono text-xs">{zone.pincode}</td>
-                      <td className="px-4 py-3">{zone.radiusKm} km</td>
                       <td className="px-4 py-3 font-semibold">
                         {formatCurrency(zone.deliveryCharge)}
                       </td>

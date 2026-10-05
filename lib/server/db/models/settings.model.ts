@@ -24,7 +24,12 @@ const generalSchema = new mongoose.Schema(
     favicon: String,
     timezone: String,
     currency: String,
-    businessType: { type: String, default: "bakery" },
+    /*
+      `businessType` WAS DECLARED HERE and had to go in the same commit as the
+      Zod key. Apart, the two break in opposite directions: the path alone
+      keeps Mongoose handing the field back and its `default: "other"`
+      re-creating it, while the key alone drops a value the schema still reads.
+    */
   },
   sub,
 );
@@ -112,7 +117,38 @@ const commerceSchema = new mongoose.Schema(
     deliveryLeadDays: { type: Number, default: 1 },
     estimatedDeliveryDays: { type: Number, default: 1 },
     deliveryTimeSlots: { type: [String], default: [] },
+    /*
+      THE THIRD TIME. See the note below about `sameDayCutoff`.
+
+      The delivery speeds a shop sells — id, label, description, fee, windows —
+      shipped declared on `CommerceSettings`, validated by Zod, defaulted, given
+      an admin editor, and wired through pricing. Every one of those said the
+      feature worked. This line was missing, so Mongoose dropped the whole array
+      on write: the owner would have typed their speeds, been told "Delivery
+      slots saved", and found the list empty on the next load, with no error
+      anywhere. Mixed, like `productTrustCards`, because the entries are objects.
+
+      `tests/domain/a-setting-the-shop-types-is-a-setting-the-shop-keeps.test.ts`
+      now compares every key of `defaultCommerceSettings` against this schema's
+      paths, so a fourth one cannot happen quietly.
+    */
+    deliveryTiers: { type: [mongoose.Schema.Types.Mixed], default: [] },
     orderNumberPrefix: { type: String, default: "BK" },
+    /*
+      Two settings that could not be saved.
+
+      `sameDayCutoff` and `productImageNote` are declared on CommerceSettings
+      and validated by `commerceSchema`, and both have a field on an admin
+      screen — but neither was ever a path here, and Mongoose's strict mode
+      drops an undeclared path silently on write. So the admin typed a
+      closing time, the form said saved, the value went nowhere, and the
+      countdown it drives never appeared. This shop's cutoff is unset for
+      exactly that reason.
+    */
+    sameDayCutoff: { type: String, default: "" },
+    productImageNote: { type: String, default: "" },
+    deliveryInformation: { type: String, default: "" },
+    productTrustCards: { type: [mongoose.Schema.Types.Mixed], default: [] },
     checkoutTerms: { type: String, default: "" },
     giftWrapEnabled: { type: Boolean, default: false },
     giftWrapFee: { type: Number, default: 0 },
@@ -132,9 +168,12 @@ const commerceSchema = new mongoose.Schema(
 
 const modulesSchema = new mongoose.Schema(
   {
-    weddingBuilder: { type: Boolean, default: true },
+    // Fails open, in step with `defaultModuleSettings`. A shop that has never
+    // existed starts wedding OFF, but that is decided once by
+    // `getOrCreateSettings` with `newShopModuleSettings` — not by this schema
+    // default, which fills in for a document that simply does not say.
+
     flavour: { type: Boolean, default: true },
-    eggEggless: { type: Boolean, default: true },
     weight: { type: Boolean, default: true },
     shape: { type: Boolean, default: true },
     photoCake: { type: Boolean, default: true },

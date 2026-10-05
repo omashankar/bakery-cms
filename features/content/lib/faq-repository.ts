@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import type { FaqCategory, FaqItem, FaqFormData } from "@/types/content";
 import type { WriteResult } from "@/lib/write-result";
 import type { LandingFaq } from "@/constants/landing-data";
@@ -81,7 +82,7 @@ export function seedFromLanding(): FaqItem[] {
 /** Local-only write. Used by the seed/migration paths (no server dual-write). */
 function lowPersist(items: FaqItem[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  safeSetItem(STORAGE_KEY, JSON.stringify(items));
 }
 
 /** Mutation write: local first, then the server, reporting what the server did. */
@@ -127,7 +128,7 @@ export function loadFaqs(): FaqItem[] {
   if (!raw) {
     const seeded = seedFromLanding();
     lowPersist(seeded);
-    localStorage.setItem(STORAGE_VERSION_KEY, String(FAQ_STORAGE_VERSION));
+    safeSetItem(STORAGE_VERSION_KEY, String(FAQ_STORAGE_VERSION));
     return seeded;
   }
 
@@ -138,20 +139,20 @@ export function loadFaqs(): FaqItem[] {
     if (!Array.isArray(parsed)) {
       const seeded = seedFromLanding();
       lowPersist(seeded);
-      localStorage.setItem(STORAGE_VERSION_KEY, String(FAQ_STORAGE_VERSION));
+      safeSetItem(STORAGE_VERSION_KEY, String(FAQ_STORAGE_VERSION));
       return seeded;
     }
 
     const storedVersion = Number(localStorage.getItem(STORAGE_VERSION_KEY) ?? 0);
     if (storedVersion < FAQ_STORAGE_VERSION) {
-      localStorage.setItem(STORAGE_VERSION_KEY, String(FAQ_STORAGE_VERSION));
+      safeSetItem(STORAGE_VERSION_KEY, String(FAQ_STORAGE_VERSION));
     }
 
     return parsed;
   } catch {
     const seeded = seedFromLanding();
     lowPersist(seeded);
-    localStorage.setItem(STORAGE_VERSION_KEY, String(FAQ_STORAGE_VERSION));
+    safeSetItem(STORAGE_VERSION_KEY, String(FAQ_STORAGE_VERSION));
     return seeded;
   }
 }

@@ -29,6 +29,9 @@ export const quoteSchema = z.object({
   // then appeared in the admin's coupon performance report as if it were real.
   couponCode: z.string().trim().max(40).optional(),
   giftWrap: z.boolean().optional(),
+  // The id only. Naming a price here would let a browser set its own
+  // surcharge; the shop's settings are the only place a fee comes from.
+  deliveryTierId: z.string().trim().max(60).optional(),
   deliveryAddress: z
     .object({ city: z.string().trim().optional(), pincode: z.string().trim().optional() })
     .optional(),
@@ -42,6 +45,21 @@ export const quoteSchema = z.object({
    * server, and the server already holds everything it needs. Optional, because
    * a quote asked purely to show a running total has no address yet.
    */
+  /**
+   * NAMED, not passed through — and that is why every field has to be listed.
+   *
+   * This object takes Zod's default, which is strip. A field added to the form
+   * and to `CheckoutAddress` but not to this list crosses the wire, is deleted
+   * here, and the stripped copy is what gets written to the draft row. The
+   * request still answers 200; nothing logs; no test that parses a partial
+   * address notices.
+   *
+   * The cost lands on one customer in particular: the one who pays online and
+   * closes the tab before the confirmation comes back. Their order is built by
+   * the Razorpay webhook from this draft, without the browser — so whatever was
+   * stripped here is gone for good, while the customer beside them who waited
+   * two more seconds keeps it. Same shop, same form, two different records.
+   */
   address: z
     .object({
       fullName: z.string().trim().min(1),
@@ -49,9 +67,13 @@ export const quoteSchema = z.object({
       phone: z.string().trim().min(1),
       addressLine1: z.string().trim().min(1),
       addressLine2: z.string().trim().optional(),
+      landmark: z.string().trim().max(200).optional(),
       city: z.string().trim().min(1),
       state: z.string().trim().min(1),
       pincode: z.string().trim().min(1),
+      country: z.string().trim().max(80).optional(),
+      altPhone: z.string().trim().max(20).optional(),
+      addressLabel: z.enum(["Home", "Office", "Other"]).optional(),
     })
     .optional(),
   /**
@@ -76,10 +98,35 @@ export const quoteSchema = z.object({
           );
         }, "That is not a real date"),
       timeSlot: z.string().trim().max(60),
+      tierId: z.string().trim().max(60).optional(),
+      tierLabel: z.string().trim().max(60).optional(),
     })
     .partial()
     .optional(),
   orderNotes: z.string().trim().max(1000).optional(),
+  /**
+   * Named here for the same reason the address fields are: this object
+   * strips what it does not know, and the draft is what the webhook rebuilds
+   * an order from when the customer closes the tab after paying.
+   *
+   * Every string is bounded. `occasion` is free text because it is the
+   * shop's own word, taken from its catalogue rather than from a list this
+   * code invented — so it cannot be an enum here.
+   */
+  personalisation: z
+    .object({
+      occasion: z.string().trim().max(60).optional(),
+      message: z.string().trim().max(500).optional(),
+      sender: z
+        .object({
+          name: z.string().trim().max(120),
+          phone: z.string().trim().max(20),
+          hideFromRecipient: z.boolean().optional(),
+        })
+        .optional(),
+      termsAcceptedAt: z.string().trim().max(40).optional(),
+    })
+    .optional(),
 });
 
 export type QuoteRequest = z.infer<typeof quoteSchema>;

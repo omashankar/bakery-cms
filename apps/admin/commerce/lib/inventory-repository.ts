@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import type { Product, StockStatus } from "@/types/product";
 import type {
   InventoryItem,
@@ -8,6 +9,7 @@ import type {
   StockHistoryReason,
 } from "@/types/inventory";
 import {
+  categoriesOf,
   getProductById,
   loadProducts,
   updateProduct,
@@ -64,7 +66,7 @@ export async function saveInventorySettings(
   settings: InventorySettings
 ): Promise<{ settings: InventorySettings; persisted: boolean }> {
   if (typeof window === "undefined") return { settings, persisted: false };
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  safeSetItem(SETTINGS_KEY, JSON.stringify(settings));
   const persisted = await saveInventorySettingsRequest(settings);
   emitInventoryUpdated();
   return { settings, persisted };
@@ -77,13 +79,13 @@ export async function saveInventorySettings(
  */
 export function persistServerHistory(entries: StockHistoryEntry[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(entries.slice(0, MAX_HISTORY)));
+  safeSetItem(HISTORY_KEY, JSON.stringify(entries.slice(0, MAX_HISTORY)));
   emitInventoryUpdated();
 }
 
 export function persistServerSettings(settings: InventorySettings): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  safeSetItem(SETTINGS_KEY, JSON.stringify(settings));
   emitInventoryUpdated();
 }
 
@@ -111,22 +113,35 @@ function appendStockHistory(entry: StockHistoryEntry): void {
 
   const history = loadStockHistory();
   const next = [entry, ...history].slice(0, MAX_HISTORY);
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+  safeSetItem(HISTORY_KEY, JSON.stringify(next));
 }
 
 export function getInventoryItems(): InventoryItem[] {
   const categories = adminCategories();
+  const namesById = new Map(categories.map((category) => [category.id, category.name]));
 
   return loadProducts().map((cake) => {
     const stockStatus = deriveStockStatus(cake, getInventorySettings());
-    const categoryName =
-      categories.find((category) => category.id === cake.categoryId)?.name ?? "—";
+    /**
+     * One name to show, every name to search.
+     *
+     * Inventory is a stock screen, not a catalogue one: it prints the primary
+     * category and nothing else, because the row is a single line on a phone
+     * and the count belongs to the product, not to any one category it sits
+     * in. But the shop can now file a product in several places, so the
+     * search has to know all of them or a cake filed under Plants cannot be
+     * found by typing "plants" here.
+     */
+    const categoryNames = categoriesOf(cake)
+      .map((id) => namesById.get(id))
+      .filter((name): name is string => Boolean(name));
 
     return {
       cakeId: cake.id,
       name: cake.name,
       slug: cake.slug,
-      categoryName,
+      categoryName: categoryNames[0] ?? "—",
+      categoryNames,
       image: cake.images[0],
       status: cake.status,
       stockStatus,
@@ -336,7 +351,8 @@ export function filterInventoryItems(
     }
 
     if (!query) return true;
-    const haystack = `${item.name} ${item.slug} ${item.categoryName}`.toLowerCase();
+    // Every category, not just the printed one — see `getInventoryItems`.
+    const haystack = `${item.name} ${item.slug} ${item.categoryNames.join(" ")}`.toLowerCase();
     return haystack.includes(query);
   });
 }

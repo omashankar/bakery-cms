@@ -11,26 +11,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { routes } from "@/constants/routes";
 import type { Product } from "@/types";
 import { formatCurrency, formatDate } from "@/utils/format";
-import { adminCategories, adminFlavours, adminOccasions } from "@/features/products/lib/catalog-options";
+import { adminCategories, adminOccasions } from "@/features/products/lib/catalog-options";
 import { formatStatusLabel } from "@/features/products/lib/product-utils";
-import { getProductById } from "@/features/products/lib/products-repository";
-import { fetchProduct } from "@/features/products/data/products-client";
-import type { ModuleSettings } from "@/types/settings";
-import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import {
-  getModuleSettings,
-  SETTINGS_UPDATED_EVENT,
-} from "@/features/settings/lib/settings-repository";
+  categoriesOf,
+  getProductById,
+} from "@/features/products/lib/products-repository";
+import { fetchProduct } from "@/features/products/data/products-client";
+
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 interface ProductPreviewPageProps {
   cakeId: string;
 }
 
 export function ProductPreviewPage({ cakeId }: ProductPreviewPageProps) {
+  const labels = useBusinessLabels();
   const router = useRouter();
   const [cake, setCake] = useState<Product | null>(null);
-  const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,12 +58,6 @@ export function ProductPreviewPage({ cakeId }: ProductPreviewPageProps) {
     };
   }, [cakeId, router]);
 
-  useEffect(() => {
-    const sync = () => setModules(getModuleSettings());
-    sync();
-    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
-    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
-  }, []);
 
   if (!cake) {
     return (
@@ -75,9 +68,23 @@ export function ProductPreviewPage({ cakeId }: ProductPreviewPageProps) {
   }
 
   const category = adminCategories().find((item) => item.id === cake.categoryId)?.name ?? "—";
-  const flavour = modules.flavour
-    ? adminFlavours().find((item) => item.id === cake.flavourId)?.name
-    : undefined;
+
+  /**
+   * The other pages this same product appears on.
+   *
+   * Kept SEPARATE from the primary rather than joined into one line: the
+   * primary is the category whose page the storefront badge links to and the
+   * one the owner chose first, and running four names together would leave
+   * this screen unable to say which of them that is. Same shape as
+   * `occasions` below, for the same reason — an unresolvable id is dropped
+   * rather than printed raw.
+   */
+  const alsoUnder = categoriesOf(cake)
+    .slice(1)
+    .map((id) => adminCategories().find((item) => item.id === id)?.name)
+    .filter(Boolean)
+    .join(", ");
+
   const occasions = adminOccasions()
     .filter((item) => cake.occasionIds.includes(item.id))
     .map((item) => item.name)
@@ -86,8 +93,8 @@ export function ProductPreviewPage({ cakeId }: ProductPreviewPageProps) {
   return (
     <AdminPage>
       <AdminPageHeader
-        title="Preview Cake"
-        description="Review how this cake will appear before publishing to the storefront."
+        title="Preview"
+        description={`Review how this ${labels.productWord.toLowerCase()} will appear before publishing to the storefront.`}
         actions={
           <>
             <Button variant="outline" render={<Link href={routes.admin.cakes.edit(cake.id)} />}>
@@ -127,7 +134,7 @@ export function ProductPreviewPage({ cakeId }: ProductPreviewPageProps) {
               {cake.isBestSeller ? <Badge variant="bakery">Best Seller</Badge> : null}
             </div>
             <CardTitle className="font-heading text-2xl">{cake.name}</CardTitle>
-            <CardDescription>{cake.shortDescription || cake.description}</CardDescription>
+            <CardDescription>{cake.description}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
             <div className="flex items-baseline gap-2">
@@ -145,10 +152,10 @@ export function ProductPreviewPage({ cakeId }: ProductPreviewPageProps) {
                 <dt className="text-muted-foreground">Category</dt>
                 <dd className="font-medium">{category}</dd>
               </div>
-              {flavour ? (
+              {alsoUnder ? (
                 <div className="flex justify-between gap-4 border-b border-border/60 py-2">
-                  <dt className="text-muted-foreground">Flavour</dt>
-                  <dd className="font-medium">{flavour}</dd>
+                  <dt className="text-muted-foreground">Also under</dt>
+                  <dd className="text-right font-medium">{alsoUnder}</dd>
                 </div>
               ) : null}
               {occasions ? (

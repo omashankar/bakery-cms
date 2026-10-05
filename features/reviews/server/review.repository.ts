@@ -80,6 +80,15 @@ const PUBLIC_REVIEW_FIELDS = {
   isFeatured: 1,
   adminReply: 1,
   repliedAt: 1,
+  // Public by design: the button that produces it is on the storefront, and
+  // a count nobody can see is not worth collecting.
+  helpfulCount: 1,
+  // The city, and NOT the order number it came from: one is a fact about
+  // this review, the other is a handle on somebody else's order.
+  deliveredCity: 1,
+  // Public because the whole point of them is to be seen — and because a
+  // moderator approved this review with them attached.
+  photoUrls: 1,
   createdAt: 1,
   updatedAt: 1,
 } as const;
@@ -91,6 +100,30 @@ export async function listApprovedByProduct(productSlug: string): Promise<Produc
     .sort({ isFeatured: -1, createdAt: -1 })
     .lean()) as unknown as Raw[];
   return docs.map(toReview);
+}
+
+/**
+ * One more reader found this review useful.
+ *
+ * `$inc` in the database rather than read-modify-write in Node: two readers
+ * pressing the button at the same moment would otherwise both write the same
+ * number and one of them would be lost.
+ *
+ * Only an APPROVED review can be counted. Without that filter the id in the
+ * URL — and the endpoint is public — would let anyone bump a review still in
+ * moderation, or a rejected one, which nobody can see to have found helpful.
+ *
+ * Returns the new count, or null when there is no such approved review.
+ */
+export async function incrementHelpful(id: string): Promise<number | null> {
+  await connectDB();
+  const doc = await ReviewModel.findOneAndUpdate(
+    { _id: id, status: "approved" },
+    { $inc: { helpfulCount: 1 } },
+    { new: true, projection: { helpfulCount: 1 } },
+  ).lean();
+  if (!doc) return null;
+  return (doc as { helpfulCount?: number }).helpfulCount ?? 0;
 }
 
 /**

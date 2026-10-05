@@ -30,25 +30,50 @@ import { calculateProductUnitPrice } from "@/features/products/lib/product-prici
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import type { ProductVariantGroup } from "@/types/product";
 
-const egg = {
-  id: "egg",
-  name: "Egg preference",
-  type: "egg",
+/**
+ * An ordinary priced group. It was the "Egg preference" special case, which
+ * had a type of its own and a module of its own; a shop that offers eggless
+ * now names an option and prices it, exactly like this.
+ *
+ * It stays in this file as the group NO module gates — which is the case the
+ * filter has to get right just as much as the gated ones.
+ */
+const addOn = {
+  id: "add-on",
+  name: "Finish",
+  type: "custom",
   required: true,
   options: [
-    { id: "regular", label: "Regular", priceAdjustment: 0, isDefault: false },
-    { id: "eggless", label: "Eggless", priceAdjustment: 80, isDefault: true, semantic: "eggless" },
+    { id: "plain", label: "Plain", priceAdjustment: 0, isDefault: false },
+    { id: "gold", label: "Gold leaf", priceAdjustment: 80, isDefault: true },
   ],
 } as unknown as ProductVariantGroup;
 
-const photo = {
-  id: "photo",
-  name: "Photo cake",
-  type: "photo",
+/**
+ * A gated group whose DEFAULT costs money — the dangerous shape, and the
+ * reason this file exists. It was the photo group ("Custom photo print" as the
+ * default, +₹250); a photo print is priced into the product now, so `shape` is
+ * the last typed group a module gates.
+ */
+const paidShape = {
+  id: "paid-shape",
+  name: "Shape",
+  type: "shape",
   required: false,
   options: [
-    { id: "standard", label: "Standard design", priceAdjustment: 0, isDefault: false },
-    { id: "print", label: "Custom photo print", priceAdjustment: 250, isDefault: true },
+    { id: "round", label: "Round", priceAdjustment: 0, isDefault: false },
+    { id: "tiered", label: "Two tiers", priceAdjustment: 250, isDefault: true },
+  ],
+} as unknown as ProductVariantGroup;
+
+const shape = {
+  id: "shape",
+  name: "Shape",
+  type: "shape",
+  required: false,
+  options: [
+    { id: "round", label: "Round", priceAdjustment: 0, isDefault: true },
+    { id: "heart", label: "Heart", priceAdjustment: 150 },
   ],
 } as unknown as ProductVariantGroup;
 
@@ -62,35 +87,52 @@ const size = {
 
 describe("the groups a shop with these modules sells", () => {
   it("keeps everything when every module is on", () => {
-    expect(variantGroupsEnabledBy([egg, photo, size], defaultModuleSettings)).toHaveLength(3);
+    expect(variantGroupsEnabledBy([addOn, paidShape, size], defaultModuleSettings)).toHaveLength(3);
   });
 
-  it("drops the egg group when Egg/Eggless is off", () => {
-    const kept = variantGroupsEnabledBy([egg, photo, size], {
+
+  /**
+   * Shapes became a typed group when the flat `shapes: string[]` was retired.
+   * The Shape MODULE has to keep gating them, or a switch a shop can still see
+   * in Settings quietly stops meaning anything — and worse, the storefront and
+   * the server’s pricing share this one filter, so a group the page hid would
+   * still be charged for.
+   */
+  it("drops the shape group when Shape is off", () => {
+    const kept = variantGroupsEnabledBy([addOn, shape, size], {
       ...defaultModuleSettings,
-      eggEggless: false,
+      shape: false,
     });
 
-    expect(kept.map((group) => group.id)).toEqual(["photo", "tier"]);
+    expect(kept.map((group) => group.id)).toEqual(["add-on", "tier"]);
   });
 
-  it("drops the photo group when Photo Cake is off", () => {
-    const kept = variantGroupsEnabledBy([egg, photo, size], {
-      ...defaultModuleSettings,
-      photoCake: false,
-    });
+  it("does not charge for a shape the page did not show", () => {
+    const priced = (groups: ProductVariantGroup[]) =>
+      calculateVariantAdjustment(groups, { shape: "heart" });
 
-    expect(kept.map((group) => group.id)).toEqual(["egg", "tier"]);
+    expect(priced([shape])).toBe(150);
+    expect(
+      priced(variantGroupsEnabledBy([shape], { ...defaultModuleSettings, shape: false })),
+    ).toBe(0);
   });
+
+  /*
+    "drops the photo group when Photo Cake is off" stood here.
+
+    There is no photo group to drop. A product that takes a photograph says
+    so with one tick and prices the printing into itself, so the module gates
+    the UPLOADER rather than an option group — and `shape` is the last typed
+    group this filter has anything to say about.
+  */
 
   it("never drops a group the modules have nothing to say about", () => {
-    const kept = variantGroupsEnabledBy([size], {
+    const kept = variantGroupsEnabledBy([size, addOn], {
       ...defaultModuleSettings,
-      eggEggless: false,
-      photoCake: false,
+      shape: false,
     });
 
-    expect(kept).toEqual([size]);
+    expect(kept).toEqual([size, addOn]);
   });
 });
 
@@ -99,16 +141,16 @@ describe("what the shop charges", () => {
     const priced = (groups: ProductVariantGroup[]) =>
       calculateProductUnitPrice({ basePrice: 1099, variantGroups: groups, variantSelections: {} });
 
-    expect(priced([egg])).toBe(1179);
+    expect(priced([paidShape])).toBe(1349);
     expect(
-      priced(variantGroupsEnabledBy([egg], { ...defaultModuleSettings, eggEggless: false })),
+      priced(variantGroupsEnabledBy([paidShape], { ...defaultModuleSettings, shape: false })),
     ).toBe(1099);
   });
 
   it("is not fixed by omitting the selection, which is why the group must go", () => {
     // The reason the gate cannot live on the client alone: an empty selection
     // map still resolves to the group's default option.
-    expect(calculateVariantAdjustment([egg], {})).toBe(80);
+    expect(calculateVariantAdjustment([paidShape], {})).toBe(250);
   });
 });
 
@@ -152,7 +194,6 @@ describe("where the gate is applied", () => {
   });
 
   it("defaults to every module ON, so an older settings document prices as before", () => {
-    expect(defaultModuleSettings.eggEggless).toBe(true);
     expect(defaultModuleSettings.photoCake).toBe(true);
 
     for (const path of [
@@ -190,8 +231,21 @@ describe("the photo a photo cake is printed with", () => {
     expect(claim).toBeGreaterThan(body.indexOf("setPhotoUrl(parsed.data.url)"));
   });
 
-  it("travels with the line the customer added", () => {
+  it("travels with the line the customer added, and only while it is offered", () => {
+    /**
+     * The gate is half of this now.
+     *
+     * `showPhotoUpload` follows the photo VARIANT as well as the module, so a
+     * customer who picked “Custom photo print”, uploaded, and then switched
+     * back to the free option hid the whole control while the URL stayed in
+     * state — and an ungated line sent the kitchen a photo to print on an
+     * order that was never charged for one. The same shape as the `weight`
+     * bug two lines above it in the same object.
+     */
     const handler = page.slice(page.indexOf("const handleAddToCart"));
-    expect(handler.slice(0, handler.indexOf("toast.success"))).toContain("photoUrl: photoUrl");
+    const body = handler.slice(0, handler.indexOf("toast.success"));
+
+    expect(body).toContain("photoUrl: (showPhotoUpload && photoUrl) || undefined");
+    expect(body).not.toContain("photoUrl: photoUrl || undefined");
   });
 });

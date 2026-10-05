@@ -1,4 +1,3 @@
-import { z } from "zod";
 
 import {
   brandInfo,
@@ -10,10 +9,10 @@ import type {
   ActivityLog,
   AnalyticsSettings,
   AppSettings,
-  BusinessTypeOption,
   CommerceSettings,
   ContactSettings,
   GeneralSettings,
+  LabelOverrides,
   MaintenanceSettings,
   ModuleSettings,
   SecuritySettings,
@@ -37,18 +36,59 @@ export const defaultGeneralSettings: GeneralSettings = {
   favicon: "/favicon.ico",
   timezone: "Asia/Kolkata",
   currency: "INR",
-  businessType: "bakery",
+  /**
+   * NEUTRAL, not bakery.
+   *
+   * The field is required, so a value has to stand here — and `"other"`
+   * resolves to the same wording the neutral defaults already gave, which
+   * means re-introducing the type changed nothing for any existing shop.
+   * Defaulting to `"bakery"` would have this software decide what every new
+   * shop sells, which is the reason the enum was deleted the first time.
+   */
 };
 
-/** Bakery is the default template — every optional module ships ON. */
+/**
+ * What to ASSUME when the stored module state is unknown. Every field ON.
+ *
+ * This is a fallback, not a policy, and it is read on four paths that are all
+ * some form of "we do not know yet": the client's default on a cold browser,
+ * `mergeAppSettings`, the reset-to-defaults payload, and `getServerModules`'
+ * catch when the database cannot be reached.
+ *
+ * IT FAILS OPEN, DELIBERATELY. A module switch was once flipped false here
+ * because that was right for a brand-new shop — and wrong for all four of
+ * these. One click of "Reset defaults" took a live page off a running shop
+ * and persisted it; a first-time visitor lost nav links before paint; and a
+ * Mongo outage 404'd a page that had served through the same outage the day
+ * before.
+ *
+ * A guess may not switch off something a running shop already has. The one path
+ * that is NOT a guess — creating a shop that has never existed — uses
+ * `newShopModuleSettings` below.
+ *
+ * These hide UI only: data and routes are never deleted.
+ */
 export const defaultModuleSettings: ModuleSettings = {
-  weddingBuilder: true,
+
   flavour: true,
-  eggEggless: true,
   weight: true,
   shape: true,
   photoCake: true,
 };
+
+/**
+ * What a shop that has NEVER EXISTED is created with.
+ *
+ * The only module path that is a decision rather than a guess, and the only
+ * one that may start something OFF. Nothing does today — the one module that
+ * started off was the Wedding Builder, and that feature is gone — so this
+ * equals the defaults. It stays because the distinction is the point: the
+ * next optional feature that should not be live on a fresh install belongs
+ * here and not in `defaultModuleSettings`, which fails open.
+ *
+ * Read by `getOrCreateSettings` and nowhere else.
+ */
+export const newShopModuleSettings: ModuleSettings = { ...defaultModuleSettings };
 
 export const defaultContactSettings: ContactSettings = {
   email: contactInfo.email,
@@ -130,12 +170,28 @@ export const defaultCommerceSettings: CommerceSettings = {
     "4:00 PM – 6:00 PM",
     "6:00 PM – 8:00 PM",
   ],
+  /**
+   * EMPTY, and that is the whole point.
+   *
+   * Shipping a Standard / Fixed Time / Midnight list would be this software
+   * telling every shop what speeds it sells and what it charges for them. A
+   * shop with none set up behaves exactly as it did before tiers existed.
+   */
+  deliveryTiers: [],
   orderNumberPrefix: "BK",
   checkoutTerms:
-    "By placing this order you agree to our delivery terms. Cakes are prepared fresh — cancellations within 2 hours of placement may be accepted.",
+    "By placing this order you agree to our delivery terms. Orders are prepared to order — cancellations within 2 hours of placement may be accepted.",
   giftWrapEnabled: true,
   giftWrapFee: 49,
   giftWrapLabel: "Gift wrap",
+  // Both blank: a shop says these or it does not, and a shipped default
+  // would be this software making a claim on every shop's behalf.
+  productImageNote: "",
+  deliveryInformation: "",
+  // Empty, like the two above it: this software has no boast of its own to
+  // make on a shop's behalf, and the reference's are numbers it cannot know.
+  productTrustCards: [],
+  sameDayCutoff: "",
   paymentMethods: {
     cod: true,
     upi: true,
@@ -161,6 +217,9 @@ export const defaultCommerceSettings: CommerceSettings = {
 export const seedActivityLog: ActivityLog[] = [];
 
 
+/** No overrides. Every label comes from the preset until a shop says otherwise. */
+export const defaultLabelOverrides: LabelOverrides = {};
+
 export const defaultAppSettings: AppSettings = {
   general: defaultGeneralSettings,
   contact: defaultContactSettings,
@@ -171,22 +230,10 @@ export const defaultAppSettings: AppSettings = {
   maintenance: defaultMaintenanceSettings,
   commerce: defaultCommerceSettings,
   modules: defaultModuleSettings,
+  labelOverrides: defaultLabelOverrides,
   activity: seedActivityLog,
   updatedAt: nowIso(),
 };
-
-export const businessTypeOptions: BusinessTypeOption[] = [
-  { value: "bakery", label: "Bakery (Default)" },
-  { value: "sweet-shop", label: "Sweet Shop" },
-  { value: "flower-shop", label: "Flower Shop" },
-  { value: "restaurant", label: "Restaurant" },
-  { value: "gift-shop", label: "Gift Shop" },
-  { value: "grocery", label: "Grocery" },
-  { value: "fashion", label: "Fashion" },
-  { value: "electronics", label: "Electronics" },
-  { value: "pharmacy", label: "Pharmacy" },
-  { value: "other", label: "Other" },
-];
 
 export const timezoneOptions = [
   { value: "Asia/Kolkata", label: "Asia/Kolkata (IST)" },
@@ -390,9 +437,24 @@ export function instagramHandleFromUrl(url: string): string {
 /** One correction to a stored settings document, as a path and the value to set. */
 export interface SettingsRepair {
   path: string;
+  /** `undefined` means UNSET the path — see how `migrate` applies it. */
   value: unknown;
   reason: string;
 }
+
+/*
+  THE LEGACY PRESET TABLE STOOD HERE.
+
+  Ten trades of wording, kept as migration input after the business-type enum
+  was deleted, with a note asking for its own removal once no stored document
+  carried a type. The type is a live setting again, so these are live presets
+  again — and they belong beside the rest of the wording, in
+  `config/business-labels.ts` as `BUSINESS_TYPE_LABELS`. Moved verbatim: not a
+  word of any shop's wording changed in the move.
+
+  Two copies of the same ten strings is how the admin and the storefront come
+  to disagree about what a shop calls its own products, so there is one.
+*/
 
 /**
  * Decides what to repair in a settings document written before the current
@@ -410,12 +472,40 @@ export interface SettingsRepair {
  *   into an `<a href>` in the footer of every storefront page. DEACTIVATE rather
  *   than delete or blank: the row keeps its label and platform, so the admin can
  *   see what needs a real URL instead of finding a link silently gone.
+ * - `general.businessType` is a field the schema no longer declares, holding
+ *   the wording preset a shop was showing before the enum was deleted. Copy
+ *   that wording into `labelOverrides` where the shop has stated none, and
+ *   DROP the field either way — that drop is what makes this rule fire once
+ *   rather than every time a shop happens to blank its wording.
  */
 export function planSettingsRepairs(settings: {
   contact?: { mapEmbedUrl?: string };
   social?: { href?: string; isActive?: boolean }[];
+  /** Legacy. Present only on documents written before the enum was deleted. */
+  general?: { businessType?: string };
+  labelOverrides?: LabelOverrides;
 }): SettingsRepair[] {
   const repairs: SettingsRepair[] = [];
+
+  /**
+   * THE LEGACY BUSINESS-TYPE REPAIR STOOD HERE, AND HAD TO GO.
+   *
+   * It read `general.businessType`, copied that trade's wording into
+   * `labelOverrides` where the shop had stated none, and `$unset` the field in
+   * the same save so it could fire only once. All of that was right while the
+   * field was deleted.
+   *
+   * The field is a live setting again. Left in place, this ran on the singleton
+   * READ that every server render funnels through — so the owner would pick
+   * their business type, be told it saved, and find it gone on the next page
+   * load, deleted by a repair rule written to clean it up.
+   *
+   * Nothing is lost by removing it. A document that still carries a type now
+   * simply has one, and `resolveLabels` layers that trade's wording under
+   * whatever the shop typed — which is what the copy was for. A document the
+   * repair already migrated keeps its explicit `labelOverrides`, and those win
+   * over any preset, so its wording does not move either.
+   */
 
   const storedMap = settings.contact?.mapEmbedUrl ?? "";
   if (storedMap) {
@@ -525,29 +615,27 @@ export function mergeAppSettings(partial: Partial<AppSettings>): AppSettings {
       },
       deliveryTimeSlots:
         partial.commerce?.deliveryTimeSlots ?? defaultCommerceSettings.deliveryTimeSlots,
+      // Listed beside the slots for the same reason: a stored array must
+      // replace the default outright, never merge key-by-key with it.
+      deliveryTiers: partial.commerce?.deliveryTiers ?? defaultCommerceSettings.deliveryTiers,
     },
     modules: { ...defaultModuleSettings, ...partial.modules },
+    labelOverrides: { ...defaultLabelOverrides, ...partial.labelOverrides },
     activity: partial.activity ?? seedActivityLog,
     updatedAt: partial.updatedAt ?? nowIso(),
   };
 }
 
-/**
- * The ONE email rule, shared by the form and the schema.
- *
- * The Contact form restated it as a regex "deliberately matching what Zod's
- * `z.email()` accepts" — and it did not, in either direction. `o'brien@bakery.ie`
- * is a legal address that Zod takes and the regex refused, so the field showed
- * "Enter a valid email address", Save stayed disabled for the WHOLE Contact
- * section, and the shop could not change its address, phone or opening hours
- * either until the owner used a different email.
- *
- * Restating a rule is how the two drift. `isSafeAssetUrl`, `isValidMapEmbedUrl`
- * and `isSafeSocialUrl` are already shared between the form and the schema for
- * exactly this reason; this is the fourth.
- */
-const emailRule = z.email();
+/*
+  THE EMAIL RULE LIVES IN features/settings/lib/email-rule.ts NOW.
 
-export function isValidEmailAddress(value: string): boolean {
-  return emailRule.safeParse(value.trim()).success;
-}
+  It was the only thing in this 648-line file that touched Zod, and the
+  `import { z } from "zod"` at the top put the whole library into the
+  client bundle of every page that imported any of the plain default
+  objects below — which is the cart, the product page, the checkout and the
+  filters panel, none of which validates an email.
+
+  Measured: the storefront's FAQ page shipped 487 KB of blocking script and
+  the largest chunk in it, 285 KB raw, was Zod.
+*/
+

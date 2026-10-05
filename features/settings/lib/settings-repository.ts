@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import type {
   ActivityLog,
   AnalyticsSettings,
@@ -6,6 +7,7 @@ import type {
   ContactSettings,
   GeneralSettings,
   MaintenanceSettings,
+  LabelOverrides,
   ModuleSettings,
   SecuritySettings,
   SmtpSettings,
@@ -19,6 +21,7 @@ import {
   defaultContactSettings,
   defaultGeneralSettings,
   defaultMaintenanceSettings,
+  defaultLabelOverrides,
   defaultModuleSettings,
   defaultSecuritySettings,
   defaultSmtpSettings,
@@ -176,6 +179,10 @@ export async function hydrateSettingsFromServer(
       },
     },
     modules: { ...current.modules, ...(server.modules ?? {}) },
+    // The shop's own words. This list is rebuilt BY HAND, so a section missing
+    // from it is discarded on every hydrate — which is precisely how
+    // `labelOverrides` stayed inert while the server resolved it correctly.
+    labelOverrides: { ...current.labelOverrides, ...(server.labelOverrides ?? {}) },
     // Activity is a client-only convenience log; the server uses audit_logs.
     activity: current.activity,
   });
@@ -333,7 +340,7 @@ function rollBackCache(previousRaw: string | null, attempted: AppSettings): void
   if (!stillOurs) return;
 
   if (previousRaw === null) localStorage.removeItem(STORAGE_KEY);
-  else localStorage.setItem(STORAGE_KEY, previousRaw);
+  else safeSetItem(STORAGE_KEY, previousRaw);
 
   /**
    * The undo has to be announced, exactly as the write was.
@@ -394,14 +401,16 @@ export function getModuleSettings(): ModuleSettings {
 }
 
 /**
- * Wedding features (builder, wedding-cakes page/nav, wedding inquiries) are
- * bakery-only and gated by the wedding module. Shared by admin + storefront so
- * every surface hides wedding consistently.
+ * The shop's own words for what it sells, as stored.
+ *
+ * Raw overrides, not resolved labels — the caller layers these over the preset
+ * through `resolveLabels`, so a blank field still means "use the preset" at
+ * exactly one place.
  */
-export function isWeddingEnabled(): boolean {
-  const settings = loadSettings();
-  return settings.general.businessType === "bakery" && settings.modules.weddingBuilder;
+export function getLabelSettings(): LabelOverrides {
+  return loadSettings().labelOverrides ?? {};
 }
+
 
 export function getActivityLog(): ActivityLog[] {
   return loadSettings().activity;
@@ -506,6 +515,17 @@ export async function saveModuleSettings(
     details: "Module settings saved",
   });
   return { value: value.modules, persisted };
+}
+
+export async function saveLabelSettings(
+  labelOverrides: LabelOverrides
+): Promise<SettingsWriteResult<LabelOverrides>> {
+  const { value, persisted } = await updateStore({ labelOverrides }, {
+    action: "updated",
+    entity: "settings",
+    details: "Product wording saved",
+  });
+  return { value: value.labelOverrides, persisted };
 }
 
 export async function clearActivityLog(): Promise<SettingsWriteResult<ActivityLog[]>> {
@@ -628,6 +648,15 @@ export function resetModuleSettings(): Promise<SettingsWriteResult<ModuleSetting
   return resetToDefaults("modules", { ...defaultModuleSettings }, getModuleSettings, "Module settings reset");
 }
 
+export function resetLabelSettings(): Promise<SettingsWriteResult<LabelOverrides>> {
+  return resetToDefaults(
+    "labelOverrides",
+    { ...defaultLabelOverrides },
+    getLabelSettings,
+    "Product wording reset",
+  );
+}
+
 export function exportLocalStorageBackup(): Record<string, string | null> {
   if (typeof window === "undefined") return {};
 
@@ -667,7 +696,7 @@ export function importLocalStorageBackup(
   for (const [key, value] of Object.entries(backup)) {
     if (!key.startsWith("bakery-cms") || value === null) continue;
     if (key === BACKUP_HISTORY_KEY) continue;
-    localStorage.setItem(key, value);
+    safeSetItem(key, value);
     count += 1;
   }
   return count;

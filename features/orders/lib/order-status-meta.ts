@@ -15,7 +15,7 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   pending: "Order placed",
   confirmed: "Accepted",
   preparing: "Preparing",
-  ready: "Cake ready",
+  ready: "Ready to dispatch",
   out_for_delivery: "Out for delivery",
   delivered: "Delivered",
   cancelled: "Cancelled",
@@ -25,10 +25,10 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
 export const ORDER_STATUS_DESCRIPTIONS: Record<OrderStatus, string> = {
   pending: "Awaiting payment or confirmation.",
   confirmed: "We received your order and payment details.",
-  preparing: "Our bakers are crafting your order with care.",
-  ready: "Your cake is packed and ready for dispatch.",
+  preparing: "We are preparing your order with care.",
+  ready: "Your order is packed and ready for dispatch.",
   out_for_delivery: "Your order is on the way to your address.",
-  delivered: "Enjoy your cakes!",
+  delivered: "Enjoy your order!",
   cancelled: "This order was cancelled.",
   refunded: "A refund has been issued for this order.",
 };

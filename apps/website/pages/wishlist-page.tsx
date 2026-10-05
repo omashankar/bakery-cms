@@ -61,13 +61,12 @@ export function WishlistPage({ catalog }: WishlistPageProps) {
     <>
       <StorePageHeader
         title="Wishlist"
-        description={`Save ${labels.productWordPlural.toLowerCase()} you love for later.`}
         breadcrumbs={[{ label: "Wishlist" }]}
       />
       <section className={layoutSpacing.sectionY}>
         <div className={layoutSpacing.container}>
           {!loaded ? (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="overflow-hidden rounded-xl border border-border bg-card">
                   <div className="aspect-square animate-pulse bg-cream-100" />
@@ -106,7 +105,7 @@ export function WishlistPage({ catalog }: WishlistPageProps) {
                   Continue Shopping
                 </Button>
               </div>
-              <StaggerReveal className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              <StaggerReveal className="grid gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-4">
                 {cakes.map((cake) => (
                   <ProductCard key={cake.id} cake={cake} />
                 ))}

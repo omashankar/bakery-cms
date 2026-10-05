@@ -16,7 +16,7 @@ export function DeliveryEstimatedCard({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-border bg-white p-6 shadow-sm sm:p-8",
+        "rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8",
         className
       )}
     >
@@ -49,7 +49,7 @@ export function DeliveryEstimatedCard({
               <MapPin className="size-4" />
               <span className="text-xs font-medium tracking-wide uppercase">Delivering to</span>
             </div>
-            <p className="mt-2 text-sm font-semibold">{snapshot.mapLabel}</p>
+            <p className="mt-2 text-sm font-semibold">{snapshot.destinationLabel}</p>
           </div>
         </div>
       </div>

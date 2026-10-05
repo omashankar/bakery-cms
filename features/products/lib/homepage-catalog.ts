@@ -1,6 +1,6 @@
 import type { LandingProduct, LandingCategory, LandingOffer } from "@/constants/landing-data";
-import { loadProducts } from "@/features/products/lib/products-repository";
-import { getCategories } from "@/features/catalog/lib/catalog-repository";
+import { categoriesOf, loadProducts } from "@/features/products/lib/products-repository";
+import { getCategories, getCollections } from "@/features/catalog/lib/catalog-repository";
 import { selectStorefrontOffers } from "@/features/commerce/lib/coupon-offers";
 import { getActiveCoupons } from "@/features/commerce/lib/coupons-repository";
 import { getPublishedStorefrontProducts } from "@/features/products/lib/product-mapper";
@@ -40,7 +40,19 @@ export function getHomepageProducts(
   maxCount = 8
 ): LandingProduct[] {
   const cached = loadProducts();
-  return buildHomepageProducts(source, maxCount, cached, getPublishedStorefrontProducts(cached));
+  return buildHomepageProducts(
+    source,
+    maxCount,
+    cached,
+    getPublishedStorefrontProducts(cached),
+    undefined,
+    // Same reason as the server path: a category slug cannot be recovered
+    // from the name, so the row needs the shop own list to resolve it.
+    getCategories(),
+    // And its collections, for a row whose slug names a curated group rather
+    // than a type — /seasonal is one on this shop.
+    getCollections(),
+  );
 }
 
 /**
@@ -50,15 +62,25 @@ export function getHomepageProducts(
  * re-reading its local stores, which keeps the homepage hydration-safe.
  */
 export function selectHomepageCategories(
-  products: readonly { status: string; categoryId: string }[],
+  products: readonly { status: string; categoryId: string; categoryIds?: string[] }[],
   categories: readonly {
     id: string;
     name: string;
     slug: string;
     image?: string;
-    cakeCount?: number;
   }[],
-  maxCount = 6
+  maxCount = 6,
+  /**
+   * A CATEGORY WITH NO PICTURE IS DROPPED — unless the caller is building
+   * the list a shop PICKS from.
+   *
+   * The band draws a picture per tile, so a pictureless category in the
+   * automatic row is a blank box nobody asked for. But a shop choosing
+   * which categories to feature must be able to choose any of them: this
+   * shop has eleven and three carry no picture, and a picker that silently
+   * omitted them would look like the three had been deleted.
+   */
+  options: { requirePicture?: boolean } = {},
 ): LandingCategory[] {
   const published = products.filter((cake) => cake.status === "published");
   return categories
@@ -69,17 +91,27 @@ export function selectHomepageCategories(
           name: category.name,
           slug: category.slug,
           image: category.image ?? "",
-          // Counted, never declared.
-          //
-          // This was `category.cakeCount ?? <the real count>`, so a number typed
-          // into the category form OVERRODE the shop's actual catalogue — and
-          // the seed had typed one for nine of them. Measured on a real shop:
-          // the homepage advertised "48 cakes" under Birthday and 271 across all
-          // categories, while the whole shop held 25 products.
-          count: published.filter((cake) => cake.categoryId === category.id).length,
+          /**
+           * Counted, never declared — and counted over EVERY membership.
+           *
+           * This was `category.cakeCount ?? <the real count>`, so a number typed
+           * into the category form OVERRODE the shop's actual catalogue — and
+           * the seed had typed one for nine of them. Measured on a real shop:
+           * the homepage advertised "48 cakes" under Birthday and 271 across all
+           * categories, while the whole shop held 25 products.
+           *
+           * Counting the primary alone would put the same lie back the other way
+           * round, once a product can be filed in more than one place: the tile
+           * says "Plants · 3" and the page it links to lists seven. A customer
+           * reads the small number, decides the shop has little to offer, and
+           * never clicks.
+           */
+          count: published.filter((cake) =>
+            categoriesOf(cake).includes(category.id),
+          ).length,
         }) satisfies LandingCategory
     )
-    .filter((category) => category.image)
+    .filter((category) => options.requirePicture === false || category.image)
     .slice(0, maxCount);
 }
 
@@ -95,5 +127,8 @@ export function getHomepageCategories(maxCount = 6): LandingCategory[] {
  * and `getHomepageCategories` above are.
  */
 export function getHomepageOffers(maxCount = 3): LandingOffer[] {
-  return selectStorefrontOffers(getActiveCoupons(), maxCount);
+  return selectStorefrontOffers(getActiveCoupons(), maxCount, {
+    // Same as the server path: a scoped card names its categories.
+    categoryNames: new Map(getCategories().map((category) => [category.id, category.name])),
+  });
 }

@@ -27,25 +27,72 @@ function visibilityForPath(pathname: string): Banner["visibility"] {
   return "all";
 }
 
-export function StorefrontBannerStrip() {
-  const [banners, setBanners] = useState<Banner[]>([]);
+/**
+ * The live banners this route may show, out of all the live ones.
+ *
+ * NOT `selectActiveHeroBanners`, deliberately. That one re-checks each
+ * banner's schedule against the clock, and this runs during the server render
+ * AND again on hydration -- microseconds apart, but a banner starting in that
+ * gap would be in the HTML and not in the hydration, which is the mismatch
+ * this whole change exists to remove. The schedule is already settled:
+ * `getPublicContent` returns live banners only. What is left is the position
+ * and the route, and neither reads the clock.
+ */
+function forThisRoute(live: Banner[], pathname: string): Banner[] {
+  const visibility = visibilityForPath(pathname);
+  return live
+    .filter((banner) => {
+      if (banner.position !== "hero") return false;
+      const scope = banner.visibility ?? "all";
+      return scope === "all" || scope === visibility;
+    })
+    .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0) || a.title.localeCompare(b.title));
+}
+
+interface StorefrontBannerStripProps {
+  /**
+   * Every live hero banner, read on the SERVER.
+   *
+   * This is what stops the strip arriving late. It used to start empty and
+   * render nothing until the browser's copy settled, so a 52px bar appeared
+   * above the header about 450ms after the page had painted and pushed the
+   * whole page down -- CLS 0.306 on the homepage, 0.545 on the wishlist, on
+   * the production build.
+   */
+  live: Banner[];
+}
+
+export function StorefrontBannerStrip({ live }: StorefrontBannerStripProps) {
+  const pathname = usePathname();
+  /*
+    THE SERVER'S ANSWER UNTIL THE BROWSER HAS A BETTER ONE.
+
+    `null` means "nothing has arrived from the browser yet" and is NOT the
+    same as an empty list, which is a real answer meaning this route shows no
+    banner. Starting from `[]` is what made the bar late in the first place.
+  */
+  const [fromBrowser, setFromBrowser] = useState<Banner[] | null>(null);
   const [index, setIndex] = useState(0);
   const [dismissed, setDismissed] = useState(false);
-  const pathname = usePathname();
+  const banners = fromBrowser ?? forThisRoute(live, pathname);
 
   useEffect(() => {
     let cancelled = false;
 
-    // Nothing until the server's banners have landed.
+    // STILL HERE, and still for its original reason.
     //
     // `getActiveHeroBanners` reads the browser cache, and on a first visit that
     // cache does not exist — so it seeded the shipped demo banners and this strip
     // advertised "Summer Celebration Sale" to every first-time visitor, for their
-    // whole session, on every page. It never re-read, so the real banners
-    // arriving milliseconds later changed nothing. An empty strip is the honest
-    // state until the shop's own answer is in.
+    // whole session, on every page. Waiting for the settled answer is what fixed
+    // that, and it is why this cannot simply read the cache on first render.
+    //
+    // What changed is that waiting no longer decides the FIRST paint: the
+    // server's list does, so there is nothing to push down when this lands. It
+    // now exists to pick up a banner the admin changed mid-session, and to
+    // re-narrow the list on a client-side navigation.
     void bannersLoaded.waitForSettled().then((settled) => {
-      if (settled && !cancelled) setBanners(getActiveHeroBanners(visibilityForPath(pathname)));
+      if (settled && !cancelled) setFromBrowser(getActiveHeroBanners(visibilityForPath(pathname)));
     });
 
     return () => {

@@ -1,25 +1,59 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getBusinessLabels, type BusinessLabels } from "@/config/business-labels";
 import {
-  getGeneralSettings,
+  getBusinessLabels,
+  resolveLabels,
+  type ResolvedLabels,
+  type BusinessLabels,
+} from "@/config/business-labels";
+import {
+  getLabelSettings,
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
 
 /**
- * Business-type product labels for client UI. Defaults to the bakery labels so
- * SSR / the bakery template render exactly as before, then resolves the real
- * business type on the client and re-reads whenever settings change.
+ * The shop's own product wording for client UI.
  *
- * Used to make visible wording (e.g. "Cakes" → "Flowers") business-aware WITHOUT
- * renaming any route, folder, component, or database collection.
+ * Starts at the neutral defaults so SSR and the first client paint agree, then
+ * layers the shop's own overrides after mount and re-reads whenever settings
+ * change.
+ *
+ * Changes visible wording only (e.g. "Products" → "Flowers"). Routes, folders,
+ * components and database collections are never renamed from here.
  */
-export function useBusinessLabels(): BusinessLabels {
-  const [labels, setLabels] = useState<BusinessLabels>(() => getBusinessLabels("bakery"));
+/**
+ * Both halves, because the merged object below genuinely is both: the icon and
+ * the nouns from the presets, and every resolved label over the top. The return
+ * type said `BusinessLabels` alone, so a caller could not read a label that was
+ * there at runtime.
+ */
+export type ShopLabels = BusinessLabels & ResolvedLabels;
+
+export function useBusinessLabels(): ShopLabels {
+  const [labels, setLabels] = useState<ShopLabels>(() => ({
+    ...getBusinessLabels(),
+    ...resolveLabels({}),
+  }));
 
   useEffect(() => {
-    const sync = () => setLabels(getBusinessLabels(getGeneralSettings().businessType));
+    /**
+     * The shop's OWN words, over the neutral defaults.
+     *
+     * This once resolved from `businessType` ALONE and threw away the
+     * overrides the server had already layered on — so `labelOverrides` was
+     * inert, and a shop that wanted "Bouquet" got "Cake" whatever it typed.
+     * The trade preset is gone entirely now, so what a shop typed is the only
+     * thing above the neutral floor.
+     *
+     * `resolveLabels` is the single place a blank means "use the default".
+     */
+    const sync = () => {
+      setLabels({
+        ...getBusinessLabels(),
+        ...resolveLabels(getLabelSettings()),
+      });
+    };
     sync();
     window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
     return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);

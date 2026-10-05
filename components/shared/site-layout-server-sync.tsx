@@ -11,6 +11,7 @@ import {
 import { persistServerHeader } from "@/features/site-layout/lib/header-repository";
 import { persistServerFooter } from "@/features/site-layout/lib/footer-repository";
 import { persistServerAppearance } from "@/features/site-layout/lib/appearance-repository";
+import { shareHydration } from "@/lib/hydrate-once";
 
 /**
  * Hydrates header + footer settings from the server once on mount, so the
@@ -42,9 +43,31 @@ export function SiteLayoutServerSync() {
  * `features/site-layout/lib/` because it needs the appearance repository, which
  * is under `apps/` — and a domain module may not depend on an app's UI layer.
  */
-export async function ensureSiteLayoutHydrated(): Promise<boolean> {
-  if (siteLayoutHydration.hasSettled()) return true;
+export function ensureSiteLayoutHydrated(): Promise<boolean> {
+  if (siteLayoutHydration.hasSettled()) return Promise.resolve(true);
 
+  /*
+    ONE BATCH PER BROWSER, HOWEVER MANY CALLERS ASK AT ONCE.
+
+    The line above answers for a read that has FINISHED, and says nothing about
+    one in flight. On /admin/header the page's own form effect asks at mount and
+    the layout's deferred hydration asks a beat later, before the first has
+    settled — so both issued header, footer and appearance. Six requests for
+    three documents, measured.
+
+    The cost is not the three extra requests. The loser's response landed about
+    eight seconds after it was issued, carrying a snapshot taken before that,
+    and wrote it into the cache with `persistServerHeader`. A save made inside
+    that window is silently reverted in this browser, and a remount then adopts
+    the reverted copy as BOTH the working and the saved one — the failure
+    `header-repository.ts` documents for a refused WRITE, arriving through a
+    duplicate READ. Today the screen is too slow for anyone to reach that
+    window. That is not a guard.
+  */
+  return shareHydration("site-layout", readSiteLayout);
+}
+
+async function readSiteLayout(): Promise<boolean> {
   const [header, footer, appearance] = await Promise.all([
     fetchHeaderSettings(),
     fetchFooterSettings(),

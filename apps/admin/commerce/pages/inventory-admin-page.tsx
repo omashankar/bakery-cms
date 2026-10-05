@@ -56,6 +56,7 @@ import { routes } from "@/constants/routes";
 import { formatRelativeTime } from "@/utils/format";
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 import { useProductCacheSync } from "@/features/products/data/use-product-cache-sync";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 const PAGE_SIZE = 10;
 
@@ -70,6 +71,7 @@ const EMPTY_OVERVIEW: InventoryOverview = {
 };
 
 export function InventoryAdminPage() {
+  const labels = useBusinessLabels();
   /**
    * This screen's own data, asked for NOW.
    *
@@ -358,7 +360,7 @@ export function InventoryAdminPage() {
           <FilterPanelSearch
             value={filters.search}
             onChange={(value) => updateFilters({ search: value })}
-            placeholder="Search products…"
+            placeholder={`Search ${labels.productWordPlural.toLowerCase()}…`}
           />
           <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
             <AdminSelect
@@ -402,7 +404,7 @@ export function InventoryAdminPage() {
           <EmptyState
             icon={Package}
             title="No inventory records found"
-            description="Try another filter, or add cakes to your catalog."
+            description={`Try another filter, or add ${labels.productWordPlural.toLowerCase()} to your catalog.`}
             className="py-14"
           />
         ) : (
@@ -501,8 +503,8 @@ export function InventoryAdminPage() {
                             size="sm"
                             variant="ghost"
                             className="h-8"
-                            aria-label="Edit product"
-                            title="Edit product"
+                            aria-label={`Edit ${labels.productWord.toLowerCase()}`}
+                            title={`Edit ${labels.productWord.toLowerCase()}`}
                             render={<Link href={routes.admin.cakes.edit(item.cakeId)} />}
                           >
                             <Pencil className="size-3.5" />
@@ -571,8 +573,8 @@ export function InventoryAdminPage() {
                           size="sm"
                           variant="ghost"
                           className="h-8"
-                          aria-label="Edit product"
-                          title="Edit product"
+                          aria-label={`Edit ${labels.productWord.toLowerCase()}`}
+                          title={`Edit ${labels.productWord.toLowerCase()}`}
                           render={<Link href={routes.admin.cakes.edit(item.cakeId)} />}
                         >
                           <Pencil className="size-3.5" />

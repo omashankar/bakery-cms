@@ -16,7 +16,6 @@ import { LinkButton } from "./components/link-button";
 import { MarketingShell } from "./components/marketing-shell";
 import { PricingTiers } from "./components/pricing-tiers";
 import { Container, Eyebrow, Section, SectionHeading } from "./components/section";
-import { WeddingMockup } from "./components/wedding-mockup";
 import {
   adminModules,
   builderCapabilities,
@@ -30,7 +29,6 @@ import {
   roadmap,
   techStack,
   trustedFeatures,
-  weddingBlocks,
   whyChoose,
 } from "./landing-data";
 
@@ -149,7 +147,7 @@ export function LandingPage() {
               <SectionHeading
                 eyebrow="Any Business"
                 title="One CMS, built for every business"
-                description="Bakery is the default template — but switch your Business Type in Settings and the entire storefront, labels, icons, and optional modules adapt instantly. One codebase, any business — no redesign."
+                description="There is no business type to choose. Name your products in your own words, build the options they come in — size, colour, flavour, capacity — and sell whatever mix you like from one catalogue. One codebase, any business, no redesign."
               />
             </ScrollReveal>
             <StaggerReveal className="mt-14 grid grid-cols-2 gap-4 sm:grid-cols-3">
@@ -302,41 +300,6 @@ export function LandingPage() {
 
         {/* ============================================================ */}
         {/* SECTION 8 — Wedding Builder                                  */}
-        {/* ============================================================ */}
-        <Section className="bg-white">
-          <Container>
-            <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
-              <ScrollReveal className="flex flex-col gap-6">
-                <SectionHeading
-                  align="left"
-                  eyebrow="Wedding Builder"
-                  title="Dedicated pages for the big day"
-                  description="Launch elegant, fully CMS-controlled wedding landing pages designed to win bespoke and celebration orders."
-                />
-                <div className="flex flex-wrap gap-2.5">
-                  {weddingBlocks.map((block) => (
-                    <span
-                      key={block}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-sm font-medium shadow-sm"
-                    >
-                      <span className="size-1.5 rounded-full bg-[#D4A373]" />
-                      {block}
-                    </span>
-                  ))}
-                </div>
-                <div className="inline-flex w-fit items-center gap-2 rounded-full bg-[#F6EEE3] px-4 py-2 text-sm font-semibold text-[#8a6a45]">
-                  <SparklesIcon className="size-4" />
-                  Fully CMS Controlled
-                </div>
-              </ScrollReveal>
-              <ScrollReveal delay={80} className="min-w-0">
-                <BrowserFrame url="app.bakerycms.com/wedding">
-                  <WeddingMockup />
-                </BrowserFrame>
-              </ScrollReveal>
-            </div>
-          </Container>
-        </Section>
 
         {/* ============================================================ */}
         {/* SECTION 9 — Payment System                                   */}

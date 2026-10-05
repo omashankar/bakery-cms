@@ -106,14 +106,14 @@ export const docChapters: DocChapter[] = [
     steps: [
       {
         title: "Add a cake",
-        body: "Name, description, photographs, price, category and occasion. Add weight tiers (half kilo, one kilo) and flavour options; each can carry its own surcharge, and the storefront prices the default combination.",
+        body: "Name, description, photographs, price, category and occasion. Add the sizes and flavours this product comes in; each can carry its own surcharge, and the storefront prices the default combination.",
         where: { label: "Cakes → Add", href: routes.admin.cakes.add },
         caution:
           "A cake stays hidden from customers until its status is Published. Draft and archived items are not shown, and not sold.",
       },
       {
         title: "Organise the menu",
-        body: "Categories, flavours, occasions and weight options all live in one place. Renaming a category here renames it everywhere — the storefront menu, the filters and the product pages.",
+        body: "Categories and occasions live in one place. Renaming a category here renames it everywhere — the storefront menu, the filters and the product pages. Sizes and flavours are typed on the product itself, so one product's list is never forced onto another.",
         where: { label: "Catalog", href: routes.admin.catalog },
       },
       {
@@ -140,11 +140,6 @@ export const docChapters: DocChapter[] = [
         title: "Rearrange the homepage",
         body: "Add, remove, reorder and edit the sections your homepage is built from — hero, categories, featured cakes, offers, testimonials. Preview before publishing; a draft is only visible to you.",
         where: { label: "Homepage Builder", href: routes.admin.builders.homepage },
-      },
-      {
-        title: "Wedding pages",
-        body: "A separate builder for the wedding collection, with its own sections and its own enquiry form. Switch the whole module off if you do not do weddings.",
-        where: { label: "Wedding Builder", href: routes.admin.builders.wedding },
       },
       {
         title: "Header, footer and colours",

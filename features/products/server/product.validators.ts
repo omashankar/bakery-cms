@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { MAX_PRODUCT_PHOTOS } from "@/features/products/lib/product-limits";
+
 /**
  * Server-side validation for product writes (ProductFormData). Core commerce
  * fields are strict; deeply-nested rich shapes (weights, variantGroups, seo)
@@ -31,10 +33,42 @@ const variantGroupSchema = z
     id: z.string(),
     name: z.string(),
     type: z.string(),
-    required: z.boolean(),
+    // Inert — see the note on ProductVariantGroup.required. Optional so a group
+    // that arrives without it is not a 400 on a field nothing reads.
+    required: z.boolean().optional(),
+    /**
+     * How the shop chose to draw this block.
+     *
+     * `.catch(undefined)` rather than a bare `.optional()`, and the difference
+     * matters on the day something goes wrong: a rollback to a build that does
+     * not know the word, or an import carrying junk in this key, must lose the
+     * KEY rather than 400 the whole product save. An unknown value then means
+     * exactly what an absent one means — nobody has said — and the storefront
+     * derives the rendering as it always has.
+     */
+    render: z.enum(["buttons", "checkbox", "stated"]).optional().catch(undefined),
     options: z.array(z.any()),
   })
   .passthrough();
+
+/**
+ * One labelled list in the product description. A real schema, not the
+ * top-level `.passthrough()` — which would accept `descriptionBlocks: "hello"`
+ * and an entry with no body, both of which reach Mongo as Mixed and then render
+ * as nothing or as "[object Object]" on the product page.
+ *
+ * The HEADING may be empty, deliberately: two of the six reference pages list
+ * their facts with no label over them. The BODY may not — a heading with
+ * nothing under it is the empty section this project keeps deleting.
+ *
+ * Bounded because it is free text an admin types and the storefront prints: the
+ * caps stop a paste turning one product document into a page nobody can read.
+ */
+const descriptionBlockSchema = z.object({
+  id: z.string().trim().min(1),
+  heading: z.string().trim().max(80).default(""),
+  body: z.string().trim().min(1, "A block needs something under its heading").max(4000),
+});
 
 export const productFormSchema = z
   .object({
@@ -45,21 +79,53 @@ export const productFormSchema = z
       .min(1, "Slug is required")
       .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/i, "Slug may contain only letters, numbers and hyphens"),
     description: z.string().default(""),
-    shortDescription: z.string().optional(),
     price: z.number().min(0, "Price cannot be negative"),
     compareAtPrice: z.number().min(0).optional(),
-    images: z.array(z.string()).default([]),
+    /**
+     * Capped, and capped HERE as well as in the form.
+     *
+     * The form is where an admin meets the limit; this is where it holds. A
+     * cap only in the browser is a suggestion — the same shape as the
+     * delivery slots, the minimum order and the shop-wide lead time, each of
+     * which was configured in the admin, checked in the browser, and honoured
+     * by nothing when a request arrived without one.
+     */
+    images: z
+      .array(z.string())
+      .max(
+        MAX_PRODUCT_PHOTOS,
+        `A product can have at most ${MAX_PRODUCT_PHOTOS} photos. Remove one and save again.`,
+      )
+      .default([]),
     categoryId: z.string().default(""),
-    flavourId: z.string().optional(),
+    /**
+     * `.optional()`, NOT `.default([])` — one deliberate deviation from the
+     * `occasionIds` line below.
+     *
+     * A product update is a whole-document replace (`findOneAndReplace`), and
+     * the service merges `{ ...existing, ...data }` with `data` last. With a
+     * default, a browser still holding the pre-deploy admin bundle sends `[]`
+     * while saving a price, and silently erases every membership the owner
+     * set. Absent leaves `...existing` standing.
+     */
+    categoryIds: z.array(z.string()).optional(),
     occasionIds: z.array(z.string()).default([]),
+    /**
+     * The delivery speeds this product can go out by.
+     *
+     * `.default([])` because empty MEANS every speed — the same reading the
+     * type, the Mongoose path and `deliverableBy` all take. There is no
+     * distinction here between absent and empty worth keeping: a shop that has
+     * never opened the control and one that ticked nothing both mean "send it
+     * however you send anything".
+     */
+    deliveryTierIds: z.array(z.string()).default([]),
     weights: z.array(weightSchema).default([]),
+    weightLabel: z.string().optional(),
     status: z.enum(["draft", "published", "archived"]),
     isFeatured: z.boolean(),
     isBestSeller: z.boolean(),
     isTrending: z.boolean(),
-    isEggless: z.boolean(),
-    isPhotoCake: z.boolean(),
-    isSeasonal: z.boolean(),
     shapes: z.array(z.string()).default([]),
     flavourOptions: z.array(z.string()).default([]),
     stockStatus: z.enum(["in_stock", "low_stock", "out_of_stock"]),
@@ -68,18 +134,123 @@ export const productFormSchema = z
     lowStockThreshold: z.number().min(0).optional(),
     allowsMessage: z.boolean(),
     allowsPhotoUpload: z.boolean(),
-    ingredients: z.string().optional(),
+    /**
+     * Optional, unlike the three booleans around it.
+     *
+     * Those are required, so every product literal in the app and in the
+     * suite already carries them. A required seventh would 400 every import,
+     * seed and API client written before today for a field whose absence has
+     * a perfectly good meaning.
+     */
+    photoFrameShape: z
+      .enum(["circle", "square", "heart", "portrait", "landscape", "wrap"])
+      .optional(),
     variantGroups: z.array(variantGroupSchema).default([]),
+    descriptionBlocks: z.array(descriptionBlockSchema).max(20).default([]),
     rating: z.number().min(0).max(5),
     reviewCount: z.number().min(0),
     seo: seoSchema.default({}),
-    barcode: z.string().optional(),
-    preparationTimeMinutes: z.number().min(0).optional(),
-    shelfLifeDays: z.number().min(0).optional(),
-    calories: z.number().min(0).optional(),
-    allergens: z.string().optional(),
-    careInstructions: z.string().optional(),
+
   })
-  .passthrough();
+  .passthrough()
+  /**
+   * A PUBLISHED product has a price. Held here as well as in the form.
+   *
+   * The same reasoning as the photo cap above: the form is where an admin meets
+   * the rule, this is where it holds. `price` is `min(0)`, so zero was a
+   * perfectly valid published price — and the form used to open at a hardcoded
+   * 999, so the field could go live either invented or empty and nothing on
+   * either side objected.
+   *
+   * Only for `published`. A draft priced at nothing is a product half built,
+   * which is what drafts are for, and archiving one must never become
+   * impossible because of what it costs.
+   *
+   * Named size rows decide it when there are any, because `priceLine` charges
+   * `weights[index].price` and never reaches the base once they exist. Every
+   * named row has to be priced: one at zero sells that size free. Rows with a
+   * blank label are ignored — the form drops them from the payload, and
+   * `priceLine` cannot sell one either.
+   */
+  .superRefine((product, ctx) => {
+    if (product.status !== "published") return;
+    for (const issue of publishIssues(product)) {
+      ctx.addIssue({ code: "custom", path: [issue.field], message: issue.message });
+    }
+  });
+
+/**
+ * Why a product cannot be put on sale as it stands — the published-only rules
+ * below, as data.
+ *
+ * Lifted out of the refinement because bulk Publish never runs the schema: it
+ * changes only the status, so a draft parked at ₹0 went on sale from the list
+ * with a tick and one button. Both paths now ask this one question.
+ */
+export function publishIssues(
+  product: {
+    price: number;
+    weights?: ReadonlyArray<{ label?: string; price: number }>;
+    compareAtPrice?: number | null;
+  },
+): { field: string; message: string }[] {
+  const issues: { field: string; message: string }[] = [];
+
+  const namedSizes = (product.weights ?? []).filter(
+      (tier) => String(tier.label ?? "").trim().length > 0,
+    );
+    const priced =
+      namedSizes.length > 0
+        ? namedSizes.every((tier) => tier.price > 0)
+        : product.price > 0;
+
+    if (!priced) {
+      issues.push({
+        field: "price",
+        message:
+          "A published product needs a price above zero — its own, or one on every size it is sold in.",
+      });
+    }
+
+    /**
+     * A COMPARE-AT AT OR BELOW THE PRICE IS NOT A SAVING, and until now it
+     * saved quietly and then drew nothing.
+     *
+     * The storefront has always refused to show one — `displayCompareAtPrice`
+     * returns undefined for it, deliberately, because shifting it would turn
+     * "we charge more than we say" into a badge. So the shop's pages are
+     * honest. What was missing is anyone TELLING the shop: two published
+     * products on this catalogue are in exactly that state, typed the wrong
+     * way round, and their owner has no way to know the saving they meant to
+     * advertise is not being advertised.
+     *
+     * `> 0` GUARDS THE CLEAR. Zero and undefined both mean "no compare-at",
+     * and without this a product whose box is being emptied is a permanent
+     * 400.
+     *
+     * Against `product.price`, the base, because that is the number
+     * `displayCompareAtPrice` compares against — a rule that judged a
+     * different basis would refuse rows the storefront would have drawn.
+     *
+     * NOT A PERCENTAGE CAP. An eighty-per-cent clearance is real, so a cap
+     * refuses an honest sale while a shop inflating by forty per cent sails
+     * through — and it would be this software inventing pricing policy. At or
+     * below the price is the only case that is provably not a discount, which
+     * is the only case a validator has standing to reject.
+     *
+     * Published-only, like every rule here: a draft being written can hold
+     * anything.
+     */
+    const compareAt = product.compareAtPrice;
+    if (compareAt != null && compareAt > 0 && compareAt <= product.price) {
+      issues.push({
+        field: "compareAtPrice",
+        message:
+          "A compare-at price has to be ABOVE the selling price, or there is no saving to show. Clear it, or swap the two numbers.",
+      });
+    }
+  return issues;
+}
 
 export type ProductFormInput = z.infer<typeof productFormSchema>;
+

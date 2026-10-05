@@ -8,15 +8,29 @@ import { getCatalog } from "@/features/catalog/server/catalog.service";
 import { readProducts } from "@/features/products/data/products-store.server";
 import * as productRepo from "@/features/products/server/product.repository";
 import { purgeProductTraces } from "@/features/products/server/product-cascade.server";
+import { deriveStockStatus } from "@/features/inventory/lib/inventory-utils";
+import { publishIssues } from "@/features/products/server/product.validators";
+import { ValidationError } from "@/lib/server/http/errors";
+import { getSettings as getInventorySettings } from "@/features/inventory/server/inventory.service";
 import type { LandingProduct } from "@/constants/landing-data";
 import type { Product, ProductFormData } from "@/types/product";
-import { defaultProductUnitPrice } from "@/features/products/lib/product-pricing";
-import { variantGroupsEnabledBy } from "@/features/products/lib/variant-utils";
+import {
+  defaultProductUnitPrice,
+  displayCompareAtPrice,
+  formatVariantSummary,
+} from "@/features/products/lib/product-pricing";
+import {
+  getDefaultVariantSelections,
+  variantGroupsEnabledBy,
+} from "@/features/products/lib/variant-utils";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import { getSettings } from "@/features/settings/server/settings.service";
 import type { ModuleSettings } from "@/types/settings";
 import {
+  buildCategoryRail,
+  categoryStartingPrices,
   buildHomepageProducts,
+  matchHomepageSource,
   type HomepageProductSource,
 } from "@/features/products/lib/homepage-rails";
 
@@ -49,6 +63,68 @@ async function categoryNames(): Promise<TaxonomyNames> {
   } catch {
     // A catalog read that fails must not take the product page down with it.
     return {};
+  }
+}
+
+/**
+ * The same catalogue, as the slug/name pairs `filterProductsByCategory` needs.
+ *
+ * `categoryNames` above answers “what is this category called”, keyed by id.
+ * A homepage row keyed by SLUG needs the other direction, and cannot get it
+ * by slugifying the name: this shop has “Eggless Cakes” at /eggless.
+ *
+ * `getCatalog` is request-cached, so asking twice costs one read.
+ */
+async function categorySlugs(): Promise<{ name: string; slug: string }[]> {
+  try {
+    const catalog = await getCatalog();
+    return (catalog.categories as Array<{ name: string; slug: string }>).map(
+      (category) => ({ name: category.name, slug: category.slug }),
+    );
+  } catch {
+    // A catalog read that fails must not take the homepage down with it.
+    return [];
+  }
+}
+
+/**
+ * The shop's occasion slugs, so a homepage row can point at one.
+ *
+ * A row is stored as a SLUG and nothing else, and the shop decides which of the
+ * three lists that slug lives in. This one exists because "birthday" moved:
+ * it was a category, the catalogue was rebuilt so that categories say what a
+ * thing IS, and the homepage's Birthday row went silent while
+ * /store/collections/birthday — which falls back to the occasion — still held
+ * nineteen products.
+ */
+async function occasionSlugs(): Promise<{ slug: string }[]> {
+  try {
+    const catalog = await getCatalog();
+    return ((catalog.occasions ?? []) as Array<{ slug: string }>).map((row) => ({
+      slug: row.slug,
+    }));
+  } catch {
+    // A catalog read that fails must not take the homepage down with it.
+    return [];
+  }
+}
+
+/**
+ * The shop's curated groups, for a homepage row that points at one.
+ *
+ * Slug and membership only — a row needs to know which products are in the
+ * group, and nothing else about it. Same request-cached read as the categories
+ * above, so asking for both costs one.
+ */
+async function collectionMembership(): Promise<{ slug: string; productIds?: string[] }[]> {
+  try {
+    const catalog = await getCatalog();
+    return ((catalog.collections ?? []) as Array<{ slug: string; productIds?: string[] }>).map(
+      (group) => ({ slug: group.slug, productIds: group.productIds }),
+    );
+  } catch {
+    // A catalog read that fails must not take the homepage down with it.
+    return [];
   }
 }
 
@@ -108,7 +184,32 @@ export async function getStorefrontProducts(): Promise<LandingProduct[]> {
  * their labels, since the filter compares labels and the card shows no prices
  * per tier.
  */
+
 function toCard(product: LandingProduct, modules: ModuleSettings): LandingProduct {
+  /**
+   * The groups a customer would actually be shown, resolved ONCE.
+   *
+   * The same gate the two prices below use. It was called four separate times
+   * in this function; a fifth caller that forgot the argument would have put a
+   * filter box on the storefront for a module the shop had switched off.
+   */
+  const visibleGroups = variantGroupsEnabledBy(product.variantGroups ?? [], modules);
+  const optionGroups = visibleGroups
+    .map((group) => ({
+      name: group.name?.trim() ?? "",
+      // Deduped case-insensitively: two options spelled "Eggless" and "eggless"
+      // are one checkbox, not two that split the same products between them.
+      labels: [
+        ...new Map(
+          group.options
+            .map((option) => option.label?.trim() ?? "")
+            .filter(Boolean)
+            .map((label) => [label.toLowerCase(), label] as const),
+        ).values(),
+      ],
+    }))
+    .filter((group) => group.name.length > 0 && group.labels.length > 0);
+
   return {
     id: product.id,
     slug: product.slug,
@@ -135,17 +236,88 @@ function toCard(product: LandingProduct, modules: ModuleSettings): LandingProduc
       weights: product.weights,
       // A module the shop has switched off is not priced, so a card must not
       // show its surcharge either — the server would not charge it.
-      variantGroups: variantGroupsEnabledBy(product.variantGroups ?? [], modules),
+      variantGroups: visibleGroups,
     }),
-    compareAtPrice: product.compareAtPrice,
+    /**
+     * Moved by whatever moved the price above it.
+     *
+     * `price` here is the default-option price, not the record base — and this
+     * shipped the record’s compare-at beside it, unshifted. So a Rs 1,000 cake
+     * with a Rs 1,200 compare-at and a default eggless option at +Rs 80 was
+     * advertised on the grid as Rs 1,080 struck against Rs 1,200, while its own
+     * product page said Rs 1,080 against Rs 1,280 — two different savings for
+     * the identical configuration, on two screens one click apart.
+     *
+     * `product-card.tsx` calls `displayCompareAtPrice` again over this value,
+     * and that call is a no-op there by construction: the card has no variant
+     * groups and its weight tiers are zeroed, so its shift is exactly 0.
+     */
+    compareAtPrice: displayCompareAtPrice(
+      product.price,
+      product.compareAtPrice,
+      defaultProductUnitPrice({
+        price: product.price,
+        weights: product.weights,
+        variantGroups: visibleGroups,
+      }),
+    ),
     badge: product.badge,
     rating: product.rating,
     reviewCount: product.reviewCount,
     inStock: product.inStock,
+    /**
+     * The outline a photo product prints in — one short string, or nothing.
+     *
+     * No card renders it. The CART does: a line carries the photograph the
+     * customer fitted as a bare URL, and the only way to show it back in the
+     * shape it will be printed is to look the shape up by slug against this
+     * catalogue, which that page is already handed for the stock check. The
+     * alternative is a new field on the cart line, which has to be threaded by
+     * hand through the quote, the order, the invoice and the lists between
+     * them — a great deal of surface for a value the server already knows.
+     *
+     * It costs nothing on the wire for the products that are not photo
+     * products: `undefined` does not serialise.
+     */
+    photoFrameShape: product.photoFrameShape,
     description: "", // required by the type; never rendered on a card
     // Filter inputs.
+    /**
+     * Every visible option, under the question the shop asked it for.
+     *
+     * The card carried `flavours` and nothing else, so a customer typing
+     * “Eggless”, “Heart”, “Black” or “256GB” matched nothing — the search
+     * haystack could only see one bakery-shaped field. The first answer to that
+     * was a flat `optionLabels`, and flattening turned out to be the bug one
+     * layer down: the collections sidebar poured the whole catalogue's options
+     * into a single list headed “Flavour”.
+     *
+     * So the card carries the grouping too. Still not `variantGroups` — no ids,
+     * no prices, no defaults, for the payload reason above — just each group's
+     * name and the words under it.
+     */
+    optionGroups,
+    /**
+     * DERIVED, never gathered a second time.
+     *
+     * Search reads this and the sidebar reads the groups. Building them
+     * separately is how "tick Heart in the sidebar, type Heart in search" comes
+     * apart later — silently, because both halves still return results.
+     */
+    optionLabels: optionGroups.flatMap((group) => group.labels),
+    // Carried across the RSC wire, or every client-side filter decides with
+    // one category while the server decided with four — the exact class this
+    // file already records, where a dropped field sent the occasion filter
+    // searching the prose instead.
+    categories: product.categories,
+    // The ids too, because a coupon scope matches on those. This is the
+    // narrow projection the cart and checkout actually receive, so a field
+    // missing here is a field the browser can never see.
+    categoryIds: product.categoryIds,
+    // The speeds, for the listing page's delivery filter. Without this the
+    // browser cannot tell an express-eligible product from any other.
+    deliveryTierIds: product.deliveryTierIds,
     occasions: product.occasions,
-    isEggless: product.isEggless,
     flavours: product.flavours,
     weights: product.weights?.map((tier) => ({ label: tier.label, price: 0 })),
   };
@@ -206,6 +378,7 @@ function nextId(): string {
 }
 
 export async function createProduct(data: ProductFormData): Promise<Product> {
+  if (data.status === "published") await assertPublishable([data]);
   const timestamp = nowIso();
   return productRepo.insertOne({
     ...data,
@@ -226,14 +399,17 @@ export async function createProduct(data: ProductFormData): Promise<Product> {
 
 export async function updateProduct(
   id: string,
-  data: ProductFormData
+  data: ProductFormData,
+  options: { stockQuantityLoaded?: number } = {},
 ): Promise<Product | null> {
   const existing = await getProductById(id);
   if (!existing) return null;
+  if (data.status === "published") await assertPublishable([data]);
 
   return productRepo.replaceOne(id, {
     ...existing,
     ...data,
+    ...(await stockForEdit(existing, data, options.stockQuantityLoaded)),
     id,
     // `rating` and `reviewCount` are owned by the reviews aggregate, which
     // writes them directly. Letting an edit form carry its stale copy back would
@@ -243,6 +419,42 @@ export async function updateProduct(
     createdAt: existing.createdAt,
     updatedAt: nowIso(),
   });
+}
+
+/**
+ * The stock an edit should leave behind.
+ *
+ * The form carries the quantity it LOADED. Orders `$inc` that field and the
+ * Inventory screen adjusts it in the database, so by the time the admin fixes a
+ * typo in the description the number on the form can be several sales old —
+ * and the whole-document replace wrote it back, re-selling cakes that had
+ * already gone and undoing a restock made in between.
+ *
+ * So the quantity is the admin's only when they changed it: an untouched field
+ * keeps what the database holds now. A changed one is a counted figure, absolute
+ * by definition, exactly like Inventory's "set". Either way the status is
+ * derived from the number actually written, never from the form's copy.
+ *
+ * A request without `stockQuantityLoaded` (an older admin bundle) keeps the
+ * previous behaviour rather than guessing.
+ */
+async function stockForEdit(
+  existing: Product,
+  data: ProductFormData,
+  stockQuantityLoaded: number | undefined,
+): Promise<Pick<Product, "stockQuantity" | "stockStatus">> {
+  const untouched =
+    stockQuantityLoaded !== undefined && data.stockQuantity === stockQuantityLoaded;
+  const stockQuantity = untouched ? (existing.stockQuantity ?? 0) : data.stockQuantity;
+  const stockStatus = deriveStockStatus(
+    {
+      stockQuantity,
+      unlimitedStock: data.unlimitedStock,
+      lowStockThreshold: data.lowStockThreshold,
+    },
+    await getInventorySettings(),
+  );
+  return { stockQuantity, stockStatus };
 }
 
 /**
@@ -275,7 +487,46 @@ export async function setProductStatus(
   status: Product["status"]
 ): Promise<number> {
   if (ids.length === 0) return 0;
+  if (status === "published") {
+    const products = await Promise.all(ids.map((id) => productRepo.findById(id)));
+    await assertPublishable(products.filter((p): p is Product => p !== null));
+  }
   return productRepo.setStatusMany(ids, status);
+}
+
+/**
+ * Refuse to put on sale anything the edit form would have refused.
+ *
+ * Bulk Publish changes only the status, so it never met the form's rules: a
+ * draft parked at ₹0, or filed nowhere, went live from the list and checkout
+ * charged nothing for it. The category is checked against the catalogue and not
+ * merely for being non-blank — a product whose category was deleted keeps the
+ * dead id, shows "Choose a category…" on its form, and passed a blank-check.
+ *
+ * All or nothing, naming every product held back, so the shop fixes them in one
+ * pass instead of discovering them one refusal at a time.
+ */
+async function assertPublishable(
+  products: Pick<Product, "name" | "price" | "weights" | "compareAtPrice" | "categoryId">[],
+): Promise<void> {
+  const catalog = await getCatalog();
+  const categories = new Set(
+    (catalog.categories as Array<{ id: string }>).map((category) => category.id),
+  );
+  const errors: { field: string; message: string }[] = [];
+  for (const product of products) {
+    const reasons = publishIssues(product).map((issue) => issue.message);
+    if (!categories.has(product.categoryId ?? "")) {
+      reasons.push("Choose a category before publishing — it decides where this is found on your shop.");
+    }
+    for (const message of reasons) errors.push({ field: product.name, message });
+  }
+  if (errors.length === 0) return;
+  const names = [...new Set(errors.map((error) => error.field))];
+  throw new ValidationError(
+    errors,
+    `Not published: ${names.join(", ")}. ${errors[0].message}`,
+  );
 }
 
 /**
@@ -285,12 +536,52 @@ export async function setProductStatus(
  * render, so the server pass produced seed data and the client swapped it after
  * hydration. Building the rails here keeps both passes identical.
  */
-export async function getHomepageRails(
-  maxCount = 8
-): Promise<Record<HomepageProductSource, LandingProduct[]>> {
-  const [products, names, modules] = await Promise.all([
+export async function getHomepageRails(maxCount = 8): Promise<{
+  rails: Record<HomepageProductSource, LandingProduct[]>;
+  /**
+   * One rail per category the shop has, keyed by slug.
+   *
+   * This is what makes a homepage row nameable after something the shop
+   * invented. Built here rather than on demand because the section renderer
+   * runs in both passes and must not read a catalogue itself — that is the
+   * bug this whole function exists to have fixed.
+   */
+  categoryRails: Record<string, LandingProduct[]>;
+  /**
+   * The cheapest live product in each category, over ALL of it.
+   *
+   * Beside the rails rather than derived from one, because a rail is capped
+   * and a starting price may not be inside the cap.
+   */
+  categoryStartingPrices: Record<string, number>;
+  /**
+   * The FLAGGED rows, cut by category — "the bestsellers that are cakes".
+   *
+   * A tabbed row whose heading says Bestsellers and whose tabs say Cakes and
+   * Flowers is making both statements at once, and neither rail already here
+   * can answer it: `rails['best-sellers']` knows nothing about categories,
+   * and `categoryRails[slug]` knows nothing about the flag.
+   *
+   * It cannot be done in the browser either. A card carries `badge`, not the
+   * flags, and `badge` is derived with a PRECEDENCE — featured beats
+   * bestseller beats trending — so a product that is both featured and a
+   * bestseller reads "Featured", and filtering on the badge would drop it
+   * from the bestsellers tab it belongs in.
+   *
+   * Only the three flag-driven sources, and only the pairs that hold
+   * something: an empty combination is left out rather than serialised, so a
+   * shop that flags nothing pays nothing for this.
+   */
+  flaggedCategoryRails: Partial<
+    Record<HomepageProductSource, Record<string, LandingProduct[]>>
+  >;
+}> {
+  const [products, names, categories, collections, occasions, modules] = await Promise.all([
     readProductsOnce(),
     categoryNames(),
+    categorySlugs(),
+    collectionMembership(),
+    occasionSlugs(),
     readModuleSettings(),
   ]);
   const all = products
@@ -306,12 +597,110 @@ export async function getHomepageRails(
     "seasonal",
   ];
 
-  return Object.fromEntries(
+  const rails = Object.fromEntries(
     sources.map((source) => [
       source,
-      buildHomepageProducts(source, maxCount, products, all, names).map((product) =>
+      buildHomepageProducts(source, maxCount, products, all, names, categories, collections).map((product) =>
         toCard(product, modules),
       ),
     ])
   ) as Record<HomepageProductSource, LandingProduct[]>;
+
+  /*
+    EVERY SLUG A ROW COULD NAME, from all three lists.
+
+    This was categories only, and a row is stored as a slug with no record of
+    which list the shop put it in — so the day the catalogue was rebuilt and
+    "birthday" became an occasion rather than a category, the homepage's
+    Birthday row had no entry here and rendered nothing, while the page its
+    "View all" opens still held nineteen products. The row and the page it
+    advertises have to agree.
+
+    Duplicates collapse: a slug in two lists gets one entry, resolved by
+    `buildCategoryRail` in the same order the route uses.
+
+    Empty rails are kept, including for slugs with nothing in them — that is
+    what tells the builder the row it is previewing has no products, rather
+    than leaving the section looking like it failed to load.
+  */
+  const railSlugs = [
+    ...new Set([
+      ...(categories ?? []).map((row) => row.slug),
+      ...(occasions ?? []).map((row) => row.slug),
+      ...(collections ?? []).map((row) => row.slug),
+    ]),
+  ].filter(Boolean);
+
+  const categoryRails = Object.fromEntries(
+    railSlugs.map((slug) => [
+      slug,
+      buildCategoryRail(slug, maxCount, all, all, categories, collections).map((product) =>
+        toCard(product, modules),
+      ),
+    ]),
+  ) as Record<string, LandingProduct[]>;
+
+  /*
+    THE PRICE A CARD SHOWS, not the price on the record.
+
+    `all` carries `product.price` — the base figure in the database. What a
+    customer reads on a grid is `toCard`'s price: the base with each variant
+    group's DEFAULT option already applied, because that is what the server
+    would charge for the thing untouched. The two differ by real money here:
+    this shop's Birthday Cake is 999 on the record and 899 on the page.
+
+    Caught by measuring rather than reading. The card said "Starting from
+    Rs 749" while the page it links to started at Rs 899 — a price no
+    customer could pay, on the one band whose whole job is to name that
+    number. Mapping through `toCard` first is what makes the card's claim and
+    the page it links to the same statement.
+  */
+  const cards = all.map((product) => toCard(product, modules));
+
+  /*
+    Built from the UNCAPPED flag list and capped after the category cut, not
+    before. `buildHomepageProducts(source, maxCount, …)` slices first, so
+    filtering its result would give "the bestsellers in this category, among
+    the first twelve bestsellers" — which is the same shape of silent wrong
+    answer as taking a starting price off a capped rail.
+  */
+  /*
+    AND OVER ALL THREE LISTS, like the plain rails above.
+
+    This cut the flag list by CATEGORY alone, which is the same fault the plain
+    rails had: a tab is stored as a slug with no record of which list the shop
+    put it in. Measured after this shop's catalogue was rebuilt — its
+    Bestsellers band has tabs for Birthday, Pastries and Anniversary, and two of
+    the three drew NOTHING, because birthday and anniversary had become
+    occasions and this map had no entry for either. A band headed Bestsellers
+    showing an empty tab is worse than no band.
+
+    `buildCategoryRail` rather than `filterProductsByCategory`, so the cut
+    resolves a slug the way the page behind the tab does: collection, then
+    category, then occasion.
+  */
+  const FLAG_SOURCES: HomepageProductSource[] = ["featured", "trending", "best-sellers"];
+  const flaggedCategoryRails: Partial<
+    Record<HomepageProductSource, Record<string, LandingProduct[]>>
+  > = {};
+
+  for (const source of FLAG_SOURCES) {
+    const flagged = matchHomepageSource(source, products, all, names, categories).map(
+      (product) => toCard(product, modules),
+    );
+
+    const bySlug: Record<string, LandingProduct[]> = {};
+    for (const slug of railSlugs) {
+      const cut = buildCategoryRail(slug, maxCount, flagged, flagged, categories, collections);
+      if (cut.length) bySlug[slug] = cut;
+    }
+    if (Object.keys(bySlug).length) flaggedCategoryRails[source] = bySlug;
+  }
+
+  return {
+    rails,
+    categoryRails,
+    categoryStartingPrices: categoryStartingPrices(cards, categories),
+    flaggedCategoryRails,
+  };
 }

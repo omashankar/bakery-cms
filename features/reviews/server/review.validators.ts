@@ -31,6 +31,17 @@ export const submitReviewSchema = z.object({
   rating: z.number().min(1).max(5),
   title: z.string().optional(),
   body: z.string().min(1),
+  /**
+   * Photos, named by the URLs this shop's own uploader handed back.
+   *
+   * Shape only, here. Whether the shop actually issued each URL is a question
+   * for the database and is asked in the service — a public write must not be
+   * able to put an arbitrary remote image, or a tracking pixel, on a product
+   * page that every visitor loads.
+   *
+   * Four is a review, not an album, and each one costs the shop's media plan.
+   */
+  photoUrls: z.array(z.string().min(1).max(2048)).max(4).optional(),
 });
 
 /** Admin moderation patch. */

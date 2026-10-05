@@ -374,3 +374,196 @@ describe("pricing a cart from the shop's own records", () => {
     expect(quote.totals.subtotal).toBe(1299);
   });
 });
+
+describe("the SERVER decides what a scoped coupon may discount", () => {
+  /**
+   * The half a browser test cannot cover, and the only half that is money.
+   *
+   * `a-coupon-can-be-for-some-of-the-shop` pins the rule engine and the cart's
+   * preview of it. Both of those run in the customer's browser. What the shop
+   * is actually paid is decided here, in `priceCart`, from the shop's own
+   * products — and the engine can only scope correctly if this path hands it
+   * the LINES, each carrying every category its product is filed under.
+   *
+   * Mutation-tested: passing `subtotal` instead of the lines, and reading
+   * `product.categoryId` instead of `categoriesOf(product)`, both survived the
+   * rule-engine suite untouched. A shop could have run "20% off plants" and had
+   * the server take 20% off the cake as well, with every test green.
+   */
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const PLANTS = "cat-plants";
+  const CAKES = "cat-cakes";
+
+  /** ₹1,000 of plants, ₹2,000 of cake, and one product that is both. */
+  const SHELF: Record<string, Record<string, unknown>> = {
+    plant: {
+      slug: "plant",
+      name: "Money Plant",
+      image: "/plant.jpg",
+      price: 500,
+      category: "Plants",
+      categoryId: PLANTS,
+      categoryIds: [PLANTS],
+    },
+    cake: {
+      slug: "cake",
+      name: "Truffle Cake",
+      image: "/cake.jpg",
+      price: 1000,
+      category: "Cakes",
+      categoryId: CAKES,
+      categoryIds: [CAKES],
+    },
+    combo: {
+      slug: "combo",
+      name: "Cake With Money Plant",
+      image: "/combo.jpg",
+      price: 1500,
+      category: "Cakes",
+      // Filed primarily under Cakes and ALSO under Plants — the membership the
+      // shop ticked, which a plants coupon has to honour.
+      categoryId: CAKES,
+      categoryIds: [CAKES, PLANTS],
+    },
+  };
+
+  async function loadShop(coupons: Record<string, unknown>[]) {
+    vi.doMock("@/features/products/server/product.repository", () => ({
+      // By SLUG, unlike the stub above — a scope test needs a mixed basket, and
+      // a repository that answers with the same product for every slug cannot
+      // tell one category from another.
+      findBySlug: vi.fn(async (slug: string) => SHELF[slug] ?? null),
+    }));
+    vi.doMock("@/features/settings/server/settings.service", () => ({
+      getSettings: vi.fn(async () => ({
+        commerce: {
+          deliveryFee: 0,
+          freeDeliveryThreshold: 0,
+          minOrderValue: 0,
+          taxEnabled: false,
+          taxRate: 0,
+          taxLabel: "",
+          taxIncludeDelivery: false,
+          platformChargeEnabled: false,
+          platformChargeLabel: "",
+          platformChargeAmount: 0,
+          useZoneBasedDelivery: false,
+          zoneFallbackDeliveryFee: 0,
+          deliveryLeadDays: 1,
+          estimatedDeliveryDays: 1,
+          deliveryTimeSlots: [],
+          orderNumberPrefix: "BK",
+          checkoutTerms: "",
+          giftWrapEnabled: false,
+          giftWrapFee: 0,
+          giftWrapLabel: "",
+          paymentMethods: { cod: true, upi: true, card: true, razorpay: true },
+        },
+      })),
+    }));
+    vi.doMock("@/features/commerce/server/commerce.service", () => ({
+      getCoupons: vi.fn(async () => coupons),
+      getZones: vi.fn(async () => []),
+    }));
+
+    return import("@/features/checkout/server/pricing.server");
+  }
+
+  const PLANTS20 = {
+    code: "PLANTS20",
+    label: "20% off plants",
+    percentOff: 20,
+    isActive: true,
+    categoryIds: [PLANTS],
+  };
+
+  it("takes the percentage off the plants and charges the cake in full", async () => {
+    const { priceCart } = await loadShop([PLANTS20]);
+
+    const quote = await priceCart({
+      items: [
+        { productSlug: "plant", quantity: 2 },
+        { productSlug: "cake", quantity: 2 },
+      ],
+      couponCode: "PLANTS20",
+    });
+
+    expect(quote.totals.subtotal).toBe(3000);
+    // 20% of the ₹1,000 of plants — NOT 20% of ₹3,000.
+    expect(quote.coupon?.discountAmount).toBe(200);
+    expect(quote.totals.total).toBe(2800);
+  });
+
+  it("honours a product filed under the category as well as its own", async () => {
+    /**
+     * The membership half. Reading `product.categoryId` instead of
+     * `categoriesOf(product)` here would leave the combo out: the shop filed it
+     * under Plants, the customer sees it on the Plants page, and the coupon
+     * named on that page would skip it.
+     */
+    const { priceCart } = await loadShop([PLANTS20]);
+
+    const quote = await priceCart({
+      items: [{ productSlug: "combo", quantity: 1 }],
+      couponCode: "PLANTS20",
+    });
+
+    expect(quote.coupon?.discountAmount).toBe(300);
+  });
+
+  it("refuses the code outright when the basket holds none of them", async () => {
+    const { priceCart } = await loadShop([PLANTS20]);
+
+    const quote = await priceCart({
+      items: [{ productSlug: "cake", quantity: 1 }],
+      couponCode: "PLANTS20",
+    });
+
+    expect(quote.coupon).toBeNull();
+    expect(quote.rejectedCoupon).toBe("PLANTS20");
+    expect(quote.totals.total).toBe(1000);
+  });
+
+  it("measures a minimum against the eligible items, not the basket", async () => {
+    const { priceCart } = await loadShop([{ ...PLANTS20, minSubtotal: 2000 }]);
+
+    // ₹3,000 in the basket, but only ₹1,000 of it is plants.
+    const quote = await priceCart({
+      items: [
+        { productSlug: "plant", quantity: 2 },
+        { productSlug: "cake", quantity: 2 },
+      ],
+      couponCode: "PLANTS20",
+    });
+
+    expect(quote.coupon).toBeNull();
+    expect(quote.rejectedCoupon).toBe("PLANTS20");
+  });
+
+  it("and an unscoped coupon still discounts the whole basket", async () => {
+    /**
+     * The compatibility case on the server path. Every coupon in the database
+     * predates this field, and the server is what charges the customer.
+     */
+    const { priceCart } = await loadShop([
+      { code: "SAVE20", label: "20% off", percentOff: 20, isActive: true },
+    ]);
+
+    const quote = await priceCart({
+      items: [
+        { productSlug: "plant", quantity: 2 },
+        { productSlug: "cake", quantity: 2 },
+      ],
+      couponCode: "SAVE20",
+    });
+
+    expect(quote.coupon?.discountAmount).toBe(600);
+  });
+});

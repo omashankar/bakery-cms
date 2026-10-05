@@ -1,5 +1,4 @@
 "use client";
-
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -15,10 +14,11 @@ import { cn } from "@/lib/utils";
 import type { BusinessHoursEntry, ContactSettings } from "@/types/settings";
 import {
   defaultContactSettings,
-  isValidEmailAddress,
+
   isValidMapEmbedUrl,
   normalizeMapEmbedUrl,
 } from "@/features/settings/lib/settings-utils";
+import { isValidEmailAddress } from "@/features/settings/lib/email-rule";
 import {
   getContactSettings,
   resetContactSettings,
@@ -121,11 +121,12 @@ export function ContactSettingsPage() {
 
   return (
     <SettingsSectionShell
-      title="Contact"
-      description={
+      title="Contact Information"
+      description="The phone, email, address and opening hours customers see on your site."
+      status={
         hydration === "ready"
           ? `${emailSet ? settings.email : "No email"} · ${hoursCount} hour row${hoursCount === 1 ? "" : "s"}`
-          : "Business contact details shown on the contact page and footer."
+          : undefined
       }
       isDirty={isDirty}
       // The fields stay behind the skeleton until the SERVER's copy has landed.
@@ -147,7 +148,16 @@ export function ContactSettingsPage() {
         <Card className="shadow-sm">
           <CardHeader>
             <CardTitle className="text-base">Contact details</CardTitle>
-            <CardDescription>Primary ways customers can reach your bakery.</CardDescription>
+            {/*
+              It said "reach your bakery" — on a screen in a CMS sold to any
+              trade, and the wording ratchet could not see it: the text sat on
+              the same line as its tags, which neither of the guard's two
+              readers looked at. The guard now reads that shape too.
+            */}
+            <CardDescription>
+              Where customers reach you. These show in the footer and on the
+              contact page.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">

@@ -5,10 +5,6 @@ import {
   publishHomepage,
   saveHomepageDraft,
 } from "@/features/cms-sections/data/homepage-sections-client";
-import {
-  BuilderRequestError as WeddingRequestError,
-  saveWeddingDraftRequest,
-} from "@/features/cms-sections/data/wedding-sections-client";
 
 /**
  * A refused write has to say enough for the builder to recover.
@@ -52,14 +48,6 @@ describe("a write the server refused", () => {
     expect(error.currentVersion).toBe(12);
   });
 
-  it("does the same on the wedding builder", async () => {
-    respond(409, { error: "conflict", currentVersion: 2 });
-
-    const error = await saveWeddingDraftRequest([], null, 1).catch((e) => e);
-
-    expect(error).toBeInstanceOf(WeddingRequestError);
-    expect(error.currentVersion).toBe(2);
-  });
 
   it("still reports a plain failure with no version attached", async () => {
     respond(400, { error: "section 1: has no usable content object" });

@@ -18,7 +18,6 @@ import {
   updateProduct,
 } from "@/features/products/lib/products-repository";
 import {
-  DEFAULT_PRODUCT_SHAPES,
   getPublishedStorefrontProducts,
   mapAdminProductToStorefront,
 } from "@/features/products/lib/product-mapper";
@@ -155,14 +154,60 @@ describe("cakes repository", () => {
     expect(loadProducts()).toHaveLength(before - 2);
   });
 
-  it("gives a new form sensible bakery defaults", () => {
+  it("gives a new form no product type at all — it is the merchant's to declare", () => {
+    /**
+     * This asserted the opposite: Round/Square/Heart, three weight tiers priced
+     * from a hardcoded 999, and an "Egg preference" group charging +80 for
+     * Eggless. A shop adding a phone charger had to find and delete every one of
+     * them, on every product, and the CMS read as though it were telling the
+     * owner what kind of shop to run.
+     *
+     * The same reasoning has since reached three more of them. A category, a
+     * stock count and a message box are answers about THIS product that the CMS
+     * was giving on the shop's behalf, and four shops walked through this form
+     * shipped all three untouched: a charger filed under Birthday Cakes, fifty
+     * units nobody had counted, and a plant page asking the buyer for a birthday
+     * message.
+     */
     const empty = createEmptyProductForm();
 
+    expect(empty.shapes).toEqual([]);
+    expect(empty.weights).toEqual([]);
+    expect(empty.variantGroups).toEqual([]);
+    expect(empty.flavourOptions).toEqual([]);
+    // `preparationTimeMinutes` and `shelfLifeDays` were checked here for the
+    // same reason. Both have gone from the product entirely, so a new one
+    // cannot be born with them and there is nothing left to assert.
+    expect(empty.descriptionBlocks).toEqual([]);
+
     expect(empty.status).toBe("draft");
-    expect(empty.shapes).toEqual([...DEFAULT_PRODUCT_SHAPES]);
-    expect(empty.variantGroups).toHaveLength(1);
-    expect(empty.variantGroups[0].type).toBe("egg");
-    expect(empty.allowsMessage).toBe(true);
+
+    // Nobody has filed it anywhere. `saveProduct` refuses to PUBLISH without a
+    // category and still lets a draft be parked.
+    expect(empty.categoryId).toBe("");
+
+    // Nobody has counted anything, and that is safe because nothing is being
+    // counted: a shop that never opens this tab keeps selling, which is what
+    // most of them mean. Unticking "Unlimited" is the act of saying otherwise.
+    expect(empty.stockQuantity).toBe(0);
+    expect(empty.unlimitedStock).toBe(true);
+    expect(empty.stockStatus).toBe("in_stock");
+
+    // Most products are not written on. This was ON, so every plant, saree and
+    // charger this CMS created carried a "Message on this order" box the shop
+    // had to find and untick.
+    expect(empty.allowsMessage).toBe(false);
+  });
+
+  it("starts a new product with no option groups at all", () => {
+    /**
+       Every product a shop created used to open with an "Egg preference" row
+       — a bakery question asked of a phone charger — and then a "Photo cake"
+       one for anything filed under a category with the word in it. Both were
+       bakery special cases; a shop names its own option groups, and a photo
+       print is priced into the product rather than chosen between.
+     */
+    expect(createEmptyProductForm().variantGroups).toEqual([]);
   });
 });
 
@@ -180,22 +225,61 @@ describe("mapAdminProductToStorefront", () => {
     expect(mapped.image).toBe("/a.jpg"); // first image only
   });
 
-  it("falls back to an empty image and the 'Cakes' category when unresolved", () => {
+  it("names no category rather than calling an unresolved product a cake", () => {
+    /**
+     * This asserted `"Cakes"`. A product whose category id resolves to neither
+     * the passed taxonomy nor the local store was badged that to CUSTOMERS, so
+     * an orphaned phone charger advertised itself as a cake — while the Catalog
+     * screen's own delete warning promised the opposite ("they will show them
+     * as uncategorised").
+     *
+     * Empty rather than undefined on purpose: `LandingProduct.category` is typed
+     * `string` and the product page calls `.toLowerCase()` on it twice, so
+     * making it optional would trade a wrong badge for a TypeError. The page
+     * renders no badge when the name is empty.
+     */
     const cake = createProduct(form({ slug: "no-image", images: [], categoryId: "missing" }));
 
     const mapped = mapAdminProductToStorefront(cake);
 
     expect(mapped.image).toBe("");
-    expect(mapped.category).toBe("Cakes");
+    expect(mapped.category).toBe("");
   });
 
-  it("derives the badge with Featured winning over Bestseller and Trending", () => {
+  it("derives the badge from the strongest claim the shop made", () => {
+    /**
+     * THE ORDER WAS FEATURED FIRST, and this case recorded that without ever
+     * saying why — there was no reason written down, because there was not
+     * one.
+     *
+     * "Featured" is a CMS word: it means "put this somewhere", and the shop
+     * says it to itself. "Bestseller" is a claim about what customers did,
+     * and the shop says it to customers. A product ticked both was showing
+     * the weaker of the two on its card.
+     *
+     * One badge either way — the card already carries a photograph, a name, a
+     * price, sometimes a struck-through price and sometimes a rating, and a
+     * second badge on one picture is decoration.
+     *
+     * Measured on this shop when it changed: the three flags are disjoint —
+     * 1 featured, 7 bestsellers, 1 trending — so nothing on screen moved. It
+     * moves for the first shop that ticks two.
+     */
     const base = form({ slug: "badged" });
 
     expect(
       mapAdminProductToStorefront(
         createProduct({ ...base, slug: "b1", isFeatured: true, isBestSeller: true, isTrending: true })
       ).badge
+    ).toBe("Bestseller");
+    // Trending beats Featured for the same reason: it is about customers.
+    expect(
+      mapAdminProductToStorefront(
+        createProduct({ ...base, slug: "b1b", isFeatured: true, isTrending: true })
+      ).badge
+    ).toBe("Trending");
+    expect(
+      mapAdminProductToStorefront(createProduct({ ...base, slug: "b1c", isFeatured: true })).badge
     ).toBe("Featured");
     expect(
       mapAdminProductToStorefront(
@@ -226,11 +310,17 @@ describe("mapAdminProductToStorefront", () => {
     expect(mapAdminProductToStorefront(withoutFlavours).flavours).toBeUndefined();
   });
 
-  it("does not expose isPhotoCake to the storefront at all", () => {
-    const cake = createProduct(form({ slug: "p1", isPhotoCake: true }));
+  it("says a product takes a photograph with one field, not two", () => {
+    /**
+     * `isPhotoCake` never crossed the mapper, and there is no such field to
+     * cross any more: it meant “offers a paid photo print”, and the print is
+     * priced into the product now. `allowsPhotoUpload` is the whole statement
+     * — it is what the uploader reads and what the photo rail selects on.
+     */
+    const cake = createProduct(form({ slug: "p1", allowsPhotoUpload: true }));
 
-    // The storefront re-derives this from allowsPhotoUpload/category instead.
     expect("isPhotoCake" in mapAdminProductToStorefront(cake)).toBe(false);
+    expect(mapAdminProductToStorefront(cake).allowsPhotoUpload).toBe(true);
   });
 
   it("getPublishedStorefrontProducts returns only published cakes", () => {

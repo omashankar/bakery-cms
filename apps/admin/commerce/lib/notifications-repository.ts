@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import { loadInquiries } from "@/features/inquiries/lib/inquiries-repository";
 import { getInventoryItems } from "@/apps/admin/commerce/lib/inventory-repository";
 import { getOrders } from "@/features/orders/lib/orders";
@@ -89,7 +90,7 @@ function readDismissedIds(): Set<string> {
 
 function writeDismissedIds(ids: Set<string>): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(DISMISSED_KEY, JSON.stringify([...ids]));
+  safeSetItem(DISMISSED_KEY, JSON.stringify([...ids]));
 }
 
 function readReadIds(): Set<string> {
@@ -107,7 +108,7 @@ function readReadIds(): Set<string> {
 
 function writeReadIds(ids: Set<string>): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(READ_KEY, JSON.stringify([...ids]));
+  safeSetItem(READ_KEY, JSON.stringify([...ids]));
 }
 
 /** Remember that these ids have been read, whatever the derived set does next. */
@@ -171,7 +172,7 @@ function notificationsChanged(
 
 function writeStoredNotifications(notifications: AdminNotification[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications.slice(0, MAX_NOTIFICATIONS)));
+  safeSetItem(STORAGE_KEY, JSON.stringify(notifications.slice(0, MAX_NOTIFICATIONS)));
   emitNotificationsUpdated();
 }
 
@@ -197,7 +198,7 @@ export async function saveNotificationSettings(
   settings: NotificationSettings
 ): Promise<boolean> {
   if (typeof window === "undefined") return false;
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  safeSetItem(SETTINGS_KEY, JSON.stringify(settings));
   // syncNotifications writes + emits itself when the derived set changed.
   syncNotifications(settings);
   return replaceNotificationSettingsRequest(settings);
@@ -208,7 +209,7 @@ export function persistServerNotificationSettings(
   settings: NotificationSettings
 ): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  safeSetItem(SETTINGS_KEY, JSON.stringify(settings));
   syncNotifications(settings);
   // Settings alone may not change the derived set (so syncNotifications stays
   // quiet), but the open preferences panel still needs to pick them up.

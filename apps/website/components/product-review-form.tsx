@@ -22,6 +22,47 @@ export function ProductReviewForm({ productSlug, cakeName, onSubmitted }: Produc
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  /**
+   * Photos, uploaded as they are chosen rather than at submit.
+   *
+   * The endpoint answers with a URL the shop has already stored, so what the
+   * review carries is a reference to something that exists — and the customer
+   * finds out a photo was refused while they can still pick another one,
+   * rather than losing the whole review to it.
+   */
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+
+  const MAX_PHOTOS = 4;
+
+  async function handlePhoto(file: File) {
+    if (photoUrls.length >= MAX_PHOTOS) {
+      toast.error(`Up to ${MAX_PHOTOS} photos`);
+      return;
+    }
+    setUploading(true);
+    try {
+      const body = new FormData();
+      body.append("photo", file);
+      const res = await fetch("/api/uploads/photo-cake", {
+        method: "POST",
+        credentials: "same-origin",
+        body,
+      });
+      const parsed = (await res.json().catch(() => null)) as
+        | { data?: { url?: string }; message?: string }
+        | null;
+      if (!res.ok || !parsed?.data?.url) {
+        toast.error(parsed?.message ?? "Could not upload that photo");
+        return;
+      }
+      setPhotoUrls((current) => [...current, parsed.data!.url!]);
+    } catch {
+      toast.error("Could not reach the shop");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -44,6 +85,7 @@ export function ProductReviewForm({ productSlug, cakeName, onSubmitted }: Produc
       rating,
       title,
       body,
+      photoUrls,
     });
 
     setSubmitting(false);
@@ -68,6 +110,7 @@ export function ProductReviewForm({ productSlug, cakeName, onSubmitted }: Produc
     setRating(5);
     setTitle("");
     setBody("");
+    setPhotoUrls([]);
     toast.success("Thank you! Your review is pending approval.");
     onSubmitted?.();
   }
@@ -90,7 +133,7 @@ export function ProductReviewForm({ productSlug, cakeName, onSubmitted }: Produc
               id="review-rating-select"
               value={rating}
               onChange={(event) => setRating(Number(event.target.value))}
-              className="flex h-10 rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="flex h-10 rounded-lg border border-input bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             >
               {[5, 4, 3, 2, 1].map((value) => (
                 <option key={value} value={value}>
@@ -143,7 +186,52 @@ export function ProductReviewForm({ productSlug, cakeName, onSubmitted }: Produc
           />
         </div>
 
-        <Button type="submit" variant="bakery" disabled={submitting}>
+        <div className="space-y-2">
+          <Label htmlFor="review-photos">Photos (optional)</Label>
+          <div className="flex flex-wrap items-center gap-2">
+            {photoUrls.map((url) => (
+              <span
+                key={url}
+                className="relative size-16 overflow-hidden rounded-lg border border-border bg-card"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={url} alt="" className="size-full object-cover" />
+                <button
+                  type="button"
+                  aria-label="Remove photo"
+                  className="absolute top-0 right-0 bg-white/90 px-1 text-xs"
+                  onClick={() =>
+                    setPhotoUrls((current) => current.filter((kept) => kept !== url))
+                  }
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+            {photoUrls.length < MAX_PHOTOS ? (
+              <input
+                id="review-photos"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                disabled={uploading}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  // Cleared so choosing the same file twice still fires.
+                  event.target.value = "";
+                  if (file) void handlePhoto(file);
+                }}
+                className="text-xs"
+              />
+            ) : null}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {uploading
+              ? "Uploading…"
+              : "A photo of what you received. Shown with your review once it is approved."}
+          </p>
+        </div>
+
+        <Button type="submit" variant="bakery" disabled={submitting || uploading}>
           {submitting ? "Submitting..." : "Submit review"}
         </Button>
       </div>

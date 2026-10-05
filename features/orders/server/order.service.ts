@@ -4,6 +4,8 @@ import { writeAuditLog } from "@/lib/server/audit/audit-log";
 import { AppError, NotFoundError } from "@/lib/server/http/errors";
 import { getSettings } from "@/features/settings/server/settings.service";
 import * as productRepo from "@/features/products/server/product.repository";
+import { cartLineChoices } from "@/features/cart/lib/cart";
+import { formatAddress } from "@/features/orders/lib/address-format";
 import { deriveStockStatus } from "@/features/inventory/lib/inventory-utils";
 import type { CommerceSettings, GeneralSettings } from "@/types/settings";
 import type { GatewayRefund, RefundRecord } from "@/types/refund";
@@ -21,10 +23,16 @@ import {
 import { resolveUnclaimedPayment } from "@/features/payments/server/unclaimed-payment.repository";
 import { verifyOrderLookup } from "@/features/orders/lib/order-tracking";
 import { orderStatusTransitionError } from "@/features/orders/lib/order-status-meta";
-import { isBeforeLeadTime, isOfferedTimeSlot } from "@/features/orders/lib/delivery-date";
+import {
+  isBeforeLeadTime,
+  isOfferedTimeSlot,
+  isPastSameDayCutoff,
+  isPastTimeSlot,
+} from "@/features/orders/lib/delivery-date";
 import { checkMinimumOrder } from "@/features/checkout/lib/minimum-order";
 import {
   priceCart,
+  UndeliverableAtSpeedError,
   UnknownProductError,
   UnknownWeightError,
 } from "@/features/checkout/server/pricing.server";
@@ -173,8 +181,52 @@ async function repriceForPlacement(input: PlaceOrderInput) {
     if (error instanceof UnknownWeightError) {
       throw new AppError("One of the items is no longer available in that size.", 409);
     }
+    // The draft-less COD path reaches the same pricing, so it has to refuse
+    // the same things — otherwise the speed check is one endpoint deep.
+    if (error instanceof UndeliverableAtSpeedError) {
+      throw new AppError(
+        `${error.productName} cannot be delivered by ${error.tierLabel}.`,
+        409,
+      );
+    }
     throw error;
   }
+}
+
+/**
+ * An order's lines as plain text, for an email body.
+ *
+ * ONE formatter, because the two emails an order sends were telling different
+ * people different things about it. The shop's copy printed
+ * `${quantity} x ${name}` and nothing else — no size, no flavour, no option the
+ * customer paid for, and no link to the photo a photo cake is printed from —
+ * and the CUSTOMER'S copy named no product at all: `order_confirmation` supplied
+ * a total, a date and a link, and left them to follow it back into the site to
+ * find out what they had bought.
+ *
+ * `includePhotoLink` is the one difference between the two, and it is a real
+ * one: the baker cannot print a photo they cannot open, and the customer
+ * uploaded it and does not need the storage URL read back to them.
+ *
+ * Exported so a test can assert what an inbox receives without sending mail.
+ */
+export function formatOrderItemsForEmail(
+  items: PlacedOrder["items"],
+  options: { includePhotoLink?: boolean } = {},
+): string {
+  return items
+    .map((item) => {
+      const chosen = cartLineChoices(item);
+
+      const lines = [`  ${item.quantity} x ${item.name}`];
+      if (chosen.length > 0) lines.push(`      ${chosen.join(" · ")}`);
+      if (item.message) lines.push(`      Message on it: ${item.message}`);
+      if (options.includePhotoLink && item.photoUrl) {
+        lines.push(`      Photo to print: ${item.photoUrl}`);
+      }
+      return lines.join("\n");
+    })
+    .join("\n");
 }
 
 /** Fresh order numbers to try when the client's collided with another customer's. */
@@ -340,6 +392,35 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
     );
   }
 
+  /**
+   * And a window that has not already closed.
+   *
+   * Nothing anywhere looked at the CLOCK. The date floor answers “is this day
+   * far enough ahead” and the slot check answers “is this a window the shop
+   * offers” — neither asks whether the window has been and gone. On a shop
+   * with no preparation lead, which is what same-day means, that let an order
+   * arrive at 11pm for that morning's 10:00 AM – 12:00 PM delivery.
+   *
+   * Only for a cart that was never quoted, for the same reason as the slot
+   * list above it: a customer who quoted at 11:55 and paid at 12:05 must not
+   * be refused after the gateway has captured. The quote endpoint refuses it
+   * while it is still free.
+   */
+  if (!draft && input.deliverySlot?.date) {
+    if (isPastSameDayCutoff(input.deliverySlot.date, commerce.sameDayCutoff ?? "")) {
+      throw new AppError(
+        "We have stopped taking orders for delivery today. Please choose a later date.",
+        409,
+      );
+    }
+    if (isPastTimeSlot(input.deliverySlot.date, input.deliverySlot.timeSlot ?? "")) {
+      throw new AppError(
+        "That delivery window has already passed today. Please choose another.",
+        409,
+      );
+    }
+  }
+
   // The shop's minimum order value, enforced by the shop.
   //
   // It was configured on two admin screens and checked in exactly one place —
@@ -481,6 +562,7 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
     // the admin's coupon performance report as if it were real.
     coupon: priced.coupon as unknown as PlacedOrder["coupon"],
     orderNotes: input.orderNotes,
+    personalisation: input.personalisation as unknown as PlacedOrder["personalisation"],
     deliverySlot: input.deliverySlot as unknown as PlacedOrder["deliverySlot"],
     placedAt,
     status,
@@ -676,6 +758,10 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
         invoice_url: base
           ? `${base}${routes.store.orderTrack}?order=${encodeURIComponent(placed.orderNumber)}`
           : "Reply to this email and we will send your invoice.",
+        // What they actually bought. The confirmation named a total, a date and
+        // a link, and no product — so the only record a customer receives
+        // without logging in could not tell them what was in their order.
+        order_items: formatOrderItemsForEmail(placed.items),
       })
     : null;
 
@@ -743,9 +829,7 @@ async function notifyShopOfOrder(
   const shopEmail = ((settings.contact ?? {}) as { email?: string }).email?.trim();
   if (!shopEmail) return;
 
-  const items = order.items
-    .map((item) => `  ${item.quantity} x ${item.name}`)
-    .join("\n");
+  const items = formatOrderItemsForEmail(order.items, { includePhotoLink: true });
 
   // "Payment Received" on the Payment Notifications screen.
   if (!(await isNotificationEnabled("admin_payment_received", "email"))) return;
@@ -758,13 +842,9 @@ async function notifyShopOfOrder(
     delivery_date: order.deliverySlot?.date
       ? `${order.deliverySlot.date}${order.deliverySlot.timeSlot ? `, ${order.deliverySlot.timeSlot}` : ""}`
       : new Date(order.estimatedDelivery).toDateString(),
-    delivery_address: [
-      order.address.addressLine1,
-      order.address.addressLine2,
-      `${order.address.city} ${order.address.pincode}`,
-    ]
-      .filter(Boolean)
-      .join(", "),
+    // Was a local join that dropped the state and had no landmark. Both are
+    // in `formatAddress` now, which every address surface shares.
+    delivery_address: formatAddress(order.address),
     order_items: items,
     admin_url: base
       ? `${base}${routes.admin.orders.detail(order.id)}`
@@ -986,13 +1066,9 @@ async function notifyOrderCancelled(order: PlacedOrder, holdsPayment: boolean): 
 }
 
 async function notifyOutForDelivery(order: PlacedOrder): Promise<void> {
-  const address = [
-    order.address.addressLine1,
-    order.address.addressLine2,
-    `${order.address.city} ${order.address.pincode}`,
-  ]
-    .filter(Boolean)
-    .join(", ");
+  // The COURIER-facing one. It dropped the state and carried no landmark,
+  // which is exactly the line a rider needs to find a door.
+  const address = formatAddress(order.address);
 
   const mail = await sendTemplatedEmail("order_shipped", order.address.email, {
     customer_name: order.address.fullName?.trim() || "there",

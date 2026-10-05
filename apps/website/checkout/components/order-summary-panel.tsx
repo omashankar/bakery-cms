@@ -1,7 +1,7 @@
 import Link from "next/link";
-import type { CartLineItem } from "@/features/cart/lib/cart";
+import { cartLineChoices, type CartLineItem } from "@/features/cart/lib/cart";
 import type { CartTotals } from "@/features/orders/lib/cart-totals";
-import { getFreeDeliveryThreshold } from "@/features/orders/lib/cart-totals";
+import { compareAtSavings, getFreeDeliveryThreshold } from "@/features/orders/lib/cart-totals";
 import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import { TaxBreakdown, taxBreakdownFromCartTotals } from "@/components/shared/tax-breakdown";
@@ -60,7 +60,12 @@ export function OrderSummaryPanel({
 }: OrderSummaryPanelProps) {
   const freeDeliveryThreshold = getFreeDeliveryThreshold();
   const labels = getCommerceLabels();
+  // From the lines on screen, not from `totals.itemCount`, so the heading and
+  // the list under it can never disagree about how many things there are.
+  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  const savings = compareAtSavings(items);
   const breakdown = taxBreakdownFromCartTotals(totals, {
+    compareAtSavings: savings,
     taxLabel: labels.taxLabel,
     platformChargeLabel: labels.platformChargeLabel,
     giftWrapLabel: giftWrapLabel ?? labels.giftWrapLabel,
@@ -71,7 +76,14 @@ export function OrderSummaryPanel({
   return (
     <aside className={cn("h-fit rounded-xl border border-border bg-cream-50 p-6", className)}>
       <div className="flex items-center justify-between gap-2">
-        <h2 className="font-heading text-lg font-semibold">Order Summary</h2>
+        {/*
+          Counted, because "Order Summary" left a customer to count the rows
+          themselves to check nothing had been dropped. The number is items,
+          not lines: two of the same thing is two.
+        */}
+        <h2 className="font-heading text-lg font-semibold">
+          Price details ({itemCount} item{itemCount === 1 ? "" : "s"})
+        </h2>
         {showEditLink ? (
           <Link href={routes.store.cart} className="text-xs font-medium text-bakery-700 hover:underline">
             Edit cart
@@ -82,7 +94,7 @@ export function OrderSummaryPanel({
       <ul className="mt-4 max-h-72 space-y-3 overflow-y-auto border-b border-border pb-4">
         {items.map((item) => (
           <li key={item.id} className="flex items-center gap-3 text-sm">
-            <span className="size-11 shrink-0 overflow-hidden rounded-lg border border-border bg-white">
+            <span className="size-11 shrink-0 overflow-hidden rounded-lg border border-border bg-card">
               {item.image ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -94,12 +106,27 @@ export function OrderSummaryPanel({
               ) : null}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate font-medium">
+              {/* Two lines, not an ellipsis. In the 320px aside this was
+                  cutting the name of the thing being bought. */}
+              <p className="line-clamp-2 font-medium">
                 {item.quantity} × {item.name}
               </p>
-              {item.weight || item.flavour ? (
-                <p className="truncate text-xs text-muted-foreground">
-                  {[item.weight, item.flavour].filter(Boolean).join(" · ")}
+              {/*
+                One component, three places: the checkout review step, the cart
+                sidebar, and the customer's own placed-order and tracking page,
+                which has no other item markup at all. It showed weight and
+                flavour only — no shape, and none of the shop's own option
+                groups — so the last screen before paying, and the only one after,
+                both omitted what the customer had chosen.
+
+                AND THEY ARE NOT CUT OFF. This line carried `truncate`, which
+                in the 320px aside reduced it to "Size: 0.5 kg · Egg
+                preferen…" — unreadable at 1440 and readable at 768, which
+                is the wrong way round. Two lines instead of one ellipsis.
+              */}
+              {cartLineChoices(item).length > 0 ? (
+                <p className="line-clamp-2 text-xs text-muted-foreground">
+                  {cartLineChoices(item).join(" · ")}
                 </p>
               ) : null}
             </div>

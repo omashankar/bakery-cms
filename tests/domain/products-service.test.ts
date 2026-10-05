@@ -91,6 +91,20 @@ vi.mock("@/features/products/server/product.repository", async () => {
   };
 });
 
+// Publishing checks the category against the catalogue, and an edit derives
+// the stock status with the shop's inventory settings — both database reads.
+vi.mock("@/features/catalog/server/catalog.service", async (importOriginal) => {
+  const { defaultCatalogStore } = await import("@/features/catalog/lib/catalog-utils");
+  return {
+    ...(await importOriginal<object>()),
+    getCatalog: async () => defaultCatalogStore,
+  };
+});
+vi.mock("@/features/inventory/server/inventory.service", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  getSettings: async () => ({ defaultLowStockThreshold: 10, trackStockHistory: true }),
+}));
+
 import {
   createProduct,
   deleteProduct,
@@ -100,14 +114,24 @@ import {
   getStorefrontProductBySlug,
   getStorefrontProductCards,
   getStorefrontProducts,
+  setProductStatus,
   updateProduct,
 } from "@/features/products/data/products-service";
 import { resetProductStore } from "@/features/products/data/products-store.server";
 import { createEmptyProductForm } from "@/features/products/lib/products-repository";
+import { defaultCatalogStore } from "@/features/catalog/lib/catalog-utils";
 import type { ProductFormData } from "@/types/product";
 
 function form(overrides: Partial<ProductFormData> = {}): ProductFormData {
-  return { ...createEmptyProductForm(), name: "Test Cake", slug: "test-cake", ...overrides };
+  return {
+    ...createEmptyProductForm(),
+    name: "Test Cake",
+    slug: "test-cake",
+    // Publishable by default: priced, and filed under a category that exists.
+    price: 500,
+    categoryId: defaultCatalogStore.categories[0].id,
+    ...overrides,
+  };
 }
 
 beforeEach(async () => {
@@ -248,6 +272,20 @@ describe("storefront projections", () => {
         name: "Card Me",
         status: "published",
         price: 800,
+        /**
+         * The tiers are stated by the FIXTURE now, not inherited from the form.
+         *
+         * `createEmptyProductForm()` used to arrive carrying three weight tiers
+         * priced from a hardcoded 999, so this test got its base/tier mismatch
+         * by accident. A new product is now born with no tiers at all, which
+         * would have made base and tier the same number and quietly retired the
+         * very thing this test exists to prove. Setting them here keeps the
+         * mismatch deliberate: base 800, tier 999, and the card must say 999.
+         */
+        weights: [
+          { label: "0.5 kg", price: 999, serves: "4–6" },
+          { label: "1 kg", price: 1199, serves: "8–10" },
+        ],
         description: "A very long description that no card ever displays",
       })
     );
@@ -279,5 +317,56 @@ describe("storefront projections", () => {
     // no tiers on the card it matched every product, so the filter did nothing.
     // Only the labels travel; the per-tier prices do not.
     expect(card?.weights?.every((tier) => tier.price === 0)).toBe(true);
+  });
+
+});
+
+describe("an edit does not undo stock that moved while the form was open", () => {
+  it("keeps the database's quantity when the form's stock field was untouched", async () => {
+    const created = await createProduct(form({ slug: "stock-race", stockQuantity: 10, unlimitedStock: false, lowStockThreshold: 8 }));
+    // Three sold since the form loaded 10.
+    await updateProduct(created.id, form({ slug: "stock-race", stockQuantity: 7, unlimitedStock: false, lowStockThreshold: 8 }));
+
+    const saved = await updateProduct(
+      created.id,
+      form({ slug: "stock-race", description: "typo fixed", stockQuantity: 10, unlimitedStock: false, lowStockThreshold: 8 }),
+      { stockQuantityLoaded: 10 },
+    );
+    expect(saved?.stockQuantity).toBe(7);
+    expect(saved?.stockStatus).toBe("low_stock");
+  });
+
+  it("writes the admin's number when they changed the field", async () => {
+    const created = await createProduct(form({ slug: "stock-set", stockQuantity: 10 }));
+    const saved = await updateProduct(
+      created.id,
+      form({ slug: "stock-set", stockQuantity: 40 }),
+      { stockQuantityLoaded: 10 },
+    );
+    expect(saved?.stockQuantity).toBe(40);
+    expect(saved?.stockStatus).toBe("in_stock");
+  });
+});
+
+describe("bulk publish obeys the same rules as the form", () => {
+  it("refuses a draft with no price, and publishes nothing in the batch", async () => {
+    const good = await createProduct(form({ slug: "bulk-good", status: "draft" }));
+    const free = await createProduct(form({ slug: "bulk-free", name: "Free Cake", status: "draft", price: 0 }));
+
+    await expect(setProductStatus([good.id, free.id], "published")).rejects.toThrow(/Free Cake/);
+    expect((await getProductById(good.id))?.status).toBe("draft");
+  });
+
+  it("refuses a product filed under a category that no longer exists", async () => {
+    const orphan = await createProduct(
+      form({ slug: "bulk-orphan", status: "draft", categoryId: "deleted-category" }),
+    );
+    await expect(setProductStatus([orphan.id], "published")).rejects.toThrow(/category/);
+  });
+
+  it("publishes a product that passes", async () => {
+    const good = await createProduct(form({ slug: "bulk-ok", status: "draft" }));
+    await setProductStatus([good.id], "published");
+    expect((await getProductById(good.id))?.status).toBe("published");
   });
 });

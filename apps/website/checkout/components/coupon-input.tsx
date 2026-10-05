@@ -9,10 +9,19 @@ import {
   applyCouponCode,
   getCouponHint,
   type AppliedCoupon,
+  type CouponCart,
 } from "@/features/orders/lib/coupons";
 
 interface CouponInputProps {
-  subtotal: number;
+  /**
+   * The cart, by line — not a subtotal.
+   *
+   * A coupon can be scoped to categories now, and a total cannot say which of
+   * these lines are plants. `CouponCart` still accepts a bare number for
+   * callers with no lines to give, but a SCOPED code against one refuses
+   * rather than guessing — so this box hands over the lines.
+   */
+  cart: CouponCart;
   applied?: AppliedCoupon;
   /**
    * Why the applied coupon no longer holds for this cart, when it does not.
@@ -28,7 +37,7 @@ interface CouponInputProps {
 }
 
 export function CouponInput({
-  subtotal,
+  cart,
   applied,
   lapsedReason,
   onApply,
@@ -40,7 +49,7 @@ export function CouponInput({
   async function handleApply() {
     setLoading(true);
     await new Promise((resolve) => setTimeout(resolve, 400));
-    const result = applyCouponCode(code, subtotal);
+    const result = applyCouponCode(code, cart);
     setLoading(false);
 
     if (!result.ok) {

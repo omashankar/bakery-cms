@@ -4,7 +4,7 @@ import { getStorefrontProductCards } from "@/features/products/data/products-ser
 
 export const metadata: Metadata = {
   title: "Shopping Cart",
-  description: "Review items in your bakery cart.",
+  description: "Review items in your cart.",
 };
 
 export default async function Page() {

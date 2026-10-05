@@ -53,3 +53,9 @@ next-env.d.ts
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# One-off migration snapshots: whole collections, including customer addresses.
+scripts/.snapshots/
+
+# Banner artwork dropped here to be uploaded to the CDN, not to be committed.
+banners/

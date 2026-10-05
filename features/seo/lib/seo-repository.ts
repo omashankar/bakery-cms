@@ -1,4 +1,6 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import { brandInfo } from "@/constants/landing-data";
+import { DEFAULT_LABELS } from "@/config/business-labels";
 import { routes } from "@/constants/routes";
 import { replaceSeoRequest } from "@/features/site-layout/lib/site-layout-api";
 import type { WriteResult } from "@/lib/write-result";
@@ -14,23 +16,58 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-const defaultOgImage =
-  "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=1200&h=630&fit=crop";
+/**
+ * EMPTY, and it was a hotlinked stock photograph of a cake.
+ *
+ * It was the og:image on every page of every shop — a third party's picture,
+ * served from a third party's CDN, presented as the shop's own in every link
+ * preview and every share. Wrong for a florist, wrong for a phone shop, and a
+ * dead preview the day that URL stops answering.
+ *
+ * The builder emits the tag only when there is a URL — `ogImage ? [...] :
+ * undefined` — so a blank omits it. No image is a correct link preview; a
+ * stranger's cake is not.
+ */
+const defaultOgImage = "";
 
 export function seedGlobal(): GlobalSeoSettings {
   return {
     siteName: brandInfo.name,
     titleSuffix: `| ${brandInfo.name}`,
-    defaultDescription: brandInfo.description,
+    /*
+      BLANK, and it was `brandInfo.description` — "Freshly baked cakes,
+      pastries and confections, made to order." That is the unconfigured
+      SHOP identity, and borrowing it here made it the sentence Google prints
+      under every page of a shop that may sell flowers.
+
+      The builder omits the tag when this is blank —
+      `...(global.defaultDescription.trim() ? { description } : {})` — so an
+      unconfigured shop has no meta description rather than a wrong one, and
+      the SEO screen is where it writes its own. No description is a gap a
+      shop can close; a description about someone else’s trade is one it has
+      to notice first.
+    */
+    defaultDescription: "",
     defaultOgImage,
-    defaultKeywords: [
-      "bakery",
-      "cakes",
-      "custom cakes",
-      "wedding cakes",
-      "pastries",
-    ],
-    canonicalBaseUrl: "https://www.your-bakery.example",
+    /*
+      EMPTY. These were one trade's search terms on every shop's every page,
+      and keywords are the field where a guess is least defensible — they say
+      what the shop wants to be found for, which only the shop knows. The
+      builder falls back to this list when a route has none of its own, so
+      empty means "no keywords tag" rather than a wrong one.
+    */
+    defaultKeywords: [],
+    /*
+      A RESERVED HOST THAT NAMES NO TRADE. It was `www.your-bakery.example`.
+
+      `.example` is reserved by RFC 2606 precisely so it never resolves, and
+      that is the point: an unconfigured shop must not hand a crawler a real
+      address it does not own. But this value reaches robots.txt and every
+      canonical tag, so until the shop sets its domain it was telling crawlers
+      the trade too. `www.example.com` is reserved by the same RFC and says
+      nothing.
+    */
+    canonicalBaseUrl: "https://www.example.com",
     allowIndexing: true,
     googleSiteVerification: "",
     defaultTwitterCard: "summary_large_image",
@@ -78,82 +115,62 @@ function seedRoutes(): SeoRouteEntry[] {
       "store-home",
       routes.store.home,
       "Storefront Home",
-      `${brandInfo.name} — Cakes & Pastries`,
-      brandInfo.description,
-      ["cakes", "bakery", "online cake order"]
+      /*
+        THE SHOP'S NAME AND NOTHING APPENDED. This was
+        `${brandInfo.name} — Cakes & Pastries`, which told every shop's
+        customers what it sells before the shop had said.
+      */
+      brandInfo.name,
+      "",
+      []
     ),
     route(
       "store-collections",
       routes.store.collections,
       "Collections",
-      "Cake Collections",
-      "Browse all cake collections and categories.",
-      ["cake collections", "birthday cakes", "premium cakes"]
+      /*
+        The neutral heading every shop already starts with, taken from
+        `DEFAULT_LABELS` rather than retyped — a shop that renames this page
+        should not have two places to change. It was "Cake Collections".
+      */
+      DEFAULT_LABELS.collectionsTitle,
+      "",
+      []
     ),
-    route(
-      "store-wedding",
-      routes.store.weddingCakes,
-      "Wedding Cakes",
-      "Wedding Cakes",
-      "Elegant wedding cakes and custom celebration designs.",
-      ["wedding cakes", "custom wedding cake"]
-    ),
-    route(
-      "store-about",
-      routes.store.about,
-      "About",
-      "About Us",
-      "Our bakery story, heritage, and commitment to quality.",
-      ["bakery story"]
-    ),
+
+
     route(
       "store-contact",
       routes.store.contact,
       "Contact",
       "Contact",
-      "Get in touch for orders, support, and custom cake inquiries.",
-      ["contact bakery", "cake inquiry"]
+      "",
+      []
     ),
     route(
       "store-faq",
       routes.store.faq,
       "FAQ",
       "FAQ",
-      "Frequently asked questions about ordering, delivery, and our cakes.",
-      ["bakery faq", "cake delivery"]
+      "",
+      []
     ),
-    route(
-      "store-gallery",
-      routes.store.gallery,
-      "Gallery",
-      "Gallery",
-      "Explore our cake gallery, wedding designs, and celebration creations.",
-      ["cake gallery", "bakery photos"]
-    ),
+
     route(
       "store-privacy",
       routes.store.privacy,
       "Privacy Policy",
       "Privacy Policy",
       "How we collect, use, and protect your information.",
-      ["privacy policy"]
+      []
     ),
     route(
       "store-terms",
       routes.store.terms,
       "Terms of Service",
       "Terms of Service",
-      "Terms and conditions for using our bakery services.",
-      ["terms of service"]
-    ),
-    route(
-      "store-search",
-      routes.store.search,
-      "Search",
-      "Search Cakes",
-      "Search cakes, flavours, and categories across our bakery catalog.",
-      ["search cakes"],
-      true
+      "",
+      []
     ),
     route(
       "store-thank-you",
@@ -176,8 +193,8 @@ export function seedStore(): SeoStore {
 
 function persist(store: SeoStore): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
-  localStorage.setItem(STORAGE_VERSION_KEY, String(SEO_STORAGE_VERSION));
+  safeSetItem(STORAGE_KEY, JSON.stringify(store));
+  safeSetItem(STORAGE_VERSION_KEY, String(SEO_STORAGE_VERSION));
   window.dispatchEvent(new Event(SEO_UPDATED_EVENT));
 }
 
@@ -253,7 +270,7 @@ async function persistAndSync(next: SeoStore): Promise<boolean> {
       const stillOurs = localStorage.getItem(STORAGE_KEY) === JSON.stringify(next);
       if (stillOurs) {
         if (previous === null) localStorage.removeItem(STORAGE_KEY);
-        else localStorage.setItem(STORAGE_KEY, previous);
+        else safeSetItem(STORAGE_KEY, previous);
         window.dispatchEvent(new Event(SEO_UPDATED_EVENT));
       }
     }

@@ -5,10 +5,20 @@ import { withErrorHandler, AppError } from "@/lib/server/http/errors";
 import { validate, readJson } from "@/lib/server/http/validate";
 import { getMaintenanceState } from "@/features/settings/server/maintenance.server";
 
-import { priceCart, UnknownProductError, UnknownWeightError } from "./pricing.server";
+import {
+  priceCart,
+  UndeliverableAtSpeedError,
+  UnknownProductError,
+  UnknownWeightError,
+} from "./pricing.server";
 import { createDraft } from "./draft.repository";
 import { quoteSchema } from "./checkout.validators";
-import { isBeforeLeadTime, isOfferedTimeSlot } from "@/features/orders/lib/delivery-date";
+import {
+  isBeforeLeadTime,
+  isOfferedTimeSlot,
+  isPastSameDayCutoff,
+  isPastTimeSlot,
+} from "@/features/orders/lib/delivery-date";
 import { checkMinimumOrder } from "@/features/checkout/lib/minimum-order";
 import { formatCurrency } from "@/utils/format";
 
@@ -113,6 +123,32 @@ export const quoteCartController = withErrorHandler(async (request: Request) => 
       );
     }
 
+    /**
+     * And a window that has not already closed.
+     *
+     * The lead time answers “is this day far enough ahead”; nothing asked
+     * whether the window on that day has been and gone. Here rather than only
+     * in `placeOrder` because this is where refusing is still free — by the
+     * time the gateway has captured, refusing a customer over a slot that
+     * expired while they were paying is worse than honouring it.
+     */
+    if (input.deliverySlot?.date) {
+      if (isPastSameDayCutoff(input.deliverySlot.date, quote.commerce.sameDayCutoff ?? "")) {
+        throw new AppError(
+          "We have stopped taking orders for delivery today. Please choose a later date.",
+          409,
+          [{ field: "deliverySlot.date", message: "Orders for today have closed" }],
+        );
+      }
+      if (isPastTimeSlot(input.deliverySlot.date, input.deliverySlot.timeSlot ?? "")) {
+        throw new AppError(
+          "That delivery window has already passed today. Please choose another.",
+          409,
+          [{ field: "deliverySlot.timeSlot", message: "That window has passed" }],
+        );
+      }
+    }
+
     // The shop's minimum, enforced where refusing is free.
     //
     // This lived only in the browser — a disabled button and a toast — so the
@@ -135,6 +171,7 @@ export const quoteCartController = withErrorHandler(async (request: Request) => 
       address: input.address,
       deliverySlot: input.deliverySlot,
       orderNotes: input.orderNotes,
+      personalisation: input.personalisation,
     });
 
     return ok(
@@ -163,6 +200,21 @@ export const quoteCartController = withErrorHandler(async (request: Request) => 
       throw new AppError("One of the items is no longer available in that size.", 409, [
         { field: "items", message: `Unknown weight on ${error.slug}: ${error.weight}` },
       ]);
+    }
+    /**
+     * A 409 like the two above, and for the same reason: the cart and the
+     * shop disagree about what is on offer.
+     *
+     * NAMED, both sides. "Your order cannot go out at that speed" over a
+     * six-line cart is an error nobody can act on — the customer has to know
+     * which product to remove or which speed to drop to.
+     */
+    if (error instanceof UndeliverableAtSpeedError) {
+      throw new AppError(
+        `${error.productName} cannot be delivered by ${error.tierLabel}.`,
+        409,
+        [{ field: "deliveryTierId", message: error.message }],
+      );
     }
     throw error;
   }

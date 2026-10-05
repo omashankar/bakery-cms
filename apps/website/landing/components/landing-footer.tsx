@@ -24,8 +24,8 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
   return (
     <footer className="border-t border-border surface-cream">
       <div className={cn(layoutSpacing.container, "py-14")}>
-        <div className="grid gap-10 lg:grid-cols-12">
-          <div className="space-y-4 lg:col-span-4">
+        <div className="grid gap-10 lg:grid-cols-[1.6fr_3fr]">
+          <div className="space-y-4">
             {/* The same mark the header renders. This used to be its own copy
                 of the markup, which is how the footer missed logo support
                 entirely and derived its letter from the name instead of the
@@ -37,9 +37,16 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
                 siteName={brandInfo.name}
               />
             </Link>
-            <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
-              {brandInfo.description}
-            </p>
+            {/*
+              NOTHING AT ALL for a shop that has not written one. This used
+              to fall through to the shipped bakery sentence, which meant
+              every shop published it as its own until somebody noticed.
+            */}
+            {brandInfo.description ? (
+              <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
+                {brandInfo.description}
+              </p>
+            ) : null}
             {/* No row at all when there is nothing to show. An admin who turns
                 every profile off means "we are not on social", and the row used
                 to fall back to the demo accounts. */}
@@ -55,7 +62,7 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
                     aria-label={social.label}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex size-9 items-center justify-center rounded-lg border border-border bg-white text-muted-foreground transition-premium hover:border-bakery-300 hover:text-bakery-700"
+                    className="flex size-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-premium hover:border-bakery-300 hover:text-bakery-700"
                   >
                     <SocialMark platform={social.platform} />
                   </a>
@@ -64,8 +71,17 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
             ) : null}
           </div>
 
+          {/*
+            EVERYTHING BUT THE BRAND, IN A GRID THAT WRAPS.
+
+            Two across from `sm` so a tablet is not the phone's single tall
+            column, four from `lg`, and a shop that adds a third link column
+            starts a second row instead of overflowing the first.
+          */}
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+
           {footerSettings.columns.map((column) => (
-            <div key={column.id} className="space-y-4 lg:col-span-2">
+            <div key={column.id} className="space-y-4">
               <h4 className="text-sm font-semibold text-foreground">{column.title}</h4>
               <ul className="space-y-2.5">
                 {column.links.map((link) => (
@@ -83,7 +99,7 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
                       On the <li>, not the <a>: hiding the anchor alone would
                       leave its bullet and spacing behind.
                     */
-                    data-gate-wedding={link.href === routes.store.weddingCakes ? "" : undefined}
+
                   >
                     <Link
                       href={link.href}
@@ -104,7 +120,7 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
           */}
           {footerSettings.showContact &&
           (contactInfo.address || contactInfo.phone || contactInfo.email) ? (
-            <div className="space-y-4 lg:col-span-2">
+            <div className="space-y-4">
               <h4 className="text-sm font-semibold text-foreground">Contact</h4>
               {/*
                 A row per detail the shop actually publishes. These used to
@@ -120,16 +136,76 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
                     {contactInfo.address}
                   </li>
                 ) : null}
+                {/*
+                  TAPPABLE, not printed. These were plain text, so a customer
+                  reading the footer on a phone — which is most of them — had
+                  to select a number by hand and paste it into the dialler.
+                  The address stays text: a map lives on the Contact page and
+                  guessing at a geo: URL from a typed line is a guess.
+                */}
                 {contactInfo.phone ? (
                   <li className="flex items-center gap-2">
                     <Phone className="size-4 shrink-0 text-bakery-700" />
-                    {contactInfo.phone}
+                    <a
+                      href={`tel:${contactInfo.phone.replace(/[^+\d]/g, "")}`}
+                      className="hover:text-foreground"
+                    >
+                      {contactInfo.phone}
+                    </a>
                   </li>
                 ) : null}
                 {contactInfo.email ? (
                   <li className="flex items-center gap-2">
                     <Mail className="size-4 shrink-0 text-bakery-700" />
-                    {contactInfo.email}
+                    {/*
+                      BREAKS AT THE @, not mid-word.
+
+                      `break-all` alone breaks wherever the line runs out:
+                      this shop’s address came out as "sumanom7014106@gmai" /
+                      "l.com". It needs 230px on one line and the footer gives
+                      each of its four columns about 170px, so it genuinely has
+                      to wrap — the question is only where.
+
+                      A `<wbr>` after the @ offers that point, and the
+                      floor under it had to change too. `break-all` declares
+                      EVERY character a break opportunity, so one more at the
+                      @ is a duplicate rather than a preference: the first
+                      line stayed "sumanom7014106@gmai" with the wbr sitting
+                      in the markup.
+
+                      `wrap-anywhere` is a LAST-RESORT opportunity — taken
+                      only when the line would otherwise overflow — so the @
+                      wins wherever the local part fits, and a local part too
+                      long for the column still breaks rather than escaping
+                      it. Measured in the footer's narrowest four-column
+                      layouts, spill past the column against a 32px gutter:
+
+                        viewport        wrap-break-word     wrap-anywhere
+                        1024            30px / 68px         0 / 0
+                        1200             2px / 39px         0 / 0
+                        1280               0 / 26px         0 / 0
+                        1440                  0 / 0         0 / 0
+
+                      The second number of each pair is a longer address than
+                      this shop's. `wrap-break-word` keeps the @ by letting
+                      the line run out of its column; at 1024 it cleared the
+                      gutter by 2px for the address this shop happens to have,
+                      and overran by 36px for one a little longer. From 1280
+                      up, where the local part fits, `wrap-anywhere` takes
+                      the @ as well — it gives up the @ only where keeping it
+                      would mean overflowing.
+                    */}
+                    <a href={`mailto:${contactInfo.email}`} className="wrap-anywhere hover:text-foreground">
+                      {contactInfo.email.includes("@") ? (
+                        <>
+                          {contactInfo.email.slice(0, contactInfo.email.indexOf("@") + 1)}
+                          <wbr />
+                          {contactInfo.email.slice(contactInfo.email.indexOf("@") + 1)}
+                        </>
+                      ) : (
+                        contactInfo.email
+                      )}
+                    </a>
                   </li>
                 ) : null}
               </ul>
@@ -142,7 +218,7 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
             be empty — and a heading over nothing is its own claim.
           */}
           {footerSettings.showHours && businessHours.length > 0 ? (
-            <div className="space-y-4 lg:col-span-2">
+            <div className="space-y-4">
               <h4 className="text-sm font-semibold text-foreground">Opening Hours</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {businessHours.map((item, index) => (
@@ -161,6 +237,7 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
               </ul>
             </div>
           ) : null}
+          </div>
         </div>
 
         {/* Location map intentionally omitted here — it lives on the Contact page. */}

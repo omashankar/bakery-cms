@@ -54,7 +54,7 @@ export function DeliveryAddressPicker({
                   "flex cursor-pointer gap-3 rounded-xl border p-4 text-sm transition-colors",
                   isSelected
                     ? "border-bakery-700 bg-cream-50"
-                    : "border-border bg-white hover:border-bakery-300"
+                    : "border-border bg-card hover:border-bakery-300"
                 )}
               >
                 <input
@@ -72,7 +72,7 @@ export function DeliveryAddressPicker({
                   <p className="font-medium text-foreground">{address.fullName}</p>
                   <p className="text-muted-foreground">{address.phone}</p>
                   <p className="text-muted-foreground">
-                    {[address.addressLine1, address.addressLine2, address.city, address.state]
+                    {[address.addressLine1, address.addressLine2, address.landmark, address.city, address.state]
                       .filter(Boolean)
                       .join(", ")}
                   </p>

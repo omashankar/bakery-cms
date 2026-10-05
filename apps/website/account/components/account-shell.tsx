@@ -10,25 +10,27 @@ import { layoutSpacing } from "@/constants/spacing";
 import { cn } from "@/lib/utils";
 
 interface AccountShellProps {
+  /**
+   * The page's `<h1>`. Still required, and still never drawn — `StorePageHeader`
+   * keeps it in the document for search engines and screen readers.
+   *
+   * The `description` that used to sit beside it is gone rather than hidden.
+   * All three were this software's own sentences — "Manage delivery addresses
+   * for faster checkout." over a page of delivery addresses — so there was
+   * nothing of the shop's to lose and nothing for a crawler to miss.
+   */
   title: string;
-  description?: string;
   breadcrumbs?: { label: string; href?: string }[];
   children: React.ReactNode;
 }
 
-export function AccountShell({
-  title,
-  description,
-  breadcrumbs = [],
-  children,
-}: AccountShellProps) {
+export function AccountShell({ title, breadcrumbs = [], children }: AccountShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <>
       <StorePageHeader
         title={title}
-        description={description}
         breadcrumbs={[{ label: "My Profile", href: routes.account.dashboard }, ...breadcrumbs]}
       />
 
@@ -52,15 +54,15 @@ export function AccountShell({
           {mobileOpen ? (
             <div
               id="account-mobile-nav"
-              className="mb-6 overflow-hidden rounded-2xl border border-border bg-white shadow-sm lg:hidden"
+              className="mb-6 overflow-hidden rounded-2xl border border-border bg-card shadow-sm lg:hidden"
             >
               <AccountNav onNavigate={() => setMobileOpen(false)} />
             </div>
           ) : null}
 
-          <div className="grid gap-8 lg:grid-cols-[260px_1fr]">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[260px_minmax(0,1fr)]">
             <aside className="hidden lg:block">
-              <div className="sticky top-24 overflow-hidden rounded-2xl border border-border bg-white shadow-sm">
+              <div className="sticky top-24 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
                 <AccountNav />
               </div>
             </aside>

@@ -22,14 +22,26 @@ const productSchema = new mongoose.Schema(
     // cakes is unreachable and the other answers for it.
     slug: { type: String, required: true, unique: true, index: true },
     description: { type: String, default: "" },
-    shortDescription: { type: String },
     price: { type: Number, default: 0 },
     compareAtPrice: { type: Number },
     images: { type: [String], default: [] },
     categoryId: { type: String, default: "" },
-    flavourId: { type: String },
+    // Declared, or every membership the owner ticks is dropped on write while
+    // the API answers 201 — see the note further down this file. `default: []`
+    // protects new writes only: `.lean()` does not apply schema defaults, so a
+    // document written before this line reads back `undefined` and is
+    // normalised on the way out instead.
+    categoryIds: { type: [String], default: [] },
     occasionIds: { type: [String], default: [] },
+    /**
+     * Declared, or every speed an owner unticks is dropped on write while the
+     * API answers 200 — the failure this repo has hit four times. `default: []`
+     * is also the CORRECT default here: empty means every speed, which is what
+     * every existing product means.
+     */
+    deliveryTierIds: { type: [String], default: [] },
     weights: { type: [mongoose.Schema.Types.Mixed], default: [] },
+    weightLabel: { type: String },
     /**
      * Indexed: the storefront's every list starts `{ status: "published" }`.
      *
@@ -42,9 +54,6 @@ const productSchema = new mongoose.Schema(
     isFeatured: { type: Boolean, default: false },
     isBestSeller: { type: Boolean, default: false },
     isTrending: { type: Boolean, default: false },
-    isEggless: { type: Boolean, default: false },
-    isPhotoCake: { type: Boolean, default: false },
-    isSeasonal: { type: Boolean, default: false },
     shapes: { type: [String], default: [] },
     flavourOptions: { type: [String], default: [] },
     stockStatus: { type: String, default: "in_stock" },
@@ -53,18 +62,27 @@ const productSchema = new mongoose.Schema(
     lowStockThreshold: { type: Number },
     allowsMessage: { type: Boolean, default: true },
     allowsPhotoUpload: { type: Boolean, default: false },
-    ingredients: { type: String },
+    // No `enum` and no default: an unknown value resolves to round at read
+    // time (`frameShape`), and a validation error here would refuse a whole
+    // product save over a picture's outline.
+    photoFrameShape: { type: String },
     variantGroups: { type: [mongoose.Schema.Types.Mixed], default: [] },
+    /**
+     * Owner-defined facts (Brand, Material, Warranty, RAM). Load-bearing line.
+     *
+     * This schema is constructed with only `{ minimize: false }`, so Mongoose
+     * `strict` is ON: without a declared path, every write of this field is
+     * dropped SILENTLY while the API still answers 201 and the admin form
+     * re-renders its own state as though it had saved. `productFormSchema` ends
+     * in `.passthrough()`, which looks like the escape hatch and is not — it
+     * governs validation, not persistence.
+     */
+    descriptionBlocks: { type: [mongoose.Schema.Types.Mixed], default: [] },
     rating: { type: Number, default: 0 },
     reviewCount: { type: Number, default: 0 },
     seo: { type: mongoose.Schema.Types.Mixed, default: {} },
     // ProductDetails
-    barcode: { type: String },
-    preparationTimeMinutes: { type: Number },
-    shelfLifeDays: { type: Number },
-    calories: { type: Number },
-    allergens: { type: String },
-    careInstructions: { type: String },
+
     // App-managed ISO timestamps (not Mongoose `timestamps`).
     createdAt: { type: String },
     updatedAt: { type: String },

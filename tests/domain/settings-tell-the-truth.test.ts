@@ -3,7 +3,15 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { defaultAppSettings, isValidEmailAddress } from "@/features/settings/lib/settings-utils";
+import { defaultAppSettings } from "@/features/settings/lib/settings-utils";
+/*
+  THE RULE MOVED, AND THE MOVE IS THE POINT. It was the only thing in
+  settings-utils touching Zod, and that import put the whole library into
+  the client bundle of every storefront page — the FAQ page shipped 487 KB
+  of script with a 285 KB Zod chunk in it. Same rule, same behaviour, a
+  module only its one caller pulls in.
+*/
+import { isValidEmailAddress } from "@/features/settings/lib/email-rule";
 
 const source = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 

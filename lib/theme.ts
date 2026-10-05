@@ -1,3 +1,5 @@
+
+import { safeSetItem } from "@/lib/safe-storage";
 export const THEME_STORAGE_KEY = "bakery-cms-theme";
 
 export const THEME_OPTIONS = ["light", "dark"] as const;
@@ -110,7 +112,7 @@ export const THEME_BLOCKING_SCRIPT = `(function(){var root=document.documentElem
   DARK_THEME_INLINE_VARS
 )
   .map(([k, v]) => `"${k}":"${v}"`)
-  .join(",")}};function system(){return window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}function apply(resolved){if(resolved==="dark"){for(var k in dark)root.style.setProperty(k,dark[k]);root.classList.add("dark");root.classList.remove("light")}else{root.classList.add("light");root.classList.remove("dark");for(var k2 in dark)root.style.removeProperty(k2)}root.style.colorScheme=resolved}try{if(isLight){apply("light");return}var stored=localStorage.getItem(key)||"light";if(stored==="system"){stored=system();try{localStorage.setItem(key,stored)}catch(e){}}apply(stored==="dark"?"dark":"light")}catch(e){apply("light")}})();`;
+  .join(",")}};function system(){return window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}function apply(resolved){if(resolved==="dark"){for(var k in dark)root.style.setProperty(k,dark[k]);root.classList.add("dark");root.classList.remove("light")}else{root.classList.add("light");root.classList.remove("dark");for(var k2 in dark)root.style.removeProperty(k2)}root.style.colorScheme=resolved}try{if(isLight){apply("light");return}var stored=localStorage.getItem(key)||"light";if(stored==="system"){stored=system();try{safeSetItem(key,stored)}catch(e){}}apply(stored==="dark"?"dark":"light")}catch(e){apply("light")}})();`;
 
 export function resolveTheme(theme: ThemeSetting): ResolvedTheme {
   return theme;
@@ -131,7 +133,7 @@ export function readStoredTheme(
     if (stored === "system") {
       const resolved = legacySystemToResolved();
       try {
-        localStorage.setItem(storageKey, resolved);
+        safeSetItem(storageKey, resolved);
       } catch {
         // ignore
       }
@@ -174,7 +176,7 @@ export function applyThemeToDocument(resolved: ResolvedTheme) {
 
 export function persistTheme(storageKey: string, theme: ThemeSetting) {
   try {
-    localStorage.setItem(storageKey, theme);
+    safeSetItem(storageKey, theme);
   } catch {
     // ignore storage errors
   }

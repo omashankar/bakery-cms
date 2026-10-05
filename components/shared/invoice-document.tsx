@@ -1,4 +1,5 @@
 import type { PlacedOrder } from "@/features/orders/lib/orders";
+import { cartLineChoices } from "@/features/cart/lib/cart";
 import { formatOrderStatus } from "@/features/orders/lib/order-status-meta";
 import { settledRefundAmount } from "@/features/orders/lib/order-overviews";
 import { TaxBreakdown, taxBreakdownFromCartTotals } from "@/components/shared/tax-breakdown";
@@ -8,6 +9,7 @@ import type { InvoiceSettings } from "@/types/invoice";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import { formatOrderDeliveryDay } from "@/features/orders/lib/delivery-tracking";
+import { formatAddress } from "@/features/orders/lib/address-format";
 
 interface InvoiceDocumentProps {
   order: PlacedOrder;
@@ -50,13 +52,9 @@ export function InvoiceDocument({
   // yet paid out is not something to put on an invoice as settled.
   const refunded = settledRefundAmount(order);
 
-  const addressLine = [
-    order.address.addressLine1,
-    order.address.addressLine2,
-    `${order.address.city}, ${order.address.state} ${order.address.pincode}`,
-  ]
-    .filter(Boolean)
-    .join(", ");
+  // One edit, six surfaces: this file backs the customer invoice, the admin
+  // invoice, the preview dialog, the design panel and the invoice list.
+  const addressLine = formatAddress(order.address);
 
   return (
     <article
@@ -178,9 +176,17 @@ export function InvoiceDocument({
             <tr key={item.id} className="border-b border-border/60 align-top">
               <td className="py-3 pr-3">
                 <p className="font-medium">{item.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {[item.weight, item.shape, item.flavour].filter(Boolean).join(" · ")}
-                </p>
+                {/*
+                  The invoice is the only paper the shop prints and the one
+                  document the customer keeps. It listed weight/shape/flavour and
+                  never `variantSummary`, so an order for a 256 GB charger read
+                  "65W Type-C Charger … 6,499" with the ₹5,000 unexplained.
+                */}
+                {cartLineChoices(item).length > 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    {cartLineChoices(item).join(" · ")}
+                  </p>
+                ) : null}
                 {item.message ? (
                   <p className="mt-1 text-xs text-muted-foreground">Message: {item.message}</p>
                 ) : null}

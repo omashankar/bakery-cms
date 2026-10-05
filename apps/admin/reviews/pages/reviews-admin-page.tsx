@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { SafeImage } from "@/components/shared/safe-image";
 import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import { loadProducts } from "@/features/products/lib/products-repository";
@@ -56,6 +57,7 @@ import { ReviewReplyDialog } from "../components/review-reply-dialog";
 import { ReviewStatusBadge } from "../components/review-status-badge";
 import { reviewsHydration } from "@/features/reviews/lib/reviews-api";
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 const PAGE_SIZE = 10;
 
@@ -70,6 +72,7 @@ const EMPTY_OVERVIEW: ProductReviewOverview = {
 };
 
 export function ReviewsAdminPage() {
+  const labels = useBusinessLabels();
   const [mounted, setMounted] = useState(false);
   const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [filters, setFilters] = useState<ReviewListFilters>(defaultReviewFilters);
@@ -229,7 +232,7 @@ export function ReviewsAdminPage() {
     <AdminPage className="space-y-4 sm:space-y-5">
       <AdminPageHeader
         title="Reviews"
-        description="Moderate product reviews."
+        description={`Moderate ${labels.productWord.toLowerCase()} reviews.`}
         className="gap-3"
         actions={
           <div className="flex w-full gap-2">
@@ -314,7 +317,7 @@ export function ReviewsAdminPage() {
           <FilterPanelSearch
             value={filters.search}
             onChange={(value) => updateFilters({ search: value })}
-            placeholder="Search reviews, customers, products…"
+            placeholder={`Search reviews, customers, ${labels.productWordPlural.toLowerCase()}…`}
           />
           <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
             <AdminSelect
@@ -352,7 +355,7 @@ export function ReviewsAdminPage() {
             <AdminSelect
               value={filters.productSlug}
               onChange={(event) => updateFilters({ productSlug: event.target.value })}
-              aria-label="Product"
+              aria-label={labels.productWord}
             >
               <option value="">All products</option>
               {cakes.map((cake) => (
@@ -477,6 +480,35 @@ export function ReviewsAdminPage() {
                       ) : null}
                       <p className="max-w-2xl text-sm text-muted-foreground">{review.body}</p>
 
+                      {/*
+                        THE PHOTOS, on the screen where a review is approved.
+
+                        A moderator pressing Approve publishes whatever is
+                        attached to it. Without these the one thing on a review
+                        that cannot be skim-read — a picture — would be published
+                        unseen, and the first person to look at it would be a
+                        customer on the product page.
+                      */}
+                      {review.photoUrls?.length ? (
+                        <div className="flex flex-wrap gap-2">
+                          {review.photoUrls.map((url) => (
+                            <a
+                              key={url}
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="size-20 overflow-hidden rounded-lg border border-border bg-muted"
+                            >
+                              <SafeImage
+                                src={url}
+                                alt=""
+                                className="size-full object-cover"
+                              />
+                            </a>
+                          ))}
+                        </div>
+                      ) : null}
+
                       {review.reportReason ? (
                         <p className="flex items-start gap-2 rounded-lg border border-red-200/80 bg-red-50 px-3 py-2 text-xs text-red-950 dark:border-red-500/30 dark:bg-red-950/40 dark:text-red-100">
                           <Flag className="mt-0.5 size-3.5 shrink-0" />
@@ -487,7 +519,7 @@ export function ReviewsAdminPage() {
                       {review.adminReply ? (
                         <div className="rounded-lg border border-border bg-muted/80 px-3 py-2 text-sm">
                           <p className="text-xs font-medium text-muted-foreground">
-                            Bakery reply
+                            Store reply
                           </p>
                           <p className="mt-0.5 text-muted-foreground">{review.adminReply}</p>
                         </div>

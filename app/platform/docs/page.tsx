@@ -5,7 +5,7 @@ import { PRODUCT_METADATA } from "@/constants/product-brand";
 export const metadata: Metadata = {
   title: { absolute: "Documentation — Bakery CMS" },
   description:
-    "A guide to running your shop from the admin panel: naming it, adding cakes, taking orders, running discounts, and keeping it safe.",
+    "A guide to running your shop from the admin panel: naming it, adding products, taking orders, running discounts, and keeping it safe.",
   alternates: { canonical: "/platform/docs" },
   // The product's icon, not the shop's — see constants/product-brand.ts.
   ...PRODUCT_METADATA,

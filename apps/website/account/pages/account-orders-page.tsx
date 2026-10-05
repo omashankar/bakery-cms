@@ -9,6 +9,7 @@ import { AccountOrderStatusBadge } from "@/apps/website/account/components/accou
 import { AccountShell } from "@/apps/website/account/components/account-shell";
 import { useCustomerAuth } from "@/apps/website/account/hooks/use-customer-auth";
 import type { PlacedOrder } from "@/features/orders/lib/orders";
+import { cartLineChoices } from "@/features/cart/lib/cart";
 import { reorderFromOrder } from "@/apps/website/lib/reorder";
 import { fetchProducts } from "@/features/products/data/products-client";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -16,10 +17,12 @@ import { ListPagination } from "@/components/shared/list-pagination";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
 import { formatCurrency, formatDate } from "@/utils/format";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 const PAGE_SIZE = 10;
 
 export function AccountOrdersPage() {
+  const labels = useBusinessLabels();
   const router = useRouter();
   const { session, ready } = useCustomerAuth();
   const [page, setPage] = useState(1);
@@ -88,7 +91,7 @@ export function AccountOrdersPage() {
       catalogue = await fetchProducts();
     } catch {
       // Distinct from "unavailable": nothing has been checked yet.
-      toast.error("Could not reach the bakery", {
+      toast.error("Could not reach the store", {
         description: "Please check your connection and try again.",
       });
       return;
@@ -128,7 +131,6 @@ export function AccountOrdersPage() {
   return (
     <AccountShell
       title="My Orders"
-      description="View and track all your bakery orders."
       breadcrumbs={[{ label: "Orders" }]}
     >
       {orders === null ? (
@@ -149,7 +151,7 @@ export function AccountOrdersPage() {
         <EmptyState
           icon={Package}
           title="We could not load your orders"
-          description="Something went wrong reaching the bakery. Your orders are safe — please try again."
+          description="Something went wrong reaching the store. Your orders are safe — please try again."
           action={
             <Button variant="bakery" onClick={() => router.refresh()}>
               Try again
@@ -163,7 +165,7 @@ export function AccountOrdersPage() {
           description="When you place an order, it will appear here."
           action={
             <Button variant="bakery" render={<Link href={routes.store.collections} />}>
-              Browse cakes
+              Browse {labels.productWordPlural.toLowerCase()}
             </Button>
           }
         />
@@ -172,7 +174,7 @@ export function AccountOrdersPage() {
           {paginated.map((order) => (
             <div
               key={order.id}
-              className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm"
+              className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
             >
               {/* Header */}
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-cream-50 px-5 py-4 sm:px-6">
@@ -199,6 +201,18 @@ export function AccountOrdersPage() {
                     <li key={item.id}>
                       <span className="font-medium text-foreground">{item.quantity} ×</span>{" "}
                       {item.name}
+                      {/*
+                        The customer's own record of what they ordered. It read
+                        "2 × Chocolate Truffle Cake" and stopped — no size, no
+                        flavour, and none of the options they were charged for —
+                        so the one page they can check their own order on could
+                        not tell two different orders of the same product apart.
+                      */}
+                      {cartLineChoices(item).length > 0 ? (
+                        <span className="block text-xs">
+                          {cartLineChoices(item).join(" · ")}
+                        </span>
+                      ) : null}
                     </li>
                   ))}
                   {order.items.length > 3 ? (

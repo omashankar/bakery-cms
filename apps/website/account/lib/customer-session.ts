@@ -1,3 +1,5 @@
+
+import { safeSetItem } from "@/lib/safe-storage";
 const CUSTOMER_SESSION_KEY = "bakery-cms-customer-session";
 
 export interface CustomerSession {
@@ -50,7 +52,7 @@ function readCache(): CustomerSession | null {
 
 function writeCache(session: CustomerSession | null): void {
   if (typeof window === "undefined") return;
-  if (session) localStorage.setItem(CUSTOMER_SESSION_KEY, JSON.stringify(session));
+  if (session) safeSetItem(CUSTOMER_SESSION_KEY, JSON.stringify(session));
   else localStorage.removeItem(CUSTOMER_SESSION_KEY);
   sessionStorage.removeItem(CUSTOMER_SESSION_KEY);
   window.dispatchEvent(new Event("bakery-customer-session-updated"));

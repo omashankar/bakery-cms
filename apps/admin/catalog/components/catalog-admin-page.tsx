@@ -7,8 +7,7 @@ import {
   Plus,
   RotateCcw,
   Tags,
-  Trash2,
-} from "lucide-react";
+  Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { reportWrite } from "@/apps/admin/lib/report-write";
 import {
   FilterPanel,
@@ -19,14 +18,18 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { EmptyState } from "@/components/shared/empty-state";
 import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
 import type { CatalogStore, CatalogTab } from "@/types/catalog";
+import type { WriteResult } from "@/lib/write-result";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+// The shop's own currency. The weight modifier printed a hardcoded ₹ while
+// every other price on the screen already resolved `general.currency`.
 import {
   CATALOG_UPDATED_EVENT,
   deleteCategories,
-  deleteFlavours,
+  deleteCollections,
+  deleteDepartments,
   deleteOccasions,
-  deleteWeightOptions,
+  moveCatalogRow,
   loadCatalogStore,
   resetCatalogStore,
 } from "@/features/catalog/lib/catalog-repository";
@@ -34,47 +37,74 @@ import {
   CATALOG_HYDRATION_EVENT,
   catalogHydrationStatus,
 } from "@/features/catalog/lib/catalog-api";
-import { loadProducts } from "@/features/products/lib/products-repository";
-import type { ModuleSettings } from "@/types/settings";
-import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import {
-  getModuleSettings,
-  SETTINGS_UPDATED_EVENT,
-} from "@/features/settings/lib/settings-repository";
+  countByCategory,
+  loadProducts,
+  productsLeftUnfiled,
+} from "@/features/products/lib/products-repository";
 import { CatalogFormDialog } from "./catalog-form-dialog";
+import { useBusinessLabels, type ShopLabels } from "@/hooks/use-business-labels";
 
 const EMPTY_STORE: CatalogStore = {
+  departments: [],
   categories: [],
-  flavours: [],
   occasions: [],
-  weights: [],
+  collections: [],
   updatedAt: "",
 };
 
-const tabs: Array<{
+/**
+ * THE SHOP'S OWN WORDS FOR ITS OWN THREE LISTS.
+ *
+ * These were module-level constants holding "Categories", "Occasions" and
+ * "Collections" — hardcoded English on the one screen whose whole job is
+ * letting a shop describe its goods, while the word for the goods themselves
+ * has been configurable since the labels shipped. A phone shop files under
+ * Brands; a florist sells for Festivals.
+ *
+ * A FUNCTION of the labels rather than a constant, because the labels arrive
+ * after mount and change when the shop edits them. The ids are untouched:
+ * `categories` is still the tab id, the route and the database section, and
+ * renaming any of those from here is how a label becomes a migration.
+ */
+function tabsFor(labels: ShopLabels): Array<{
   id: CatalogTab;
   label: string;
   singular: string;
-}> = [
-  { id: "categories", label: "Categories", singular: "Category" },
-  { id: "occasions", label: "Occasions", singular: "Occasion" },
-  { id: "flavours", label: "Flavours", singular: "Flavour" },
-  { id: "weights", label: "Weights", singular: "Weight" },
-];
+}> {
+  return [
+    /* FIRST, because it is the level above the rest. */
+    { id: "departments", label: labels.departmentWordPlural, singular: labels.departmentWord },
+    { id: "categories", label: labels.categoryWordPlural, singular: labels.categoryWord },
+    { id: "occasions", label: labels.occasionWordPlural, singular: labels.occasionWord },
+    { id: "collections", label: labels.collectionWordPlural, singular: labels.collectionWord },
+  ];
+}
 
 // Tab bar order — includes a Themes placeholder (design-theme data model comes later).
-const tabBar: Array<{ id: CatalogTab | "themes"; label: string; soon?: boolean }> = [
-  { id: "categories", label: "Categories" },
-  { id: "occasions", label: "Occasions" },
+function tabBarFor(
+  labels: ShopLabels,
+): Array<{ id: CatalogTab | "themes"; label: string; soon?: boolean }> {
+  return [
+  { id: "departments", label: labels.departmentWordPlural },
+  { id: "categories", label: labels.categoryWordPlural },
+  { id: "occasions", label: labels.occasionWordPlural },
+  { id: "collections", label: labels.collectionWordPlural },
   { id: "themes", label: "Themes", soon: true },
-  { id: "flavours", label: "Flavours" },
-  { id: "weights", label: "Weights" },
-];
+  /*
+    A Weights tab stood here. Sizes are typed on the product now — a shop-wide
+    list forced one product's sizes onto every other, and editing it changed
+    nothing a customer could see once products stopped deriving from it.
+  */
+  ];
+}
 
 export function CatalogAdminPage() {
+  const labels = useBusinessLabels();
   const [mounted, setMounted] = useState(false);
+  const tabs = tabsFor(labels);
+  const tabBar = tabBarFor(labels);
   const [activeTab, setActiveTab] = useState<CatalogTab>("categories");
-  const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
   const [showThemes, setShowThemes] = useState(false);
   const [search, setSearch] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
@@ -120,72 +150,96 @@ export function CatalogAdminPage() {
     };
   }, []);
 
-  // Flavours/Weights are optional bakery modules — hide those tabs when off.
-  useEffect(() => {
-    const sync = () => {
-      const next = getModuleSettings();
-      setModules(next);
-      setActiveTab((current) => {
-        if (current === "flavours" && !next.flavour) return "categories";
-        if (current === "weights" && !next.weight) return "categories";
-        return current;
-      });
-    };
-    sync();
-    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
-    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
-  }, []);
+  /*
+    A module gate stood here, and Flavours was the only tab it hid.
 
-  const moduleForTab: Partial<Record<CatalogTab | "themes", keyof ModuleSettings>> = {
-    flavours: "flavour",
-    weights: "weight",
-  };
-  const visibleTabBar = tabBar.filter((tab) => {
-    const mod = moduleForTab[tab.id];
-    return mod ? modules[mod] : true;
-  });
+    Flavours have left the Catalog: a flavour was never a list a shop
+    maintained, it was a word typed on a product, and `modules.flavour` now
+    gates that box on the product form instead. Nothing left on this screen
+    is optional, so there is nothing to filter.
+  */
 
   const items = useMemo(() => {
     const query = search.trim().toLowerCase();
-    const list =
-      activeTab === "categories"
-        ? store.categories
-        : activeTab === "flavours"
-          ? store.flavours
-          : activeTab === "occasions"
-            ? store.occasions
-            : store.weights;
+    /**
+     * A LOOKUP, not a growing ternary.
+     *
+     * Two sections fitted in a ternary; three do not, and the third would
+     * have fallen into the else — so the Collections tab would have listed
+     * occasions, searched them, and offered to delete them.
+     */
+    /*
+      `isActive` and `sortOrder` are what the three lists share besides a name,
+      and this screen shows both — a Hidden marker and the two arrows — so they
+      belong in the shape it narrows to.
+    */
+    const list: {
+      id: string;
+      name: string;
+      slug: string;
+      isActive?: boolean;
+      sortOrder?: number;
+    }[] = {
+      departments: store.departments,
+      categories: store.categories,
+      occasions: store.occasions,
+      collections: store.collections,
+    }[activeTab];
 
-    if (!query) return list;
-    return list.filter((item) => {
-      const label = "label" in item ? item.label : item.name;
-      const slug = "slug" in item ? item.slug : "";
-      return label.toLowerCase().includes(query) || slug.toLowerCase().includes(query);
+    /*
+      SORTED THE WAY THE SHOP IS, or the arrows would appear to do nothing.
+
+      The storefront reads these lists through `offeredRows`, which orders by
+      `sortOrder` and puts an unnumbered row last. This screen read the stored
+      array. `moveCatalogRow` happens to write the two in agreement, so they
+      would not have drifted today — but a screen that manages an order has to
+      show that order rather than one that matches it by construction.
+    */
+    const ordered = [...list].sort((a, b) => {
+      const left = typeof a.sortOrder === "number" ? a.sortOrder : Number.POSITIVE_INFINITY;
+      const right = typeof b.sortOrder === "number" ? b.sortOrder : Number.POSITIVE_INFINITY;
+      if (left !== right) return left - right;
+      return list.indexOf(a) - list.indexOf(b);
     });
+
+    if (!query) return ordered;
+    return ordered.filter(
+      (item) =>
+        item.name.toLowerCase().includes(query) || item.slug.toLowerCase().includes(query),
+    );
   }, [activeTab, search, store]);
+
+  /**
+   * Read once, shared by the counts and by the orphan check.
+   *
+   * The orphan check needs the PRODUCTS rather than a tally: whether deleting
+   * a category leaves something filed nowhere depends on what else that
+   * product holds, which a count per category cannot answer.
+   */
+  const publishedProducts = useMemo(
+    () => (mounted ? loadProducts().filter((cake) => cake.status === "published") : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [mounted, refreshKey],
+  );
 
   // How many published products are really in each category. `cakeCount` on the
   // category is a hand-typed number that agreed with nothing: the seed claimed
   // 48 cakes under Birthday and 271 across all categories, in a shop with 25.
-  const productsByCategory = useMemo(() => {
-    if (!mounted) return new Map<string, number>();
-    const tally = new Map<string, number>();
-    for (const cake of loadProducts()) {
-      if (cake.status !== "published") continue;
-      tally.set(cake.categoryId, (tally.get(cake.categoryId) ?? 0) + 1);
-    }
-    return tally;
-  }, [mounted, refreshKey]);
+  // One increment per MEMBERSHIP — see `countByCategory`, which is shared with
+  // the homepage tiles so the two screens cannot disagree about a number.
+  const productsByCategory = useMemo(
+    () => countByCategory(publishedProducts),
+    [publishedProducts],
+  );
 
-  const counts = {
+  const counts: Record<CatalogTab, number> = {
+    departments: store.departments.length,
     categories: store.categories.length,
-    flavours: store.flavours.length,
     occasions: store.occasions.length,
-    weights: store.weights.length,
+    collections: store.collections.length,
   };
 
-  const totalItems =
-    counts.categories + counts.flavours + counts.occasions + counts.weights;
+  const totalItems = Object.values(counts).reduce((sum, n) => sum + n, 0);
   const activeTabMeta = tabs.find((tab) => tab.id === activeTab) ?? tabs[0];
   const allSelected =
     items.length > 0 && items.every((item) => selectedIds.includes(item.id));
@@ -226,10 +280,35 @@ export function CatalogAdminPage() {
     setSelectedIds(items.map((item) => item.id));
   }
 
-  /** Products that would be orphaned by deleting the current selection. */
+  /**
+   * Products left filed NOWHERE by deleting the current selection.
+   *
+   * This summed the per-category tallies, which was right while a product had
+   * exactly one category and is wrong twice over now: it counts a product filed
+   * in two of the doomed categories TWICE, and it counts a product that keeps a
+   * category outside the selection as orphaned when it is not.
+   *
+   * Both errors point the same way — the only warning attached to a destructive
+   * action over-reports — and an owner who checks it once, finds it wrong, and
+   * stops reading it is worse off than one who was never warned.
+   */
   function orphanCount(): number {
     if (activeTab !== "categories") return 0;
-    return selectedIds.reduce((n, id) => n + (productsByCategory.get(id) ?? 0), 0);
+    return productsLeftUnfiled(publishedProducts, selectedIds).length;
+  }
+
+  /**
+   * Move one row up or down its list.
+   *
+   * The repository renumbers the WHOLE list rather than swapping two values,
+   * because most rows have never carried a `sortOrder` — see the note there.
+   * Nothing is reported on success: the list redraws with the row in its new
+   * place, which is the feedback. A refused write is worth a word.
+   */
+  async function handleMove(id: string, direction: -1 | 1) {
+    const { persisted } = await moveCatalogRow(activeTab, id, direction);
+    refresh();
+    if (!persisted) reportWrite(false, "Order saved");
   }
 
   async function handleDelete() {
@@ -241,24 +320,42 @@ export function CatalogAdminPage() {
     // Three of this shop's products are already in that state.
     const orphans = orphanCount();
     if (orphans > 0) {
-      const noun = orphans === 1 ? "cake is" : "cakes are";
-      const which = selectedIds.length === 1 ? "category" : "categories";
+      const noun = orphans === 1 ? `${labels.productWord.toLowerCase()} is` : `${labels.productWordPlural.toLowerCase()} are`;
+      const which =
+        selectedIds.length === 1
+          ? labels.categoryWord.toLowerCase()
+          : labels.categoryWordPlural.toLowerCase();
       const ok = window.confirm(
         `${orphans} published ${noun} still in the ${which} you are deleting.\n\n` +
-          "They will keep pointing at a category that no longer exists: the shop " +
-          "will show them as plain “Cakes”, and the category filter here will " +
-          "never find them again.\n\nDelete anyway?"
+          "That is every category they are filed under, so they will be left " +
+          "pointing at nothing: the shop will show them as uncategorised, and " +
+          "the category filter here will never find them again.\n\n" +
+          "Anything filed somewhere else as well is not counted here and keeps " +
+          "its other categories.\n\nDelete anyway?"
       );
       if (!ok) return;
     }
-    const remove =
-      activeTab === "categories"
-        ? deleteCategories
-        : activeTab === "flavours"
-          ? deleteFlavours
-          : activeTab === "occasions"
-            ? deleteOccasions
-            : deleteWeightOptions;
+    /*
+      KEYED ON THE TAB, not an either/or.
+
+      This was `activeTab === "categories" ? deleteCategories : deleteOccasions`,
+      written when there were two tabs. Collections arrived as a third and fell
+      into the else — so selecting a collection and pressing Delete filtered the
+      OCCASIONS list by a collection's id, matched nothing, wrote the occasions
+      back unchanged, and reported "Deleted 0 items". `deleteCollections` was
+      written at the same time as the tab and has never been called.
+
+      A map rather than a chain, because the next tab added to this screen will
+      be a missing key here — a crash in development — and not a silent write to
+      whichever list the else happened to name.
+    */
+    const removers: Record<CatalogTab, (ids: string[]) => Promise<WriteResult<number>>> = {
+      departments: deleteDepartments,
+      categories: deleteCategories,
+      occasions: deleteOccasions,
+      collections: deleteCollections,
+    };
+    const remove = removers[activeTab];
 
     const { value: count, persisted } = await remove(selectedIds);
     refresh();
@@ -266,15 +363,15 @@ export function CatalogAdminPage() {
   }
 
   async function handleReset() {
-    // One click on "Reset defaults" replaced all four taxonomies in the database
+    // One click on "Reset defaults" replaced every taxonomy in the database
     // with the shipped ones, unconfirmed. Everything a shop had named — its
-    // categories, occasions, flavours and weight tiers — gone, and every product
-    // left pointing at ids that no longer existed.
+    // categories and occasions — gone, and every product left pointing at ids
+    // that no longer existed.
     const ok = window.confirm(
-      `This replaces all four lists — ${counts.categories} categories, ` +
-        `${counts.occasions} occasions, ${counts.flavours} flavours and ` +
-        `${counts.weights} weights — with the ones this software ships with.\n\n` +
-        "Anything you have named here is lost, and cakes using those values will " +
+      `This replaces both lists — ${counts.categories} categories and ` +
+        `${counts.occasions} occasions — ` +
+        `with the ones this software ships with.\n\n` +
+        "Anything you have named here is lost, and products using those values will " +
         "point at entries that no longer exist.\n\nReset the whole catalog?"
     );
     if (!ok) return;
@@ -293,7 +390,7 @@ export function CatalogAdminPage() {
         title="Catalog"
         description={
           showThemes
-            ? "Cake design themes — coming soon"
+            ? "Design themes — coming soon"
             : totalItems > 0
               ? `${counts[activeTab]} ${activeTabMeta.label.toLowerCase()} · ${totalItems} total`
               : "Categories, flavours, occasions, and weights"
@@ -350,7 +447,7 @@ export function CatalogAdminPage() {
 
       <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         <div className="flex w-max min-w-full gap-1.5 pb-0.5">
-          {visibleTabBar.map((tab) => {
+          {tabBar.map((tab) => {
             const isThemes = tab.id === "themes";
             const active = isThemes ? showThemes : !showThemes && activeTab === tab.id;
             return (
@@ -390,7 +487,7 @@ export function CatalogAdminPage() {
           <EmptyState
             icon={Palette}
             title="Themes coming soon"
-            description="Cake design themes (e.g. Cartoon, Floral, Minimal, Elegant) will be manageable here."
+            description="Design themes (e.g. Cartoon, Floral, Minimal, Elegant) will be manageable here."
             className="py-16"
           />
         </section>
@@ -454,18 +551,16 @@ export function CatalogAdminPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((item) => {
+                  {items.map((item, index) => {
                     const id = item.id;
-                    const label = "label" in item ? item.label : item.name;
-                    const slug = "slug" in item ? item.slug : undefined;
+                    const label = item.name;
+                    const slug = item.slug;
                     const detail =
-                      activeTab === "weights" && "modifier" in item
-                        ? `+₹${item.modifier} · serves ${item.serves}`
-                        : activeTab === "categories"
-                          ? `${productsByCategory.get(item.id) ?? 0} cakes`
-                          : slug
-                            ? `/${slug}`
-                            : "—";
+                      activeTab === "categories"
+                        ? `${productsByCategory.get(item.id) ?? 0} ${labels.productWordPlural.toLowerCase()}`
+                        : slug
+                          ? `/${slug}`
+                          : "—";
 
                     return (
                       <tr
@@ -483,22 +578,63 @@ export function CatalogAdminPage() {
                           />
                         </td>
                         <td className="px-4 py-3">
-                          <p className="font-medium text-foreground">{label}</p>
+                          <p className="font-medium text-foreground">
+                            {label}
+                            {/*
+                              A row switched off still appears HERE — this is
+                              where the shop manages it — and says so, because
+                              the alternative is an owner looking at a row that
+                              is on this screen and not on their shop with
+                              nothing to explain the difference.
+                            */}
+                            {item.isActive === false ? (
+                              <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                                Hidden
+                              </span>
+                            ) : null}
+                          </p>
                           {slug ? (
                             <p className="text-xs text-muted-foreground">/{slug}</p>
                           ) : null}
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">{detail}</td>
-                        <td className="px-4 py-3 text-right">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8"
-                            onClick={() => openEdit(id)}
-                          >
-                            <Pencil className="size-3.5" />
-                            Edit
-                          </Button>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1">
+                            {/*
+                              Disabled at the ends rather than hidden, so the
+                              rows do not change width as you move one down a
+                              long list.
+                            */}
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="size-8"
+                              disabled={!canWrite || index === 0}
+                              aria-label={`Move ${label} up`}
+                              onClick={() => void handleMove(id, -1)}
+                            >
+                              <ChevronUp className="size-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="size-8"
+                              disabled={!canWrite || index === items.length - 1}
+                              aria-label={`Move ${label} down`}
+                              onClick={() => void handleMove(id, 1)}
+                            >
+                              <ChevronDown className="size-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8"
+                              onClick={() => openEdit(id)}
+                            >
+                              <Pencil className="size-3.5" />
+                              Edit
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -510,16 +646,14 @@ export function CatalogAdminPage() {
             <ul className="divide-y divide-border md:hidden">
               {items.map((item) => {
                 const id = item.id;
-                const label = "label" in item ? item.label : item.name;
-                const slug = "slug" in item ? item.slug : undefined;
+                const label = item.name;
+                const slug = item.slug;
                 const detail =
-                  activeTab === "weights" && "modifier" in item
-                    ? `+₹${item.modifier} · serves ${item.serves}`
-                    : activeTab === "categories"
-                      ? `${productsByCategory.get(item.id) ?? 0} cakes`
-                      : slug
-                        ? `/${slug}`
-                        : null;
+                  activeTab === "categories"
+                    ? `${productsByCategory.get(item.id) ?? 0} ${labels.productWordPlural.toLowerCase()}`
+                    : slug
+                      ? `/${slug}`
+                      : null;
 
                 return (
                   <li key={id} className="flex items-start gap-3 p-3 sm:p-4">
@@ -532,6 +666,11 @@ export function CatalogAdminPage() {
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-foreground">
                         {label}
+                        {item.isActive === false ? (
+                          <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                            Hidden
+                          </span>
+                        ) : null}
                       </p>
                       {detail ? (
                         <p className="truncate text-xs text-muted-foreground">{detail}</p>

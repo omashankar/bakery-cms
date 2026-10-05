@@ -30,6 +30,20 @@ export const TEMPLATE_VARIABLE_CONTRACT: Record<string, readonly string[]> = {
     "payment_method",
     "delivery_date",
     "invoice_url",
+    /**
+     * WHAT THEY BOUGHT.
+     *
+     * This list had six variables and not one of them named a product, so the
+     * only record a customer receives without logging in quoted a total and
+     * left them to follow the tracking link to find out what was in the order.
+     * The shop's own copy (`admin_new_order`) has had `order_items` all along.
+     *
+     * Declared here rather than only in the seed because `availableVariablesFor`
+     * reads the CONTRACT: a shop whose template row was seeded long ago — and
+     * which is deliberately never rewritten — gets the chip in its editor from
+     * this line alone.
+     */
+    "order_items",
   ],
   order_shipped: [
     ...STORE_VARIABLES,

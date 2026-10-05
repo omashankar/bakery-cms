@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import type { LandingProduct } from "@/constants/landing-data";
 import {
   bestSellers,
@@ -10,22 +11,23 @@ import {
 } from "@/constants/landing-data";
 import { fixBrokenImageUrl } from "@/constants/demo-images";
 import type { Product, ProductFormData } from "@/types";
-import {
-  adminCategories,
-  adminFlavours,
-  adminOccasions,
-  getCategoryByName,
-  getDefaultWeights,
-  getFlavourByName,
-} from "./catalog-options";
-import { DEFAULT_PRODUCT_SHAPES } from "./product-mapper";
+import { adminOccasions, getCategoryByName } from "./catalog-options";
 import { slugify } from "./product-utils";
-import { createDefaultVariantGroups, normalizeVariantGroups } from "./variant-utils";
+import { normalizeVariantGroups } from "./variant-utils";
 
 const STORAGE_KEY = "bakery-cms-admin-cakes";
 const STORAGE_VERSION_KEY = "bakery-cms-admin-cakes-version";
 /** v6: variant options carry an explicit `semantic`, backfilled from legacy labels. */
-const CAKES_STORAGE_VERSION = 6;
+/**
+ * v7: products carry `categoryIds` — every category they are filed under.
+ *
+ * Bumped rather than left alone because this cache is a SECOND live store.
+ * Every admin browser holds a full copy, and the Catalog counts, the Products
+ * filter, Inventory and global search all read it rather than the database. A
+ * copy written before this ships has no memberships, so those four screens
+ * would disagree with the storefront until the browser happened to refetch.
+ */
+const CAKES_STORAGE_VERSION = 7;
 
 /**
  * Fired whenever the product cache changes — including when `useProductCacheSync`
@@ -48,7 +50,7 @@ function emitProductsUpdated(): void {
  */
 function writeProducts(cakes: Product[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(cakes));
+  safeSetItem(STORAGE_KEY, JSON.stringify(cakes));
 }
 
 function nowIso(): string {
@@ -67,11 +69,6 @@ function mapLandingProductToAdmin(cake: LandingProduct, index: number): Product 
       updatedAt: timestamp,
     };
 
-  const flavour =
-    getFlavourByName(cake.category) ??
-    adminFlavours().find((item) =>
-      cake.description.toLowerCase().includes(item.slug)
-    );
 
   const occasionIds =
     cake.category.toLowerCase().includes("wedding") ||
@@ -84,22 +81,54 @@ function mapLandingProductToAdmin(cake: LandingProduct, index: number): Product 
     name: cake.name,
     slug: cake.slug,
     description: cake.description,
-    shortDescription: cake.description.slice(0, 100),
     price: cake.price,
-    compareAtPrice: cake.price > 1000 ? Math.round(cake.price * 1.1) : undefined,
+    // NO INVENTED MRP. This was `price > 1000 ? price * 1.1 : undefined`, so
+    // every demo product over Rs 1000 wore a permanent “9% OFF” against a
+    // price nobody had ever charged. A struck-through number is a claim about
+    // the past, and the shop is the only one who can make it.
+    compareAtPrice: cake.compareAtPrice,
     images: [cake.image],
     categoryId: category.id,
-    flavourId: flavour?.id,
+    /**
+     * The demo product's own memberships, resolved through the shop's list.
+     *
+     * Read from `cake.categories` where a demo product names extra ones, and
+     * never GUESSED from the category text the way `occasionIds` is two
+     * blocks up. That guess is the last of a pattern this repo removed
+     * elsewhere — a "birthday" page that showed every chocolate cake in the
+     * shop — and copying it here would file products the owner never filed.
+     */
+    categoryIds: [
+      ...new Set([
+        category.id,
+        ...(cake.categories ?? [])
+          .map((name) => getCategoryByName(name)?.id)
+          .filter((id): id is string => Boolean(id)),
+      ]),
+    ],
     occasionIds,
-    weights: getDefaultWeights(cake.price),
+    /**
+     * The demo cakes' own sizes, named here rather than derived.
+     *
+     * This called `getDefaultWeights(cake.price)` — the shop-wide Catalog list
+     * — which is gone: sizes are typed on the product. The three tiers are the
+     * ones that list used to hold, so a fresh demo install looks exactly as it
+     * did, and an owner can now change them per cake without touching anything
+     * else in the shop.
+     */
+    weights: [
+      { label: "0.5 kg", price: cake.price, serves: "4–6" },
+      { label: "1 kg", price: cake.price + 200, serves: "8–10" },
+      { label: "1.5 kg", price: cake.price + 450, serves: "12–15" },
+    ],
     status: index === 1 ? "draft" : "published",
     isFeatured: cake.badge === "Featured",
     isBestSeller: cake.badge === "Bestseller",
     isTrending: cake.badge === "Trending",
-    isEggless: cake.isEggless ?? cake.category.toLowerCase().includes("eggless"),
-    isPhotoCake: cake.category.toLowerCase().includes("photo"),
-    isSeasonal: cake.category.toLowerCase().includes("seasonal"),
-    shapes: [...DEFAULT_PRODUCT_SHAPES],
+    // Nothing in the landing data says a product comes in Round, Square and
+    // Heart — the seed said it on their behalf, and the storefront then offered
+    // the picker. The last copy of the injection 46b04b2 removed.
+    shapes: [],
     flavourOptions: cake.flavours ?? [],
     stockStatus: cake.inStock === false ? "out_of_stock" : index % 5 === 0 ? "low_stock" : "in_stock",
     stockQuantity: cake.inStock === false ? 0 : index % 5 === 0 ? 6 : 50,
@@ -107,21 +136,29 @@ function mapLandingProductToAdmin(cake: LandingProduct, index: number): Product 
     lowStockThreshold: undefined,
     allowsMessage: true,
     allowsPhotoUpload: cake.category.toLowerCase().includes("photo"),
-    ingredients: undefined,
-    barcode: undefined,
-    preparationTimeMinutes: cake.category.toLowerCase().includes("photo") ? 180 : 120,
-    shelfLifeDays: 3,
-    calories: 320,
-    allergens: cake.isEggless
-      ? "Contains milk, wheat. Prepared without eggs."
-      : "Contains milk, wheat, eggs.",
-    careInstructions: "Refrigerate within 2 hours. Serve at room temperature for best taste.",
-    variantGroups: createDefaultVariantGroups({
-      isEggless: cake.isEggless ?? cake.category.toLowerCase().includes("eggless"),
-      isPhotoCake: cake.category.toLowerCase().includes("photo"),
-    }),
-    rating: cake.rating ?? 4.5,
-    reviewCount: cake.reviewCount ?? 12,
+    /*
+      A seed used to stamp shelfLifeDays 3, calories 320 and a care sentence
+      onto every demo product, and preparationTimeMinutes was derived from the
+      category. All four fields have gone from the product; careInstructions is
+      the one that remains, and it stays blank because a care note is the
+      shop own to write.
+    */
+    /*
+      A "Photo cake" group used to be built here for any demo product filed
+      under a category with the word in it — a paid print option beside a free
+      one. A product that takes a photograph takes one, and the price of
+      printing is part of its price, so there is no group to build.
+    */
+    variantGroups: [],
+    // Zero, not 4.5. A shop opened advertising “4.5 ★ · 12 reviews” on every
+    // product with no review behind any of it — and the honest aggregate then
+    // averaged its first real review against a number that was never earned.
+    // ZERO, not what the demo data says. The landing fixtures carry their own
+    // 4.9s and 4.7s — fine as marketing copy on the vendor’s own page, and a
+    // lie the moment they are seeded into a real shop’s catalogue as that
+    // shop’s ratings. `?? 0` was not enough: the fixtures do set them.
+    rating: 0,
+    reviewCount: 0,
     seo: {
       // Name only. The shop's brand comes from SEO → Title Suffix, which is
       // applied once at render; baking it in here printed it twice.
@@ -156,32 +193,185 @@ export function seedProducts(): Product[] {
   return getSeedLandingProducts().map(mapLandingProductToAdmin);
 }
 
+/**
+ * THE FULL MEMBERSHIP, PRIMARY FIRST — the one definition of it.
+ *
+ * `categoryIds[0] === categoryId`, always, with no blanks and no repeats. It
+ * is established on every READ (`normalizeCommerceFields`, just below) and on
+ * every WRITE (the admin form's payload builder), and those were two copies of
+ * the same expression until they were not — which is how a product ends up
+ * filed one way in the database and another way on the screen that wrote it.
+ *
+ * Rebuilding rather than patching is the point on the write side: moving a
+ * product to a different primary must not leave the old one in the array
+ * behind it, still holding the page the owner was tidying.
+ */
+export function fileUnderCategories(primary: string, also: readonly string[] = []): string[] {
+  return [...new Set([primary, ...also].filter(Boolean))];
+}
+
+/**
+ * WHAT IS STILL TICKED AFTER THE PRIMARY CATEGORY CHANGES.
+ *
+ * Rebuilding the array on save is not enough on its own, because the form
+ * rebuilds it FROM its own state — and that state is the product as the server
+ * returned it, where `categoryIds` already contains the primary. So changing
+ * the Category dropdown from Cakes to Plants left `cat-cakes` sitting in the
+ * list, and the payload came out `["cat-plants", "cat-cakes"]`: the owner
+ * moved a cake out of Birthday, saved, and it was still on the Birthday page.
+ * The "Also show it under" grid even re-drew with Birthday freshly ticked,
+ * which is honest about what would be saved and not what anyone asked for.
+ *
+ * The category being LEFT is dropped, and so is the one being taken up — it is
+ * about to be the primary, and a row cannot be both. A category the owner
+ * ticked themselves is never touched: filed under Cakes + Chocolate with Cakes
+ * primary, promoting Chocolate keeps nothing extra, while promoting Plants
+ * keeps Chocolate.
+ *
+ * Clearing the box empties the list outright. `categoryId: ""` means the
+ * product is filed nowhere, and leaving memberships behind it would both break
+ * `categoryIds[0] === categoryId` and strand them: the grid is hidden while
+ * there is no primary, so nothing on screen could untick them.
+ */
+export function refileUnder(
+  previous: { categoryId: string; categoryIds?: readonly string[] },
+  chosen: string,
+): string[] {
+  if (!chosen) return [];
+  return (previous.categoryIds ?? []).filter(
+    (id) => id !== previous.categoryId && id !== chosen,
+  );
+}
+
+/**
+ * CAN THIS PRODUCT GO OUT AT THIS SPEED?
+ *
+ * Empty or absent means yes, to everything. That is what every product in
+ * every shop means today, and reading it any other way would make a whole
+ * catalogue undeliverable the moment this field existed.
+ *
+ * A tier the shop has since DELETED is not special-cased: a product listing
+ * only dead tiers can be sent by none of the live ones, which is the honest
+ * answer and the one a shop notices — the alternative, treating an
+ * unresolvable list as "all", quietly re-enables two-hour delivery on a
+ * wedding cake because somebody tidied the settings.
+ */
+export function deliverableBy(
+  product: { deliveryTierIds?: string[] },
+  tierId: string,
+): boolean {
+  const allowed = product.deliveryTierIds ?? [];
+  return allowed.length === 0 || allowed.includes(tierId);
+}
+
+/**
+ * Every category a product is filed under, whatever shape it is in.
+ *
+ * `normalizeCommerceFields` guarantees `categoryIds` on anything that came
+ * through a repository read — but the homepage counts, the admin catalog and
+ * the orphan check all take products from callers that may not have, and each
+ * had started writing its own `?? [categoryId]`. Three copies of a fallback is
+ * how two screens come to disagree about where a product is filed.
+ */
+export function categoriesOf(cake: { categoryId: string; categoryIds?: string[] }): string[] {
+  return fileUnderCategories(cake.categoryId, cake.categoryIds ?? []);
+}
+
+/**
+ * How many products sit in each category — ONE INCREMENT PER MEMBERSHIP.
+ *
+ * These buckets legitimately sum to MORE than the number of products, because
+ * a product filed in three categories is in three of them. That is not a
+ * double-count waiting to be fixed; it is what each row means, and restoring
+ * single-counting makes every category under-report the page it links to.
+ */
+export function countByCategory(
+  products: readonly { categoryId: string; categoryIds?: string[] }[],
+): Map<string, number> {
+  const tally = new Map<string, number>();
+  for (const cake of products) {
+    for (const id of categoriesOf(cake)) {
+      tally.set(id, (tally.get(id) ?? 0) + 1);
+    }
+  }
+  return tally;
+}
+
+/**
+ * The products that deleting these categories would leave filed nowhere.
+ *
+ * A product is orphaned only when EVERY category it holds is being deleted —
+ * which is a question about the product, not about any one category, and is
+ * why this cannot be answered by summing per-category counts.
+ *
+ * A product already filed nowhere is not counted: it is in that state
+ * whatever happens next, and reporting it as newly orphaned would make the
+ * warning wrong in the direction that gets warnings ignored.
+ */
+export function productsLeftUnfiled<T extends { categoryId: string; categoryIds?: string[] }>(
+  products: readonly T[],
+  deleting: readonly string[],
+): T[] {
+  const doomed = new Set(deleting);
+  return products.filter((cake) => {
+    const filed = categoriesOf(cake);
+    return filed.length > 0 && filed.every((id) => doomed.has(id));
+  });
+}
+
 export function normalizeCommerceFields(cake: Product): Product {
   const variantGroups = normalizeVariantGroups(cake);
 
   return {
     ...cake,
-    isEggless: cake.isEggless ?? false,
-    isPhotoCake: cake.isPhotoCake ?? false,
-    isSeasonal: cake.isSeasonal ?? false,
-    shapes: cake.shapes?.length ? cake.shapes : [...DEFAULT_PRODUCT_SHAPES],
+    // Never Round/Square/Heart by default. This runs on every repository read,
+    // so a phone charger came back from the database with three cake shapes on
+    // it — offered to the customer, and stamped onto the order line they chose
+    // from. A product with no shapes is sold in one shape, which is most of them.
+    shapes: cake.shapes ?? [],
     flavourOptions: cake.flavourOptions ?? [],
     stockStatus: cake.stockStatus ?? "in_stock",
     stockQuantity: cake.stockQuantity ?? 50,
     unlimitedStock: cake.unlimitedStock ?? false,
     lowStockThreshold: cake.lowStockThreshold,
     allowsMessage: cake.allowsMessage ?? true,
-    allowsPhotoUpload:
-      cake.allowsPhotoUpload ?? cake.isPhotoCake ?? false,
-    barcode: cake.barcode,
-    preparationTimeMinutes: cake.preparationTimeMinutes,
-    shelfLifeDays: cake.shelfLifeDays,
-    calories: cake.calories,
-    allergens: cake.allergens,
-    careInstructions: cake.careInstructions,
+    allowsPhotoUpload: cake.allowsPhotoUpload ?? false,
+
     variantGroups,
-    rating: cake.rating ?? 4.5,
-    reviewCount: cake.reviewCount ?? 12,
+    /**
+     * THE FULL MEMBERSHIP, PRIMARY FIRST — established here and nowhere else.
+     *
+     * Every document written before this field existed reads back
+     * `categoryIds === undefined`: `.lean()` does not apply schema defaults, so
+     * the `default: []` on the model never fires for them. Left to the callers,
+     * the careful ones would write `?.includes()` and quietly answer false for
+     * the entire existing catalogue, with no line logged anywhere.
+     *
+     * This function is the one chokepoint every product passes through — every
+     * server read via `toProduct`, and every browser-cache read via
+     * `normalizeProductImages`. Normalising here is why no reader downstream
+     * needs a fallback, and why no backfill is required for correctness.
+     */
+    categoryIds: categoriesOf(cake),
+    // Owner-defined facts. Absent means the shop has stated none, not that it
+    // needs some invented for it — the mistake this function made with shapes.
+    descriptionBlocks: cake.descriptionBlocks ?? [],
+    /**
+     * A product nobody has reviewed has no stars.
+     *
+     * `createEmptyProductForm` was fixed to write 0 — "a cake with no reviews
+     * has no rating. This started at 4.5" — and this, three lines below the
+     * shape injection removed in the same pass, kept inventing 4.5 stars from
+     * 12 reviews for any document that simply omits the fields. It runs on
+     * EVERY repository read, so an imported product, a legacy row or a restored
+     * backup came back advertising social proof that no review anywhere
+     * supports, rendered as stars on every grid card and at the top of the
+     * product page. `rating` and `reviewCount` are owned by the reviews
+     * aggregate, which writes them directly; absent means nobody has said
+     * anything yet, and that is what it should read as.
+     */
+    rating: cake.rating ?? 0,
+    reviewCount: cake.reviewCount ?? 0,
   };
 }
 
@@ -215,6 +405,62 @@ function normalizeProductImages(cakes: Product[]): { cakes: Product[]; changed: 
   return { cakes: next, changed };
 }
 
+/**
+ * Every size label this shop has already typed, commonest first.
+ *
+ * NOT a taxonomy. There is no list to maintain, nothing to keep in step with
+ * the products, and nothing that can go stale: this is a reading of what the
+ * shop has actually done, offered back as suggestions while it types the next
+ * one. Delete every product that uses a label and the label stops being
+ * offered, because it is no longer true that the shop sells it.
+ *
+ * A shop-wide list of sizes is what this replaces, and the reason it had to go
+ * is that it forced one product's sizes onto every other — a cake shop that
+ * also sells chargers had “0.5 kg” offered for a charger and nothing for the
+ * cable length. The reason this exists at all is the other half of that same
+ * problem: a shop with thirty products should not type “500 gm” thirty times,
+ * and two spellings of one size split the storefront filter in two.
+ */
+export function sizeLabelsInUse(): string[] {
+  const seen = new Map<string, number>();
+
+  for (const product of loadProducts()) {
+    for (const tier of product.weights ?? []) {
+      const label = tier.label?.trim();
+      if (!label) continue;
+      seen.set(label, (seen.get(label) ?? 0) + 1);
+    }
+  }
+
+  return [...seen.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([label]) => label);
+}
+
+/**
+ * What one of those sizes usually costs on this shop's other products.
+ *
+ * Offered as the starting price when a size is added by name, so adding
+ * “1 kg” to the thirty-first product does not mean looking up what the other
+ * thirty charge. The MEDIAN rather than the mean: one mispriced product
+ * should not drag the suggestion, and a shop with two price points gets one
+ * of the two rather than a number nobody charges.
+ */
+export function usualPriceForSize(label: string): number | null {
+  const wanted = label.trim().toLowerCase();
+  if (!wanted) return null;
+
+  const prices = loadProducts()
+    .flatMap((product) => product.weights ?? [])
+    .filter((tier) => tier.label?.trim().toLowerCase() === wanted)
+    .map((tier) => tier.price)
+    .filter((price) => typeof price === "number" && price > 0)
+    .sort((a, b) => a - b);
+
+  if (prices.length === 0) return null;
+  return prices[Math.floor(prices.length / 2)];
+}
+
 export function loadProducts(): Product[] {
   if (typeof window === "undefined") return seedProducts();
 
@@ -227,7 +473,7 @@ export function loadProducts(): Product[] {
     if (!raw) {
       const seeded = seedProducts();
       writeProducts(seeded);
-      localStorage.setItem(STORAGE_VERSION_KEY, String(CAKES_STORAGE_VERSION));
+      safeSetItem(STORAGE_VERSION_KEY, String(CAKES_STORAGE_VERSION));
       return seeded;
     }
 
@@ -238,7 +484,7 @@ export function loadProducts(): Product[] {
     if (!Array.isArray(parsed)) {
       const seeded = seedProducts();
       writeProducts(seeded);
-      localStorage.setItem(STORAGE_VERSION_KEY, String(CAKES_STORAGE_VERSION));
+      safeSetItem(STORAGE_VERSION_KEY, String(CAKES_STORAGE_VERSION));
       return seeded;
     }
 
@@ -247,7 +493,7 @@ export function loadProducts(): Product[] {
 
     if (changed || storedVersion < CAKES_STORAGE_VERSION) {
       writeProducts(normalized);
-      localStorage.setItem(STORAGE_VERSION_KEY, String(CAKES_STORAGE_VERSION));
+      safeSetItem(STORAGE_VERSION_KEY, String(CAKES_STORAGE_VERSION));
     }
 
     return normalized;
@@ -341,37 +587,105 @@ export function createEmptyProductForm(): ProductFormData {
     name: "",
     slug: "",
     description: "",
-    shortDescription: "",
-    price: 999,
+    /**
+     * ZERO, because the shop has not said what this costs yet.
+     *
+     * This was 999 — a number no merchant ever typed, sitting on the one field
+     * that decides whether a sale makes money. It is the same invention as the
+     * 4.5 stars `rating` used to be born with a few lines above, and it carries
+     * further: a product whose Price & stock tab is never opened went LIVE at
+     * 999, priced by the CMS on the shop's behalf.
+     *
+     * Nothing downstream wants a seed. `weights` starts empty, so
+     * `rederiveWeights` has no tier to re-derive, and 0 actually repairs
+     * `renameSize`: it only offers a usual price for a size still priced at
+     * nothing, and a row cloned from a 999 base never qualified.
+     *
+     * 0 reads as unset, and `saveProduct` refuses to PUBLISH at a price of
+     * nothing while still letting a draft be parked.
+     */
+    price: 0,
     compareAtPrice: undefined,
     images: [],
-    categoryId: adminCategories()[0]?.id ?? "1",
-    flavourId: undefined,
+    /**
+     * NO CATEGORY IS CHOSEN YET.
+     *
+     * This was `adminCategories()[0]?.id ?? "1"` — the first row of whatever
+     * taxonomy this browser happened to be holding, which on a fresh install is
+     * the shipped demo's "Birthday Cakes". A shop adding a phone charger met a
+     * box that looked answered, moved past it, and filed the charger under
+     * Birthday Cakes. All four shops walked through this form did exactly that,
+     * and every one of them shipped.
+     *
+     * Worse than a wrong answer: the server's taxonomy replaces that cached
+     * list after mount, so on a cold browser the id was often one the shop's
+     * real list has never held — a box reading empty over an id that saved
+     * without a word.
+     *
+     * Empty is the honest start, and `saveProduct` refuses to PUBLISH without
+     * one while still letting a draft be parked.
+     */
+    categoryId: "",
+    // Empty, never `[categoryId]`: the primary is blank on a new product, and
+    // an array holding "" files it under a category that does not exist.
+    categoryIds: [],
     occasionIds: [],
-    weights: getDefaultWeights(999),
+    // Empty means every speed the shop offers — see `deliverableBy`.
+    deliveryTierIds: [],
+    /**
+     * A NEW PRODUCT IS BORN EMPTY.
+     *
+     * These four fields used to arrive pre-filled with cake: three weight tiers
+     * from the Catalog presets, Round/Square/Heart, an "Egg preference" group
+     * charging +80 for Eggless, and a 120-minute prep time. A shop adding a
+     * phone charger had to find and delete every one of them, on every product,
+     * and the CMS read as though it were telling them what kind of shop to run.
+     *
+     * Nothing is lost for the bakery, but say where it actually is: the Pricing
+     * tab has "Sell this by size", which fills the Catalog weight presets, and
+     * the Options tab has "Add egg / eggless" and "Add option". An earlier
+     * version of this note named "Reset to defaults", which has since been
+     * deleted — it replaced the whole array rather than adding to it, so one
+     * click on a charger wiped Storage and Colour. A merchant asking for cake
+     * options gets them; a merchant who never asked no longer has to undo them.
+     */
+    weights: [],
     status: "draft",
     isFeatured: false,
     isBestSeller: false,
     isTrending: false,
-    isEggless: false,
-    isPhotoCake: false,
-    isSeasonal: false,
-    shapes: [...DEFAULT_PRODUCT_SHAPES],
+    shapes: [],
     flavourOptions: [],
     stockStatus: "in_stock",
-    stockQuantity: 50,
-    unlimitedStock: false,
+    /**
+     * NOBODY HAS COUNTED ANYTHING YET.
+     *
+     * This was 50 — a number no shop typed, on the field that decides when its
+     * product stops selling. A bake-to-order shop was handed fifty units it had
+     * never made and would stop taking orders on the fifty-first; a shop with
+     * three sarees in the room would sell forty-seven it does not have.
+     *
+     * The honest start is nothing counted, and it is safe because `unlimitedStock`
+     * starts ON: a shop that never opens this tab keeps selling, which is what
+     * most shops mean. The moment it unticks that box it has said "I sell from a
+     * fixed number", and the number below it is the one it typed.
+     */
+    stockQuantity: 0,
+    unlimitedStock: true,
     lowStockThreshold: undefined,
-    allowsMessage: true,
+    /**
+     * OFF, because most products are not written on.
+     *
+     * This started ON, so every plant, saree and phone charger this CMS ever
+     * created carried a "Message on this order — e.g. Happy Birthday!" box that
+     * the shop never asked for and had to find and untick. A cake shop ticks it
+     * once per product; every other trade was unticking it once per product.
+     */
+    allowsMessage: false,
     allowsPhotoUpload: false,
-    ingredients: "",
-    barcode: "",
-    preparationTimeMinutes: 120,
-    shelfLifeDays: 3,
-    calories: undefined,
-    allergens: "",
-    careInstructions: "",
-    variantGroups: createDefaultVariantGroups(),
+
+    variantGroups: [],
+    descriptionBlocks: [],
     // A cake with no reviews has no rating. This started at 4.5.
     rating: 0,
     reviewCount: 0,

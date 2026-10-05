@@ -94,5 +94,5 @@ export function exportPaymentsToCsv(orders: PlacedOrder[]): void {
 
   const csv = toCsv([headers, ...rows]);
 
-  downloadCsv(`bakery-payments-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+  downloadCsv(`payments-${new Date().toISOString().slice(0, 10)}.csv`, csv);
 }

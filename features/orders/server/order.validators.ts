@@ -31,9 +31,21 @@ const addressSchema = z
     phone: z.string().trim().min(1, "Phone is required"),
     addressLine1: z.string().trim().min(1, "Address is required"),
     addressLine2: z.string().optional(),
+    /**
+     * Bounded, because this object passes through.
+     *
+     * `.passthrough()` below means an unlisted key survives to Mongo unchecked
+     * — and these three are interpolated into the courier's WhatsApp message
+     * and the shop's own new-order alert. Naming them here is what puts a
+     * length on them, the same reason `timeSlot` carries a `.max(60)`.
+     */
+    landmark: z.string().trim().max(200).optional(),
     city: z.string().trim().min(1, "City is required"),
     state: z.string().trim().min(1, "State is required"),
     pincode: z.string().trim().min(1, "Pincode is required"),
+    country: z.string().trim().max(80).optional(),
+    altPhone: z.string().trim().max(20).optional(),
+    addressLabel: z.enum(["Home", "Office", "Other"]).optional(),
   })
   .passthrough();
 
@@ -74,6 +86,11 @@ const deliverySlotSchema = z.object({
   // Bounded because it is printed on an invoice and pushed into a WhatsApp
   // template. Blank is allowed: a shop may offer no timed slots at all.
   timeSlot: z.string().trim().max(60).default(""),
+  // The chosen speed. Bounded like `timeSlot`, and for the same reasons: both
+  // are printed on an invoice and pushed into a WhatsApp template. The FEE is
+  // never accepted from the caller — it is looked up in the shop's settings.
+  tierId: z.string().trim().max(60).optional(),
+  tierLabel: z.string().trim().max(60).optional(),
 });
 
 export const placeOrderSchema = z.object({
@@ -115,6 +132,29 @@ export const placeOrderSchema = z.object({
   paymentReference: z.string().optional(),
   coupon: z.record(z.string(), z.unknown()).optional(),
   orderNotes: z.string().optional(),
+  /**
+   * TOP-LEVEL, so it has to be named.
+   *
+   * This schema takes Zod's default, which is strip — the comment a few
+   * lines above says so, and says it deliberately, because the client is
+   * allowed to keep sending fields the server no longer wants. The other
+   * side of that is this: a field wired everywhere EXCEPT here is dropped
+   * on the way into the order, with a 200 and no message.
+   */
+  personalisation: z
+    .object({
+      occasion: z.string().trim().max(60).optional(),
+      message: z.string().trim().max(500).optional(),
+      sender: z
+        .object({
+          name: z.string().trim().max(120),
+          phone: z.string().trim().max(20),
+          hideFromRecipient: z.boolean().optional(),
+        })
+        .optional(),
+      termsAcceptedAt: z.string().trim().max(40).optional(),
+    })
+    .optional(),
   deliverySlot: deliverySlotSchema.optional(),
 });
 

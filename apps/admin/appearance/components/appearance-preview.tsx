@@ -12,10 +12,12 @@ import { getGeneralSettings } from "@/features/settings/lib/settings-repository"
 import { loadHeaderSettings } from "@/features/site-layout/lib/header-repository";
 import { formatCurrency } from "@/utils/format";
 import {
+  appearanceCssVariables,
   defaultAppearanceSettings,
   isValidHexColor,
   normalizeHexColor,
 } from "@/features/site-layout/lib/appearance-utils";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 interface AppearancePreviewProps {
   settings: AppearanceSettings;
@@ -53,6 +55,7 @@ export function AppearancePreview({
   hydration = "ready",
   saved,
 }: AppearancePreviewProps) {
+  const labels = useBusinessLabels();
   // The saved palette first, the demo default only if there is no saved one —
   // matching what `appearance-page.tsx` does when it live-applies.
   const base = saved ?? defaultAppearanceSettings;
@@ -76,19 +79,41 @@ export function AppearancePreview({
    */
   const general = getGeneralSettings();
   const header = loadHeaderSettings();
-  const siteName = general.siteName?.trim() || "Your bakery";
+  const siteName = general.siteName?.trim() || "Your store";
   const logoLetter = header.logoLetter?.trim() || siteName.charAt(0).toUpperCase();
   const samplePrice = formatCurrency(1299, general.currency);
 
+  /**
+   * THE REAL TOKENS, not a private set that only this panel understands.
+   *
+   * This painted with four `--preview-*` variables of its own invention and
+   * three hardcoded `text-white`s. Two things followed from that, and both
+   * were the panel lying about the shop's own storefront:
+   *
+   *  - It showed a FULLER repaint than the page delivered. Every surface
+   *    here was wired by hand to a preview variable, while the real page
+   *    had literal whites and a frozen hairline it could not reach.
+   *  - It showed white button text whatever colour was picked — which is
+   *    the exact defect `readableInkOn` exists to fix. An owner trying a
+   *    pale colour saw an unreadable button here and concluded it was
+   *    meant to look like that.
+   *
+   * Asking `appearanceCssVariables` for the map means this panel is wrong
+   * only when the storefront is wrong, which is the entire point of it.
+   */
   const previewStyle = {
-    "--preview-primary": primary,
-    "--preview-accent": accent,
-    "--preview-surface": surface,
-    "--preview-radius": `${radius}px`,
+    colorScheme: "light",
+    ...appearanceCssVariables({
+      preset: settings.preset,
+      primaryColor: primary,
+      accentColor: accent,
+      surfaceColor: surface,
+      borderRadius: radius,
+    }),
   } as React.CSSProperties;
 
   return (
-    <Card className="overflow-hidden shadow-sm" style={previewStyle}>
+    <Card className="overflow-hidden shadow-sm">
       <CardHeader className="border-b border-border">
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-base">Storefront preview</CardTitle>
@@ -113,14 +138,14 @@ export function AppearancePreview({
         <div
           className="storefront-light bg-background text-foreground"
           data-storefront-theme="light"
-          style={{ colorScheme: "light" }}
+          style={previewStyle}
         >
           <div className="border-b border-border px-4 py-3">
             <div className="flex items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2">
                 <div
-                  className="flex size-8 shrink-0 items-center justify-center rounded-[var(--preview-radius)] text-sm font-bold text-white"
-                  style={{ backgroundColor: "var(--preview-primary)" }}
+                  className="flex size-8 shrink-0 items-center justify-center rounded-[var(--radius)] text-sm font-bold text-[var(--primary-foreground)]"
+                  style={{ backgroundColor: "var(--primary)" }}
                 >
                   {logoLetter}
                 </div>
@@ -128,10 +153,10 @@ export function AppearancePreview({
               </div>
               <Button
                 size="sm"
-                className="shrink-0 text-white"
+                className="shrink-0 text-[var(--primary-foreground)]"
                 style={{
-                  backgroundColor: "var(--preview-primary)",
-                  borderRadius: "var(--preview-radius)",
+                  backgroundColor: "var(--primary)",
+                  borderRadius: "var(--radius)",
                 }}
               >
                 Order
@@ -141,11 +166,11 @@ export function AppearancePreview({
 
           <div className="space-y-4 px-4 py-4">
             <div
-              className="rounded-[var(--preview-radius)] border border-border p-4"
-              style={{ backgroundColor: "var(--preview-surface)" }}
+              className="rounded-[var(--radius)] border border-border p-4"
+              style={{ backgroundColor: "var(--cream-100)" }}
             >
-              <p className="text-xs font-semibold tracking-widest text-[var(--preview-primary)] uppercase">
-                Featured Cake
+              <p className="text-xs font-semibold tracking-widest text-[var(--primary)] uppercase">
+                Featured {labels.productWord}
               </p>
               <h3 className="mt-2 font-heading text-xl font-bold">Chocolate Truffle</h3>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -155,39 +180,39 @@ export function AppearancePreview({
                 <Badge
                   variant="outline"
                   style={{
-                    borderColor: "var(--preview-accent)",
-                    color: "var(--preview-primary)",
+                    borderColor: "var(--brand-accent)",
+                    color: "var(--primary)",
                   }}
                 >
                   Bestseller
                 </Badge>
-                <span className="text-sm font-semibold text-[var(--preview-primary)]">
+                <span className="text-sm font-semibold text-[var(--primary)]">
                   {samplePrice}
                 </span>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-[var(--preview-radius)] border border-border bg-background p-3">
-                <Cake className="mb-2 size-5 text-[var(--preview-primary)]" />
+              <div className="rounded-[var(--radius)] border border-border bg-background p-3">
+                <Cake className="mb-2 size-5 text-[var(--primary)]" />
                 <p className="text-sm font-medium">Primary</p>
                 <Button
                   size="sm"
-                  className="mt-2 w-full text-white"
+                  className="mt-2 w-full text-[var(--primary-foreground)]"
                   style={{
-                    backgroundColor: "var(--preview-primary)",
-                    borderRadius: "var(--preview-radius)",
+                    backgroundColor: "var(--primary)",
+                    borderRadius: "var(--radius)",
                   }}
                 >
-                  Add Cake
+                  Add {labels.productWord}
                 </Button>
               </div>
-              <div className="rounded-[var(--preview-radius)] border border-border bg-background p-3">
-                <Search className="mb-2 size-5 text-[var(--preview-accent)]" />
+              <div className="rounded-[var(--radius)] border border-border bg-background p-3">
+                <Search className="mb-2 size-5 text-[var(--brand-accent)]" />
                 <p className="text-sm font-medium">Accent</p>
                 <div
-                  className="mt-2 h-9 rounded-[var(--preview-radius)] border-2 bg-background"
-                  style={{ borderColor: "var(--preview-accent)" }}
+                  className="mt-2 h-9 rounded-[var(--radius)] border-2 bg-background"
+                  style={{ borderColor: "var(--brand-accent)" }}
                 />
               </div>
             </div>

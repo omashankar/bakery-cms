@@ -48,7 +48,12 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { AppBrand } from "@/components/shared/app-brand";
-import { adminNavSections, type AdminNavItem, type NavItem } from "@/constants/navigation";
+import {
+  adminNavSections,
+  navItemLabel,
+  type AdminNavItem,
+  type NavItem,
+} from "@/constants/navigation";
 import { routes } from "@/constants/routes";
 import { isSettingsOwnedPath } from "@/lib/admin-settings-pages";
 import { countNewInquiries } from "@/apps/admin/inquiries";
@@ -407,9 +412,7 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
   const [inquiryBadge, setInquiryBadge] = useState(0);
   const [inventoryBadge, setInventoryBadge] = useState(0);
   const [notificationBadge, setNotificationBadge] = useState(0);
-  // Wedding Builder is bakery-only: hidden for other business types or when the
-  // module is off. Hidden from the sidebar only — the route/page still exist.
-  const [hideWedding, setHideWedding] = useState(false);
+
   /**
    * Whose panel this is.
    *
@@ -445,8 +448,7 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
     }
 
     function refreshModules() {
-      const isBakery = getGeneralSettings().businessType === "bakery";
-      setHideWedding(!isBakery || !getModuleSettings().weddingBuilder);
+      // Nothing in the sidebar is module-gated since the Wedding Builder went.
     }
 
     function refreshBrand() {
@@ -481,16 +483,11 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
     return adminNavSections.map((section) => ({
       ...section,
       items: section.items
-        .filter((item) => !hideWedding || item.href !== routes.admin.builders.wedding)
-        // Relabel the "Cakes" catalog item for the current business type — the
-        // route/component stay named "cakes"; only the visible label changes.
-        .map((item) =>
-          item.href === routes.admin.cakes.list
-            ? { ...item, label: labels.productWordPlural }
-            : item
-        ),
+        // The route and component stay named "cakes"; only the visible label
+        // changes. Shared with the command palette, which used to disagree.
+        .map((item) => ({ ...item, label: navItemLabel(item, labels) })),
     }));
-  }, [hideWedding, labels]);
+  }, [labels]);
 
   useEffect(() => {
     setOpenMenu(findOpenMenuHref(pathname));

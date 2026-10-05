@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { routes } from "@/constants/routes";
+import { storefrontHeading } from "@/constants/typography";
+import { cn } from "@/lib/utils";
 
 type ProfileForm = {
   firstName: string;
@@ -101,11 +103,10 @@ export function AccountDashboardPage() {
   return (
     <AccountShell
       title="My Profile"
-      description="Manage your personal details and quick access to your activity."
     >
       {/* Personal Information */}
-      <div className="rounded-2xl border border-border bg-white p-6 shadow-sm sm:p-8">
-        <h2 className="font-heading text-lg font-bold text-foreground">
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
+        <h2 className={cn(storefrontHeading.card, "text-foreground")}>
           Personal Information
         </h2>
         <div className="mt-1 h-px bg-border" />
@@ -179,8 +180,8 @@ export function AccountDashboardPage() {
       </div>
 
       {/* Quick Links */}
-      <div className="rounded-2xl border border-border bg-white p-6 shadow-sm sm:p-8">
-        <h2 className="font-heading text-lg font-bold text-foreground">Quick Links</h2>
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
+        <h2 className={cn(storefrontHeading.card, "text-foreground")}>Quick Links</h2>
         <div className="mt-1 h-px bg-border" />
 
         <div className="mt-4 divide-y divide-border">

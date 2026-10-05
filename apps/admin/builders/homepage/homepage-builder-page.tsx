@@ -25,10 +25,12 @@ import {
 } from "@/lib/datetime-local";
 import { useUnsavedChangesGuard } from "@/apps/admin/builders/shared/use-unsaved-changes-guard";
 import { HomepageSectionRenderer } from "@/features/cms-sections/homepage-section-renderer";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 import {
   createSectionInstance,
   getRegistryEntry,
-  HOMEPAGE_SECTION_REGISTRY,
+  resolveRegistryEntry,
+  ADDABLE_SECTION_REGISTRY,
 } from "@/constants/section-registry";
 import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 import type { HomepageSectionRendererProps } from "@/features/cms-sections/homepage-section-renderer";
@@ -66,6 +68,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { adminCategories } from "@/features/products/lib/catalog-options";
+import { CATALOG_UPDATED_EVENT } from "@/features/catalog/lib/catalog-repository";
 import { cn } from "@/lib/utils";
 
 type ConfirmAction =
@@ -86,6 +90,71 @@ const EMPTY_META = {
 };
 
 export function HomepageBuilderPage() {
+  const labels = useBusinessLabels();
+  /**
+   * One choke point for the registry’s CHROME.
+   *
+   * Six builder fields read “Max cakes shown” and two section types were called
+   * “Featured Cakes” / “Trending Cakes”, in a builder every trade uses. The
+   * registry is plain data and cannot read a setting, so it carries tokens and
+   * they are filled HERE — in the one place this page resolves an entry, rather
+   * than in each of the three components that render one.
+   */
+  /**
+   * The shop's own categories, so the category-rail row can offer them.
+   *
+   * Read here rather than in the registry, which is plain data — and this is
+   * the one choke point where an entry is resolved, so both the Add Section
+   * list and the editor panel get the same filled options.
+   */
+  /**
+   * READ AGAIN WHEN THE CATALOGUE CHANGES, not once and for ever.
+   *
+   * This was a `useMemo` with empty deps over a localStorage read. Two
+   * things make that the wrong shape. The page is server-rendered before it
+   * hydrates, and with no window `loadCatalogStore` hands back the SHIPPED
+   * demo catalogue — so the first dropdown every shop saw was somebody
+   * else's categories. And `CatalogServerSync` fills that cache from the
+   * server in a mount effect, firing CATALOG_UPDATED_EVENT, which nothing
+   * on this screen was listening for: a shop that added a category found
+   * the picker still offering the old list until a full reload.
+   */
+  const [categoryOptions, setCategoryOptions] = useState(adminCategories);
+  useEffect(() => {
+    const sync = () => setCategoryOptions(adminCategories());
+    sync();
+    window.addEventListener(CATALOG_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(CATALOG_UPDATED_EVENT, sync);
+  }, []);
+  const optionSources = useMemo(
+    () => ({ categories: categoryOptions }),
+    [categoryOptions],
+  );
+  const resolveEntry = useCallback(
+    (type: HomepageSectionType) => {
+      const entry = getRegistryEntry(type);
+      return entry ? resolveRegistryEntry(entry, labels, optionSources) : undefined;
+    },
+    [labels, optionSources],
+  );
+  /**
+   * WHAT THE "ADD SECTION" DIALOG OFFERS — which is not the whole registry.
+   *
+   * Two entries are `legacy`: `photo-cakes` and `eggless`, bakery slugs
+   * frozen into the section type and kept because layouts already published
+   * carry them. A florist read them in the list of things to add.
+   *
+   * ONLY THIS LIST IS FILTERED. `resolveEntry` above goes through
+   * `getRegistryEntry`, which searches the whole registry, so a section
+   * already on a page still resolves its fields and keeps its editor.
+   */
+  const registry = useMemo(
+    () =>
+      ADDABLE_SECTION_REGISTRY.map((entry) =>
+        resolveRegistryEntry(entry, labels, optionSources),
+      ),
+    [labels, optionSources],
+  );
   const [mounted, setMounted] = useState(false);
   /**
    * Whether the saved layout was actually READ.
@@ -343,7 +412,7 @@ export function HomepageBuilderPage() {
     setSelectedId(instance.instanceId);
     setListFilter("all");
     setMobilePanel("editor");
-    toast.success(`${getRegistryEntry(type)?.label ?? "Section"} added`);
+    toast.success(`${resolveEntry(type)?.label ?? "Section"} added`);
   }
 
   function handleDuplicateSection(id: string) {
@@ -662,7 +731,7 @@ export function HomepageBuilderPage() {
             onAdd={() => setAddDialogOpen(true)}
             onDuplicate={handleDuplicateSection}
             onRemove={(id) => setConfirm({ type: "remove", id })}
-            resolveEntry={(type) => getRegistryEntry(type)}
+            resolveEntry={resolveEntry}
             reorderEnabled={listFilter === "all"}
             totalCount={sections.length}
             emptyMessage={
@@ -769,8 +838,8 @@ export function HomepageBuilderPage() {
           <SectionEditorPanel
             section={selectedSection}
             onChange={handleSectionChange}
-            resolveEntry={(type) => getRegistryEntry(type)}
-            settingsNote="Cake grids use the catalog. Promo banners come from Banner Manager. Site footer is managed under Footer."
+            resolveEntry={resolveEntry}
+            settingsNote={`${labels.productWordPlural} grids use the catalog. Promo banners come from Banner Manager. Site footer is managed under Footer.`}
           />
         </aside>
       </div>
@@ -779,7 +848,7 @@ export function HomepageBuilderPage() {
         open={addDialogOpen}
         onOpenChange={setAddDialogOpen}
         onAdd={handleAddSection}
-        registry={HOMEPAGE_SECTION_REGISTRY}
+        registry={registry}
         title="Add homepage section"
         description="Choose a section type to add to the layout."
       />

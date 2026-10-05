@@ -44,7 +44,10 @@ vi.mock("@/features/products/server/product.repository", () => ({
  * re-run rather than read it.
  */
 import { createProduct } from "@/features/products/data/products-service";
-import { createEmptyProductForm } from "@/features/products/lib/products-repository";
+import {
+  createEmptyProductForm,
+  normalizeCommerceFields,
+} from "@/features/products/lib/products-repository";
 
 beforeEach(() => {
   inserted.length = 0;
@@ -72,5 +75,47 @@ describe("the new-product form", () => {
 
     expect(form.rating, "the blank form started at 4.5 stars").toBe(0);
     expect(form.reviewCount).toBe(0);
+  });
+});
+
+describe("reading a product back does not invent one either", () => {
+  it("leaves a record that stores no rating at zero", () => {
+    /**
+     * The form was fixed and the READ path was not. `normalizeCommerceFields`
+     * runs on every repository read and filled `rating: cake.rating ?? 4.5` and
+     * `reviewCount: cake.reviewCount ?? 12` — so a document that simply omits
+     * the fields came back advertising 4.5 stars from 12 reviews, rendered on
+     * every grid card and at the top of the product page, with nothing behind
+     * it anywhere.
+     *
+     * Reachable by anything that did not come through the admin form: an
+     * import, a legacy row, a restored backup. `rating` and `reviewCount` are
+     * owned by the reviews aggregate, which writes them directly; absent means
+     * nobody has said anything yet.
+     */
+    const read = normalizeCommerceFields({
+      id: "p-imported",
+      name: "Imported Product",
+      slug: "imported-product",
+      price: 500,
+    } as never);
+
+    expect(read.rating, "an unreviewed product was given 4.5 stars").toBe(0);
+    expect(read.reviewCount, "…from 12 reviews that do not exist").toBe(0);
+  });
+
+  it("still honours a real aggregate the reviews wrote", () => {
+    // The guard must not start flattening genuine ratings to zero.
+    const read = normalizeCommerceFields({
+      id: "p-reviewed",
+      name: "Reviewed Product",
+      slug: "reviewed-product",
+      price: 500,
+      rating: 4.2,
+      reviewCount: 7,
+    } as never);
+
+    expect(read.rating).toBe(4.2);
+    expect(read.reviewCount).toBe(7);
   });
 });

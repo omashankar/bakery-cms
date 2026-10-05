@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ContactSettingsPage } from "@/apps/admin/settings";
 
 export const metadata: Metadata = {
-  title: "Contact Settings",
+  title: "Contact Information",
   description: "Business contact information and opening hours.",
 };
 

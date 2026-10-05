@@ -26,8 +26,36 @@ export function mapAdminProductToStorefront(
   cake: Product,
   names?: TaxonomyNames
 ): LandingProduct {
+  /**
+   * The category's own name, or nothing — never the literal "Cakes".
+   *
+   * A product whose category id resolves to neither list was badged "Cakes" to
+   * customers, so an orphaned phone charger advertised itself as a cake. The
+   * Catalog screen's own delete warning promised this ("they will show them as
+   * uncategorised"), and the code did the opposite.
+   *
+   * Empty rather than undefined, deliberately: `LandingProduct.category` is
+   * typed `string` and the product page reads `.toLowerCase()` on it twice.
+   * Making it optional would trade a wrong badge for the same TypeError class
+   * `getProductVariantGroups` carried — so those two reads are guarded in the
+   * same commit, and the badge simply does not render when there is no name.
+   */
   const category =
-    names?.categories?.get(cake.categoryId) ?? getCategoryById(cake.categoryId)?.name ?? "Cakes";
+    names?.categories?.get(cake.categoryId) ?? getCategoryById(cake.categoryId)?.name ?? "";
+
+  /**
+   * Every category, resolved the same way, with the same asymmetry.
+   *
+   * An id the shop has since deleted is DROPPED from this array, while an
+   * unresolvable primary collapses to `""` above — because the primary drives
+   * a badge that must not render, and these drive matchers that must not
+   * match a raw id.
+   */
+  const categories = names?.categories
+    ? cake.categoryIds
+        .map((id) => names.categories?.get(id))
+        .filter((name): name is string => Boolean(name))
+    : undefined;
 
   // The occasions this cake is actually tagged with. The storefront filter used
   // to search the name, category and description for the word "Wedding" instead,
@@ -47,32 +75,66 @@ export function mapAdminProductToStorefront(
     price: cake.price,
     compareAtPrice: cake.compareAtPrice,
     image: cake.images[0] ?? "",
+    // The rest of them. Three gates already passed for this field — the type,
+    // the Mongoose path and the validator all declare `images` — and the admin
+    // already submits the whole array; it was this line, and one line in the
+    // form, that capped every shop at a single photo.
+    images: cake.images,
     category,
+    categories,
+    /**
+     * The ids, UNFILTERED — deliberately unlike `categories` above.
+     *
+     * `categories` drops an id the shop has since deleted, because a name it
+     * cannot resolve is not a name. These are not resolved against anything:
+     * a coupon scoped to a deleted category must match NOTHING, and dropping
+     * the id here would leave the product looking unfiled — which, for a
+     * scope test, reads the same as "no scope" a line later.
+     */
+    categoryIds: cake.categoryIds,
+    deliveryTierIds: cake.deliveryTierIds,
     occasions,
-    badge: cake.isFeatured
-      ? "Featured"
-      : cake.isBestSeller
-        ? "Bestseller"
-        : cake.isTrending
-          ? "Trending"
+    /**
+     * THE STRONGEST CLAIM THE SHOP MADE, and "Featured" is the weakest of the
+     * three.
+     *
+     * One badge, because the card already carries a photograph, a name, a
+     * price, sometimes a struck-through price and sometimes a rating, and a
+     * second badge on one picture is decoration. But the ORDER was wrong:
+     * `isFeatured` is a CMS word meaning "put this somewhere", `isBestSeller`
+     * is a claim about what customers did, and a product ticked both was
+     * showing the weaker of the two.
+     *
+     * Measured on this catalogue the three flags are disjoint — 1 featured, 7
+     * bestsellers, 1 trending — so nothing on screen changes today. It changes
+     * for the first shop that ticks two.
+     */
+    badge: cake.isBestSeller
+      ? "Bestseller"
+      : cake.isTrending
+        ? "Trending"
+        : cake.isFeatured
+          ? "Featured"
           : undefined,
     rating: cake.rating,
     reviewCount: cake.reviewCount,
-    isEggless: cake.isEggless,
     flavours: cake.flavourOptions.length > 0 ? cake.flavourOptions : undefined,
     inStock: cake.stockStatus !== "out_of_stock",
     shapes: cake.shapes,
     allowsMessage: cake.allowsMessage,
     allowsPhotoUpload: cake.allowsPhotoUpload,
-    ingredients: cake.ingredients,
+    photoFrameShape: cake.photoFrameShape,
     weights: cake.weights,
-    barcode: cake.barcode,
-    preparationTimeMinutes: cake.preparationTimeMinutes,
-    shelfLifeDays: cake.shelfLifeDays,
-    calories: cake.calories,
-    allergens: cake.allergens,
-    careInstructions: cake.careInstructions,
+    weightLabel: cake.weightLabel,
+
     variantGroups: cake.variantGroups,
+    /**
+     * This list is a WHITELIST, not a spread — a field missing from it persists
+     * perfectly and is never seen by a customer, which is the second of the two
+     * silent failures a new product field has to survive. The first is the
+     * Mongoose path.
+     */
+    descriptionBlocks: cake.descriptionBlocks,
   };
 }
 

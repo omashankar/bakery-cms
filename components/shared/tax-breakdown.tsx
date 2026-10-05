@@ -54,10 +54,39 @@ export function TaxBreakdown({
     showAllLines || (values.platformCharge !== undefined && values.platformCharge > 0);
   const showGiftWrap =
     showAllLines || (values.giftWrapFee !== undefined && values.giftWrapFee > 0);
+  /**
+   * Its own row, not folded into Delivery.
+   *
+   * A customer who picks a faster speed should see the faster speed charged,
+   * under the name the shop gave it. Folding it in produces one number that
+   * went up for a reason the page does not state.
+   *
+   * Only shown when it cost something: a free tier has nothing to say here,
+   * and the chosen speed is named on the Personalize screen either way.
+   */
+  const showDeliveryTier =
+    values.deliveryTierFee !== undefined && values.deliveryTierFee > 0;
+  /**
+   * MRP and its discount REPLACE the subtotal, rather than joining it.
+   *
+   * The two add up to the subtotal, so printing all three is the same
+   * number said twice. Shown only when the shop actually typed compare-at
+   * prices — with none, there is no MRP to state and "MRP Total" beside an
+   * identical "Subtotal" would be a saving of zero dressed as a discount.
+   */
+  const savings = values.compareAtSavings ?? 0;
+  const showMrp = savings > 0;
 
   return (
     <dl className={cn("space-y-2", textClass, className)}>
-      <Row label="Subtotal" value={formatCurrency(values.subtotal)} tone="muted" />
+      {showMrp ? (
+        <>
+          <Row label="MRP total" value={formatCurrency(values.subtotal + savings)} tone="muted" />
+          <Row label="MRP discount" value={`- ${formatCurrency(savings)}`} tone="discount" />
+        </>
+      ) : (
+        <Row label="Subtotal" value={formatCurrency(values.subtotal)} tone="muted" />
+      )}
       {values.discount && values.discount > 0 ? (
         <Row
           label={values.discountLabel ?? "Discount"}
@@ -81,6 +110,13 @@ export function TaxBreakdown({
         }
         tone="muted"
       />
+      {showDeliveryTier ? (
+        <Row
+          label={values.deliveryTierLabel ?? "Faster delivery"}
+          value={formatCurrency(values.deliveryTierFee ?? 0)}
+          tone="muted"
+        />
+      ) : null}
       {showTax ? (
         <Row
           label={values.taxLabel ?? "Tax"}
@@ -114,6 +150,8 @@ export function taxBreakdownFromCartTotals(
     platformChargeLabel?: string;
     giftWrapLabel?: string;
     discountLabel?: string;
+    /** See `TaxBreakdownValues.compareAtSavings`. Computed from the lines, never stored. */
+    compareAtSavings?: number;
     /**
      * What the shop charges today, used only to check the stored rate against.
      * When they agree the shop's own wording is kept.
@@ -142,6 +180,9 @@ export function taxBreakdownFromCartTotals(
     platformChargeLabel: options?.platformChargeLabel,
     giftWrapFee: totals.giftWrapFee ?? 0,
     giftWrapLabel: options?.giftWrapLabel,
+    compareAtSavings: options?.compareAtSavings ?? 0,
+    deliveryTierFee: totals.deliveryTierFee ?? 0,
+    deliveryTierLabel: totals.deliveryTierLabel,
     taxableAmount: totals.taxableAmount,
     total: totals.total,
   };

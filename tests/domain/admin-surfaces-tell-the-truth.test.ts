@@ -284,3 +284,92 @@ describe("the admin badge on a shop that has set nothing", () => {
     expect(fn.slice(0, 400)).toMatch(/trimmed\s*!==\s*defaultGeneralSettings\.favicon/);
   });
 });
+
+describe("an admin screen does not call its own live output a demo", () => {
+  /**
+   * The SEO screen's Organization JSON-LD box was captioned "Demo placeholder
+   * for structured data." whenever the JSON was valid.
+   *
+   * It is not a placeholder and never was: the value is injected verbatim into
+   * a `<script type="application/ld+json">` on every storefront page. A shop
+   * owner reading "demo" leaves the box wrong, or empty, believing nothing
+   * reads it — and search engines read it.
+   *
+   * Two assertions, in both directions, because removing the word "demo" from a
+   * caption that still says nothing useful would be a rename rather than a fix.
+   */
+  /**
+   * The CAPTION, not the card.
+   *
+   * Anchored on the `<p>` whose text the ternary chooses, because the enclosing
+   * card is 11,000 characters of unrelated SEO fields — four of them carrying a
+   * `placeholder=` attribute, one carrying the word "demo" in a reset dialog.
+   * Scoped to the card, this guard would have failed on all five and told you
+   * nothing about the sentence it is named for.
+   */
+  const jsonLdCaption = () => {
+    /**
+     * Line endings NORMALISED before anything is matched.
+     *
+     * The repo stores LF and checks out CRLF, so an anchor containing a literal
+     * "\n" finds the caption in a file a script just wrote and stops finding it
+     * the moment git touches the same file. This passed, then failed with
+     * nothing changed but a `git stash` round trip.
+     */
+    const page = code("apps/admin/seo/components/seo-admin-page.tsx").replace(/\r\n/g, "\n");
+    const marker = /isValidJson\(global\.organizationSchemaJson \?\? ""\)\s*\n\s*\?/;
+    const found = marker.exec(page);
+    expect(found, "the Organization JSON-LD caption is gone — re-point this test").not.toBeNull();
+    const at = found!.index;
+    return page.slice(at, page.indexOf("</p>", at));
+  };
+
+  it("does not call it a demo or a placeholder", () => {
+    expect(jsonLdCaption()).not.toMatch(/demo|placeholder|mock|sample|coming soon/i);
+  });
+
+  it("says where the value actually goes", () => {
+    expect(jsonLdCaption()).toMatch(/every page of your shop/i);
+  });
+
+  it("and it really does go there", () => {
+    /**
+     * The half that makes the caption true rather than merely different. If the
+     * injection is ever removed, the caption becomes the lie the old one was —
+     * so the claim is pinned to the code that honours it.
+     */
+    const layout = code("layouts/storefront-layout.tsx");
+    expect(layout).toContain("application/ld+json");
+    expect(layout).toMatch(/organizationSchema/i);
+  });
+
+  it("and the builders' settings note is not inherited from a default about a mock store", () => {
+    /**
+     * `SectionEditorPanel` defaulted `settingsNote` to "Product and catalog data
+     * still comes from the mock store until the CMS content layer is fully
+     * connected" — untrue since the builders were wired to the real catalogue,
+     * and it would have rendered on any third builder added later. Required
+     * now, so a new caller has to say something true.
+     */
+    const panel = code("apps/admin/builders/shared/section-editor-panel.tsx");
+    expect(panel).not.toMatch(/mock store/i);
+    expect(panel).toMatch(/settingsNote: string;/);
+    expect(panel, "settingsNote went back to being optional").not.toMatch(/settingsNote\?:/);
+  });
+
+  it("and the media tools dialog advertises only the tool that works", () => {
+    /**
+     * The dialog described "Duplicate finder and compression utilities" over a
+     * permanently disabled compress button. The disabled button labelled
+     * "(coming soon)" is this repo's honest pattern and stays; the HEADING
+     * turning that admitted gap back into a claim is the defect.
+     */
+    const dialog = code("apps/admin/media/components/media-tools-dialog.tsx");
+    const description = dialog.slice(
+      dialog.indexOf("<DialogDescription>"),
+      dialog.indexOf("</DialogDescription>"),
+    );
+    expect(description).not.toMatch(/compress/i);
+    expect(description).toMatch(/duplicate/i);
+  });
+});

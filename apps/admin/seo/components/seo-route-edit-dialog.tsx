@@ -27,6 +27,7 @@ import {
   parseKeywords,
 } from "@/features/seo/lib/seo-metadata";
 import { SeoSerpPreview } from "./seo-serp-preview";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 interface SeoRouteEditDialogProps {
   open: boolean;
@@ -57,6 +58,7 @@ export function SeoRouteEditDialog({
   onOpenChange,
   onSaved,
 }: SeoRouteEditDialogProps) {
+  const labels = useBusinessLabels();
   const [form, setForm] = useState<SeoRouteFormState>({
     metaTitle: "",
     metaDescription: "",
@@ -205,7 +207,7 @@ export function SeoRouteEditDialog({
                   onChange={(e) =>
                     setForm((prev) => ({ ...prev, keywords: e.target.value }))
                   }
-                  placeholder="cakes, bakery, wedding cakes"
+                  placeholder={`${labels.productWordPlural.toLowerCase()}, delivery, gifts`}
                 />
               </div>
 

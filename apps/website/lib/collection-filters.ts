@@ -1,27 +1,83 @@
 import type { LandingProduct } from "@/constants/landing-data";
-import {
-  getFlavours,
-  getOccasions,
-  getWeightOptions,
-} from "@/features/catalog/lib/catalog-repository";
-import {
-  defaultFlavours,
-  defaultOccasions,
-  defaultWeightOptions,
-} from "@/features/catalog/lib/catalog-utils";
+import { searchHaystack } from "@/features/products/lib/product-catalog";
+
 
 export type CollectionSort = "name" | "price-asc" | "price-desc" | "popular";
+
+/**
+ * The delivery speeds worth offering on THIS page.
+ *
+ * The shop's own tiers, narrowed to the ones something here can actually be
+ * sent by — the same rule every other box now follows, and the one that makes
+ * an "Express" page mean something. A product with no speeds listed can go
+ * out at any of them, which is every product until an owner says otherwise,
+ * so on an untouched shop this offers every tier and filters nothing out.
+ */
+export function getFilterDeliveryOptions(
+  products: readonly { deliveryTierIds?: string[] }[],
+  tiers: readonly { id: string; label: string }[],
+): { id: string; label: string }[] {
+  return tiers.filter((tier) =>
+    products.some(
+      (product) =>
+        (product.deliveryTierIds ?? []).length === 0 ||
+        (product.deliveryTierIds ?? []).includes(tier.id),
+    ),
+  );
+}
 
 export interface CollectionFilters {
   search: string;
   sort: CollectionSort;
   occasions: string[];
+  /**
+   * What is ticked, per QUESTION the shop asked.
+   *
+   * Keyed by `optionFacetKey(group.name)` — never by `group.id`, which is minted
+   * fresh per product, so "Shape" carries a different id on all 29 of this
+   * shop's cakes and a box built on ids would be 29 boxes of one option each.
+   *
+   * A key is ABSENT when nothing under it is ticked; it is never present and
+   * empty. `countActiveFilters` and the matcher both lean on that.
+   */
+  options: Record<string, string[]>;
+  /**
+   * The LEGACY per-product flavour list, and nothing else now.
+   *
+   * This used to hold ticks from a box headed "Flavour" that was fed by every
+   * variant option in the catalogue: Regular, Eggless, Round, Square, Heart —
+   * not one of them a flavour, and on a shop selling chargers it read 65W and
+   * Type-C. Those live in `options` above, under the shop's own headings.
+   *
+   * What is left is the one thing the word was ever true of: the comma-separated
+   * list on the product form, gated by the flavour module.
+   */
   flavours: string[];
   weights: string[];
   priceMin: number;
   priceMax: number;
-  egglessOnly: boolean;
   inStockOnly: boolean;
+}
+
+/** One filter box: the shop's own question, and the answers worth offering. */
+export interface CollectionFilterFacet {
+  /** Folded name — matches `CollectionFilters.options` and a product's groups. */
+  key: string;
+  /** The spelling to print, chosen from what the products actually say. */
+  name: string;
+  options: string[];
+}
+
+/**
+ * One spelling for a group name or an option label.
+ *
+ * Case and inner spacing folded, so "Egg preference", "Egg Preference" and
+ * "Egg  preference" are one box rather than three, each holding a third of the
+ * catalogue. Folding the KEY rather than the display text means a tick survives
+ * a shop tidying its capitalisation.
+ */
+export function optionFacetKey(value: string): string {
+  return value.trim().replace(/\s+/gu, " ").toLowerCase();
 }
 
 /**
@@ -47,6 +103,73 @@ export const COLLECTION_PRICE_FLOOR = 5000;
  * slider's maximum `cake.price > filters.priceMax` is false for every cake in
  * the catalogue. A ceiling below the highest price silently hides it again.
  */
+/** One band in the price dropdown: a label and the range it stands for. */
+export interface PriceBand {
+  label: string;
+  min: number;
+  /** `Infinity` for the open top band. */
+  max: number;
+}
+
+/**
+ * THE PRICE BANDS THIS SHOP'S OWN CATALOGUE SUPPORTS.
+ *
+ * The reference storefront offers fixed slices — "499 and below", "500-999",
+ * "1000-1499", "1500-2499", "2500 and above". Copied here they would be
+ * wrong: measured against this catalogue those five buckets hold 0, 10, 12, 2
+ * and 3, so the first option is permanently empty and twenty-two of
+ * twenty-seven products sit in two of them. A florist's would land somewhere
+ * else again, and a shop selling tiered cakes at 19,000 somewhere else
+ * entirely.
+ *
+ * QUARTILES, so each band holds roughly a quarter of what is on the page and
+ * every one of them narrows something. The cuts are then rounded to a number
+ * a customer would recognise — 999 reads as "under 1,000" — and rounding can
+ * collide two cuts into one, so duplicates and any cut outside the real range
+ * are dropped rather than drawn as an empty option.
+ *
+ * Pure, and over the products IN VIEW rather than the whole shop: a category
+ * of premium cakes should not offer a band its own page cannot fill.
+ */
+export function priceBandsFor(cakes: { price: number }[]): PriceBand[] {
+  const prices = cakes
+    .map((cake) => cake.price)
+    .filter((price) => Number.isFinite(price) && price > 0)
+    .sort((a, b) => a - b);
+
+  // Under four products there is nothing to quarter; one band is no band.
+  if (prices.length < 4) return [];
+
+  const round = (value: number) => {
+    for (const step of [100, 250, 500, 1000, 2500, 5000]) {
+      if (value <= step * 20) return Math.round(value / step) * step;
+    }
+    return Math.round(value / 10000) * 10000;
+  };
+
+  const low = prices[0];
+  const high = prices[prices.length - 1];
+  const cuts = [...new Set([0.25, 0.5, 0.75].map((f) => round(prices[Math.floor((prices.length - 1) * f)])))]
+    .filter((cut) => cut > low && cut <= high)
+    .sort((a, b) => a - b);
+
+  if (cuts.length === 0) return [];
+
+  const money = (value: number) => value.toLocaleString("en-IN");
+  const bands: PriceBand[] = [];
+  let from = 0;
+  for (const cut of cuts) {
+    bands.push({
+      label: from === 0 ? `Under ₹${money(cut)}` : `₹${money(from)} – ₹${money(cut - 1)}`,
+      min: from,
+      max: cut - 1,
+    });
+    from = cut;
+  }
+  bands.push({ label: `₹${money(from)} and above`, min: from, max: Infinity });
+  return bands;
+}
+
 export function collectionPriceCeiling(cakes: { price: number }[]): number {
   const highest = cakes.reduce(
     (max, cake) => (Number.isFinite(cake.price) ? Math.max(max, cake.price) : max),
@@ -58,57 +181,301 @@ export function collectionPriceCeiling(cakes: { price: number }[]): number {
   return Math.ceil(highest / step) * step;
 }
 
-/** The starting filters for a given catalogue: nothing filtered out. */
+/**
+ * The starting filters for a given catalogue: nothing filtered out.
+ *
+ * `options` is rebuilt rather than spread. The spread above it is shallow, so
+ * every caller of this function — and the fifteen test files that spread the
+ * constant — would otherwise share ONE record between them, and the first
+ * `filters.options[key].push(...)` anywhere would reach all of them.
+ */
 export function defaultCollectionFilters(priceCeiling: number): CollectionFilters {
-  return { ...DEFAULT_COLLECTION_FILTERS, priceMax: priceCeiling };
+  return { ...DEFAULT_COLLECTION_FILTERS, options: {}, priceMax: priceCeiling };
 }
 
 export const DEFAULT_COLLECTION_FILTERS: CollectionFilters = {
   search: "",
   sort: "popular",
   occasions: [],
+  // Frozen, so the shared-identity hazard above fails loudly at the line that
+  // caused it rather than quietly in whichever test happens to run next.
+  options: Object.freeze({}) as Record<string, string[]>,
   flavours: [],
   weights: [],
   priceMin: 0,
   priceMax: COLLECTION_PRICE_FLOOR,
-  egglessOnly: false,
   inStockOnly: false,
 };
 
-export function getFilterOccasionOptions(): string[] {
-  return getOccasions().map((item) => item.name);
-}
-
-export function getFilterFlavourOptions(): string[] {
-  return getFlavours().map((item) => item.name);
-}
-
 /**
- * The weight tiers this shop actually sells.
+ * The occasions to offer, READ OFF THE PRODUCTS IN VIEW.
  *
- * This was the hard-coded list `["0.5 kg", "1 kg", "1.5 kg"]`, so a shop that
- * added a 2 kg tier — or renamed its tiers, or removed one — had a filter panel
- * offering sizes it does not sell and hiding the ones it does. The Catalog
- * screen's whole Weights tab reached this list not at all.
+ * This was `getOccasions()` — the catalog TAXONOMY, reached through
+ * `loadCatalogStore()`, which on a browser with no cached catalogue returns
+ * the shipped demo list. So a charger shop's first visitor got an Occasion
+ * box holding Birthday, Wedding, Anniversary and Corporate: four ticks the
+ * shop had deleted, each of which empties the grid. It never corrected
+ * itself during that visit, because the mount effect had already run.
+ *
+ * It was also the only facet still built from a fixed list. Size, Flavour
+ * and every option box were moved onto the products precisely so "the panel
+ * can no longer offer a tick that matches nothing", and this one was left
+ * behind.
+ *
+ * Ordered by how many products carry it, like the sizes below.
  */
-export function getFilterWeightOptions(): string[] {
-  const options = getWeightOptions().map((option) => option.label);
-  return options.length > 0 ? options : DEFAULT_FILTER_WEIGHT_OPTIONS;
+export function getFilterOccasionOptions(products: LandingProduct[]): string[] {
+  const counts = new Map<string, number>();
+
+  for (const product of products) {
+    for (const occasion of product.occasions ?? []) {
+      const label = occasion?.trim();
+      if (!label) continue;
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+  }
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([label]) => label);
 }
 
-/** Stable for SSR and the first client paint, like the occasion/flavour ones. */
-export const DEFAULT_FILTER_WEIGHT_OPTIONS: string[] = defaultWeightOptions.map(
-  (option) => option.label
-);
+/**
+ * The questions this shop's products ask, each with its own answers.
+ *
+ * This is the whole point of the change. There was ONE box, headed "Flavour",
+ * and `getFilterFlavourOptions` poured every variant option in the catalogue
+ * into it. On this shop it offered Regular, Eggless, Round, Square and Heart —
+ * five ticks under a heading that was true of none of them — and a shop selling
+ * chargers would have read "Flavour: 65W, Type-C, Black". The heading was
+ * hard-coded in the panel and nothing narrowed the list to groups named Flavour,
+ * because nothing knew which group a label had come from.
+ *
+ * Now a box is a GROUP. The name is the shop's own, so a nursery gets "Pot size"
+ * and a hardware shop gets "Wattage" without this file learning either word.
+ *
+ * Built from the products the page is showing, like the sizes below and for the
+ * same reason: a box can never offer a tick that matches nothing, and a category
+ * page never heads a box with a question nothing on it answers.
+ */
+export function getFilterOptionFacets(products: LandingProduct[]): CollectionFilterFacet[] {
+  /** key -> { spellings of the name, label counts, how many products carry it } */
+  const facets = new Map<
+    string,
+    { names: Map<string, number>; labels: Map<string, { text: string; count: number }>; carriers: number }
+  >();
+
+  for (const product of products) {
+    for (const group of product.optionGroups ?? []) {
+      const key = optionFacetKey(group.name ?? "");
+      if (!key) continue;
+
+      let facet = facets.get(key);
+      if (!facet) {
+        facet = { names: new Map(), labels: new Map(), carriers: 0 };
+        facets.set(key, facet);
+      }
+      const name = (group.name ?? "").trim();
+      facet.names.set(name, (facet.names.get(name) ?? 0) + 1);
+      facet.carriers += 1;
+
+      for (const raw of group.labels ?? []) {
+        const label = raw?.trim();
+        if (!label) continue;
+        const folded = optionFacetKey(label);
+        const seen = facet.labels.get(folded);
+        // First spelling wins the display text only until a commoner one
+        // appears; `commonest` below settles it the same way names are settled.
+        if (seen) seen.count += 1;
+        else facet.labels.set(folded, { text: label, count: 1 });
+      }
+    }
+  }
+
+  const commonest = (counts: Map<string, number>) =>
+    [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? "";
+
+  return [...facets.entries()]
+    .map(([key, facet]) => ({
+      key,
+      name: commonest(facet.names),
+      carriers: facet.carriers,
+      options: [...facet.labels.values()]
+        .sort((a, b) => b.count - a.count || a.text.localeCompare(b.text))
+        .map((label) => label.text),
+    }))
+    /**
+     * A box that cannot narrow anything is a heading spent on nothing.
+     *
+     * One option is not enough on its own to drop it — "Gift wrap: Yes" carried
+     * by 3 products out of 400 is a working filter. What makes it useless is one
+     * option that EVERY product in scope carries, because then the tick keeps
+     * the whole page. That is this shop's "Shape: Round" if it ever narrows to
+     * one; it is not "Egg preference: Eggless" on the one product that has it.
+     */
+    .filter(
+      (facet) =>
+        facet.options.length > 1 ||
+        (facet.options.length === 1 && facet.carriers < products.length),
+    )
+    // The questions most of the shop answers, first.
+    .sort((a, b) => b.carriers - a.carriers || a.name.localeCompare(b.name))
+    .map(({ key, name, options }) => ({ key, name, options }));
+}
+
+/** What is ticked in one box — never index `filters.options` raw. */
+export function tickedOptions(filters: CollectionFilters, key: string): string[] {
+  return filters.options?.[key] ?? [];
+}
 
 /**
- * Stable occasion / flavour defaults for SSR and the client's first paint —
- * identical on server and client, so the filter panel hydrates without a
- * mismatch. The panel swaps in the (possibly customized) catalog values from
- * localStorage after mount.
+ * Drop ticks for boxes this page does not offer.
+ *
+ * A customer ticks "Wattage: 65W" on Chargers and clicks through to Plants. The
+ * tick is still in state, no box on the new page shows it, and — because a
+ * product that does not carry the group falls back to its own words — the grid
+ * empties with nothing on screen to explain why.
+ *
+ * Returns the SAME object when nothing is dropped. That is load-bearing, not
+ * tidiness: the page runs `useEffect(() => setPage(1), [categorySlug, filters])`,
+ * so a fresh object every render would send a customer on page 3 back to page 1
+ * on every keystroke.
  */
-export const DEFAULT_FILTER_OCCASION_OPTIONS: string[] = defaultOccasions.map((item) => item.name);
-export const DEFAULT_FILTER_FLAVOUR_OPTIONS: string[] = defaultFlavours.map((item) => item.name);
+export function pruneOptionSelections(
+  filters: CollectionFilters,
+  offered: CollectionFilterFacet[],
+  /**
+   * The OTHER three list axes, each as the page currently offers it.
+   *
+   * This function covered `options` alone, and the docblock above described
+   * — accurately — a failure it prevented for one axis out of four. A size
+   * ticked on Cakes, a flavour ticked on Pastries and an occasion ticked
+   * anywhere were all carried into a category that does not offer them, and
+   * each empties the grid the same way and for the same reason.
+   */
+  lists?: { weights?: string[]; flavours?: string[]; occasions?: string[] },
+): CollectionFilters {
+  const available = new Map(offered.map((facet) => [facet.key, new Set(facet.options.map(optionFacetKey))]));
+  const kept: Record<string, string[]> = {};
+  let changed = false;
+
+  for (const [key, labels] of Object.entries(filters.options ?? {})) {
+    const offeredLabels = available.get(key);
+    const surviving = offeredLabels
+      ? labels.filter((label) => offeredLabels.has(optionFacetKey(label)))
+      : [];
+    if (surviving.length !== labels.length) changed = true;
+    if (surviving.length > 0) kept[key] = surviving;
+  }
+
+  /**
+   * An axis the caller says nothing about is NOT pruned.
+   *
+   * `undefined` means "I have no list for this", which is different from an
+   * empty list meaning "this page offers none" — and treating the two alike
+   * would silently drop every tick for a caller that only passes one axis.
+   */
+  const next: CollectionFilters = { ...filters, options: kept };
+  for (const axis of ["weights", "flavours", "occasions"] as const) {
+    const offeredValues = lists?.[axis];
+    if (!offeredValues) continue;
+    const allowed = new Set(offeredValues.map(optionFacetKey));
+    const surviving = filters[axis].filter((value) => allowed.has(optionFacetKey(value)));
+    if (surviving.length !== filters[axis].length) changed = true;
+    next[axis] = surviving;
+  }
+
+  return changed ? next : filters;
+}
+
+/**
+ * The flavours this shop actually sells, read off the products it is selling.
+ *
+ * It was the shop-wide Catalog taxonomy — a list somebody had to maintain
+ * beside the products, which could offer Butterscotch when nothing on the page
+ * is butterscotch, and could miss the one flavour a shop had typed on twenty
+ * products but never added to the list.
+ *
+ * Now it reads the same field `matchesFlavour` compares against, so the panel
+ * can no longer offer a tick that matches nothing. Ordered by how many products
+ * carry it, so a shop's usual flavours come first rather than whichever product
+ * happened to be added first.
+ *
+ * `optionLabels` used to be read here too, and that was the bug: every variant
+ * option in the catalogue arrived under the word "Flavour". Variant options are
+ * `getFilterOptionFacets` above, under the shop's own headings. What is left
+ * here is the legacy comma-separated list and only that — which is empty on
+ * every product in this shop, so the box does not render at all.
+ */
+export function getFilterFlavourOptions(products: LandingProduct[]): string[] {
+  const counts = new Map<string, number>();
+
+  for (const product of products) {
+    for (const raw of product.flavours ?? []) {
+      const label = raw?.trim();
+      if (!label) continue;
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+  }
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([label]) => label);
+}
+
+/**
+ * The sizes this shop actually sells, read off the products it is selling.
+ *
+ * Three answers, in order. It was the hard-coded `["0.5 kg", "1 kg", "1.5 kg"]`,
+ * so a shop that renamed or added a tier had a panel offering sizes it does not
+ * sell. Then it was the shop-wide Catalog taxonomy, which was better but still
+ * a second list to keep in step — a size could sit in Catalog with no product
+ * using it, and a product could be sold in a size Catalog had never heard of.
+ *
+ * Now it is the products. A size is offered as a filter exactly when something
+ * in front of the customer is sold in it, which is the only definition that
+ * cannot go stale — and it is the same set `matchesWeight` compares against
+ * two functions below, so the panel can no longer offer a tick that matches
+ * nothing.
+ *
+ * Ordered by how many products use it, so the sizes a shop mostly sells come
+ * first rather than whichever product happened to be added first.
+ */
+export function getFilterWeightOptions(products: LandingProduct[]): string[] {
+  const counts = new Map<string, number>();
+
+  for (const product of products) {
+    for (const tier of product.weights ?? []) {
+      const label = tier.label?.trim();
+      if (!label) continue;
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+  }
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([label]) => label);
+}
+
+/**
+ * Stable occasion defaults for SSR and the client's first paint — identical on
+ * server and client, so the filter panel hydrates without a mismatch. The panel
+ * swaps in the (possibly customized) catalog values from localStorage after
+ * mount.
+ *
+ * There is no flavour twin any more, and there does not need to be: flavours
+ * come from the products the page was handed, which the server and the client
+ * both have before they paint.
+ *
+ * AND NOW THERE IS NO OCCASION TWIN EITHER. This existed to seed the panel
+ * with the shipped demo occasions so SSR and hydration agreed, back when the
+ * panel read the catalog taxonomy out of localStorage after mount. It does
+ * not: occasions come from the products the page was handed, exactly like
+ * flavours and sizes, so both passes compute the same list from the same data
+ * and there is nothing to seed. The demo list it held was itself the bug —
+ * a charger shop's first visitor was offered Birthday, Wedding, Anniversary
+ * and Corporate, four ticks that empty the grid.
+ */
 
 /**
  * Match the occasions the cake is TAGGED with.
@@ -135,11 +502,81 @@ function matchesOccasion(cake: LandingProduct, occasions: string[]): boolean {
   return occasions.some((occasion) => haystack.includes(occasion.toLowerCase()));
 }
 
+/**
+ * Does this text say that word — as a word, not as a fragment?
+ *
+ * The filter used to ask `haystack.includes(word)`, which kept an "all-round
+ * favourite" under Round, an "Irregular" under Regular and a "Blackout Curtain
+ * Rod" under Black. Punctuation is flattened to spaces rather than stripped, so
+ * "Type-C" is found in "USB Type-C cable" and "65W" in "65W charger".
+ *
+ * `\p{L}\p{N}` with /u rather than \w, or every non-Latin label — a shop typing
+ * its options in Hindi or Tamil — would fold to nothing and match everything.
+ */
+function saysWord(text: string, word: string): boolean {
+  const pad = (value: string) => ` ${value.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim()} `;
+  const needle = pad(word);
+  return needle.trim().length > 0 && pad(text).includes(needle);
+}
+
+/**
+ * Match the ticks a customer left in the shop's own boxes.
+ *
+ * AND across boxes, OR inside one: "Shape: Heart or Square, AND Egg preference:
+ * Eggless" is what a sidebar full of checkboxes reads as.
+ *
+ * The rule that took the longest to settle is what happens to a product that
+ * does not carry the box's group at all, and this shop is why. Its four cakes
+ * named "Eggless Chocolate Fudge", "Eggless Vanilla Dream", "Eggless Fruit
+ * Fantasy" and "Eggless Red Velvet" carry NO "Egg preference" group — a
+ * migration removed it, correctly, because charging ₹80 to make an eggless cake
+ * eggless is not a choice. Match strictly on the group and those four vanish
+ * from the Eggless filter: the shop's actual eggless cakes, hidden from the
+ * customer asking for eggless.
+ *
+ * So: if the product ANSWERS the question, its answer decides — exactly, never
+ * against its prose, so ticking Round no longer keeps an "all-round favourite".
+ * If it does not answer, fall back to the words the shop wrote. The four cakes
+ * say Eggless in their names and are kept; ticking "Regular" drops them, which
+ * is right, because they cannot be made regular.
+ */
+function matchesOptionFacets(
+  cake: LandingProduct,
+  selection: Record<string, string[]> | undefined,
+): boolean {
+  const asked = Object.entries(selection ?? {}).filter(([, labels]) => labels.length > 0);
+  if (asked.length === 0) return true;
+
+  const owned = new Map<string, Set<string>>();
+  for (const group of cake.optionGroups ?? []) {
+    const key = optionFacetKey(group.name ?? "");
+    if (!key) continue;
+    const set = owned.get(key) ?? new Set<string>();
+    owned.set(key, set);
+    for (const label of group.labels ?? []) set.add(optionFacetKey(label));
+  }
+
+  return asked.every(([key, labels]) => {
+    const mine = owned.get(key);
+    if (mine && mine.size > 0) return labels.some((label) => mine.has(optionFacetKey(label)));
+    return labels.some((label) => saysWord(`${cake.name} ${cake.description}`, label));
+  });
+}
+
+/**
+ * The LEGACY flavour list, matched the same way its box is now built.
+ *
+ * This read `optionLabels` first, which is what made a box headed "Flavour"
+ * answer for Shape and Egg preference. Variant options are `matchesOptionFacets`
+ * above now; this compares the comma-separated list on the product form, and
+ * falls back to the shop's own words for a product that never filled it in.
+ */
 function matchesFlavour(cake: LandingProduct, flavours: string[]): boolean {
   if (flavours.length === 0) return true;
-  const productFlavours = cake.flavours ?? [];
-  const haystack = `${cake.name} ${cake.description} ${productFlavours.join(" ")}`.toLowerCase();
-  return flavours.some((flavour) => haystack.includes(flavour.toLowerCase()));
+
+  const owned = new Set((cake.flavours ?? []).map(optionFacetKey));
+  if (owned.size > 0) return flavours.some((flavour) => owned.has(optionFacetKey(flavour)));
+  return flavours.some((flavour) => saysWord(`${cake.name} ${cake.description}`, flavour));
 }
 
 /**
@@ -171,32 +608,44 @@ export function applyCollectionFilters(
 
   let result = cakes.filter((cake) => {
     if (query) {
-      // Same haystack as the search page, and for the same reason: this filter
-      // runs on the card projection, where `description` is deliberately blank.
-      // A third of this predicate could never match, while the flavours and
-      // occasions the customer actually types were sitting unused in the same
-      // payload.
-      const haystack = [
-        cake.name,
-        cake.category,
-        cake.description,
-        ...(cake.flavours ?? []),
-        ...(cake.occasions ?? []),
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      if (!haystack.includes(query)) return false;
+      /*
+        THE SAME FUNCTION AS THE HEADER'S DROPDOWN, not the same six field
+        names written out a second time.
+
+        This was a copy, and its own comment — "Same haystack as the search
+        page" — was the only thing holding the two together. That is a promise
+        a person has to keep by hand every time either side gains a field, and
+        `optionLabels` is the one that got away: it was added here and not
+        there, so ticking "Heart" in the sidebar found a cake that typing
+        "Heart" into the box did not.
+
+        This is the page the header search lands on, so the two agreeing is
+        not tidiness. A dropdown row a customer taps Enter past has to be
+        findable by the page underneath it, and now it is by construction:
+        the dropdown ranks on top of this predicate rather than beside it.
+      */
+      if (!searchHaystack(cake).includes(query)) return false;
     }
 
     if (cake.price < filters.priceMin || cake.price > filters.priceMax) return false;
-    if (filters.egglessOnly && !cake.isEggless && !cake.category.toLowerCase().includes("eggless")) {
-      return false;
-    }
+    /*
+      An "Eggless only" tick stood here, reading `cake.isEggless` — and, as a
+      second chance, whether the shop happened to have typed "eggless" into
+      the category name. Both are gone: the flag, because a recipe is the
+      shop's claim to make in its own words rather than a boolean this
+      software derives, and the category match because a word typed for filing
+      should never decide what a page claims (see the note in
+      product-detail-page.tsx).
+
+      Nothing on a product says machine-readably that it is eggless any more,
+      so a cross-catalogue tick for it cannot be honest. Searching the name
+      and description is what remains, and that is what the shop writes.
+    */
     if (filters.inStockOnly && cake.inStock === false) return false;
 
     return (
       matchesOccasion(cake, filters.occasions) &&
+      matchesOptionFacets(cake, filters.options) &&
       matchesFlavour(cake, filters.flavours) &&
       matchesWeight(cake, filters.weights)
     );
@@ -219,9 +668,20 @@ export function countActiveFilters(
 ): number {
   let count = 0;
   if (filters.occasions.length) count += 1;
+  /**
+   * One per BOX, keeping the convention every other axis here uses: three ticks
+   * in one box is one filter, one tick in each of three boxes is three.
+   *
+   * `Object.values`, never `.length` — `options` is a record, `.length` on it is
+   * `undefined`, and `if (undefined)` is a badge that silently stops counting.
+   * That is how the mobile sheet would close over three ticked boxes reading
+   * plain "Filters" while the grid behind it was filtered.
+   */
+  for (const labels of Object.values(filters.options ?? {})) {
+    if (labels.length) count += 1;
+  }
   if (filters.flavours.length) count += 1;
   if (filters.weights.length) count += 1;
-  if (filters.egglessOnly) count += 1;
   if (filters.inStockOnly) count += 1;
   if (filters.priceMin > 0 || filters.priceMax < priceCeiling) count += 1;
   return count;

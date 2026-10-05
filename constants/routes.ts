@@ -31,13 +31,71 @@ export const routes = {
     home: "/store",
     collections: "/store/collections",
     collection: (slug: string) => `/store/collections/${slug}`,
-    cake: (slug: string) => `/store/cakes/${slug}`,
-    weddingCakes: "/store/wedding-cakes",
-    about: "/store/about",
-    gallery: "/store/gallery",
+    /**
+     * AN OCCASION HAS ITS OWN ADDRESS, and that is the whole difference.
+     *
+     * Occasions used to live at `/store/collections/<slug>` alongside
+     * categories and collections, and the listing there ORs the two: a slug
+     * matched a category's products and an occasion's tags together. So a shop
+     * with a "Birthday Cakes" category and a "Birthday" occasion — which this
+     * one has, along with Wedding and Anniversary — could not have a page for
+     * either. One address, one merged grid, and the category's name on top of
+     * it; the occasion had 19 products and no way to show its own.
+     *
+     * The old address still resolves, unchanged. This is a second door, not a
+     * move: every link written before today still works.
+     */
+    occasion: (slug: string) => `/store/occasions/${slug}`,
+    /**
+     * A DEPARTMENT'S OWN PAGE.
+     *
+     * The kind of thing a shop sells — Cakes, Flowers, Gifts — holding the
+     * categories it filed under it. It had no address at all: the header drew
+     * it as a heading and the trail above a product as a plain word, both
+     * carrying a comment that a crumb is a promise a page exists and this one
+     * did not. It does now.
+     *
+     * A SIBLING of the occasion page, not a parent of the category one. A
+     * category keeps `/store/collections/<slug>` — where every pill, menu row
+     * and card links — because nesting it would move 29 products' addresses
+     * the day a shop re-files one, which is the reasoning the flat product
+     * address above already records.
+     */
+    department: (slug: string) => `/store/departments/${slug}`,
+    /**
+     * A PRODUCT'S OWN ADDRESS — and it stopped saying "cakes".
+     *
+     * This shop is going to sell flowers, plants, gifts, chocolates, fashion,
+     * mobiles, electronics, beauty, home, toys and sports. A bouquet at
+     * /store/cakes/red-roses is a CMS telling a customer what trade its shop
+     * is in, and getting it wrong.
+     *
+     * FLAT, not /store/<department>/<category>/<slug>. Three of this shop's
+     * 29 products are filed under TWO categories each — Black Forest Supreme
+     * is under Chocolate Cakes AND Cream Cakes — so a nested address has to
+     * pick one, and it changes the day the shop re-files the product. An
+     * address that moves when somebody tidies the catalogue is an address
+     * nobody can link to.
+     *
+     * The old one still resolves: see the 307 in next.config.ts. Temporary,
+     * because a browser caches a permanent redirect more or less for ever and
+     * this shape is one a deployment might reasonably revisit.
+     *
+     * The FOLDER moved too — app/(storefront)/store/p/[slug] — because a
+     * route's path is its directory. `loading.tsx` moved with it; leaving it
+     * behind is a page that silently loses its skeleton.
+     */
+    product: (slug: string) => `/store/p/${slug}`,
+    /**
+     * @deprecated The old name, kept so nothing breaks mid-rename. Points at
+     * the new address — it was never the folder name that mattered to a
+     * caller, only where the link goes.
+     */
+    cake: (slug: string) => `/store/p/${slug}`,
+
+
     contact: "/store/contact",
     faq: "/store/faq",
-    search: "/store/search",
     privacy: "/store/privacy",
     terms: "/store/terms",
     thankYou: "/store/thank-you",
@@ -90,7 +148,7 @@ export const routes = {
 
     builders: {
       homepage: "/admin/builders/homepage",
-      wedding: "/admin/builders/wedding",
+
     },
 
     pages: {

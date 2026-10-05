@@ -5,10 +5,12 @@ import {
   Award,
   Camera,
   Cake,
+  Clock,
   Gift,
   Heart,
   HelpCircle,
   Images,
+  History,
   LayoutGrid,
   Leaf,
   Mail,
@@ -35,6 +37,7 @@ import { cn } from "@/lib/utils";
 
 const iconMap: Record<string, LucideIcon> = {
   Sparkles,
+  History,
   LayoutGrid,
   Star: Award,
   TrendingUp,
@@ -42,6 +45,7 @@ const iconMap: Record<string, LucideIcon> = {
   Tag,
   Heart,
   Camera,
+  Clock,
   Leaf,
   Sun,
   Shield,

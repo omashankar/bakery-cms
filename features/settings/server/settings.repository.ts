@@ -2,13 +2,16 @@ import { connectDB } from "@/lib/server/db/mongoose";
 import { SettingsModel } from "@/lib/server/db/models/settings.model";
 import {
   defaultAppSettings,
+  newShopModuleSettings,
   planSettingsRepairs,
 } from "@/features/settings/lib/settings-utils";
+import type { LabelOverrides } from "@/types/settings";
 
 /**
  * Settings repository — data access for the singleton settings document.
- * Seeds from the same `defaultAppSettings` the frontend uses, so a fresh
- * install matches the bakery template exactly.
+ * Seeds from the same `defaultAppSettings` the frontend uses — except
+ * `modules`, where a brand-new shop takes `newShopModuleSettings` so it does
+ * not open with a live Wedding Builder it never asked for.
  */
 
 const SINGLETON = "singleton";
@@ -35,11 +38,33 @@ async function migrate(doc: SettingsDoc): Promise<SettingsDoc> {
   const repairs = planSettingsRepairs({
     contact: { mapEmbedUrl: doc.get("contact.mapEmbedUrl") as string | undefined },
     social: doc.get("social") as { href?: string; isActive?: boolean }[] | undefined,
+    // `general.businessType` was read here to feed a repair that copied its
+    // trade's wording across and then deleted the field. The field is a live
+    // setting again and that repair is gone, so this read is gone with it —
+    // leaving it would hand `planSettingsRepairs` a value nothing consumes and
+    // invite the rule back.
+    labelOverrides: doc.get("labelOverrides") as LabelOverrides | undefined,
   });
 
   if (repairs.length === 0) return doc;
 
-  for (const repair of repairs) doc.set(repair.path, repair.value);
+  for (const repair of repairs) {
+    if (repair.value === undefined) {
+      /**
+       * Dropping a path the schema no longer DECLARES.
+       *
+       * `doc.set(path, undefined)` is a silent no-op under the default strict
+       * mode — save() still resolves, and the field is still there on the next
+       * read, so the repair would report itself done forever without ever
+       * doing it. Probed against the installed mongoose 9.8.0: only
+       * `{ strict: false }` emits the `$unset`, and it rides in the same delta
+       * as the sets above — still one write, not two.
+       */
+      doc.set(repair.path, undefined, { strict: false });
+    } else {
+      doc.set(repair.path, repair.value);
+    }
+  }
 
   try {
     await doc.save();
@@ -72,7 +97,11 @@ export async function getOrCreateSettings() {
     analytics: defaultAppSettings.analytics,
     maintenance: defaultAppSettings.maintenance,
     commerce: defaultAppSettings.commerce,
-    modules: defaultAppSettings.modules,
+    // The one path that is a decision rather than a guess: a shop that has
+    // never existed has not asked for a Wedding Builder. Every OTHER reader of
+    // module defaults — the reset payload, the cold browser, the DB-failure
+    // catch — takes `defaultModuleSettings`, which fails open.
+    modules: newShopModuleSettings,
     labelOverrides: {},
   });
 }

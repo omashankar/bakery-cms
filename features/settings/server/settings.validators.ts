@@ -17,20 +17,7 @@ import { isValidIp } from "@/features/settings/lib/maintenance-access";
  * boundary that rejects bad input before it reaches the DB.
  */
 
-export const businessTypeEnum = z.enum([
-  "bakery",
-  "sweet-shop",
-  "flower-shop",
-  "restaurant",
-  "gift-shop",
-  "grocery",
-  "fashion",
-  "electronics",
-  "pharmacy",
-  "other",
-]);
-
-const nonNegative = z.number().min(0, "Must be zero or more");
+export const nonNegative = z.number().min(0, "Must be zero or more");
 
 /**
  * Timezone and currency are closed sets, not free text: both are fed straight to
@@ -62,7 +49,16 @@ export const generalSchema = z.object({
   favicon: assetUrl,
   timezone: z.enum(timezoneValues, "Unknown timezone"),
   currency: z.enum(currencyValues, "Unknown currency"),
-  businessType: businessTypeEnum,
+  /*
+    THERE IS NO `businessType` HERE ANY MORE, and this note is load-bearing.
+
+    It was an enum with `.catch("other")`, which RE-CREATED the field on every
+    read. A `z.object` strips keys it does not declare, so a document that
+    still carries one parses fine and simply loses it on the next save — which
+    is why removing this needed no migration. Do not tighten this object to
+    reject unknown keys without migrating first: every settings document
+    written before today still has the field at rest.
+  */
 });
 
 export const contactSchema = z.object({
@@ -206,11 +202,54 @@ export const commerceSchema = z.object({
   deliveryLeadDays: z.number().int().min(0),
   estimatedDeliveryDays: z.number().int().min(0),
   deliveryTimeSlots: z.array(z.string()).default([]),
+  deliveryTiers: z
+    .array(
+      z.object({
+        id: z.string().trim().min(1).max(60),
+        label: z.string().trim().min(1).max(60),
+        description: z.string().trim().max(160).default(""),
+        fee: nonNegative,
+        windows: z.array(z.string().trim().max(60)).max(24).default([]),
+      }),
+    )
+    .max(8)
+    .default([]),
   orderNumberPrefix: z.string().trim().min(1).max(8),
   checkoutTerms: z.string().default(""),
   giftWrapEnabled: z.boolean(),
   giftWrapFee: nonNegative,
   giftWrapLabel: z.string().default(""),
+  productImageNote: z.string().default(""),
+  deliveryInformation: z.string().default(""),
+  /**
+   * Bounded, because it is free text an admin types and every product page
+   * prints. A title with no words in it is a card with nothing to say, so it
+   * is refused rather than rendered as an empty box; a SUBTITLE may be blank,
+   * because "Timely Delivery" on its own is a complete thing to say.
+   */
+  productTrustCards: z
+    .array(
+      z.object({
+        id: z.string().trim().min(1),
+        icon: z.string().trim().min(1).max(40),
+        title: z.string().trim().min(1, "A card needs a title").max(60),
+        subtitle: z.string().trim().max(120).default(""),
+      }),
+    )
+    .max(6)
+    .default([]),
+  /**
+   * `HH:MM` on a 24-hour clock, or blank.
+   *
+   * Validated rather than trusted: this drives a countdown a customer decides
+   * on, and "5pm" or "17:70" would either render nothing or count towards a
+   * time that does not exist.
+   */
+  sameDayCutoff: z
+    .string()
+    .trim()
+    .regex(/^$|^([01]\d|2[0-3]):[0-5]\d$/, "Use a 24-hour time such as 17:00")
+    .default(""),
   paymentMethods: z.object({
     cod: z.boolean(),
     upi: z.boolean(),
@@ -220,9 +259,8 @@ export const commerceSchema = z.object({
 });
 
 export const modulesSchema = z.object({
-  weddingBuilder: z.boolean(),
+
   flavour: z.boolean(),
-  eggEggless: z.boolean(),
   weight: z.boolean(),
   shape: z.boolean(),
   photoCake: z.boolean(),
@@ -234,6 +272,30 @@ export const labelOverridesSchema = z.object({
   collectionsSubtitle: z.string().trim().optional(),
   productWord: z.string().trim().optional(),
   productWordPlural: z.string().trim().optional(),
+  descriptionHeading: z.string().trim().optional(),
+  /*
+    THE THREE LISTS A PRODUCT IS FILED UNDER, named here or dropped silently.
+
+    This object has no `.passthrough()` — deliberately, so a typo is refused
+    rather than stored — which means a field the type declares and this does
+    not is stripped on write while the API answers 200. That is the failure
+    this repo has hit four times, and adding the six boxes to the settings
+    form without adding them here would have been the fifth.
+  */
+  categoryWord: z.string().trim().optional(),
+  categoryWordPlural: z.string().trim().optional(),
+  occasionWord: z.string().trim().optional(),
+  occasionWordPlural: z.string().trim().optional(),
+  collectionWord: z.string().trim().optional(),
+  collectionWordPlural: z.string().trim().optional(),
+  /*
+    DECLARED, because this schema has no `.passthrough()` — the comment above
+    says so deliberately. A word typed in the type and missing here is stripped
+    on write while the API answers 200, and the shop's own noun silently never
+    saves.
+  */
+  departmentWord: z.string().trim().optional(),
+  departmentWordPlural: z.string().trim().optional(),
 });
 
 /** section name -> its schema, used by the controller to validate PUT bodies. */

@@ -1,5 +1,6 @@
 "use client";
 
+import { safeSetItem } from "@/lib/safe-storage";
 import {
   getGatewayConfig,
   PAYMENT_GATEWAYS,
@@ -100,7 +101,7 @@ function readStore(): GatewayStore {
     }
 
     if (hadCredentials) {
-      localStorage.setItem(STORE_KEY, JSON.stringify(cleaned));
+      safeSetItem(STORE_KEY, JSON.stringify(cleaned));
       console.warn(
         "[payments] Removed gateway credentials that an earlier version stored in this browser. Re-enter them in Admin → Payments; they are saved on the server now.",
       );
@@ -113,7 +114,7 @@ function readStore(): GatewayStore {
 
 async function writeStore(store: GatewayStore): Promise<boolean> {
   if (typeof window === "undefined") return false;
-  localStorage.setItem(STORE_KEY, JSON.stringify(store));
+  safeSetItem(STORE_KEY, JSON.stringify(store));
   // writeStore is only reached via genuine admin mutations (never a seed/load
   // path), so dual-writing to the server here cannot clobber with defaults.
   const persisted = await replacePaymentGatewaysRequest(store);
@@ -134,7 +135,7 @@ export function persistServerGateways(store: Record<string, unknown>): void {
     void _dropped;
     cleaned[id] = rest;
   }
-  localStorage.setItem(STORE_KEY, JSON.stringify(cleaned));
+  safeSetItem(STORE_KEY, JSON.stringify(cleaned));
   window.dispatchEvent(new Event(GATEWAYS_UPDATED_EVENT));
 }
 

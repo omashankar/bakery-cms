@@ -52,8 +52,15 @@ export async function PUT(request: Request, context: RouteContext) {
   const { id } = await context.params;
 
   let body: ProductFormData;
+  let stockQuantityLoaded: number | undefined;
   try {
-    body = validate(productFormSchema, await readJson(request)) as ProductFormData;
+    const raw = await readJson(request);
+    body = validate(productFormSchema, raw) as ProductFormData;
+    // Not part of the product: the quantity the form opened with, so an
+    // untouched stock field cannot overwrite sales made since. See
+    // `stockForEdit`.
+    const loaded = (raw as { stockQuantityLoaded?: unknown } | null)?.stockQuantityLoaded;
+    if (typeof loaded === "number" && Number.isFinite(loaded)) stockQuantityLoaded = loaded;
   } catch (error) {
     if (error instanceof AppError) {
       return NextResponse.json({ error: error.message, errors: error.errors }, { status: error.status });
@@ -62,7 +69,7 @@ export async function PUT(request: Request, context: RouteContext) {
   }
 
   try {
-    const updated = await updateProduct(id, body);
+    const updated = await updateProduct(id, body, { stockQuantityLoaded });
     if (!updated) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
@@ -75,6 +82,9 @@ export async function PUT(request: Request, context: RouteContext) {
     });
     return NextResponse.json({ product: updated });
   } catch (error) {
+    if (error instanceof AppError) {
+      return NextResponse.json({ error: error.message, errors: error.errors }, { status: error.status });
+    }
     // The unique index decides, not a scan-then-write that two requests can both
     // pass. See the note on `isDuplicateSlugError`.
     if (isDuplicateSlugError(error)) {

@@ -123,7 +123,11 @@ export function ActivitySettingsPage() {
     <AdminPage className="space-y-4 sm:space-y-5">
       <AdminPageHeader
         title="Activity Log"
-        description="Recent actions across settings, content, and inquiries in this demo CMS."
+        /*
+          It called a permanent record "this demo CMS" — the one screen whose
+          whole value is that a shop can trust what it says happened.
+        */
+        description="Who changed what, and when. Kept so you can see what happened without asking anyone."
         actions={
           <Button
             variant="outline"

@@ -15,10 +15,10 @@ import {
   defaultSocialLinks,
   isSafeSocialUrl,
 } from "@/features/settings/lib/settings-utils";
-import type { BusinessType } from "@/types/settings";
 
 import * as repo from "./settings.repository";
-import { resolveLabels, type LabelOverrides } from "./business-labels.server";
+import { resolveLabels } from "@/config/business-labels";
+import type { LabelOverrides } from "@/types/settings";
 
 interface RequestCtx {
   ip: string;
@@ -42,16 +42,20 @@ const SECTION_DEFAULTS: Record<string, unknown> = {
 };
 
 type SettingsJson = Record<string, unknown> & {
-  general?: { businessType?: BusinessType };
+  /*
+    `general` stays `unknown` throughout. It named `businessType` while this
+    file read that trade to layer its wording under the shop's own; nothing
+    here reads it now, and a stored one is stripped on the next save.
+  */
+  general?: Record<string, unknown>;
   labelOverrides?: LabelOverrides;
 };
 
 function withLabels(json: SettingsJson) {
-  const businessType = (json.general?.businessType ?? "bakery") as BusinessType;
   return {
     ...json,
     activity: [], // server keeps audit_logs separately; kept for client shape parity
-    labels: resolveLabels(businessType, json.labelOverrides ?? {}),
+    labels: resolveLabels(json.labelOverrides ?? {}),
   };
 }
 
@@ -88,7 +92,6 @@ export async function getPublicSettings() {
   const doc = await readSettingsDoc();
   // Loosely typed on purpose — we cherry-pick storefront-safe fields below.
   const json = doc.toJSON() as Record<string, any>;
-  const businessType = (json.general?.businessType ?? "bakery") as BusinessType;
   return {
     general: {
       siteName: json.general?.siteName,
@@ -100,8 +103,23 @@ export async function getPublicSettings() {
       // Not a secret, and the storefront needs it: every date it renders is
       // formatted in the store's timezone, not the visitor's machine zone.
       timezone: json.general?.timezone,
-      businessType,
+      /*
+        `businessType` WAS SHIPPED TO THE CLIENT FROM HERE, and the reason is
+        worth keeping: this list is cherry-picked by hand, the storefront
+        re-resolves its wording in the browser, and a field left out of it is
+        simply absent there. While the trade layered wording under the shop's
+        own, leaving it out meant the client fell back to "other" and rendered
+        neutral words under a server that had just rendered the shop's — a
+        hydration mismatch as well as a wrong word.
+
+        There is no trade layer now. `labelOverrides` one field below is the
+        only thing above the neutral floor, and it still travels, so the two
+        sides still resolve the same labels.
+      */
     },
+    // The shop's own wording, so a storefront that hydrates from this subset
+    // resolves the same labels the server just did rather than the defaults.
+    labelOverrides: json.labelOverrides ?? {},
     contact: json.contact,
     // Active AND renderable. This payload feeds any client that asks, so the
     // href guard belongs at the boundary rather than only in the surfaces that
@@ -116,7 +134,7 @@ export async function getPublicSettings() {
       message: json.maintenance?.message ?? "",
     },
     modules: json.modules,
-    labels: resolveLabels(businessType, json.labelOverrides ?? {}),
+    labels: resolveLabels(json.labelOverrides ?? {}),
   };
 }
 
@@ -124,8 +142,7 @@ export async function getPublicSettings() {
 export async function getLabels() {
   const doc = await readSettingsDoc();
   const json = doc.toJSON() as SettingsJson;
-  const businessType = (json.general?.businessType ?? "bakery") as BusinessType;
-  return resolveLabels(businessType, json.labelOverrides ?? {});
+  return resolveLabels(json.labelOverrides ?? {});
 }
 
 /**

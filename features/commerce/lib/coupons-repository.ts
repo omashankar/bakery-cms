@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import { specialOffers } from "@/constants/landing-data";
 import { couponsHydration, replaceCouponsRequest } from "./commerce-api";
 import { hasExpired } from "@/lib/expiry-date";
@@ -23,6 +24,8 @@ export interface StoredCoupon {
   usageCount: number;
   createdAt: string;
   expiresAt?: string;
+  /** The categories it applies to; empty or absent means the whole shop. */
+  categoryIds?: string[];
 }
 
 export function buildDefaultCoupons(): StoredCoupon[] {
@@ -37,8 +40,14 @@ export function buildDefaultCoupons(): StoredCoupon[] {
           label: offer.discount,
           description: offer.description,
           percentOff: 20,
-          isActive: true,
-          usageCount: 12,
+          // INACTIVE, and never used. These seed into Mongo as real,
+          // resolvable codes — `getCoupons` is what `priceCart` checks a typed
+          // code against — with no expiry, so on a shop the owner had only
+          // just set up, anyone who guessed BDAY20 took 20% off a live
+          // checkout. They are examples now: visible in the admin, switched
+          // on by the owner when the owner means them.
+          isActive: false,
+          usageCount: 0,
           createdAt: now,
         } satisfies StoredCoupon;
       }
@@ -50,8 +59,8 @@ export function buildDefaultCoupons(): StoredCoupon[] {
           description: offer.description,
           minSubtotal: 10000,
           flatOff: 2000,
-          isActive: true,
-          usageCount: 4,
+          isActive: false,
+          usageCount: 0,
           createdAt: now,
         } satisfies StoredCoupon;
       }
@@ -61,7 +70,9 @@ export function buildDefaultCoupons(): StoredCoupon[] {
         label: offer.discount,
         description: offer.description,
         percentOff: 10,
-        isActive: true,
+        // Inactive for the same reason as the two above: a demo code that
+        // resolves is money, not decoration.
+        isActive: false,
         usageCount: 0,
         createdAt: now,
       } satisfies StoredCoupon;
@@ -75,8 +86,10 @@ export function buildDefaultCoupons(): StoredCoupon[] {
       label: "10% OFF",
       description: "Welcome offer for new customers",
       percentOff: 10,
-      isActive: true,
-      usageCount: 28,
+      // Off, like the rest. This one shipped claiming 28 redemptions on a
+      // shop that had taken no orders.
+      isActive: false,
+      usageCount: 0,
       createdAt: now,
     },
   ];
@@ -141,7 +154,7 @@ async function readHydratedCoupons(): Promise<StoredCoupon[] | null> {
 /** Local-only write (localStorage + event). No server dual-write. */
 function lowWriteCoupons(coupons: StoredCoupon[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(COUPONS_STORAGE_KEY, JSON.stringify(coupons));
+  safeSetItem(COUPONS_STORAGE_KEY, JSON.stringify(coupons));
   window.dispatchEvent(new Event(COUPONS_UPDATED_EVENT));
 }
 
@@ -185,7 +198,7 @@ async function writeCoupons(
       localStorage.getItem(COUPONS_STORAGE_KEY) === JSON.stringify(coupons);
     if (stillOurs) {
       if (previous === null) localStorage.removeItem(COUPONS_STORAGE_KEY);
-      else localStorage.setItem(COUPONS_STORAGE_KEY, previous);
+      else safeSetItem(COUPONS_STORAGE_KEY, previous);
       window.dispatchEvent(new Event(COUPONS_UPDATED_EVENT));
     }
   }

@@ -111,7 +111,9 @@ export function DeliveryZoneFormDialog({
         <DialogHeader>
           <DialogTitle>{zone ? "Edit delivery zone" : "Add delivery zone"}</DialogTitle>
           <p className="text-sm text-muted-foreground">
-            Use a full 6-digit pincode or a prefix (e.g. 4000). Radius is for planning only.
+            A full 6-digit pincode matches only that one. Anything shorter is a
+            prefix — 324 covers every pincode starting 324. Set the charge to 0
+            to deliver here free.
           </p>
         </DialogHeader>
 
@@ -155,16 +157,27 @@ export function DeliveryZoneFormDialog({
                   : "Matches the whole city — leave empty for a city-wide zone."}
             </p>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="zone-radius">Radius (km)</Label>
-            <Input
-              id="zone-radius"
-              type="number"
-              min={0}
-              value={form.radiusKm}
-              onChange={(event) => patch({ radiusKm: Math.max(0, Number(event.target.value) || 0) })}
-            />
-          </div>
+          {/*
+            A "Radius (km)" box stood here and it decided NOTHING.
+
+            `findDeliveryZone` matches on the pincode rule and, failing that,
+            the city. It never reads `radiusKm` — nothing does, anywhere in the
+            storefront or the checkout. The field was stored, validated, listed
+            in the table and exported to CSV, and no customer was ever included
+            or excluded by it.
+
+            The harm is not the wasted box, it is what an owner believes while
+            filling it in. Setting "8 km" beside a pincode rule of `324` reads
+            as "Kota, within eight kilometres" — and the shop then quotes and
+            accepts orders across the whole of 324xxx, which may be an hour's
+            drive. The dialog's own hint said "Radius is for planning only",
+            which is a note about what the field does not do, printed above a
+            control that looked like it did it.
+
+            The stored value stays on the records: nothing reads it, so it
+            cannot mislead anyone from there, and dropping it from the type and
+            the validator is a schema change with no benefit to pay for it.
+          */}
           <div className="space-y-2">
             <Label htmlFor="zone-charge">Delivery charge</Label>
             <Input

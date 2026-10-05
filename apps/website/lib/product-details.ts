@@ -3,8 +3,6 @@ import { getCommerceSettings } from "@/features/settings/lib/settings-repository
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import { earliestDeliveryDateString } from "@/features/orders/lib/delivery-date";
 import {
-  formatPreparationTime,
-  formatShelfLife,
 } from "@/features/products/lib/variant-utils";
 import { fetchApprovedReviews } from "@/features/reviews/lib/reviews-api";
 
@@ -18,44 +16,77 @@ export interface ProductReview {
   adminReply?: string;
   repliedAt?: string;
   isFeatured?: boolean;
-}
-
-export function getProductGalleryImages(cake: LandingProduct): string[] {
-  // Products carry a single real image; show only that — never pad the gallery
-  // with unrelated stock photos that don't depict the actual cake.
-  return [cake.image];
+  /** How many readers said it helped them. Absent on one nobody has marked. */
+  helpfulCount?: number;
+  /**
+   * Where the reviewer's order was delivered, when the server could prove
+   * there was one. Absent otherwise — and absent is the common case.
+   */
+  deliveredCity?: string;
+  /** Photos the reviewer attached, as this shop stored them. */
+  photoUrls?: string[];
 }
 
 /**
- * Flavours this product is actually offered in — empty when the merchant has
- * not configured any.
+ * Every photo of THIS product, and no others.
  *
- * This used to fall back to the first four catalogue flavours, which produced
- * nonsense: a "Red Velvet Classic" was offered in Chocolate/Vanilla/Fruit/
- * Butterscotch (Red Velvet itself was cut off by the slice), and Chocolate was
- * preselected — so the order recorded a flavour that contradicted the cake and
- * that the customer never chose. A global flavour list is a catalogue taxonomy,
- * not a per-product option set.
+ * This returned `[cake.image]` — one element, always — which made the
+ * gallery's own thumbnail rail unreachable code: it renders on
+ * `images.length > 1`, and the length was one. The comment explaining why said
+ * products carry a single image, and that was true of the DATA rather than of
+ * the model: `images` is an array on the product, in the database and in the
+ * validator, and the admin form had one box.
+ *
+ * Still never padded. A gallery filled out with stock photos is a picture of
+ * something the customer is not buying.
  */
-export function getProductFlavourOptions(cake: LandingProduct): string[] {
-  return cake.flavours ?? [];
+export function getProductGalleryImages(cake: LandingProduct): string[] {
+  const stored = (cake.images ?? [])
+    .map((url) => (typeof url === "string" ? url.trim() : ""))
+    .filter((url) => url.length > 0);
+  if (stored.length > 0) return stored;
+
+  // A product mapped before this field existed, or a card projection, which
+  // carries `image` alone by design.
+  const single = typeof cake.image === "string" ? cake.image.trim() : "";
+  return single ? [single] : [];
 }
 
+/*
+  `getProductFlavourOptions` stood here, and by the end nothing called it.
+
+  It used to fall back to the first four CATALOGUE flavours, which produced
+  nonsense: a "Red Velvet Classic" was offered in Chocolate/Vanilla/Fruit/
+  Butterscotch — Red Velvet itself cut off by the slice — and Chocolate was
+  preselected, so the order recorded a flavour that contradicted the cake and
+  that the customer never chose. The fallback went first, then its last
+  caller, and now the catalogue list it was named after has gone too.
+
+  `getProductShapeOptions` below is the same argument, still in use.
+*/
+
+/**
+ * The shapes this product is offered in — empty when the merchant named none.
+ *
+ * The Round/Square/Heart fallback meant a customer buying a charger was shown a
+ * shape picker, and `addToCart` stamped the chosen one onto the order line. The
+ * same reasoning as the flavour list above: a shipped list is not a
+ * statement about this product.
+ */
 export function getProductShapeOptions(cake?: LandingProduct): string[] {
-  if (cake?.shapes?.length) return cake.shapes;
-  return ["Round", "Square", "Heart"];
+  return cake?.shapes ?? [];
 }
 
-export function getProductDetailBadges(cake: LandingProduct): string[] {
-  const badges: string[] = [];
-  const prep = formatPreparationTime(cake.preparationTimeMinutes);
-  const shelf = formatShelfLife(cake.shelfLifeDays);
-  if (prep) badges.push(prep);
-  if (shelf) badges.push(shelf);
-  if (cake.calories) badges.push(`${cake.calories} kcal / serving`);
-  if (cake.barcode) badges.push(`SKU ${cake.barcode}`);
-  return badges;
-}
+/*
+  `getProductDetailBadges` stood here, and every chip it could build came
+  from a field the shop has since removed: "2 hr prep", "Best within 3 days",
+  "280 kcal / serving" and "SKU 2542". With all four gone the function could
+  only ever return an empty array, and the row it filled renders nothing.
+
+  Two of them said it twice, too — prep, shelf life and calories were also
+  bullets in the description, and the SKU was printed again at the foot of
+  the page.
+*/
 
 export function getDeliveryTimeSlots(): string[] {
   const slots =
@@ -95,6 +126,11 @@ export async function getProductReviews(
     adminReply: review.adminReply,
     repliedAt: review.repliedAt,
     isFeatured: review.isFeatured,
+    helpfulCount: review.helpfulCount,
+    // Server-resolved from the reviewer's own delivered order. The endpoint
+    // does not send the order number it came from, and this does not want it.
+    deliveredCity: review.deliveredCity,
+    photoUrls: review.photoUrls,
   }));
 }
 

@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import type { MediaFolder } from "@/types/media";
 import { replaceMediaFoldersRequest } from "./media-api";
 import { MEDIA_UPDATED_EVENT } from "./media-utils";
@@ -12,7 +13,7 @@ function nowIso(): string {
 
 function persist(folders: MediaFolder[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(FOLDERS_STORAGE_KEY, JSON.stringify(folders));
+  safeSetItem(FOLDERS_STORAGE_KEY, JSON.stringify(folders));
 }
 
 export function loadMediaFolders(): MediaFolder[] {

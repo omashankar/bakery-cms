@@ -45,6 +45,31 @@ export async function create(inquiry: Inquiry): Promise<Inquiry> {
  * among the newest, so it is inside the window. An ALL-TIME total derived from
  * this would be wrong past the cap — do not add one without a server count().
  */
+/**
+ * The answered questions for one product, for the PUBLIC product page.
+ *
+ * A NARROW projection, and the reason is the same one the reviews endpoint
+ * learned: this is unauthenticated and the slug is public, so returning the
+ * whole document would publish the asker’s email address and phone number,
+ * and the shop’s private `notes` about them, to anybody who typed the URL.
+ *
+ * Only answered ones. An unanswered question is a stranger’s message sitting
+ * in the shop’s inbox; answering it is the moderation step that makes it the
+ * shop’s to show.
+ */
+export async function listAnsweredForProduct(productSlug: string): Promise<Inquiry[]> {
+  await connectDB();
+  const docs = (await InquiryModel.find({
+    type: "product",
+    productSlug,
+    answer: { $nin: [null, ""] },
+  })
+    .select({ name: 1, message: 1, answer: 1, answeredAt: 1, createdAt: 1 })
+    .sort({ answeredAt: -1 })
+    .lean()) as unknown as Raw[];
+  return docs.map(toInquiry);
+}
+
 export async function listAll(limit = 1000): Promise<Inquiry[]> {
   await connectDB();
   const docs = (await InquiryModel.find()

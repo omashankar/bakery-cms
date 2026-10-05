@@ -29,15 +29,22 @@ import { layoutSpacing } from "@/constants/spacing";
  * Shaped to match what replaces them, so the layout does not jump.
  */
 
-/** Mirrors `StorePageHeader`: bordered cream band, breadcrumb, title, blurb. */
+/**
+ * Mirrors `StorePageHeader`: a breadcrumb, and nothing else.
+ *
+ * IT HAS TO KEEP MIRRORING IT. This exists so the page does not jump when the
+ * real thing replaces it, which means every change there has to be made here
+ * too — and that component has now lost its band, its heading and its blurb.
+ * Left as it was, the skeleton would draw 150px of bordered cream box that
+ * then vanished, which is a worse jump than showing no skeleton at all.
+ *
+ * The real header's `<h1>` is `sr-only`, so it occupies no space and there is
+ * nothing here to stand in for it.
+ */
 export function StoreHeaderSkeleton() {
   return (
-    <div className="border-b border-border bg-cream-100">
-      <div className={`${layoutSpacing.container} py-8 sm:py-10`}>
-        <Skeleton className="h-3.5 w-40" />
-        <Skeleton className="mt-4 h-9 w-64 sm:h-10 sm:w-80" />
-        <Skeleton className="mt-3 h-4 w-full max-w-md" />
-      </div>
+    <div className={`${layoutSpacing.container} pt-5 sm:pt-6`}>
+      <Skeleton className="h-4 w-40" />
     </div>
   );
 }

@@ -1,5 +1,4 @@
 import { storefrontNav } from "@/constants/navigation";
-import { routes } from "@/constants/routes";
 import type { HeaderNavItem, HeaderSettings } from "@/types/site-layout";
 
 function nowIso(): string {
@@ -18,9 +17,9 @@ export const defaultHeaderSettings: HeaderSettings = {
    */
   logoLetter: "",
   showSearch: true,
-  showCta: true,
-  ctaLabel: "Order Inquiry",
-  ctaHref: routes.store.contact,
+  // ON, so no shop loses the strip it has today. See the type's own note for
+  // why it is a switch at all.
+  showBannerStrip: true,
   nav: storefrontNav.map((item, index) => ({
     id: `nav-${index + 1}`,
     label: item.label,
@@ -47,7 +46,6 @@ export type HeaderOverview = {
   visibleLinks: number;
   hiddenLinks: number;
   searchEnabled: boolean;
-  ctaEnabled: boolean;
 };
 
 export function getHeaderOverview(settings: HeaderSettings): HeaderOverview {
@@ -57,7 +55,6 @@ export function getHeaderOverview(settings: HeaderSettings): HeaderOverview {
     visibleLinks,
     hiddenLinks: settings.nav.length - visibleLinks,
     searchEnabled: settings.showSearch,
-    ctaEnabled: settings.showCta,
   };
 }
 

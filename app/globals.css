@@ -19,6 +19,23 @@
   --color-bakery-900: var(--bakery-900);
   --color-bakery-950: var(--bakery-950);
 
+  /*
+    THE BAND TONES.
+
+    Not surfaces — the shop's own surface colour drives those, and these do
+    not move with it. They are the tint a `panel` band is drawn in, so a long
+    page of rows reads as a sequence rather than as one colour repeated. Soft
+    enough that the product photographs on top stay the loudest thing there.
+  */
+  --color-band-rose: var(--band-rose);
+  --color-band-mint: var(--band-mint);
+  --color-band-sand: var(--band-sand);
+  --color-band-sky: var(--band-sky);
+  --color-band-rose-strong: var(--band-rose-strong);
+  --color-band-mint-strong: var(--band-mint-strong);
+  --color-band-sand-strong: var(--band-sand-strong);
+  --color-band-sky-strong: var(--band-sky-strong);
+
   --color-cream-50: var(--cream-50);
   --color-cream-100: var(--cream-100);
   --color-cream-200: var(--cream-200);
@@ -82,12 +99,23 @@
   --font-heading: var(--font-heading);
   --font-mono: var(--font-geist-mono);
 
-  /* Radius — 12px base, 16px for large surfaces */
+  /*
+    Radius — 12px base, and a real scale above it.
+
+    `xl` through `4xl` were ALL 1rem, so `rounded-2xl` and `rounded-xl` drew
+    the identical corner and the four steps were one step wearing four
+    names. The shop asked for less rounding on its cards; this is that, and
+    it also gives the scale somewhere to go.
+
+    Product cards (`rounded-xl`) come down 16px -> 12px, the tiles and
+    panels (`rounded-2xl`) 16px -> 14px. The two largest stay where they
+    were, for the surfaces that want a soft corner.
+  */
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
   --radius-lg: var(--radius);
-  --radius-xl: 1rem;
-  --radius-2xl: 1rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 0.875rem;
   --radius-3xl: 1rem;
   --radius-4xl: 1rem;
 
@@ -123,6 +151,21 @@
   --bakery-950: #2d1f16;
 
   --cream-50: #ffffff;
+  --band-rose: #fdf2f5;
+  --band-mint: #f1f8f2;
+  --band-sand: #fdf8ec;
+  --band-sky: #f1f6fd;
+  /*
+    THE SAME TONE, A FEW STEPS DOWN — for the view-all pill that sits on the
+    band. Measured off the layout this follows: its pink band carries a pink
+    button, its cream band a yellow one, its blue bands blue ones. The rule
+    is the same in all four, and a neutral pill on a tinted band is the one
+    thing none of them does.
+  */
+  --band-rose-strong: #f9d5e0;
+  --band-mint-strong: #d3ebd7;
+  --band-sand-strong: #fbeac2;
+  --band-sky-strong: #d5e5fa;
   --cream-100: #faf8f4;
   --cream-200: #f5f2ec;
   --cream-300: #ebe6dc;
@@ -150,12 +193,24 @@
   --ease-out: cubic-bezier(0, 0, 0.2, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 
-  /* Shadows — soft, border-first design */
-  --shadow-xs: 0 1px 2px 0 rgb(45 45 45 / 0.03);
-  --shadow-sm: 0 1px 2px 0 rgb(45 45 45 / 0.04);
-  --shadow-md: 0 2px 4px 0 rgb(45 45 45 / 0.05);
-  --shadow-lg: 0 4px 8px 0 rgb(45 45 45 / 0.06);
-  --shadow-xl: 0 4px 12px 0 rgb(45 45 45 / 0.07);
+  /*
+    VISIBLE, and only just.
+
+    Every step of this scale was 3-7% of black over a 2-12px blur, which at
+    a card's size is nothing at all: the product cards read as flat rectangles
+    pasted on the page, and `hover:shadow-md` changed nothing a customer could
+    see. Two layers each now — a tight contact shadow and a wider soft one —
+    at roughly two thirds of the usual web strength, so a card lifts without
+    the page turning into a pile of floating boxes.
+
+    Warm grey rather than black: the whole surface is cream, and a neutral
+    black shadow on a warm ground reads as dirt.
+  */
+  --shadow-xs: 0 1px 2px 0 rgb(45 45 45 / 0.04);
+  --shadow-sm: 0 1px 3px 0 rgb(45 45 45 / 0.06), 0 1px 2px -1px rgb(45 45 45 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(45 45 45 / 0.07), 0 2px 4px -2px rgb(45 45 45 / 0.05);
+  --shadow-lg: 0 10px 15px -3px rgb(45 45 45 / 0.08), 0 4px 6px -4px rgb(45 45 45 / 0.06);
+  --shadow-xl: 0 20px 25px -5px rgb(45 45 45 / 0.09), 0 8px 10px -6px rgb(45 45 45 / 0.06);
   --shadow-card: 0 0 0 1px var(--border-soft);
 
   /* Semantic — Light mode (primary) */
@@ -232,14 +287,23 @@ html.dark {
   --sidebar-border: #5c4638;
   --sidebar-ring: #d4a373;
 
-  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.15);
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.2);
-  --shadow-md: 0 2px 4px 0 rgb(0 0 0 / 0.25);
-  --shadow-lg: 0 4px 8px 0 rgb(0 0 0 / 0.3);
-  --shadow-xl: 0 4px 12px 0 rgb(0 0 0 / 0.35);
+  /* The same two-layer scale, at the strength a dark ground needs. */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.2);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.28), 0 1px 2px -1px rgb(0 0 0 / 0.24);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.32), 0 2px 4px -2px rgb(0 0 0 / 0.26);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.38), 0 4px 6px -4px rgb(0 0 0 / 0.3);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.42), 0 8px 10px -6px rgb(0 0 0 / 0.32);
   --shadow-card: 0 0 0 1px rgb(250 248 244 / 10%);
 
   --border-soft: #5c4638;
+  --band-rose: #3a2a30;
+  --band-mint: #26332a;
+  --band-sand: #383021;
+  --band-sky: #242e3a;
+  --band-rose-strong: #553a44;
+  --band-mint-strong: #37493c;
+  --band-sand-strong: #50442d;
+  --band-sky-strong: #334152;
   --surface-cream: #4a3324;
   --beige: #3a281c;
   --text-primary: #faf8f4;
@@ -271,14 +335,29 @@ html.dark {
   --input: #e8e5df;
   --ring: #d4a373;
   --border-soft: #e8e5df;
+  --band-rose: #fdf2f5;
+  --band-mint: #f1f8f2;
+  --band-sand: #fdf8ec;
+  --band-sky: #f1f6fd;
+  /*
+    THE SAME TONE, A FEW STEPS DOWN — for the view-all pill that sits on the
+    band. Measured off the layout this follows: its pink band carries a pink
+    button, its cream band a yellow one, its blue bands blue ones. The rule
+    is the same in all four, and a neutral pill on a tinted band is the one
+    thing none of them does.
+  */
+  --band-rose-strong: #f9d5e0;
+  --band-mint-strong: #d3ebd7;
+  --band-sand-strong: #fbeac2;
+  --band-sky-strong: #d5e5fa;
   --surface-cream: #faf8f4;
   --beige: #f5f2ec;
   --text-primary: #2d2d2d;
-  --shadow-xs: 0 1px 2px 0 rgb(45 45 45 / 0.03);
-  --shadow-sm: 0 1px 2px 0 rgb(45 45 45 / 0.04);
-  --shadow-md: 0 2px 4px 0 rgb(45 45 45 / 0.05);
-  --shadow-lg: 0 4px 8px 0 rgb(45 45 45 / 0.06);
-  --shadow-xl: 0 4px 12px 0 rgb(45 45 45 / 0.07);
+  --shadow-xs: 0 1px 2px 0 rgb(45 45 45 / 0.04);
+  --shadow-sm: 0 1px 3px 0 rgb(45 45 45 / 0.06), 0 1px 2px -1px rgb(45 45 45 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(45 45 45 / 0.07), 0 2px 4px -2px rgb(45 45 45 / 0.05);
+  --shadow-lg: 0 10px 15px -3px rgb(45 45 45 / 0.08), 0 4px 6px -4px rgb(45 45 45 / 0.06);
+  --shadow-xl: 0 20px 25px -5px rgb(45 45 45 / 0.09), 0 8px 10px -6px rgb(45 45 45 / 0.06);
   --shadow-card: 0 0 0 1px var(--border-soft);
 }
 
@@ -333,12 +412,51 @@ html.dark {
 }
 
 @layer utilities {
+  /*
+    A ROW THAT SCROLLS WITHOUT SAYING SO.
+
+    Three properties, because no one of them covers a browser on its own:
+    `scrollbar-width` is the standard and Firefox, the `::-webkit-scrollbar`
+    pseudo-element is Chrome, Edge and Safari, and `-ms-overflow-style` is
+    the old Edge that some shop laptops still run.
+
+    It is here because it was not. Four rows on the storefront scroll
+    sideways and each one had hand-copied a different subset: the category
+    tiles had all three, the product rail had two, the tabbed rail's own tab
+    strip had none at all — so a bar was painted under the tabs in every
+    browser there is, on the one row nobody had thought to check. A rule
+    copied by hand is a rule that drifts; this is the copy.
+
+    ONLY FOR A ROW THAT SCROLLS SIDEWAYS. A vertical bar is usually the only
+    thing telling a customer that a box holds more than it is showing — the
+    checkout's order summary and the phone's navigation drawer both need
+    theirs, and neither should ever wear this class.
+  */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
   .font-heading {
     font-family: var(--font-heading), var(--font-sans), system-ui, sans-serif;
   }
 
+  /*
+    THE SHOP'S SURFACE COLOUR, which is what the name says.
+
+    This drew `--muted`, and `--muted` is the surface colour shaded 4%
+    darker — so the alternating band on the homepage came out a flat grey
+    against white, and a page of twenty bands read as horizontal stripes
+    rather than as one page. `--surface-cream` is set from the same shop
+    setting without the shading, which is the near-white tint the class was
+    named for and what the storefront this is drawn from uses.
+  */
   .surface-cream {
-    background-color: var(--muted);
+    background-color: var(--surface-cream);
     color: var(--foreground);
   }
 
@@ -472,11 +590,43 @@ html.dark {
  * The React components still gate in JS (final DOM + interactivity); this only
  * removes the pre-hydration flash.
  */
-html[data-wed="0"] [data-gate-wedding],
+
 html[data-mod-flavour="0"] [data-gate-flavour],
-html[data-mod-egg="0"] [data-gate-egg],
 html[data-mod-weight="0"] [data-gate-weight],
 html[data-mod-shape="0"] [data-gate-shape],
 html[data-mod-photo="0"] [data-gate-photo] {
   display: none !important;
+}
+
+/*
+ * A FIELD A FINGER CAN TAP WITHOUT THE PAGE ZOOMING.
+ *
+ * iOS Safari zooms whenever a focused field's text is under 16px, and does
+ * not zoom back out when the field is blurred — so one tap on a 14px box
+ * leaves the shopper on a magnified, sideways-scrolling page for the rest
+ * of the visit.
+ *
+ * The shared Input and Textarea are `text-base md:text-sm`: 16px below the
+ * md breakpoint and 14px above it. md is 768px, which is an iPad in
+ * portrait; in landscape it is 1024. Measured, seventy fields across the
+ * storefront were under 16px from 768 up.
+ *
+ * THE TRIGGER IS THE POINTER, NOT THE WIDTH, which is why this is not a
+ * breakpoint: no width rule catches a tablet in landscape without also
+ * catching a laptop. A mouse-driven screen is untouched at every width.
+ *
+ * `max(1rem, 1em)` rather than a flat 16px — `1em` is the inherited size,
+ * so a field deliberately set larger keeps its size and only the too-small
+ * ones are lifted.
+ *
+ * UNLAYERED on purpose: Tailwind's utilities sit in a cascade layer, and
+ * unlayered CSS beats a layer regardless of specificity, so this wins over
+ * `.text-sm` without `!important`.
+ */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: max(1rem, 1em);
+  }
 }

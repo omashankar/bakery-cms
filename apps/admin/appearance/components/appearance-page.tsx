@@ -37,22 +37,34 @@ import {
 } from "@/features/site-layout/lib/appearance-utils";
 import { APPEARANCE_UPDATED_EVENT } from "@/features/site-layout/lib/appearance-utils";
 import { AppearancePreview } from "./appearance-preview";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
+// The shipped palette, asked for rather than copied out again — this held a
+// fourth hand-written copy of the demo brown.
 const EMPTY_OVERVIEW: AppearanceOverview = {
   presetLabel: "—",
   isCustom: false,
-  borderRadius: 12,
-  primaryColor: "#6f4e37",
-  accentColor: "#d4a373",
+  borderRadius: defaultAppearanceSettings.borderRadius,
+  primaryColor: defaultAppearanceSettings.primaryColor,
+  accentColor: defaultAppearanceSettings.accentColor,
 };
 
+/*
+  THE COLOUR IS NAMED BY ITS JOB, not by what the demo shop happened to pick.
+
+  These read "Primary brown", "Gold accent" and "Cream surface" — so a florist
+  or a gift shop opened this screen and was asked to choose its brown. The
+  hints already say what each colour does; the labels were describing the one
+  palette that shipped with the software.
+*/
 const COLOR_FIELDS = [
-  { key: "primaryColor" as const, label: "Primary brown", hint: "Buttons, links, brand marks" },
-  { key: "accentColor" as const, label: "Gold accent", hint: "Focus rings and highlights" },
-  { key: "surfaceColor" as const, label: "Cream surface", hint: "Soft backgrounds and panels" },
+  { key: "primaryColor" as const, label: "Primary colour", hint: "Buttons, links, brand marks" },
+  { key: "accentColor" as const, label: "Accent colour", hint: "Focus rings and highlights" },
+  { key: "surfaceColor" as const, label: "Surface colour", hint: "Soft backgrounds and panels" },
 ];
 
 export function AppearancePage() {
+  const labels = useBusinessLabels();
   // The shared hydrated form. This page hand-rolled it: a one-shot `[]`-dep
   // effect read localStorage on mount and declared the form ready in the same
   // tick. `SiteLayoutServerSync` reads the server's copy from a root-layout
@@ -213,7 +225,7 @@ export function AppearancePage() {
       resetDisabled={!canSave}
       saveDisabled={!hasValidAppearanceColors(settings) || !canSave}
       resetTitle="Reset appearance?"
-      resetDescription="Restore the Classic Bakery preset and default radius. Custom colors will be lost."
+      resetDescription="Restore the default preset and radius. Custom colors will be lost."
     >
       <SettingsHydrationNotice hydration={hydration} />
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] xl:items-start">
@@ -350,7 +362,9 @@ export function AppearancePage() {
                   <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
                     Heading
                   </p>
-                  <p className="mt-2 font-heading text-2xl font-bold">Celebration Cakes</p>
+                  {/* The shop’s own headings, so the specimen shows the type at
+                      the words it will actually render. */}
+                  <p className="mt-2 font-heading text-2xl font-bold">{labels.collectionsTitle}</p>
                   <p className="mt-1 text-xs text-muted-foreground">Plus Jakarta Sans</p>
                 </div>
                 <div className="rounded-xl border border-border bg-card p-4">
@@ -358,8 +372,7 @@ export function AppearancePage() {
                     Body
                   </p>
                   <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                    Freshly baked cakes, pastries, and confections made with premium
-                    ingredients.
+                    {labels.collectionsSubtitle}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">Inter</p>
                 </div>

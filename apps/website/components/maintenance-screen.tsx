@@ -22,7 +22,7 @@ export function MaintenanceScreen({
   return (
     <main
       className={cn(
-        "flex min-h-screen flex-col items-center justify-center bg-white text-center",
+        "flex min-h-screen flex-col items-center justify-center bg-background text-center",
         layoutSpacing.container
       )}
       style={{ colorScheme: "light" }}

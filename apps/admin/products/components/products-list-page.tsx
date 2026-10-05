@@ -40,6 +40,7 @@ import { routes } from "@/constants/routes";
 import type { Product as CakeEntity, EntityStatus } from "@/types";
 import { formatCurrency, formatRelativeTime } from "@/utils/format";
 import { adminCategories } from "@/features/products/lib/catalog-options";
+import { categoriesOf } from "@/features/products/lib/products-repository";
 import {
   deleteProductRequest,
   fetchProducts,
@@ -75,28 +76,42 @@ function getStatusVariant(status: EntityStatus): "success" | "outline" | "second
   return "secondary";
 }
 
-function filterProducts(cakes: CakeEntity[], filters: ProductListFilters): CakeEntity[] {
+export function filterProducts(cakes: CakeEntity[], filters: ProductListFilters): CakeEntity[] {
   const query = filters.search.trim().toLowerCase();
   const settings = getInventorySettings();
 
+  /**
+   * Built ONCE, outside the filter.
+   *
+   * This was a `.find()` over the category list per product per keystroke.
+   * A product can now be filed under several categories, which would have
+   * turned that into a nested loop; a Map turns the whole thing into a
+   * lookup instead.
+   */
+  const namesById = new Map(adminCategories().map((item) => [item.id, item.name]));
+
   return cakes
     .filter((cake) => {
+      const filed = categoriesOf(cake);
       if (query) {
-        const categoryName =
-          adminCategories().find((c) => c.id === cake.categoryId)?.name ?? "";
-        const haystack = `${cake.name} ${cake.slug} ${categoryName}`.toLowerCase();
+        // EVERY category it is filed under. Matching the primary alone hides
+        // a product from a search for the very category the owner just put
+        // it in.
+        const names = filed.map((id) => namesById.get(id) ?? "").join(" ");
+        const haystack = `${cake.name} ${cake.slug} ${names}`.toLowerCase();
         if (!haystack.includes(query)) return false;
       }
-      if (filters.categoryId !== "all" && cake.categoryId !== filters.categoryId) {
+      // Membership, not equality. Filtering by Plants has to find a cake the
+      // shop ALSO filed under Plants — that is the whole point of the box
+      // that let them file it there, and an equality test silently drops it.
+      if (filters.categoryId !== "all" && !filed.includes(filters.categoryId)) {
         return false;
       }
       if (filters.status !== "all" && cake.status !== filters.status) return false;
       if (filters.flag === "featured" && !cake.isFeatured) return false;
       if (filters.flag === "trending" && !cake.isTrending) return false;
       if (filters.flag === "best-seller" && !cake.isBestSeller) return false;
-      if (filters.productType === "eggless" && !cake.isEggless) return false;
-      if (filters.productType === "photo" && !cake.isPhotoCake) return false;
-      if (filters.productType === "seasonal" && !cake.isSeasonal) return false;
+      if (filters.productType === "photo" && !cake.allowsPhotoUpload) return false;
       if (filters.stock !== "all") {
         const derivedStatus = deriveStockStatus(cake, settings);
         if (filters.stock === "unlimited") {
@@ -123,6 +138,16 @@ export function ProductsListPage() {
   const labels = useBusinessLabels();
   const productLower = labels.productWord.toLowerCase();
   const productsLower = labels.productWordPlural.toLowerCase();
+  /**
+   * `${n} ${noun}` using the shop’s OWN two words.
+   *
+   * These toasts said `${n} cake${n === 1 ? "" : "s"}` — the noun welded in, and
+   * the plural built by appending a letter. Both fail the moment a shop renames
+   * anything: a florist deleting two things was told "2 cakes deleted", and a
+   * shop selling Boxes would have been told "2 Boxs". The plural is a separate
+   * field precisely because it is not always the singular plus s.
+   */
+  const countOf = (n: number) => `${n} ${n === 1 ? productLower : productsLower}`;
   const [filters, setFilters] = useState<ProductListFilters>(defaultProductListFilters);
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -137,7 +162,9 @@ export function ProductsListPage() {
       setLoadError(null);
     } catch (error) {
       // Leave the previous list on screen rather than blanking the table.
-      setLoadError(error instanceof Error ? error.message : "Failed to load products");
+      setLoadError(
+        error instanceof Error ? error.message : `Failed to load ${productsLower}`,
+      );
     } finally {
       setMounted(true);
     }
@@ -211,19 +238,19 @@ export function ProductsListPage() {
       await refresh();
       setSelectedIds([]);
 
-      if (updated > 0) toast.success(`${updated} cake${updated === 1 ? "" : "s"} ${verb}`);
+      if (updated > 0) toast.success(`${countOf(updated)} ${verb}`);
       // Fewer rows changed than were selected: something was deleted or already
       // in that state. Say so rather than reporting the number asked for.
       const missed = ids.length - updated;
       if (missed > 0) {
-        toast.error(`${missed} cake${missed === 1 ? " was" : "s were"} not updated`);
+        toast.error(`${countOf(missed)} ${missed === 1 ? "was" : "were"} not updated`);
       }
     } catch (error) {
       await refresh();
       toast.error(
         error instanceof Error
           ? error.message
-          : `Could not ${verb === "published" ? "publish" : "archive"} the selected cakes`
+          : `Could not ${verb === "published" ? "publish" : "archive"} the selected ${productsLower}`
       );
     }
   }
@@ -248,12 +275,28 @@ export function ProductsListPage() {
     setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
     setDeleteTarget(null);
 
-    if (ok > 0) toast.success(`${ok} cake${ok === 1 ? "" : "s"} deleted`);
-    if (failed > 0) toast.error(`${failed} cake${failed === 1 ? "" : "s"} could not be deleted`);
+    if (ok > 0) toast.success(`${countOf(ok)} deleted`);
+    if (failed > 0) toast.error(`${countOf(failed)} could not be deleted`);
   }
 
   function categoryName(categoryId: string) {
     return adminCategories().find((item) => item.id === categoryId)?.name ?? "—";
+  }
+
+  /**
+   * The primary, and how many more — never the whole list.
+   *
+   * This table is already `min-w-[760px]` across seven columns and the phone
+   * card gives the same line one row, so joining four names wraps badly in
+   * both. The primary is the one whose page a customer lands on from the
+   * badge, so it is the one that reads; the count says there is more without
+   * costing a column. The full list is on the preview screen.
+   */
+  function categoryLabel(cake: { categoryId: string; categoryIds?: string[] }) {
+    const more = categoriesOf(cake).length - 1;
+    return more > 0
+      ? `${categoryName(cake.categoryId)} +${more}`
+      : categoryName(cake.categoryId);
   }
 
   return (
@@ -353,7 +396,7 @@ export function ProductsListPage() {
           <FilterPanelSearch
             value={filters.search}
             onChange={(value) => updateFilters({ search: value })}
-            placeholder="Search cakes…"
+            placeholder={`Search ${productsLower}…`}
           />
           <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
             <AdminSelect
@@ -417,12 +460,10 @@ export function ProductsListPage() {
                 })
               }
               className="w-full"
-              aria-label="Product type"
+              aria-label={`${labels.productWord} type`}
             >
               <option value="all">All types</option>
-              {modules.eggEggless ? <option value="eggless">Eggless</option> : null}
               {modules.photoCake ? <option value="photo">Photo</option> : null}
-              <option value="seasonal">Seasonal</option>
             </AdminSelect>
             <AdminSelect
               value={filters.sort}
@@ -557,17 +598,12 @@ export function ProductsListPage() {
                                 Best Seller
                               </Badge>
                             ) : null}
-                            {modules.eggEggless && cake.isEggless ? (
-                              <Badge variant="outline" className="text-[10px]">
-                                Eggless
-                              </Badge>
-                            ) : null}
                           </div>
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {categoryName(cake.categoryId)}
+                      {categoryLabel(cake)}
                     </td>
                     <td className="px-4 py-3 font-semibold">{formatCurrency(cake.price)}</td>
                     <td className="px-4 py-3">
@@ -653,7 +689,7 @@ export function ProductsListPage() {
                           {cake.name}
                         </p>
                         <p className="truncate text-xs text-muted-foreground">
-                          {categoryName(cake.categoryId)} · {formatCurrency(cake.price)}
+                          {categoryLabel(cake)} · {formatCurrency(cake.price)}
                         </p>
                       </div>
                       <Badge variant={getStatusVariant(cake.status)}>

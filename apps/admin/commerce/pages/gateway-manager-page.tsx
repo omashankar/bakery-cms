@@ -126,7 +126,7 @@ export function GatewayManagerPage() {
     <AdminPage className="space-y-4 sm:space-y-5">
       <AdminPageHeader
         title="Payment Gateways"
-        description="Enable and configure the gateways your bakery accepts."
+        description="Enable and configure the gateways your store accepts."
       />
 
       <section className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 sm:gap-3">

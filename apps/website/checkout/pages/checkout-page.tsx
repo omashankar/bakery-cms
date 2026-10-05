@@ -24,7 +24,6 @@ import {
 import { openRazorpayCheckout } from "@/apps/website/checkout/lib/razorpay";
 import { getEnabledCheckoutMethods } from "@/features/payments/lib/resolve-methods";
 import { PaymentMethodList } from "@/apps/website/checkout/payments/payment-method-list";
-import { SecurityBadges } from "@/features/payments/components/security-badges";
 import {
   ProcessingState,
   type PaymentUIState,
@@ -50,7 +49,9 @@ import {
   hasDeliverySlot,
   saveCheckoutDraft,
   type CheckoutAddress,
+  type CheckoutStep,
   type DeliverySlot,
+  type OrderPersonalisation,
   type PaymentMethod,
 } from "@/features/orders/lib/checkout-draft";
 import {
@@ -59,11 +60,13 @@ import {
 } from "@/apps/website/lib/product-details";
 import type { AppliedCoupon } from "@/features/orders/lib/coupons";
 import { applyCouponCode } from "@/features/orders/lib/coupons";
+import { formatAddress } from "@/features/orders/lib/address-format";
 import {
   hasBlockingCartIssues,
   validateCartAgainstCatalog,
 } from "@/features/orders/lib/cart-validation";
 import type { LandingProduct } from "@/constants/landing-data";
+import { storefrontHeading } from "@/constants/typography";
 import { confirmOrder, placeOrder, type PlacedOrder } from "@/features/orders/lib/orders";
 import {
   clearUnconfirmedOrder,
@@ -72,7 +75,12 @@ import {
 } from "@/features/orders/lib/unconfirmed-order";
 import { requestCartQuote } from "@/features/checkout/lib/quote-api";
 import { grantOrderAccess } from "@/features/orders/lib/order-access";
-import { earliestDeliveryDateString } from "@/features/orders/lib/delivery-date";
+import {
+  addDays,
+  earliestDeliveryDateString,
+  isPastSameDayCutoff,
+  isPastTimeSlot,
+} from "@/features/orders/lib/delivery-date";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import {
   clearCart,
@@ -80,7 +88,6 @@ import {
   getCartItems,
   getCartPreferences,
   subscribeToCart,
-  updateCartPreferences,
 } from "@/features/cart/lib/cart";
 import type { CartLineItem } from "@/features/cart/lib/cart";
 import { Button } from "@/components/ui/button";
@@ -91,6 +98,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
 import { formatCalendarDate, formatCurrency } from "@/utils/format";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
+import { cn } from "@/lib/utils";
 
 const paymentOptions: {
   value: PaymentMethod;
@@ -112,26 +121,61 @@ const paymentOptions: {
   },
 ];
 
-/** Strip the address-book fields the checkout form does not carry. */
-function toCheckoutAddress(saved: SavedAddress): CheckoutAddress {
+/**
+ * Strip the address-book fields the checkout form does not carry.
+ *
+ * Written out key by key ON PURPOSE — a blanket spread would drag `id`,
+ * `label`, `isDefault` and the timestamps into the form. The cost is that a
+ * field added to `CheckoutAddress` and forgotten here compiles perfectly and
+ * blanks itself the moment a returning customer taps their saved address.
+ * Every optional one takes `?? ""` so an older saved record yields a string
+ * rather than flipping its input to uncontrolled.
+ */
+/**
+ * A saved destination, as this form's values — WITH THE ACCOUNT'S EMAIL.
+ *
+ * It used to carry `saved.email`, and the address book stores an email per
+ * address, so choosing a different saved destination silently changed which
+ * account the order belonged to. The order list is found by matching the
+ * session's email against the order's `address.email`
+ * (order.repository.ts, findByCustomerEmail), so that was a destination
+ * picker quietly reassigning the buyer's own order history.
+ */
+function toCheckoutAddress(saved: SavedAddress, accountEmail: string): CheckoutAddress {
   return {
     fullName: saved.fullName,
-    email: saved.email,
+    email: accountEmail,
     phone: saved.phone,
     addressLine1: saved.addressLine1,
     addressLine2: saved.addressLine2 ?? "",
+    landmark: saved.landmark ?? "",
     city: saved.city,
     state: saved.state,
     pincode: saved.pincode,
+    country: saved.country ?? "",
+    altPhone: saved.altPhone ?? "",
+    addressLabel: saved.addressLabel,
   };
 }
 
-/** Same delivery destination, ignoring formatting differences. */
+/**
+ * Same delivery destination, ignoring formatting differences.
+ *
+ * `landmark` counts: it is the line a rider navigates by, so two addresses
+ * that differ only there are not the same destination. Leaving it out made
+ * SAVE look broken — the book already held a "match", so nothing was written
+ * and nothing was said.
+ *
+ * `country`, `altPhone` and `addressLabel` do NOT count. None of them changes
+ * where the parcel goes, and treating a relabelled address as a new one would
+ * fill the book with duplicates.
+ */
 function isSameAddress(a: Partial<CheckoutAddress>, b: Partial<CheckoutAddress>): boolean {
   const norm = (value?: string) => (value ?? "").trim().toLowerCase();
   return (
     norm(a.addressLine1) === norm(b.addressLine1) &&
     norm(a.addressLine2) === norm(b.addressLine2) &&
+    norm(a.landmark) === norm(b.landmark) &&
     norm(a.city) === norm(b.city) &&
     norm(a.state) === norm(b.state) &&
     norm(a.pincode) === norm(b.pincode)
@@ -168,27 +212,99 @@ interface CheckoutPageProps {
 }
 
 export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
+  const labels = useBusinessLabels();
+  const productLower = labels.productWord.toLowerCase();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [items, setItems] = useState<CartLineItem[]>([]);
   const [ready, setReady] = useState(false);
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<CheckoutStep>(1);
   const [coupon, setCoupon] = useState<AppliedCoupon | undefined>();
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
   const [orderNotes, setOrderNotes] = useState("");
+  /**
+   * What Personalize collects, held flat and assembled on the way out.
+   *
+   * One object reaches the server — see `OrderPersonalisation` — but six
+   * controls write to it, and a single state object would mean every
+   * keystroke replacing the whole thing.
+   */
+  const [occasion, setOccasion] = useState("");
+  const [giftMessage, setGiftMessage] = useState("");
+  const [senderName, setSenderName] = useState("");
+  const [senderPhone, setSenderPhone] = useState("");
+  const [editingSender, setEditingSender] = useState(false);
+  const [hideSender, setHideSender] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [giftWrap, setGiftWrap] = useState(false);
   const [deliverySlot, setDeliverySlot] = useState<DeliverySlot>(EMPTY_DELIVERY_SLOT);
   const [slotError, setSlotError] = useState<string | null>(null);
+  /**
+   * Why "Place order" refused, when it refused because of the consent box.
+   *
+   * Beside `slotError` because it is the same thing: a refusal the customer
+   * has to be able to read. The alternative — disabling the button — is what
+   * was here, and it could not work: `components/ui/button.tsx` carries
+   * `disabled:pointer-events-none`, so the `title` that was supposed to
+   * explain the grey button was never reachable by a pointer on any device.
+   */
+  const [termsError, setTermsError] = useState<string | null>(null);
+  /**
+   * WHO THE ORDER BELONGS TO.
+   *
+   * Held rather than read inline, because `getCustomerSession()` reads the
+   * browser and a render-time call would differ between the server's HTML
+   * and the first client render. Set from the same session the draft is
+   * restored with, below.
+   *
+   * It matters because "My orders" matches this against each order's
+   * `address.email` (order.repository.ts, findByCustomerEmail), so it is
+   * the key the buyer's own history is found by — not a contact detail.
+   */
+  const [accountEmail, setAccountEmail] = useState("");
+  /**
+   * The VISIBLE consent box, for moving focus to when it refuses.
+   *
+   * Not `getElementById("acceptTerms")`: Base UI puts that id on the hidden
+   * input it renders for form submission, and that input is
+   * `tabindex="-1"`. Focusing it moves focus nowhere a customer can see —
+   * measured, and the first version of this did exactly that.
+   */
+  const termsBoxRef = useRef<HTMLButtonElement>(null);
   const [slotOptions, setSlotOptions] = useState<string[]>([]);
+  /**
+   * Held as an id, so the price is always the shop's.
+   *
+   * `deliverySlot.tierId` is where it ends up, but the slot is only written
+   * on the way out of Personalize — this drives the preview while the
+   * customer is still choosing.
+   */
+  const [deliveryTierId, setDeliveryTierId] = useState("");
   const [minDeliveryDate, setMinDeliveryDate] = useState("");
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   /** A saved address id, or "new" while entering one by hand. */
   const [addressChoice, setAddressChoice] = useState<string>("new");
-  const [saveNewAddress, setSaveNewAddress] = useState(true);
   /** Set when editing an existing saved address rather than adding one. */
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   /** The form is only shown when adding or editing — otherwise the cards are enough. */
   const [showAddressForm, setShowAddressForm] = useState(false);
+  /**
+   * THE STEP COULD RENDER NEITHER A CARD NOR A FORM, and there was no way back.
+   *
+   * `showAddressForm` was set true only at mount, and set false again on submit.
+   * `DeliveryAddressPicker` returns null on an empty book — and its "Add new"
+   * button is inside that early return, as is the form's own Cancel, which
+   * renders only when a saved address exists. So a customer with NO saved
+   * address who unticked "save this address" and pressed Back arrived at a step
+   * with no picker, no form, and no control that could summon one: just the
+   * date box and a Continue button. The typed values survived in the form state
+   * and still submitted, which is worse than losing them — the address was
+   * there, being sent, and could not be read or corrected.
+   *
+   * Derived, not stored, so the two cannot drift apart again: when there is
+   * nothing to pick from, the form IS the step.
+   */
+  const addressFormOpen = showAddressForm || savedAddresses.length === 0;
   const [placing, setPlacing] = useState(false);
   const [commerce, setCommerce] = useState(defaultCommerceSettings);
   // Null while unknown — do not hide a method on a guess.
@@ -213,8 +329,35 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
     async function checkGateway() {
       try {
         const response = await fetch("/api/razorpay/availability");
-        const status = await response.json();
-        if (!cancelled) setOnlinePaymentReady(Boolean(status?.configured));
+        /**
+         * A REFUSAL IS NOT AN ANSWER.
+         *
+         * This read `Boolean(status?.configured)` off whatever came back. A
+         * throw was handled — that left the state `null`, which means unknown
+         * and keeps the method on offer — but a response that ARRIVED and said
+         * something else was not: a 500, an error envelope, a rate-limit page,
+         * anything without a `configured` key, all became `Boolean(undefined)`,
+         * which is `false`, which hides Pay Online for the rest of that page
+         * load.
+         *
+         * The shop then looks to that customer like a shop that takes cash
+         * only, on a gateway that was working the whole time — and a reload is
+         * the only thing that fixes it, which nobody thinks to do.
+         *
+         * Caught in the browser, not in a unit test: the same spec passed once
+         * and failed twice against a gateway the server confirmed was live.
+         */
+        if (!response.ok) {
+          if (!cancelled) setOnlinePaymentReady(null);
+          return;
+        }
+        const status = (await response.json()) as { configured?: unknown };
+        if (cancelled) return;
+        // Still unknown when the body does not say. Only an explicit answer
+        // decides, in either direction.
+        setOnlinePaymentReady(
+          typeof status?.configured === "boolean" ? status.configured : null,
+        );
       } catch {
         if (!cancelled) setOnlinePaymentReady(null);
       }
@@ -230,11 +373,13 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   const enabledMethods = useMemo(
     () =>
       ready
-        ? getEnabledCheckoutMethods().filter(
+        ? // The SWITCHES THIS RENDER HOLDS, not whatever the cache says when
+          // this line runs. Reading the cache here made the list a snapshot of
+          // an arbitrary moment, and nothing re-took it.
+          getEnabledCheckoutMethods(commerce.paymentMethods).filter(
             (method) => method.id !== "razorpay" || onlinePaymentReady !== false
           )
         : [],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [ready, commerce.paymentMethods, onlinePaymentReady]
   );
 
@@ -302,6 +447,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
     control,
     handleSubmit,
     reset,
+    setValue,
     watch,
     formState,
   } = useForm<CheckoutAddress>({
@@ -350,7 +496,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
 
     const cartItems = getCartItems();
     if (cartItems.length === 0) {
-      toast.info("Your cart is empty — add a cake to check out");
+      toast.info(`Your cart is empty — add a ${productLower} to check out`);
       router.replace(routes.store.cart);
       return;
     }
@@ -360,16 +506,34 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
 
     const draft = getCheckoutDraft();
     const session = getCustomerSession();
+    setAccountEmail(session?.email ?? "");
 
+    /**
+     * `reset` REPLACES the value set, so this literal is the whole form — a
+     * field left out of it is blank on the screen while the draft still holds
+     * it, and the next Continue writes that blank back over the good value.
+     * `defaultValues` does not save you here.
+     */
     reset({
       fullName: draft.address.fullName || session?.name || "",
-      email: draft.address.email || session?.email || "",
+      /*
+        THE SESSION FIRST, not the draft. This read the draft before the
+        session, so a recipient's address typed before this fix would
+        survive it — and the order list is found by matching the session's
+        email against the order's. The draft may hold a destination; it
+        does not get to hold an identity.
+      */
+      email: session?.email || draft.address.email || "",
       phone: draft.address.phone || session?.phone || "",
       addressLine1: draft.address.addressLine1,
       addressLine2: draft.address.addressLine2,
+      landmark: draft.address.landmark,
       city: draft.address.city,
       state: draft.address.state,
       pincode: draft.address.pincode,
+      country: draft.address.country,
+      altPhone: draft.address.altPhone,
+      addressLabel: draft.address.addressLabel,
     });
 
     const addresses = getSavedAddresses();
@@ -381,18 +545,21 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
     const preferred = draftHasAddress ? null : getDefaultAddress();
     if (preferred) {
       setAddressChoice(preferred.id);
-      reset(toCheckoutAddress(preferred));
+      reset(toCheckoutAddress(preferred, session?.email ?? ""));
     } else if (draftHasAddress) {
       const matching = addresses.find((entry) => isSameAddress(entry, draft.address));
       setAddressChoice(matching?.id ?? "new");
       // A typed-but-unsaved address must stay editable on return.
       if (!matching) setShowAddressForm(true);
     }
-    // Nothing to choose from: go straight to the form.
-    if (addresses.length === 0) setShowAddressForm(true);
+    // "Nothing to choose from: go straight to the form" stood here, and it was
+    // the ONLY thing opening the form for a first-time customer — once, at
+    // mount, never again. `addressFormOpen` derives that from the book itself,
+    // so it now holds on every render including the one after Back.
 
     setItems(cartItems);
     setDeliverySlot(draft.deliverySlot ?? EMPTY_DELIVERY_SLOT);
+    setDeliveryTierId(draft.deliverySlot?.tierId ?? "");
     setSlotOptions(getDeliveryTimeSlots());
     setMinDeliveryDate(getMinDeliveryDate());
     setStep(draft.step);
@@ -405,6 +572,19 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
         ""
     );
 
+    /**
+     * The sender defaults to whoever is signed in, which is true often
+     * enough to save typing and never asserted as fact — the EDIT button
+     * is there because the person paying is not always the person named.
+     */
+    const saved = draft.personalisation;
+    setOccasion(saved?.occasion ?? "");
+    setGiftMessage(saved?.message ?? "");
+    setSenderName(saved?.sender?.name ?? session?.name ?? "");
+    setSenderPhone(saved?.sender?.phone ?? session?.phone ?? "");
+    setHideSender(Boolean(saved?.sender?.hideFromRecipient));
+    setTermsAccepted(Boolean(saved?.termsAcceptedAt));
+
     const enabledMethods = paymentOptions.filter(
       (option) => loadedCommerce.paymentMethods[option.value]
     );
@@ -413,11 +593,20 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
       : enabledMethods[0]?.value ?? "cod";
     setPaymentMethod(initialMethod);
 
-    // ?step=3 is a deep link back into Review. Only honour it when the draft
-    // already holds a deliverable address — otherwise the URL alone would skip
-    // the address form and place an order with nowhere to send it.
+    /**
+     * ?step=2 and ?step=3 are deep links into Personalize and Payment.
+     *
+     * Honoured only when the draft already holds what that screen stands on:
+     * Personalize needs somewhere to deliver to, and Payment needs a booked
+     * slot as well. Otherwise a URL on its own skips a screen — and on the
+     * last one that means taking money for an order with no date on it.
+     */
     const stepParam = searchParams.get("step");
-    if (stepParam === "3" && hasDeliverableAddress(draft.address)) {
+    const deliverable = hasDeliverableAddress(draft.address);
+    if (stepParam === "2" && deliverable) {
+      setStep(2);
+    }
+    if (stepParam === "3" && deliverable && hasDeliverySlot(draft.deliverySlot)) {
       setStep(3);
     }
 
@@ -430,7 +619,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   }, [reset, router, searchParams]);
 
   /** Moves between steps and records it in history, so Back walks the flow. */
-  function goToStep(next: 1 | 2 | 3) {
+  function goToStep(next: CheckoutStep) {
     setStep(next);
     const params = new URLSearchParams(searchParams.toString());
     if (next === 1) params.delete("step");
@@ -444,10 +633,13 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   useEffect(() => {
     if (!ready) return;
     const param = Number(searchParams.get("step"));
-    const target: 1 | 2 | 3 = param === 2 || param === 3 ? param : 1;
+    const target: CheckoutStep = param === 2 || param === 3 ? param : 1;
     if (target === step) return;
-    // Never land on a later step without an address to deliver to.
-    if (target > 1 && !hasDeliverableAddress(getCheckoutDraft().address)) return;
+    // Never land on a later step without what it stands on: an address to
+    // deliver to, and — for Payment — a slot to deliver in.
+    const draft = getCheckoutDraft();
+    if (target > 1 && !hasDeliverableAddress(draft.address)) return;
+    if (target === 3 && !hasDeliverySlot(draft.deliverySlot)) return;
     setStep(target);
   }, [searchParams, ready, step]);
 
@@ -463,13 +655,13 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
          *
          * `commitPlacedOrder` clears the cart on a successful order, which
          * fires this subscriber. So at the exact moment the order went through,
-         * the customer got "Your cart is now empty — add a cake to check out"
+         * the customer got `Your cart is now empty — add a ${productLower} to check out`
          * and a `router.replace` to the cart, racing the push to the success
          * page — a contradiction and a coin toss over where they landed.
          */
         if (orderCommitted.current) return;
 
-        toast.info("Your cart is now empty — add a cake to check out");
+        toast.info(`Your cart is now empty — add a ${productLower} to check out`);
         router.replace(routes.store.cart);
         return;
       }
@@ -498,14 +690,55 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
 
   const watchedCity = watch("city");
   const watchedPincode = watch("pincode");
+  // The 3-up control is not an <input>, so its value is watched rather than
+  // registered; `setValue` is what writes the choice back into the form.
+  const watchedAddressLabel = watch("addressLabel");
 
-  // The coupon was validated against whatever the cart held when it was
-  // applied. Re-check it against the cart being paid for, so an edited cart
-  // cannot keep a discount it no longer qualifies for.
-  const subtotal = useMemo(
-    () => items.reduce((sum, item) => sum + item.price * item.quantity, 0),
-    [items]
-  );
+  /**
+   * THE SHOP'S OWN WORDS, not Birthday / Anniversary / Other.
+   *
+   * A fixed list is a claim about what this shop sells and who for. These
+   * are the occasions the shop has actually tagged its products with, so a
+   * florist offers what a florist tagged — and a shop that has tagged
+   * nothing is asked nothing, because an empty row of buttons is worse than
+   * no row at all.
+   */
+  /**
+   * The speeds this shop sells, and the one chosen.
+   *
+   * A shop with none configured gets exactly what it had before tiers
+   * existed: the flat window list, one delivery charge, nothing to pick.
+   */
+  const deliveryTiers = commerce.deliveryTiers ?? [];
+  const chosenTier = deliveryTiers.find((tier) => tier.id === deliveryTierId);
+  /**
+   * Windows come from the chosen tier when it has any.
+   *
+   * A tier with none takes no window at all — a midnight or a next-day
+   * delivery has nothing to choose — and offering the shop-wide list there
+   * would let a customer book 4pm on a service that does not run at 4pm.
+   */
+  const windowsForTier = chosenTier ? chosenTier.windows : slotOptions;
+
+  const occasionOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const product of catalog) {
+      for (const name of product.occasions ?? []) {
+        const clean = name.trim();
+        if (clean) seen.set(clean.toLowerCase(), clean);
+      }
+    }
+    return [...seen.values()].sort((a, b) => a.localeCompare(b));
+  }, [catalog]);
+
+  /*
+    A `subtotal` memo stood here and was the coupon's only view of the cart.
+    The coupon takes the LINES now — a scoped code cannot tell plants from cake
+    given one number — and the minimum-order checks further down read
+    `totals.subtotal`, the SHOP's number, not this one. So nothing was left
+    reading it, and leaving it would have been the obvious wrong argument for
+    the next person to pass to `applyCouponCode`.
+  */
   /**
    * The coupon re-checked against the cart being paid for, and WHY when it no
    * longer holds.
@@ -516,9 +749,31 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
    * discount line in them. Nothing said the coupon had stopped applying, and
    * nothing said what would bring it back.
    */
+  /**
+   * The cart as a COUPON sees it — one entry per line, carrying every category
+   * the product is filed under.
+   *
+   * A scoped coupon ("20% off plants") takes 20% of the plants in this basket
+   * and nothing off the cake beside them, and a subtotal cannot say which line
+   * is which. Built from the same server-sent `catalog` the stock check above
+   * uses, so this page and the server are reading one catalogue.
+   *
+   * This is a PREVIEW. The server re-derives the discount from its own
+   * products in `quoteCart`, and the guard further down blocks the order on
+   * any disagreement — so a browser that got this wrong cannot pay less.
+   */
+  const couponLines = useMemo(() => {
+    const bySlug = new Map(catalog.map((product) => [product.slug, product.categoryIds ?? []]));
+    return items.map((item) => ({
+      productSlug: item.productSlug,
+      categoryIds: bySlug.get(item.productSlug) ?? [],
+      price: item.price,
+      quantity: item.quantity,
+    }));
+  }, [items, catalog]);
   const couponCheck = useMemo(
-    () => (coupon ? applyCouponCode(coupon.code, subtotal) : null),
-    [coupon, subtotal],
+    () => (coupon ? applyCouponCode(coupon.code, couponLines) : null),
+    [coupon, couponLines],
   );
   const validCoupon = couponCheck?.ok ? couponCheck.coupon : null;
   const couponLapsedReason = couponCheck && !couponCheck.ok ? couponCheck.message : null;
@@ -550,16 +805,31 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
         items,
         discount: validCoupon?.discountAmount ?? 0,
         giftWrap,
+        deliveryTierId,
         deliveryAddress: {
           city: watchedCity,
           pincode: watchedPincode,
         },
         commerceOverride: commerce,
       }),
-    [items, validCoupon, giftWrap, watchedCity, watchedPincode, commerce]
+    [items, validCoupon, giftWrap, deliveryTierId, watchedCity, watchedPincode, commerce]
   );
 
   const totals = serverTotals ?? localTotals;
+
+  /**
+   * The sender, as the payment screen reads it back.
+   *
+   * Derived rather than taken from `collectPersonalisation()`, which stamps
+   * `new Date()` when the terms are ticked — calling that during a render
+   * would mint a fresh timestamp on every keystroke anywhere on the page.
+   * The condition matches the one in there, so the screen shows exactly what
+   * the order will carry, including nothing when both boxes are empty.
+   */
+  const personalisationSender =
+    senderName.trim() || senderPhone.trim()
+      ? { name: senderName.trim(), phone: senderPhone.trim(), hideFromRecipient: hideSender }
+      : undefined;
 
   /**
    * The earliest date this address can actually be delivered on.
@@ -572,26 +842,40 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
    */
   const earliestDeliveryDate = useMemo(() => {
     const zoneDays = totals.deliveryMinDays;
-    if (typeof zoneDays !== "number" || zoneDays <= 0) return minDeliveryDate;
 
     // Calendar arithmetic, not Date arithmetic. The first version built a LOCAL
     // midnight and read it back through `toISOString()`, which is UTC — so in
     // IST the floor came out a day early and the picker offered exactly the date
     // the server refuses, with the refusal landing after the card was charged.
-    const zoneFloor = earliestDeliveryDateString(zoneDays);
-    return zoneFloor > minDeliveryDate ? zoneFloor : minDeliveryDate;
-  }, [totals.deliveryMinDays, minDeliveryDate]);
+    const zoneFloor =
+      typeof zoneDays === "number" && zoneDays > 0
+        ? earliestDeliveryDateString(zoneDays)
+        : minDeliveryDate;
+    const floor = zoneFloor > minDeliveryDate ? zoneFloor : minDeliveryDate;
+
+    /**
+     * And past the shop own closing time for today.
+     *
+     * `sameDayCutoff` drove a countdown on the product page and nothing else,
+     * so a shop that closes at 2pm went on offering today at 11pm. The quote
+     * refuses that now; this is so the customer is never offered it.
+     */
+    return isPastSameDayCutoff(floor, commerce.sameDayCutoff)
+      ? addDays(floor, 1)
+      : floor;
+  }, [totals.deliveryMinDays, minDeliveryDate, commerce.sameDayCutoff]);
 
   // Anything that changes the price invalidates the shop's last answer.
   useEffect(() => {
     setServerTotals(null);
     setServerItems(null);
-  }, [items, validCoupon, giftWrap, watchedCity, watchedPincode]);
+  }, [items, validCoupon, giftWrap, deliveryTierId, watchedCity, watchedPincode]);
 
   function persistDraft(
     patch: Partial<{
-      step: 1 | 2 | 3;
+      step: CheckoutStep;
       address: CheckoutAddress;
+      personalisation?: OrderPersonalisation;
       deliverySlot: DeliverySlot;
       paymentMethod: PaymentMethod;
       coupon?: AppliedCoupon;
@@ -608,48 +892,152 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
     });
   }
 
-  const onDeliverySubmit = (address: CheckoutAddress) => {
-    if (!hasDeliverySlot(deliverySlot)) {
-      setSlotError("Choose a delivery date and time");
-      return;
-    }
-    setSlotError(null);
-
-    // Keeping the address book current is a convenience — it must never block
-    // the order, so every path here is best-effort.
+  /**
+   * Writes the destination to the address book, and goes nowhere.
+   *
+   * This used to be the first half of the step's submit, so the only way to
+   * keep an address was to leave the screen — and whether it was kept at all
+   * was decided by a checkbox the customer had to notice before pressing
+   * Continue. Now SAVE saves and Continue continues, which is what the two
+   * words mean.
+   *
+   * Still best-effort: keeping the book current is a convenience and must
+   * never be the reason an order cannot be placed.
+   */
+  const saveAddressToBook = (address: CheckoutAddress) => {
     try {
       if (editingAddressId) {
-        updateSavedAddress(editingAddressId, address);
+        updateSavedAddress(editingAddressId, {
+          ...address,
+          // Deliberate overwrite. Editing used to pass no `label` at all, so
+          // the old one survived — which meant re-labelling an address from
+          // Home to Office changed nothing anybody could see.
+          label: address.addressLabel ?? "Home",
+        });
         setSavedAddresses(getSavedAddresses());
         toast.success("Address updated");
-      } else {
-        const alreadySaved = savedAddresses.some((entry) => isSameAddress(entry, address));
-        if (saveNewAddress && !alreadySaved) {
-          const created = createSavedAddress({
-            ...address,
-            label: address.city?.trim() || "Address",
-            isDefault: savedAddresses.length === 0,
-          });
-          setSavedAddresses(getSavedAddresses());
-          setAddressChoice(created.id);
-          toast.success("Address saved for next time");
-        }
+        return;
       }
+
+      const alreadySaved = savedAddresses.some((entry) => isSameAddress(entry, address));
+      if (alreadySaved) {
+        // Silent before, and pressing a button that does nothing and says
+        // nothing reads as broken.
+        toast.info("That address is already in your address book");
+        return;
+      }
+
+      const created = createSavedAddress({
+        ...address,
+        // The customer's own word for it. This was `address.city`, so someone
+        // who chose Home got a card titled "Kota".
+        label: address.addressLabel ?? "Home",
+        isDefault: savedAddresses.length === 0,
+      });
+      setSavedAddresses(getSavedAddresses());
+      setAddressChoice(created.id);
+      toast.success("Address saved for next time");
     } catch {
       // Ignore — the order still goes through with the address as typed.
     }
+  };
 
+  const onDeliverySubmit = (address: CheckoutAddress) => {
     setShowAddressForm(false);
     setEditingAddressId(null);
 
-    persistDraft({ step: 2, address, deliverySlot });
+    // The slot is asked for on the next screen now, so it is not this one's
+    // to persist — writing it here would stamp an empty slot over one the
+    // customer had already chosen and come back from.
+    persistDraft({ step: 2, address });
     goToStep(2);
   };
 
-  const onPaymentContinue = () => {
-    persistDraft({ step: 3, paymentMethod, orderNotes });
+  /**
+   * What Personalize collected, or nothing at all.
+   *
+   * Undefined rather than an object of empty strings: a shop reading an
+   * order should be able to tell "they chose nothing" from "they chose
+   * blank", and every read-back downstream tests for presence.
+   */
+  function collectPersonalisation(): OrderPersonalisation | undefined {
+    const sender =
+      senderName.trim() || senderPhone.trim()
+        ? {
+            name: senderName.trim(),
+            phone: senderPhone.trim(),
+            hideFromRecipient: hideSender || undefined,
+          }
+        : undefined;
+
+    const value: OrderPersonalisation = {
+      occasion: occasion.trim() || undefined,
+      message: giftMessage.trim() || undefined,
+      sender,
+      termsAcceptedAt: termsAccepted ? new Date().toISOString() : undefined,
+    };
+
+    return Object.values(value).some(Boolean) ? value : undefined;
+  }
+
+  /** Leaving Personalize: the slot is what this screen exists to collect. */
+  const onPersonalizeContinue = () => {
+    /**
+     * The LABEL is stamped here, beside the id.
+     *
+     * An id alone cannot name the service on an order the shop reads back
+     * next month, after the tier has been renamed or deleted. The fee is
+     * deliberately not stamped: that is looked up from settings every time
+     * the cart is priced, so a browser can never name its own surcharge.
+     */
+    const slotWithTier: DeliverySlot = {
+      ...deliverySlot,
+      tierId: chosenTier?.id,
+      tierLabel: chosenTier?.label,
+    };
+
+    if (!slotWithTier.date?.trim()) {
+      setSlotError("Choose a delivery date");
+      /*
+        AND TAKE THEM TO IT. The message lands beside the date field, which
+        is most of a screen above the button on a phone — so without this
+        the button simply looks broken. Focusing scrolls it into view, which
+        is the half that was missing.
+
+        `getElementById` is right here: the shared Input puts the id on the
+        real control. The consent box one step later needs a ref instead,
+        because Base UI puts its id on a hidden tabindex="-1" input.
+      */
+      document.getElementById("deliveryDate")?.focus();
+      return;
+    }
+
+    /**
+     * The window is required only where one exists to pick.
+     *
+     * `hasDeliverySlot` cannot decide this: it is handed a stored slot with no
+     * settings in reach, so it answers the guard-level question — has a
+     * delivery been booked at all. Whether THIS speed needs a window is known
+     * here, where the tier is in hand.
+     */
+    const needsWindow = deliveryTiers.length > 0 ? windowsForTier.length > 0 : true;
+    if (needsWindow && !slotWithTier.timeSlot?.trim()) {
+      document.getElementById("deliveryTime")?.focus();
+      setSlotError(
+        deliveryTiers.length > 0
+          ? "Choose a delivery time for this option"
+          : "Choose a delivery date and time",
+      );
+      return;
+    }
+    setSlotError(null);
+    persistDraft({
+      step: 3,
+      deliverySlot: slotWithTier,
+      paymentMethod,
+      personalisation: collectPersonalisation(),
+    });
     goToStep(3);
-    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   /**
@@ -681,6 +1069,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
       coupon: validCoupon ?? undefined,
       deliverySlot,
       orderNotes: orderNotes.trim() || undefined,
+      personalisation: collectPersonalisation(),
     });
 
     if (closed) {
@@ -796,14 +1185,14 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
       // the customer round a loop that cannot end. Their own words, and the
       // reference, so support can act on it.
       if (refusal) {
-        toast.error("The bakery could not accept this order", {
+        toast.error("The store could not accept this order", {
           description: `${refusal} Please contact support with the reference shown — your payment is safe.`,
           duration: 15000,
         });
         return;
       }
 
-      toast.error("Still couldn't reach the bakery", {
+      toast.error("Still couldn't reach the store", {
         description:
           "Your order is safe here. Try again, or contact support with the reference shown.",
       });
@@ -816,6 +1205,25 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   };
 
   const onPlaceOrder = async () => {
+    /*
+      THE CONSENT TICK IS ENFORCED HERE, NOT BY GREYING THE BUTTON.
+
+      It has to be enforced somewhere: the order records `termsAcceptedAt`
+      from this flag, so an enabled button with an unticked box would store
+      an order with no consent behind it. Refusing here is the same shape as
+      the delivery slot's refusal above, and unlike a disabled button it can
+      say why.
+
+      First, before the minimum-order check and before the cart is priced —
+      there is no point asking the server what the order costs when it is
+      not going to be placed.
+    */
+    if (!termsAccepted) {
+      setTermsError("Accept the terms above to continue");
+      termsBoxRef.current?.focus();
+      return;
+    }
+
     if (commerce.minOrderValue > 0 && totals.subtotal < commerce.minOrderValue) {
       toast.error(`Minimum order value is ${formatCurrency(commerce.minOrderValue)}`);
       return;
@@ -831,12 +1239,14 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
       items,
       couponCode: validCoupon?.code,
       giftWrap,
+      deliveryTierId: deliveryTierId || undefined,
       deliveryAddress: { city: address.city, pincode: address.pincode },
       // The whole order intent, so the webhook can finish this order from the
       // draft if the customer's browser never comes back from the gateway.
       address,
       deliverySlot,
       orderNotes: orderNotes.trim() || undefined,
+      personalisation: collectPersonalisation(),
     });
 
     if (!quote) {
@@ -867,7 +1277,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
       persistDraft({ coupon: undefined });
       setPlacing(false);
       toast.error(`${quote.rejectedCoupon} could not be applied`, {
-        description: `The bakery did not accept this code, so it has been removed. This order comes to ${formatCurrency(quote.totals.total)}.`,
+        description: `The store did not accept this code, so it has been removed. This order comes to ${formatCurrency(quote.totals.total)}.`,
         duration: 10000,
       });
       return;
@@ -942,7 +1352,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   return (
     <>
       {/*
-        The order reached this browser but not the bakery. Shown INSTEAD of the
+        The order reached this browser but not the store. Shown INSTEAD of the
         success page, and it blocks: the customer needs to know their order is
         not in yet, and if they paid, they need the reference in front of them
         before they navigate away. Retry re-sends the order — never the payment.
@@ -956,8 +1366,8 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
               unconfirmed.closed
                 ? `The shop closed while your payment was going through, so we could not confirm the order here. Your payment is safe and the bakery has it — quote the reference below when you get in touch. ${unconfirmed.closed}`
                 : unconfirmed.paymentStatus === "paid"
-                  ? "Your payment went through, but we couldn't reach the bakery to confirm the order. Nothing has been lost — please retry."
-                  : "We couldn't reach the bakery to confirm your order. Your cart is still here — please retry."
+                  ? "Your payment went through, but we couldn't reach the store to confirm the order. Nothing has been lost — please retry."
+                  : "We couldn't reach the store to confirm your order. Your cart is still here — please retry."
             }
             reason={
               unconfirmed.paymentReference
@@ -1008,7 +1418,10 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       label: "Change method",
                       onClick: () => {
                         setPayUI(null);
-                        goToStep(2);
+                        // Payment, which is step 3 now — 2 is Personalize, and
+                        // sending someone to re-pick a date they had already
+                        // chosen is not what "Change method" offers.
+                        goToStep(3);
                       },
                       variant: "outline",
                     },
@@ -1026,7 +1439,6 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
 
       <StorePageHeader
         title="Checkout"
-        description="Complete your delivery details and place your order."
         breadcrumbs={[
           { label: "Cart", href: routes.store.cart },
           { label: "Checkout" },
@@ -1043,19 +1455,56 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
             className="mb-8"
           />
 
-          <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
             <div className="order-1 space-y-6 lg:order-none lg:col-start-1">
               {step === 1 ? (
-                <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
-                  <h2 className="font-heading text-lg font-semibold">Delivery details</h2>
+                <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+                  {/*
+                    "Delivery details" covered two questions — where, and when —
+                    and only one of them is still asked here. The when moved to
+                    Personalize, so this says the one thing it now does.
+                  */}
+                  <h2 className={storefrontHeading.card}>Delivery address</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Where should we deliver your order?
                   </p>
 
+                  {/*
+                    AN ID, so the Continue button can live in the sidebar.
+
+                    That button is a submit, and a submit outside its form
+                    does nothing at all — silently. `form="…"` is the
+                    attribute that reconnects them, and it keeps the
+                    validation this form already runs.
+                  */}
                   <form
+                    id="checkoutAddressForm"
                     className="mt-6 space-y-4"
                     onSubmit={handleSubmit(onDeliverySubmit)}
                   >
+                    {/*
+                      WHO THE ORDER BELONGS TO — shown, not asked.
+
+                      The order list matches the session's email against the
+                      order's `address.email`, so this value is the key the
+                      buyer's own history is found by, not a contact detail.
+                      As an input inside a card headed "New delivery
+                      address", under "Where should we deliver your order?",
+                      it invited a gift sender to type the RECIPIENT's — and
+                      one keystroke put the order somewhere they could never
+                      find it.
+
+                      Checkout is sign-in gated, so the account email always
+                      exists. It is read back here, above the destination
+                      and outside it, and the registration stays mounted so
+                      the value still reaches the order.
+                    */}
+                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-xl border border-border bg-cream-50 px-4 py-3 text-sm">
+                      <span className="text-muted-foreground">Ordering as</span>
+                      <span className="font-medium break-all">{accountEmail}</span>
+                    </div>
+                    <input type="hidden" {...register("email")} />
+
                     <DeliveryAddressPicker
                       addresses={savedAddresses}
                       selectedId={addressChoice === "new" ? null : addressChoice}
@@ -1063,13 +1512,13 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                         setAddressChoice(address.id);
                         setEditingAddressId(null);
                         setShowAddressForm(false);
-                        reset(toCheckoutAddress(address));
+                        reset(toCheckoutAddress(address, accountEmail));
                       }}
                       onEdit={(address) => {
                         setAddressChoice(address.id);
                         setEditingAddressId(address.id);
                         setShowAddressForm(true);
-                        reset(toCheckoutAddress(address));
+                        reset(toCheckoutAddress(address, accountEmail));
                       }}
                       onAddNew={() => {
                         setAddressChoice("new");
@@ -1087,8 +1536,8 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                     />
 
 
-                    {showAddressForm ? (
-                      <div className="space-y-4 rounded-xl border border-border bg-white p-4">
+                    {addressFormOpen ? (
+                      <div className="space-y-4 rounded-xl border border-border bg-card p-4">
                         <div className="flex items-center justify-between gap-3">
                           <p className="text-sm font-medium">
                             {editingAddressId ? "Edit address" : "New delivery address"}
@@ -1106,7 +1555,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                                   savedAddresses[0];
                                 if (fallback) {
                                   setAddressChoice(fallback.id);
-                                  reset(toCheckoutAddress(fallback));
+                                  reset(toCheckoutAddress(fallback, accountEmail));
                                 }
                               }}
                             >
@@ -1119,6 +1568,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                         <Label htmlFor="fullName">Full name</Label>
                         <Input
                           id="fullName"
+                          aria-required
                           {...register("fullName", { required: "Name is required" })}
                         />
                         {formState.errors.fullName ? (
@@ -1127,29 +1577,17 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                           </p>
                         ) : null}
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          {...register("email", {
-                            required: "Email is required",
-                            pattern: {
-                              value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                              message: "Enter a valid email",
-                            },
-                          })}
-                        />
-                        {formState.errors.email ? (
-                          <p role="alert" className="text-xs text-destructive">
-                            {formState.errors.email.message}
-                          </p>
-                        ) : null}
-                      </div>
+                      {/*
+                        THE EMAIL INPUT WAS HERE. It is read-only text above
+                        the picker now — see the note there. Phone keeps the
+                        first column and "Alternate phone" the second, which
+                        is where the two numbers belong.
+                      */}
                       <div className="space-y-2">
                         <Label htmlFor="phone">Phone</Label>
                         <Input
                           id="phone"
+                          aria-required
                           type="tel"
                           {...register("phone", {
                             required: "Phone is required",
@@ -1162,10 +1600,21 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                           </p>
                         ) : null}
                       </div>
+                      <div className="space-y-2">
+                        {/*
+                          No validation beyond a length cap. A second number is
+                          a courtesy — refusing the order because the spare one
+                          is short would be the field costing more than it is
+                          worth.
+                        */}
+                        <Label htmlFor="altPhone">Alternate phone (optional)</Label>
+                        <Input id="altPhone" type="tel" {...register("altPhone")} />
+                      </div>
                       <div className="space-y-2 sm:col-span-2">
                         <Label htmlFor="addressLine1">Address line 1</Label>
                         <Input
                           id="addressLine1"
+                          aria-required
                           {...register("addressLine1", { required: "Address is required" })}
                         />
                         {formState.errors.addressLine1 ? (
@@ -1178,10 +1627,25 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                         <Label htmlFor="addressLine2">Address line 2 (optional)</Label>
                         <Input id="addressLine2" {...register("addressLine2")} />
                       </div>
+                      <div className="space-y-2 sm:col-span-2">
+                        {/*
+                          Its own field, not a second address line. "Flat 4B"
+                          continues the address; "opposite the water tank" is
+                          how somebody finds the door. The rider's message
+                          carries this one.
+                        */}
+                        <Label htmlFor="landmark">Landmark (optional)</Label>
+                        <Input
+                          id="landmark"
+                          placeholder="A shop, a turning, anything easy to spot"
+                          {...register("landmark")}
+                        />
+                      </div>
                       <div className="space-y-2">
                         <Label htmlFor="city">City</Label>
                         <Input
                           id="city"
+                          aria-required
                           {...register("city", { required: "City is required" })}
                         />
                         {formState.errors.city ? (
@@ -1194,6 +1658,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                         <Label htmlFor="state">State</Label>
                         <Input
                           id="state"
+                          aria-required
                           {...register("state", { required: "State is required" })}
                         />
                         {formState.errors.state ? (
@@ -1206,6 +1671,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                         <Label htmlFor="pincode">PIN code</Label>
                         <Input
                           id="pincode"
+                          aria-required
                           {...register("pincode", {
                             required: "PIN code is required",
                             pattern: { value: /^\d{6}$/, message: "Enter 6-digit PIN" },
@@ -1225,95 +1691,438 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                           </p>
                         ) : null}
                       </div>
+                      <div className="space-y-2">
+                        {/*
+                          A TYPED FIELD, not a dropdown.
+
+                          Nothing in this CMS records which country the shop is
+                          in — no setting, no list anywhere in the repo — so a
+                          select offering one country would be this code making
+                          a claim on the shop's behalf, and a select offering
+                          every country is a list nobody asked for.
+                        */}
+                        <Label htmlFor="country">Country (optional)</Label>
+                        <Input id="country" {...register("country")} />
+                      </div>
+
+                      <div className="space-y-2 sm:col-span-2">
+                        {/*
+                          "(optional)", because it is — `addressLabel`
+                          falls back to "Home" wherever it is read, and the
+                          note above lists it among the fields that do not
+                          count.
+
+                          This form marks the optional ones rather than the
+                          required ones, which works only while the marking
+                          is complete. This was the exception: the one
+                          unmarked control that reads as mandatory, sitting
+                          between fields that genuinely are. A buyer who
+                          tested the inference here would learn the wrong
+                          lesson and stop trusting it everywhere else.
+                        */}
+                        <Label>Save this as (optional)</Label>
+                        {/*
+                          What the customer calls the place. It used to be the
+                          city name, stamped on without asking — so somebody
+                          who meant "Office" got a card headed "Kota", and the
+                          two addresses they keep at the same city were
+                          impossible to tell apart in the list.
+
+                          Radios, not buttons: this is one choice out of three,
+                          and a keyboard or a screen reader should be able to
+                          arrow through it.
+                        */}
+                        <div
+                          role="radiogroup"
+                          aria-label="Save this as"
+                          className="grid grid-cols-3 gap-2"
+                        >
+                          {(["Home", "Office", "Other"] as const).map((option) => {
+                            const active = watchedAddressLabel === option;
+                            return (
+                              <button
+                                key={option}
+                                type="button"
+                                role="radio"
+                                aria-checked={active}
+                                onClick={() => setValue("addressLabel", option)}
+                                className={cn(
+                                  "rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                                  active
+                                    ? "border-bakery-700 bg-bakery-700 text-white"
+                                    : "border-border bg-card text-foreground hover:border-bakery-700"
+                                )}
+                              >
+                                {option}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
 
-                        {/* Only offered for a genuinely new destination —
-                            editing an existing one already updates it. */}
-                        {!editingAddressId ? (
-                          <label className="flex cursor-pointer items-center gap-3 text-sm">
-                            <Checkbox
-                              checked={saveNewAddress}
-                              onCheckedChange={(checked) => setSaveNewAddress(checked === true)}
-                            />
-                            Save this address for next time
-                          </label>
-                        ) : null}
+                        {/*
+                          "Save this address for next time" stood here, ticked
+                          by default, and it was the only thing deciding
+                          whether Continue also wrote to the address book. A
+                          button that says SAVE decides that now — a customer
+                          who wants to keep an address presses it, and one who
+                          does not, does not.
+
+                          CANCEL only appears when there is a card to fall back
+                          to. With an empty book the form IS the step, and a
+                          Cancel that can close it leads nowhere.
+                        */}
+                        <div className="flex flex-col-reverse gap-3 border-t border-border pt-4 sm:flex-row sm:justify-end">
+                          {savedAddresses.length > 0 ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="sm:min-w-32"
+                              onClick={() => {
+                                setShowAddressForm(false);
+                                setEditingAddressId(null);
+                                const fallback =
+                                  savedAddresses.find((entry) => entry.id === addressChoice) ??
+                                  savedAddresses[0];
+                                if (fallback) {
+                                  setAddressChoice(fallback.id);
+                                  reset(toCheckoutAddress(fallback, accountEmail));
+                                }
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                          ) : null}
+                          {/*
+                            type="button", and validated by hand.
+
+                            The form's onSubmit carries the customer to
+                            Personalize, so a default <button> here would save
+                            the address AND leave the screen — the one thing
+                            splitting these two apart was meant to stop.
+                            `handleSubmit(fn)()` runs the same validation the
+                            step does, so SAVE cannot write a half-typed
+                            destination into the book.
+                          */}
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            className="sm:min-w-32"
+                            onClick={() => void handleSubmit(saveAddressToBook)()}
+                          >
+                            {editingAddressId ? "Save changes" : "Save address"}
+                          </Button>
+                        </div>
                       </div>
                     ) : null}
 
-                    {/* One slot for the whole order — an order is delivered
-                        once, even when each cake was added separately. */}
-                    <div className="space-y-3 rounded-xl border border-border bg-cream-50 p-4">
-                      <div>
-                        <p className="text-sm font-medium">When should we deliver?</p>
-                        <p className="text-xs text-muted-foreground">
-                          We bake fresh, so the earliest date depends on preparation time.
-                        </p>
-                      </div>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="deliveryDate">Delivery date</Label>
-                          <Input
-                            id="deliveryDate"
-                            type="date"
-                            min={earliestDeliveryDate}
-                            value={deliverySlot.date}
-                            aria-invalid={Boolean(slotError) && !deliverySlot.date}
-                            onChange={(event) => {
-                              setSlotError(null);
-                              setDeliverySlot((prev) => ({ ...prev, date: event.target.value }));
-                            }}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="deliveryTime">Delivery time</Label>
-                          <select
-                            id="deliveryTime"
-                            value={deliverySlot.timeSlot}
-                            aria-invalid={Boolean(slotError) && !deliverySlot.timeSlot}
-                            onChange={(event) => {
-                              setSlotError(null);
-                              setDeliverySlot((prev) => ({
-                                ...prev,
-                                timeSlot: event.target.value,
-                              }));
-                            }}
-                            className="h-8 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20"
-                          >
-                            <option value="">Select a time</option>
-                            {slotOptions.map((slot) => (
-                              <option key={slot} value={slot}>
-                                {slot}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                      {slotError ? (
-                        <p role="alert" className="text-xs text-destructive">
-                          {slotError}
-                        </p>
-                      ) : null}
-                    </div>
-
                     <CartIssuesAlert issues={cartIssues} />
 
-                    <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-between">
-                      <Button variant="outline" render={<Link href={routes.store.cart} />}>
-                        Back to cart
-                      </Button>
-                      <Button type="submit" variant="bakery" disabled={cartBlocked}>
-                        Continue to payment
-                      </Button>
-                    </div>
                   </form>
                 </div>
               ) : null}
 
               {step === 2 ? (
                 <div className="space-y-6">
-                  <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
-                    <h2 className="font-heading text-lg font-semibold">Payment method</h2>
+                  <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+                    <h2 className={storefrontHeading.card}>Personalize your order</h2>
+
+                    <div className="mt-5 space-y-4">
+                      {deliveryTiers.length > 0 ? (
+                        <div className="space-y-2">
+                          <Label>How fast</Label>
+                          {/*
+                            The shop's own speeds and the shop's own prices.
+                            A shop that has set none up never sees this block,
+                            and gets the one delivery charge it always had.
+                          */}
+                          <div role="radiogroup" aria-label="How fast" className="space-y-2">
+                            {deliveryTiers.map((tier) => {
+                              const active = tier.id === deliveryTierId;
+                              return (
+                                <button
+                                  key={tier.id}
+                                  type="button"
+                                  role="radio"
+                                  aria-checked={active}
+                                  onClick={() => {
+                                    setSlotError(null);
+                                    setDeliveryTierId(tier.id);
+                                    // A window booked against the old tier
+                                    // may not exist on this one, and a select
+                                    // holding a value it has no option for
+                                    // shows blank while still submitting.
+                                    if (!tier.windows.includes(deliverySlot.timeSlot)) {
+                                      setDeliverySlot((prev) => ({ ...prev, timeSlot: "" }));
+                                    }
+                                  }}
+                                  className={cn(
+                                    "flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors",
+                                    active
+                                      ? "border-bakery-700 bg-bakery-50"
+                                      : "border-border bg-card hover:border-bakery-700"
+                                  )}
+                                >
+                                  <span>
+                                    <span className="block text-sm font-medium">{tier.label}</span>
+                                    {tier.description ? (
+                                      <span className="block text-xs text-muted-foreground">
+                                        {tier.description}
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                  {/*
+                                    A free tier says Free rather than a
+                                    zero-rupee amount, the same way the
+                                    Delivery row does.
+                                  */}
+                                  <span className="shrink-0 text-sm font-semibold">
+                                    {tier.fee > 0 ? `+${formatCurrency(tier.fee)}` : "Free"}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : null}
+                  {/* One slot for the whole order — an order is delivered
+                      once, even when each cake was added separately. */}
+                  <div className="space-y-3 rounded-xl border border-border bg-cream-50 p-4">
+                    <div>
+                      <p className="text-sm font-medium">When should we deliver?</p>
+                      <p className="text-xs text-muted-foreground">
+                        The earliest date depends on preparation time.
+                      </p>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="deliveryDate">Delivery date</Label>
+                        <Input
+                          id="deliveryDate"
+                          aria-required
+                          type="date"
+                          min={earliestDeliveryDate}
+                          value={deliverySlot.date}
+                          aria-invalid={Boolean(slotError) && !deliverySlot.date}
+                          onChange={(event) => {
+                            setSlotError(null);
+                            setDeliverySlot((prev) => ({ ...prev, date: event.target.value }));
+                          }}
+                        />
+                      </div>
+                      {/*
+                        Hidden when the chosen speed has no windows — a
+                        midnight or a next-day delivery has nothing to pick,
+                        and an empty dropdown labelled "Delivery time" reads
+                        as a list that failed to load.
+                      */}
+                      {windowsForTier.length > 0 ? (
+                      <div className="space-y-2">
+                        <Label htmlFor="deliveryTime">Delivery time</Label>
+                        <select
+                          id="deliveryTime"
+                          aria-required
+                          value={deliverySlot.timeSlot}
+                          aria-invalid={Boolean(slotError) && !deliverySlot.timeSlot}
+                          onChange={(event) => {
+                            setSlotError(null);
+                            setDeliverySlot((prev) => ({
+                              ...prev,
+                              timeSlot: event.target.value,
+                            }));
+                          }}
+                          className="h-8 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20"
+                        >
+                          <option value="">Select a time</option>
+                          {/*
+                            Today windows that have already closed are not
+                            offered — the quote refuses them. The one already
+                            chosen stays listed whatever the clock says, so the
+                            select never renders a value it has no option for;
+                            changing the date is what clears it.
+                          */}
+                          {windowsForTier
+                            .filter(
+                              (slot) =>
+                                slot === deliverySlot.timeSlot ||
+                                !isPastTimeSlot(deliverySlot.date, slot),
+                            )
+                            .map((slot) => (
+                              <option key={slot} value={slot}>
+                                {slot}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                      ) : null}
+                    </div>
+                    {slotError ? (
+                      <p role="alert" className="text-xs text-destructive">
+                        {slotError}
+                      </p>
+                    ) : null}
+                  </div>
+                      {occasionOptions.length > 0 ? (
+                        <div className="space-y-2">
+                          <Label>Occasion (optional)</Label>
+                          {/*
+                            The shop's own words. A shop that has tagged no
+                            occasions is not asked — this whole block is gone,
+                            rather than showing an empty row of buttons.
+                          */}
+                          <div role="radiogroup" aria-label="Occasion" className="flex flex-wrap gap-2">
+                            {occasionOptions.map((option) => {
+                              const active = occasion === option;
+                              return (
+                                <button
+                                  key={option}
+                                  type="button"
+                                  role="radio"
+                                  aria-checked={active}
+                                  // Pressing the chosen one again clears it:
+                                  // the field is optional, and a control with
+                                  // no way back is not.
+                                  onClick={() => setOccasion(active ? "" : option)}
+                                  className={cn(
+                                    "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
+                                    active
+                                      ? "border-bakery-700 bg-bakery-700 text-white"
+                                      : "border-border bg-card text-foreground hover:border-bakery-700"
+                                  )}
+                                >
+                                  {option}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <div className="space-y-2">
+                        {/*
+                          For whoever opens the parcel — NOT the same box as
+                          "Special instructions" on the payment step, which is
+                          for the shop, and not the per-item message, which is
+                          printed on the thing itself. Three messages sounds
+                          like two too many until you need to tell a rider
+                          about a gate code without it appearing on a gift.
+                        */}
+                        <Label htmlFor="giftMessage">Message for the recipient (optional)</Label>
+                        <Textarea
+                          id="giftMessage"
+                          rows={3}
+                          maxLength={500}
+                          value={giftMessage}
+                          onChange={(event) => setGiftMessage(event.target.value)}
+                        />
+                      </div>
+
+                      <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            {/*
+                              "(optional)", like the two labels above it.
+
+                              These prefill from the account, and the
+                              sign-in modal asks for a name as optional —
+                              so a customer who skipped that box arrives
+                              here with nothing, which is the common case.
+                              Unmarked, the empty state read as a field
+                              they had failed to fill.
+                            */}
+                            <p className="text-sm font-medium">Who it is from (optional)</p>
+                            {/*
+                              AND THE PROMISE ONLY WHEN THERE IS SOMETHING
+                              TO PROMISE ABOUT. "We will use these to reach
+                              you" sat above a box reading "Not set", which
+                              is a sentence contradicting the line under it.
+                            */}
+                            {personalisationSender ? (
+                              <p className="text-xs text-muted-foreground">
+                                We will use these to reach you about this order.
+                              </p>
+                            ) : null}
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setEditingSender((open) => !open)}
+                          >
+                            {editingSender ? "Done" : "Edit"}
+                          </Button>
+                        </div>
+
+                        {/*
+                          Filled in from the signed-in account and shown as
+                          text until asked otherwise. The person paying is not
+                          always the person named, so EDIT exists — but a
+                          checkout that opens with two more empty boxes reads
+                          as two more things to do.
+                        */}
+                        {editingSender ? (
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label htmlFor="senderName">Name</Label>
+                              <Input
+                                id="senderName"
+                                value={senderName}
+                                onChange={(event) => setSenderName(event.target.value)}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="senderPhone">Phone</Label>
+                              <Input
+                                id="senderPhone"
+                                type="tel"
+                                value={senderPhone}
+                                onChange={(event) => setSenderPhone(event.target.value)}
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm">
+                            {[senderName, senderPhone].filter(Boolean).join(" · ") || (
+                              <span className="text-muted-foreground">Not set</span>
+                            )}
+                          </p>
+                        )}
+
+                        <label className="flex cursor-pointer items-start gap-3 text-sm">
+                          <Checkbox
+                            checked={hideSender}
+                            onCheckedChange={(checked) => setHideSender(checked === true)}
+                          />
+                          <span>
+                            Keep it a surprise
+                            <span className="block text-xs text-muted-foreground">
+                              {/*
+                                THE FIRST SENTENCE IS ALWAYS TRUE — it
+                                describes what this tick does. The second
+                                is a claim about values the shop holds, so
+                                it waits until there are some; over an
+                                empty box it contradicted the "Not set"
+                                three lines above.
+                              */}
+                              Your name and number stay off what the recipient sees.
+                              {personalisationSender
+                                ? " The shop still has them, because it has to be able to reach you."
+                                : null}
+                            </span>
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              ) : null}
+
+              {step === 3 ? (
+                <div className="space-y-6">
+                  <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+                    <h2 className={storefrontHeading.card}>Payment method</h2>
                     <p className="mt-1 text-sm text-muted-foreground">
                       Pay securely online, or choose Cash on Delivery.
                     </p>
@@ -1334,12 +2143,24 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       />
                     </div>
 
-                    <div className="mt-5 border-t border-border pt-5">
-                      <SecurityBadges />
-                    </div>
+                    {/*
+                      THREE BADGES WENT FROM HERE, and nothing replaced them.
+
+                      They read "256-bit SSL / Encrypted", "Secure Checkout /
+                      Verified" and "PCI-DSS Ready / Compliant". None was the
+                      shop's to say — the last is a card-industry compliance
+                      claim, the second names no verifier, and the component
+                      that drew them said so itself: "Placeholders — no live
+                      attestation."
+
+                      A softer reassurance in their place would be the same
+                      offence in quieter words. The payment card above
+                      already names Razorpay, which is a fact about who
+                      handles the payment and is the shop's to state.
+                    */}
                   </div>
 
-                  <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
+                  <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
                     <Label htmlFor="orderNotes">Special instructions (optional)</Label>
                     <Textarea
                       id="orderNotes"
@@ -1347,52 +2168,31 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       placeholder="Gate code, delivery instructions, etc."
                       value={orderNotes}
                       onChange={(event) => setOrderNotes(event.target.value)}
+                      // Persisted on blur because this box no longer has a
+                      // screen to leave: the step that used to write it away on
+                      // its way to Review is the step the order is placed from.
+                      onBlur={(event) => persistDraft({ orderNotes: event.target.value })}
                     />
                   </div>
 
-                  <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
-                    <Button variant="outline" onClick={() => goToStep(1)}>
-                      Back
-                    </Button>
-                    <Button
-                      variant="bakery"
-                      onClick={onPaymentContinue}
-                      disabled={availablePaymentOptions.length === 0}
-                    >
-                      Review order
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
-
-              {step === 3 ? (
-                <div className="space-y-6">
-                  <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
-                    <h2 className="font-heading text-lg font-semibold">Review & confirm</h2>
+                  <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+                    <h2 className={storefrontHeading.card}>Review & confirm</h2>
                     <p className="mt-1 text-sm text-muted-foreground">
                       Please verify your details before placing the order.
                     </p>
 
                     <div className="mt-6 space-y-4 text-sm">
-                      <ReviewBlock title="Delivery to">
+                      <ReviewBlock title="Delivery to" onChange={() => goToStep(1)}>
                         <p className="font-medium">{getCheckoutDraft().address.fullName}</p>
                         <p>{getCheckoutDraft().address.phone}</p>
                         <p>{getCheckoutDraft().address.email}</p>
                         <p className="text-muted-foreground">
-                          {[
-                            getCheckoutDraft().address.addressLine1,
-                            getCheckoutDraft().address.addressLine2,
-                            getCheckoutDraft().address.city,
-                            getCheckoutDraft().address.state,
-                            getCheckoutDraft().address.pincode,
-                          ]
-                            .filter(Boolean)
-                            .join(", ")}
+                          {formatAddress(getCheckoutDraft().address)}
                         </p>
                       </ReviewBlock>
 
                       {hasDeliverySlot(deliverySlot) ? (
-                        <ReviewBlock title="Delivery slot">
+                        <ReviewBlock title="Delivery slot" onChange={() => goToStep(2)}>
                           {/*
                             The calendar day the customer picked, not an
                             instant. `new Date("2026-08-16")` is midnight UTC,
@@ -1402,7 +2202,14 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                             order stored Sunday.
                           */}
                           <p className="font-medium">{formatCalendarDate(deliverySlot.date)}</p>
-                          <p className="text-muted-foreground">{deliverySlot.timeSlot}</p>
+                          {/* The speed bought, named. A slot with no window
+                              prints nothing rather than an empty line. */}
+                          {deliverySlot.tierLabel ? (
+                            <p className="text-muted-foreground">{deliverySlot.tierLabel}</p>
+                          ) : null}
+                          {deliverySlot.timeSlot ? (
+                            <p className="text-muted-foreground">{deliverySlot.timeSlot}</p>
+                          ) : null}
                         </ReviewBlock>
                       ) : null}
 
@@ -1412,6 +2219,18 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                             paymentOptions.find((option) => option.value === paymentMethod)?.label}
                         </p>
                       </ReviewBlock>
+
+                      {personalisationSender ? (
+                        <ReviewBlock title="Sent by" onChange={() => goToStep(2)}>
+                          <p className="font-medium">{personalisationSender.name}</p>
+                          <p className="text-muted-foreground">{personalisationSender.phone}</p>
+                          {personalisationSender.hideFromRecipient ? (
+                            <p className="text-xs text-muted-foreground">
+                              Kept off what the recipient sees
+                            </p>
+                          ) : null}
+                        </ReviewBlock>
+                      ) : null}
 
                       {orderNotes ? (
                         <ReviewBlock title="Notes">
@@ -1432,42 +2251,8 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       </p>
                     ) : null}
 
-                    <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
-                      <Button variant="outline" onClick={() => goToStep(2)}>
-                        Back to payment
-                      </Button>
-                      <Button
-                        variant="bakery"
-                        onClick={onPlaceOrder}
-                        disabled={
-                          placing ||
-                          cartBlocked ||
-                          (commerce.minOrderValue > 0 && totals.subtotal < commerce.minOrderValue)
-                        }
-                      >
-                        {placing ? <Loader2 className="size-4 animate-spin" /> : null}
-                        {placing ? (
-                          paymentMethod === "razorpay" ? "Processing payment…" : "Placing order…"
-                        ) : paymentMethod === "razorpay" ? (
-                          <>Pay {formatCurrency(totals.total)}</>
-                        ) : (
-                          <>Place order · {formatCurrency(totals.total)}</>
-                        )}
-                      </Button>
-                    </div>
                   </div>
 
-                  <p className="text-center text-xs text-muted-foreground">
-                    {commerce.checkoutTerms || (
-                      <>
-                        By placing your order, you agree to our{" "}
-                        <Link href={routes.store.terms} className="text-bakery-700 hover:underline">
-                          Terms of Service
-                        </Link>
-                        .
-                      </>
-                    )}
-                  </p>
                 </div>
               ) : null}
             </div>
@@ -1478,41 +2263,221 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                 totals={totals}
                 giftWrapLabel={commerce.giftWrapLabel}
               />
-              {commerce.giftWrapEnabled ? (
-                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-white p-4">
-                  <Checkbox
-                    checked={giftWrap}
-                    onCheckedChange={(checked) => {
-                      const next = checked === true;
-                      setGiftWrap(next);
-                      updateCartPreferences({ giftWrap: next });
-                    }}
-                  />
-                  <span className="text-sm">
-                    <span className="font-medium">{commerce.giftWrapLabel}</span>
-                    <span className="block text-muted-foreground">
-                      Adds {formatCurrency(commerce.giftWrapFee)} to your order
-                    </span>
-                  </span>
-                </label>
-              ) : null}
 
-              <div className="rounded-xl border border-border bg-white p-4">
-                  <p className="mb-3 text-sm font-medium">Have a coupon?</p>
-                  <CouponInput
-                    subtotal={totals.subtotal}
-                    applied={coupon}
-                    lapsedReason={couponLapsedReason}
-                    onApply={(next) => {
-                      setCoupon(next);
-                      persistDraft({ coupon: next });
-                    }}
-                    onRemove={() => {
-                      setCoupon(undefined);
-                      persistDraft({ coupon: undefined });
-                    }}
-                  />
+              {/*
+                THE WAY ON, IN THE SAME CORNER ON EVERY STEP.
+
+                It used to be three different buttons in three different
+                places: 83x32 on Address, 161x32 on Personalize, 153x32 on
+                Payment, each tucked under a long form in the wide column
+                while the total sat over here. On a phone that meant
+                scrolling past the money to find the button, and on every
+                step it meant looking somewhere new for the same thing.
+
+                Directly under the totals, full width, so the amount and
+                the control that commits to it are read together. 48px
+                tall because this is the control the page exists for and
+                the shared button's 32 is under every touch-target floor.
+                The way back is 44 and sits underneath rather than beside,
+                so the two never compete for one corner.
+
+                The consent box is here, not in the review card, for one
+                hard reason: the refusal it raises renders beside the box,
+                and a box in the other column would put the explanation
+                half a screen away from the press that caused it.
+              */}
+              <div className="space-y-3">
+                {step === 3 ? (
+                  <div className="rounded-xl border border-border bg-card p-4">
+                    {/*
+                      A CONTROL, not a caption.
+
+                      This was a centred grey sentence saying agreement had
+                      already happened by virtue of pressing the button beside it.
+                      Nothing was ticked and nothing was recorded, so the shop had
+                      no way to say when — or whether — its terms were accepted on
+                      any given order.
+
+                      It is unticked to begin with, deliberately. A pre-ticked
+                      consent box records the same nothing the sentence did, and
+                      the order stores the moment it was ticked rather than the
+                      fact that a page once contained the words.
+                    */}
+                    <label className="flex cursor-pointer items-start justify-center gap-3 text-xs text-muted-foreground">
+                      {/*
+                        An id, because the visible label is the shop's own
+                        terms wording and therefore not a stable handle for
+                        anything that needs to find this control. The label
+                        still names it for a screen reader, which is what a
+                        reader of a consent box should hear.
+                      */}
+                      <Checkbox
+                        id="acceptTerms"
+                        ref={termsBoxRef}
+                        checked={termsAccepted}
+                        aria-invalid={Boolean(termsError)}
+                        aria-describedby={termsError ? "acceptTermsError" : undefined}
+                        /* Cleared on the tick, or the red line outlives the
+                           correction that answered it. */
+                        onCheckedChange={(checked) => {
+                          setTermsAccepted(checked === true);
+                          if (checked === true) setTermsError(null);
+                        }}
+                      />
+                      <span>
+                        {commerce.checkoutTerms || (
+                          <>
+                            I agree to the{" "}
+                            <Link
+                              href={routes.store.terms}
+                              className="text-bakery-700 hover:underline"
+                            >
+                              Terms of Service
+                            </Link>
+                            .
+                          </>
+                        )}
+                      </span>
+                    </label>
+                    {termsError ? (
+                      <p
+                        id="acceptTermsError"
+                        role="alert"
+                        className="mt-2 text-center text-xs text-destructive"
+                      >
+                        {termsError}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {step === 1 ? (
+                  <Button
+                    type="submit"
+                    form="checkoutAddressForm"
+                    variant="bakery"
+                    className="h-12 w-full text-base"
+                    disabled={cartBlocked}
+                  >
+                    Continue
+                  </Button>
+                ) : null}
+
+                {step === 2 ? (
+                  <Button
+                    variant="bakery"
+                    className="h-12 w-full text-base"
+                    onClick={onPersonalizeContinue}
+                    disabled={cartBlocked}
+                  >
+                    Continue to payment
+                  </Button>
+                ) : null}
+
+                {step === 3 ? (
+                  <Button
+                    variant="bakery"
+                    className="h-12 w-full text-base"
+                    onClick={onPlaceOrder}
+                    /*
+                      EVERY REASON LEFT HERE IS ONE THE CUSTOMER CAN SEE.
+
+                      `placing` shows a spinner in this button,
+                      `cartBlocked` draws the CartIssuesAlert, and the
+                      minimum-order clause draws its own alert. Each greys
+                      the button and each says why, on the screen, without
+                      a pointer.
+
+                      `!termsAccepted` used to be in this list and is not
+                      any more — it is the one gate with nothing visible
+                      behind it, and it is enforced in `onPlaceOrder`,
+                      which can put the reason under the box it is about.
+                    */
+                    disabled={
+                      placing ||
+                      cartBlocked ||
+                      (commerce.minOrderValue > 0 && totals.subtotal < commerce.minOrderValue)
+                    }
+                  >
+                    {placing ? <Loader2 className="size-4 animate-spin" /> : null}
+                    {placing ? (
+                      paymentMethod === "razorpay" ? "Processing payment…" : "Placing order…"
+                    ) : paymentMethod === "razorpay" ? (
+                      <>Pay {formatCurrency(totals.total)}</>
+                    ) : (
+                      <>Place order · {formatCurrency(totals.total)}</>
+                    )}
+                  </Button>
+                ) : null}
+
+                {/*
+                  THE WAY BACK, under the way on, never beside it.
+
+                  Only the first step names where it goes — "Back to cart"
+                  — because that one leaves the checkout route. The inner
+                  steps say "Back".
+                */}
+                {step === 1 ? (
+                  <Button
+                    variant="outline"
+                    className="h-11 w-full"
+                    render={<Link href={routes.store.cart} />}
+                  >
+                    Back to cart
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    className="h-11 w-full"
+                    onClick={() => goToStep((step - 1) as 1 | 2)}
+                  >
+                    Back
+                  </Button>
+                )}
               </div>
+              {/*
+                THE GIFT WRAP TICK AND THE COUPON BOX WERE HERE, AND ARE ON
+                THE CART.
+
+                The cart's "Order extras" card carries the wrap, and its
+                sidebar carries "Have a coupon?". Drawing both again put two
+                fresh decisions directly under the button that moves the
+                purchase on — on Address, again on Personalize, again on
+                Payment — which is the opposite of what that corner is for.
+
+                Nothing is lost by taking them out. An applied coupon still
+                shows as its own Discount line in the price panel on every
+                step, the wrap still shows in the totals when it is on, and
+                "Edit cart" sits in that panel's header on every step.
+
+                ONE BRANCH OF THE COUPON BOX STAYS, and it is not a prompt.
+                `couponLapsedReason` had exactly one consumer — the box
+                that just went — and CouponInput's own comment says what
+                losing it costs: "The discount is already gone from the
+                totals; this is the only thing on the page that admits it."
+                Without it, a code that stops applying part-way through
+                makes the total go UP with nothing explaining why.
+
+                So it renders only when a coupon is applied AND has lapsed,
+                which is the amber notice and nothing else. A working
+                coupon shows as a Discount line in the panel and nowhere
+                else; a dead one is reported.
+              */}
+              {coupon && couponLapsedReason ? (
+                <CouponInput
+                  cart={couponLines}
+                  applied={coupon}
+                  lapsedReason={couponLapsedReason}
+                  onApply={(next) => {
+                    setCoupon(next);
+                    persistDraft({ coupon: next });
+                  }}
+                  onRemove={() => {
+                    setCoupon(undefined);
+                    persistDraft({ coupon: undefined });
+                  }}
+                />
+              ) : null}
               {!getCustomerSession() ? (
                 <p className="text-center text-xs text-muted-foreground">
                   Have an account?{" "}
@@ -1534,16 +2499,42 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   );
 }
 
+/**
+ * A read-back, and the way back to change it.
+ *
+ * This rendered a title and its children and nothing else, so the screen that
+ * takes the money showed a customer their address, their delivery date and
+ * their payment method with no way to correct any of them — the only route
+ * back was the browser's own button, or a stepper circle two screens up.
+ *
+ * `onChange` is optional because not every block has somewhere to go: the
+ * notes are typed on this screen already.
+ */
 function ReviewBlock({
   title,
+  onChange,
   children,
 }: {
   title: string;
+  onChange?: () => void;
   children: React.ReactNode;
 }) {
   return (
     <div className="rounded-xl border border-border bg-cream-50 p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</p>
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</p>
+        {onChange ? (
+          <button
+            type="button"
+            onClick={onChange}
+            className="text-xs font-medium text-bakery-700 underline-offset-2 hover:underline"
+          >
+            {/* Named for what it changes, so three of these on one screen do
+                not all read "Change". */}
+            Change {title.toLowerCase()}
+          </button>
+        ) : null}
+      </div>
       <div className="mt-2 space-y-1">{children}</div>
     </div>
   );

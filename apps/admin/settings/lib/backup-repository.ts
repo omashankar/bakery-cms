@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import type { BackupSnapshot } from "@/types/backup";
 import type { AppSettings } from "@/types/settings";
 import type { CatalogStore } from "@/types/catalog";
@@ -125,8 +126,8 @@ async function pushSettingsSections(value: unknown): Promise<boolean> {
  *
  * A `bakery-cms-catalog` blob carrying no recognised section pushed nothing,
  * returned true, and was listed among the restored sections. Worse than the
- * settings case: `loadCatalogStore` substitutes `defaultCategories`,
- * `defaultFlavours`, `defaultOccasions` and `defaultWeightOptions` for every
+ * settings case: `loadCatalogStore` substitutes `defaultCategories` and
+ * `defaultOccasions` for every
  * section the blob is missing, so the admin was told their catalogue had been
  * restored while the demo seed sat in the cache waiting for the Catalog page's
  * next replace-all save to ship it to Mongo.
@@ -302,7 +303,7 @@ function notify(): void {
 
 function persist(snapshots: BackupSnapshot[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshots));
+  safeSetItem(STORAGE_KEY, JSON.stringify(snapshots));
   notify();
 }
 

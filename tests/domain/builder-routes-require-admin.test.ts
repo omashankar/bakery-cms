@@ -36,19 +36,13 @@ vi.mock("@/features/cms-sections/data/homepage-sections.server", () => ({
   saveDraftSections: vi.fn(async () => written),
 }));
 
-vi.mock("@/features/cms-sections/data/wedding-sections.server", () => ({
-  getWeddingState: vi.fn(async () => state),
-  publishWeddingSections: vi.fn(async () => written),
-  resetWeddingSections: vi.fn(async () => state),
-  saveWeddingDraft: vi.fn(async () => written),
-}));
 
 import * as homepageRoute from "@/app/api/homepage-sections/route";
-import * as weddingRoute from "@/app/api/wedding-sections/route";
+
 
 const ROUTES = [
   { what: "/api/homepage-sections", route: homepageRoute },
-  { what: "/api/wedding-sections", route: weddingRoute },
+
 ] as const;
 
 function signedOut() {

@@ -2,12 +2,7 @@ import { cache } from "react";
 
 import { writeAuditLog } from "@/lib/server/audit/audit-log";
 import { NotFoundError } from "@/lib/server/http/errors";
-import {
-  defaultCategories,
-  defaultFlavours,
-  defaultOccasions,
-  defaultWeightOptions,
-} from "@/features/catalog/lib/catalog-utils";
+import { catalogSectionDefaults } from "@/features/catalog/lib/catalog-utils";
 
 import * as repo from "./catalog.repository";
 
@@ -18,19 +13,28 @@ interface RequestCtx {
   actorEmail?: string;
 }
 
-/** Per-section defaults, used by resetSection. */
-const SECTION_DEFAULTS: Record<string, unknown> = {
-  categories: defaultCategories,
-  flavours: defaultFlavours,
-  occasions: defaultOccasions,
-  weights: defaultWeightOptions,
-};
+/**
+ * Per-section defaults, used by resetSection.
+ *
+ * Defined in catalog-utils so a test can hold it against the section schemas
+ * without dragging Mongoose in. A section missing from it has a Reset button
+ * that 404s, even with a schema registered and a route that accepts writes.
+ */
+const SECTION_DEFAULTS = catalogSectionDefaults;
 
 function toCatalog(json: Record<string, unknown>) {
   return {
+    /*
+      `?? []` for the same reason as collections below: a shop with no
+      departments has none, and inventing CAKES or FLOWERS would be this
+      software deciding what its trade is.
+    */
+    departments: json.departments ?? [],
     categories: json.categories ?? [],
-    flavours: json.flavours ?? [],
     occasions: json.occasions ?? [],
+    // `?? []` and not a default list: a shop with no collections has none,
+    // and inventing some would put groups on the storefront nobody made.
+    collections: json.collections ?? [],
     weights: json.weights ?? [],
     updatedAt: json.updatedAt,
   };

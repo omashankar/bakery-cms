@@ -146,6 +146,36 @@ const nextConfig: NextConfig = {
        */
       { source: "/", destination: "/store", permanent: false },
       { source: "/landing", destination: "/platform", permanent: true },
+      /*
+        THE SEARCH PAGE IS GONE; THE RESULTS ARE ON THE COLLECTIONS PAGE.
+
+        It was a page whose whole content was a second search box, a row of
+        five hardcoded bakery words, and a grid the collections page already
+        draws. The shop asked for the header box to land on results directly.
+
+        Next forwards the query string to the destination, so an indexed or
+        bookmarked /store/search?q=chocolate arrives as
+        /store/collections?q=chocolate and still finds what it went for.
+
+        Permanent: the page is not coming back, and the old address should
+        stop being fetched.
+      */
+      /*
+        A PRODUCT STOPPED BEING A CAKE.
+
+        Every product lived at /store/cakes/<slug>, which is wrong for a shop
+        that will sell flowers and mobiles. The page moved to /store/p/<slug>
+        and this keeps every link that already exists working: a bookmark, a
+        WhatsApp forward, a banner somebody typed by hand.
+
+        TEMPORARY (307), deliberately, and the note at the top of this list
+        says why: a browser caches a permanent redirect more or less for ever,
+        and the shop has not yet settled the address shape. Nothing is lost by
+        waiting — this site is currently `Disallow: /` in robots.txt, so
+        there is no search ranking to transfer either way.
+      */
+      { source: "/store/cakes/:slug", destination: "/store/p/:slug", permanent: false },
+      { source: "/store/search", destination: "/store/collections", permanent: true },
       { source: "/admin/website", destination: "/admin/settings", permanent: true },
       { source: "/admin/website/homepage", destination: "/admin/builders/homepage", permanent: true },
       { source: "/admin/website/header", destination: "/admin/header", permanent: true },

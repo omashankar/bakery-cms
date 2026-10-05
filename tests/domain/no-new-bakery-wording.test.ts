@@ -1,0 +1,411 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join, sep } from "node:path";
+
+import { describe, expect, it } from "vitest";
+
+/**
+ * The ratchet. 190 surfaces named the goods for the shop; this stops the 191st.
+ *
+ * The mechanism to avoid that — `resolveLabels`, `useBusinessLabels`,
+ * `getServerLabels` — has worked for the whole life of the project, and 190
+ * places still ignored it, because nothing ever said so. Every one was written
+ * by somebody who could see that this shop was a bakery.
+ *
+ * This scans the text a HUMAN READS for trade words and fails on anything not
+ * in the allowlist below. The allowlist is the interesting half: each entry is a
+ * place where naming the trade is correct, with the reason. Adding to it should
+ * feel like a decision, because it is one.
+ *
+ * What it deliberately does not scan: identifiers (`cake.price`, `CakeEntity`,
+ * `/admin/cakes`), CSS tokens (the palette is literally named `bakery-700`),
+ * search keywords, comments, and test files. Those are names for the code, or
+ * words typed INTO the app rather than shown by it.
+ */
+
+const ROOT = process.cwd();
+
+/** Where a shop's customers and staff actually read text. */
+const SCANNED = [
+  "apps/admin",
+  "apps/website",
+  "components/storefront",
+  "components/shared",
+  "features/orders/lib",
+  "features/commerce/lib",
+  "features/checkout",
+  "features/customer-auth/server",
+  "features/uploads/server",
+  "features/payments/registry",
+  "features/media/lib",
+  /*
+    ADDED 2026-10-01. Nineteen trade words lived in `features/seo/lib` — page
+    titles, descriptions and keyword lists that every shop is BORN with and
+    that Google reads first. A ratchet built to stop the 191st surface could
+    not see any of them.
+  */
+  "features/seo",
+  "app",
+  "lib/admin-breadcrumbs.ts",
+  /**
+   * The photo-print layout keeps BOTH sides' words: the refusals a customer
+   * reads ("That photo is too large") and the outline names a shop picks from
+   * ("Round", "Square", "Heart"). It sits in lib/ because it is geometry, not
+   * because it is invisible.
+   */
+  "lib/images",
+  "constants/section-registry.ts",
+  "features/cms-sections",
+];
+
+/**
+ * Naming the trade is RIGHT in these places. Each needs a reason, and "it was
+ * already like that" is not one.
+ */
+/**
+ * `only` narrows an allowance to ONE string.
+ *
+ * Without it an entry forgives its whole file, which is how a `why` reading
+ * "It is the only match in the file" came to cover a second one nobody had
+ * argued for. Give it whenever the reason is about a particular sentence.
+ */
+const ALLOWED: { path: string; why: string; only?: string | string[] }[] = [
+  {
+    path: "apps/admin/settings/components/modules-settings-page",
+    why: "the optional modules ARE bakery product fields — flavour, egg preference, weight, shape, photo cake. Naming them is what tells a florist which to switch off.",
+  },
+  {
+    path: "app/(admin)/admin/settings/modules/page",
+    why: "that page's own metadata, describing the same modules.",
+  },
+  {
+    path: "apps/website/pages/search-page",
+    why: "the Photo Cake quick-search chip: gated on the photoCake module and filtered against the catalogue, so it shows only where it finds something.",
+  },
+  /*
+    THREE ENTRIES STOOD HERE and protected nothing.
+
+    `settings-overview-page`, `product-variant-manager` and
+    `product-detail-page` were each allowed for a bakery word that has since
+    been removed — the Type control offers only Shape and Custom now, the
+    settings index stopped listing the modules by their food names, and the
+    upload panel is captioned “Printed photo”. Replaying this guard's own
+    matcher over all three finds zero offenders, so the entries exempted
+    2,557 lines to defend nothing: whatever drifted into them next would
+    have passed.
+
+    An allowance is a debt. It has to be re-read when the reason for it goes.
+  */
+  {
+    path: "apps/admin/products/components/product-form-page",
+    why: "one placeholder, deliberately naming one edible thing and one not — 'Chocolate Truffle Cake, 65W Type-C Charger' — so the box shows a shop that this field is not about cake. It is the only match in the file, and `only` is what keeps that true.",
+    only: "e.g. Chocolate Truffle Cake, 65W Type-C Charger",
+  },
+  {
+    /**
+     * TWO SECTION TYPES THAT REALLY ARE BAKERY ONES.
+     *
+     * `photo-cakes` and `eggless` are bakery slugs frozen into the section
+     * type — the renderer says so where it dispatches them, and they stay
+     * only because layouts already published carry them. `category-rail` is
+     * what a shop adds instead, and it picks the category from the shop's
+     * own list. So these four strings name two legacy rows, the way the
+     * wedding row keeps its own name; every other line in this file is
+     * copy shipped to every trade, and stays inside the ratchet.
+     */
+    path: "constants/section-registry.ts",
+    why: "two legacy bakery section types, kept for layouts already published — a shop adds a Category row instead.",
+    only: ["Photo Cakes", "Shop Photo Cakes", "Eggless Cakes"],
+  },
+  {
+    path: "features/design-system",
+    why: "the vendor's own component gallery, not a shop surface.",
+  },
+  {
+    path: "app/design-system/page",
+    why: "the same gallery's metadata.",
+  },
+  /**
+   * The PRODUCT is called Bakery CMS. That is the vendor's name for the software,
+   * not a shop's name for its goods — `AppBrand` says so, and the admin sidebar
+   * already passes the shop's own name instead. Renaming the product is a real
+   * decision and a separate one; it does not belong to this guard.
+   */
+  { path: "components/shared/app-brand", why: "the product's own name." },
+  { path: "app/page", why: "the product's marketing metadata." },
+  { path: "app/(admin)/admin/page", why: "the product's admin metadata." },
+  {
+    path: "app/platform",
+    why: "the product's own marketing site and docs — pages about the CMS, read by the shop owners it is sold to.",
+  },
+  /**
+   * A HISTORICAL RECORD, not wording. `LEGACY_SEEDED_CONTACT` lists the demo
+   * address and phone this install once shipped, so a shop still holding them
+   * un-edited does not start publishing them as its own. I "fixed" the address
+   * here once and contact-details-are-the-shops-own caught it: rewriting the
+   * list is exactly how the guarantee breaks.
+   */
+  {
+    path: "apps/website/lib/shipped-placeholder",
+    why: "the values this install used to ship, kept verbatim so they can still be rejected.",
+  },
+];
+
+/**
+ * Words that name the trade rather than the goods.
+ *
+ * `baked` and `baking` are in here because "freshly baked" was the single most
+ * common claim in the sweep, and it is a claim about GOODS a shop may not sell —
+ * not a label anything could substitute.
+ */
+const TRADE = /\b(cakes?|bakery|bakers?|bake[ds]?|baking|patisserie|pastries|confections?)\b/i;
+
+/** Wedding cakes are a separately gated FEATURE that keeps its own name. */
+const WEDDING = /wedding/i;
+
+function walk(target: string, out: string[]) {
+  let entries;
+  try {
+    entries = readdirSync(target, { withFileTypes: true });
+  } catch {
+    out.push(target); // a file, not a directory
+    return;
+  }
+  for (const entry of entries) {
+    const full = join(target, entry.name);
+    if (entry.isDirectory()) {
+      if (!/node_modules|[.]next|[.]git/.test(entry.name)) walk(full, out);
+    } else if (/[.]tsx?$/.test(entry.name) && !/[.]test[.]/.test(entry.name)) {
+      out.push(full);
+    }
+  }
+}
+
+/**
+ * Text a human reads: string literals and bare JSX prose. Not code.
+ *
+ * Telling those apart one line at a time is the whole difficulty. A first cut
+ * matched any indented line starting with a letter, and swept up `cakeId:
+ * cake.id,` and `tally.set(cake.categoryId, ...)` — identifiers, reported as
+ * though a customer read them. Prose is the text carrying none of the
+ * punctuation code needs.
+ */
+export function readableStrings(line: string): string[] {
+  if (/^\s*(\/\/|\*|\/\*)/.test(line)) return [];
+  if (/^import |from ["']/.test(line)) return [];
+  // The colour palette is named `bakery-700`; those are class names.
+  if (/-bakery-|bakery-\d/.test(line)) return [];
+  // A line that reaches into a product or a route is code ABOUT cakes, not
+  // words a shop shows.
+  if (/\bcakes?\s*[.[]|routes\.|\bCake[A-Z]/.test(line)) return [];
+  // Search keywords are typed INTO the app, not read from it. The command
+  // palette keeps "cake" matchable on purpose, so a rename cannot orphan a row.
+  if (/\bkeywords:/.test(line)) return [];
+
+  const found: string[] = [];
+  for (const match of line.matchAll(/"([^"]{4,160})"|`([^`]{4,160})`/g)) {
+    found.push(match[1] || match[2] || "");
+  }
+  // Bare JSX prose: indented, opens with a letter, and carries none of the
+  // punctuation that would make it an expression.
+  const bare = line.match(/^\s{4,}([A-Za-z][^<>{}"`=;:()[\]$]{6,120})$/);
+  if (bare && !/\b(const|let|return|import|export|await)\b/.test(bare[1])) {
+    found.push(bare[1]);
+  }
+
+  /**
+   * JSX text sharing a line with its own tags.
+   *
+   * `<CardDescription>Primary ways customers can reach your bakery.</CardDescription>`
+   * — invisible to both readers above. The quoted-string one finds no quotes,
+   * and the bare-prose one needs the line to OPEN with a letter, which this
+   * opens with "<". A sentence the shop reads, on a screen in a CMS sold to any
+   * trade, that the ratchet was structurally unable to see.
+   *
+   * Bounded the same way the bare-prose branch is: text carrying the
+   * punctuation an expression needs is code, not words.
+   */
+  /**
+   * Up to three leading non-letters, so a BULLETED line is visible.
+   *
+   * This required the first character after `>` to be a letter, which made
+   * every `<li>• …</li>` in the repo invisible to the entire ratchet — and a
+   * bulleted list is exactly where a screen enumerates what it does.
+   * "Step-by-step bakery fulfillment timeline" sat on a customer-facing
+   * tracking page through every run of this guard.
+   *
+   * Replayed over all the files this walks, the widened form finds that one
+   * line and nothing else — the bound stays tight enough not to start
+   * matching attribute values and template fragments.
+   */
+  for (const inline of line.matchAll(/>[^A-Za-z<>{}"`=$]{0,3}([A-Za-z][^<>{}"`=$]{5,160})</g)) {
+    found.push(inline[1]!);
+  }
+
+  return found.filter((text) => {
+    const trimmed = text.trim();
+    if (!TRADE.test(trimmed)) return false;
+    // Slugs, ids, routes, class strings — names for the code.
+    if (/^[a-z0-9-/.]+$/.test(trimmed)) return false;
+    if (/[${}]|=>/.test(trimmed)) return false;
+    if (/^(flex|grid|rounded|border|hover:|sm:|md:|lg:|text-|bg-|size-)/.test(trimmed)) {
+      return false;
+    }
+    if (WEDDING.test(trimmed)) return false;
+    return true;
+  });
+}
+
+/**
+ * The lines of a file that are not inside a block comment.
+ *
+ * Per-line matching cannot see this: the continuation lines of a `/* … *\/` or a
+ * JSX `{/* … *\/}` are prose starting with a letter, and this repo comments
+ * heavily — a dozen explanations of the very bug being fixed were reported as
+ * the bug.
+ */
+export function codeLines(source: string): { line: string; number: number }[] {
+  const out: { line: string; number: number }[] = [];
+  let inBlock = false;
+  source.split(/\r?\n/).forEach((line, index) => {
+    const opens = line.includes("/*");
+    const closes = line.includes("*/");
+    if (inBlock) {
+      if (closes) inBlock = false;
+      return;
+    }
+    if (opens && !closes) {
+      inBlock = true;
+      return;
+    }
+    out.push({ line, number: index + 1 });
+  });
+  return out;
+}
+
+describe("no new bakery wording on a shop surface", () => {
+  const files: string[] = [];
+  for (const target of SCANNED) walk(join(ROOT, target), files);
+
+  const offenders: string[] = [];
+  for (const file of files) {
+    const rel = file.slice(ROOT.length + 1).split(sep).join("/");
+    /**
+     * A path, not a PREFIX of one.
+     *
+     * `startsWith` made `{ path: "app/(admin)/admin/page" }` — written for one
+     * metadata export — exempt four files: that page plus the whole CMS Pages
+     * editor at `app/(admin)/admin/pages/…`. A `why` about a browser tab was
+     * silently covering an admin route group, because one string happened to
+     * begin with the other.
+     *
+     * An entry may still name a DIRECTORY; it just has to end at a boundary.
+     */
+    const allowance = ALLOWED.find(
+      (entry) =>
+        rel === entry.path ||
+        rel.startsWith(`${entry.path}.`) ||
+        rel.startsWith(`${entry.path}/`),
+    );
+
+    /**
+     * An allowance that names its STRING forgives that string and nothing else.
+     *
+     * Every entry used to exempt its whole file, however narrow the reason it
+     * gave. `product-form-page`'s says in as many words "It is the only match in
+     * the file" — and a second one was written into that file, shipped, and
+     * caught by a mutation rather than by this. A guard whose allowlist grows
+     * silently is the shape of guard this project keeps finding broken.
+     *
+     * A file-wide allowance is still allowed, because some are honestly
+     * file-wide: the vendor's own marketing pages, a historical record kept
+     * verbatim. Those simply give no `only`.
+     */
+    if (allowance && !allowance.only) continue;
+
+    for (const { line, number } of codeLines(readFileSync(file, "utf8"))) {
+      for (const text of readableStrings(line)) {
+        /*
+          `only` may name SEVERAL strings now, and still forgives nothing
+          else. One file can hold two narrow reasons — the section registry
+          names two legacy bakery section TYPES — and a single string forced
+          the choice between listing one of them and forgiving the file.
+        */
+        const only = allowance?.only;
+        const forgiven = only
+          ? (Array.isArray(only) ? only : [only]).some((one) => text.includes(one))
+          : false;
+        if (forgiven) continue;
+        offenders.push(`${rel}:${number}  ${text.trim().slice(0, 90)}`);
+      }
+    }
+  }
+
+  it("finds none", () => {
+    expect(
+      offenders,
+      offenders.length
+        ? `\nA shop that does not sell cakes would read these:\n\n${offenders.join("\n")}\n\n` +
+            "Use the shop's own word — `useBusinessLabels()` in a client component, " +
+            "`getServerLabels()` on the server, or a labels parameter for a pure module. " +
+            "If naming the trade really is right here, add the file to ALLOWED with the reason.\n"
+        : undefined,
+    ).toEqual([]);
+  });
+
+  it("scans enough files to mean something", () => {
+    // A walk that silently found nothing would pass the case above forever.
+    expect(files.length).toBeGreaterThan(200);
+  });
+
+  it("would catch a new one", () => {
+    // The matcher, exercised directly — so "finds none" cannot go green because
+    // the matching quietly stopped working.
+    expect(readableStrings('  const t = "Add a cake to your order";')).toEqual([
+      "Add a cake to your order",
+    ]);
+    expect(readableStrings("        Freshly baked every morning")).toEqual([
+      "Freshly baked every morning",
+    ]);
+
+    /**
+     * A BULLETED line, which this could not see at all.
+     *
+     * The matcher required a letter immediately after `>`, so every
+     * `<li>• …</li>` in the repo was invisible to the whole ratchet — and a
+     * bulleted list is exactly where a screen enumerates what it does. This
+     * exact string sat on the customer's own order-tracking page, under "What
+     * you can track", through every green run of this guard.
+     */
+    expect(readableStrings("      <li>• Step-by-step bakery fulfillment timeline</li>")).toEqual([
+      "Step-by-step bakery fulfillment timeline",
+    ]);
+    // Other list markers a designer might reach for, so the fix is not
+    // bullet-shaped by accident.
+    expect(readableStrings("  <li>— Freshly baked every morning</li>")).toEqual([
+      "Freshly baked every morning",
+    ]);
+
+    // And the kinds of false positive it must keep ignoring.
+    expect(readableStrings('  <p className="text-bakery-700">Hi</p>')).toEqual([]);
+    // The widening is THREE characters, not a wildcard — a bound, so it stays
+    // a fix for list markers rather than becoming "skip anything up front".
+    expect(readableStrings("  <li>—— • Freshly baked cakes</li>")).toEqual([]);
+    expect(readableStrings("  // a comment about cakes")).toEqual([]);
+    expect(readableStrings('  const w = "Wedding Cakes";')).toEqual([]);
+    expect(readableStrings("      cakeId: cake.id,")).toEqual([]);
+    expect(readableStrings('    keywords: ["photo cake", "wedding"],')).toEqual([]);
+  });
+
+  it("does not read a block comment as prose", () => {
+    const source = [
+      "const a = 1;",
+      "/*",
+      "  A shop selling cakes AND chargers had no honest answer.",
+      "*/",
+      "const b = 2;",
+    ].join("\n");
+
+    expect(codeLines(source).map((entry) => entry.number)).toEqual([1, 5]);
+  });
+});
+

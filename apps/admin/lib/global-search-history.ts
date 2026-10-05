@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import type { GlobalSearchResult } from "./global-search";
 
 const STORAGE_KEY = "bakery-cms-global-search-recent";
@@ -42,7 +43,7 @@ export function recordRecentSearch(result: GlobalSearchResult): void {
     ...loadRecentSearches().filter((item) => item.id !== result.id),
   ].slice(0, MAX_RECENT);
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  safeSetItem(STORAGE_KEY, JSON.stringify(next));
 }
 
 export function clearRecentSearches(): void {
@@ -50,11 +51,23 @@ export function clearRecentSearches(): void {
   localStorage.removeItem(STORAGE_KEY);
 }
 
-export function recentSearchToResult(entry: RecentSearchEntry): GlobalSearchResult {
+/**
+ * A stored row, re-titled from the LIVE wording where there is one.
+ *
+ * `recordRecentSearch` persists the title that was rendered at the time, which
+ * is right for a product or an order — that text is data — and wrong for the
+ * palette’s own chrome. Without `liveTitle`, a shop that renames its products
+ * still opens Ctrl+K to "Add new cake" on every machine where somebody once
+ * clicked it, forever, and no unit test or fresh browser would ever show it.
+ */
+export function recentSearchToResult(
+  entry: RecentSearchEntry,
+  liveTitle?: string,
+): GlobalSearchResult {
   return {
     id: entry.id,
     group: entry.group,
-    title: entry.title,
+    title: liveTitle ?? entry.title,
     subtitle: entry.subtitle,
     href: entry.href,
   };

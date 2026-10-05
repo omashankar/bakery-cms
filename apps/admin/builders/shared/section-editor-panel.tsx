@@ -8,7 +8,7 @@ import type {
   SectionBackground,
   SectionFieldDef,
 } from "@/types/homepage-builder";
-import { parseHeroSlides, parseListField } from "@/constants/section-registry";
+import { parseHeroSlides, parseListField, rowFlag } from "@/constants/section-registry";
 import { routes } from "@/constants/routes";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,15 @@ interface SectionEditorPanelProps<T extends BuilderEditableSection> {
   section: T | null;
   onChange: (section: T) => void;
   resolveEntry: (type: T["type"]) => { label: string; fields: SectionFieldDef[] } | undefined;
-  settingsNote?: string;
+  /**
+   * REQUIRED, so nobody inherits a sentence about somebody else's screen.
+   *
+   * The default here read "Product and catalog data still comes from the mock
+   * store until the CMS content layer is fully connected" — untrue since the
+   * builders were wired to the real catalogue, and it would have rendered on
+   * any third builder added later. Both existing callers pass a real one.
+   */
+  settingsNote: string;
 }
 
 /** Repeatable editor for the hero carousel's slides (stored as JSON in content). */
@@ -81,6 +89,8 @@ function ListField({
 
   const removeRow = (index: number) => commit(rows.filter((_, i) => i !== index));
 
+  const atCap = typeof field.maxItems === "number" && rows.length >= field.maxItems;
+
   const moveRow = (index: number, direction: -1 | 1) => {
     const target = index + direction;
     if (target < 0 || target >= rows.length) return;
@@ -93,10 +103,28 @@ function ListField({
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
         <Label className="text-xs">{field.label}</Label>
-        <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={addRow}>
-          <Plus className="size-3.5" />
-          Add
-        </Button>
+        {/*
+          THE CAP IS SHOWN, not just enforced. A disabled Add with nothing
+          saying why reads as a bug, and the admin looks for the fault
+          instead of reading the count.
+        */}
+        <div className="flex items-center gap-2">
+          {atCap ? (
+            <span className="text-xs text-muted-foreground">
+              {field.maxItems} maximum
+            </span>
+          ) : null}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 px-2 text-xs"
+            onClick={addRow}
+            disabled={atCap}
+          >
+            <Plus className="size-3.5" />
+            Add
+          </Button>
+        </div>
       </div>
 
       {keyed.length === 0 ? (
@@ -148,32 +176,90 @@ function ListField({
                   key={column.key}
                   id={`${field.key}-${id}-${column.key}`}
                   label={column.label}
+                  hint={column.hint}
                   value={row[column.key] ?? ""}
                   onChange={(next) => updateRow(index, column.key, next)}
                 />
-              ) : column.type === "select" ? (
-                <select
+              ) : column.type === "boolean" ? (
+                /*
+                  A TICKBOX, not a text box.
+
+                  Every other column here is a string, so a boolean column
+                  fell through to the Input below and an admin had to type
+                  the word `true` to widen a card — and typing `false` to
+                  narrow it did nothing, because a non-empty string is
+                  truthy. `rowFlag` is the matching reader.
+                */
+                <div
                   key={column.key}
-                  aria-label={column.label}
-                  className="h-9 w-full rounded-lg border border-border bg-background px-2 text-sm"
-                  value={row[column.key] ?? ""}
-                  onChange={(event) => updateRow(index, column.key, event.target.value)}
+                  className="flex items-center justify-between rounded-lg border border-border px-3 py-2"
                 >
-                  {(column.options ?? []).map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                  <Label htmlFor={`${field.key}-${id}-${column.key}`}>{column.label}</Label>
+                  <Switch
+                    id={`${field.key}-${id}-${column.key}`}
+                    checked={rowFlag(row[column.key])}
+                    onCheckedChange={(checked) =>
+                      updateRow(index, column.key, checked ? "true" : "false")
+                    }
+                  />
+                </div>
+              ) : column.type === "select" ? (
+                /*
+                  A LABEL THAT STAYS.
+
+                  These two carried their name in `aria-label` and the
+                  placeholder only, so the moment an admin typed anything the
+                  name vanished. The picture and tickbox columns beside them
+                  have always had a visible one. On a row of four fields —
+                  which the banner grid has, eight times over — two boxes of
+                  filled-in text with nothing saying which is which is a
+                  screen you have to guess at.
+                */
+                <div key={column.key} className="space-y-1">
+                  <Label htmlFor={`${field.key}-${id}-${column.key}`} className="text-xs">
+                    {column.label}
+                  </Label>
+                  <select
+                    id={`${field.key}-${id}-${column.key}`}
+                    className="h-9 w-full rounded-lg border border-border bg-background px-2 text-sm"
+                    value={row[column.key] ?? ""}
+                    onChange={(event) => updateRow(index, column.key, event.target.value)}
+                  >
+                    {/*
+                      A BLANK CHOICE, FIRST, AND ONLY WHEN NOTHING IS PICKED.
+
+                      A new row starts every column at "", which matches no
+                      option — so the browser showed the FIRST category with
+                      nothing stored behind it. A shop reads that as a pick it
+                      has made, saves, and the band renders nothing for a row
+                      it believes it filled in.
+
+                      It disappears once something is chosen, so it cannot be
+                      picked back by accident.
+                    */}
+                    {row[column.key] ? null : (
+                      <option value="">Choose…</option>
+                    )}
+                    {(column.options ?? []).map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               ) : (
-                <Input
-                  key={column.key}
-                  className="h-9 text-sm"
-                  aria-label={column.label}
-                  placeholder={column.placeholder ?? column.label}
-                  value={row[column.key] ?? ""}
-                  onChange={(event) => updateRow(index, column.key, event.target.value)}
-                />
+                <div key={column.key} className="space-y-1">
+                  <Label htmlFor={`${field.key}-${id}-${column.key}`} className="text-xs">
+                    {column.label}
+                  </Label>
+                  <Input
+                    id={`${field.key}-${id}-${column.key}`}
+                    className="h-9 text-sm"
+                    placeholder={column.placeholder ?? column.label}
+                    value={row[column.key] ?? ""}
+                    onChange={(event) => updateRow(index, column.key, event.target.value)}
+                  />
+                </div>
               ),
             )}
           </div>
@@ -200,9 +286,17 @@ function SlidesField({
     commit([
       ...slides,
       {
-        headline: "New slide",
+        /*
+          BLANK, not "New slide" and "Shop Now".
+
+          Both were placeholder words that publish: the headline renders as a
+          heading on the live homepage until somebody notices, and the button
+          label overrides the fallback that would otherwise name whatever the
+          shop actually sells. An empty label is the one that adapts.
+        */
+        headline: "",
         subtext: "",
-        primaryLabel: "Shop Now",
+        primaryLabel: "",
         primaryHref: routes.store.collections,
         imageUrl: "",
       },
@@ -328,12 +422,55 @@ function SlidesField({
               />
             </div>
           </div>
+          {/*
+            WIDE AND UNCROPPED, because a hero slide is the one picture whose
+            own edges carry the message. The default 16:9 cover preview cut a
+            4.8:1 banner down to its middle in the very control used to upload
+            it, so the admin could not see what a customer would get.
+          */}
           <PhotoField
             id={`slide-${index}-image`}
             label="Slide image"
             value={slide.imageUrl ?? ""}
             onChange={(next) => updateSlide(index, { imageUrl: next })}
+            aspect="wide"
+            fit="contain"
           />
+          <PhotoField
+            id={`slide-${index}-mobile-image`}
+            label="Phone image (optional)"
+            value={slide.mobileImageUrl ?? ""}
+            onChange={(next) => updateSlide(index, { mobileImageUrl: next })}
+            fit="contain"
+          />
+          {/*
+            Says what it is for. A wide banner on a phone is either cropped to
+            its middle or shrunk to a strip, and neither is fixable in CSS —
+            the answer is a differently composed picture.
+          */}
+          <p className="-mt-1 text-xs text-muted-foreground">
+            Used below 640px. Leave blank and the wide image shows whole,
+            which on a phone is short.
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor={`slide-${index}-alt`}>Image description</Label>
+            <Input
+              id={`slide-${index}-alt`}
+              value={slide.imageAlt ?? ""}
+              onChange={(e) => updateSlide(index, { imageAlt: e.target.value })}
+              placeholder="Optional"
+            />
+            {/*
+              Says WHEN it matters rather than asking for it every time. A
+              slide whose words are real text beside the picture needs
+              nothing here; a banner with the words drawn into the artwork
+              carries them nowhere else, and a reader gets silence.
+            */}
+            <p className="text-xs text-muted-foreground">
+              Needed when the words are part of the picture — it is what a
+              screen reader reads out.
+            </p>
+          </div>
         </div>
       ))}
 
@@ -411,6 +548,7 @@ function renderField<T extends BuilderEditableSection>(
         key={field.key}
         id={field.key}
         label={field.label}
+        hint={field.hint}
         value={String(value ?? "")}
         onChange={(next) => updateContent(field.key, next)}
         placeholder={field.placeholder}
@@ -450,7 +588,7 @@ export function SectionEditorPanel<T extends BuilderEditableSection>({
   section,
   onChange,
   resolveEntry,
-  settingsNote = "Product and catalog data still comes from the mock store until the CMS content layer is fully connected.",
+  settingsNote,
 }: SectionEditorPanelProps<T>) {
   if (!section) {
     return (
@@ -527,6 +665,11 @@ export function SectionEditorPanel<T extends BuilderEditableSection>({
               >
                 <option value="white">White</option>
                 <option value="cream">Cream</option>
+                <option value="panel">Card — neutral</option>
+                <option value="panel-rose">Card — rose</option>
+                <option value="panel-mint">Card — mint</option>
+                <option value="panel-sand">Card — sand</option>
+                <option value="panel-sky">Card — sky</option>
               </AdminSelect>
             </div>
             <p className="text-xs leading-relaxed text-muted-foreground">{settingsNote}</p>

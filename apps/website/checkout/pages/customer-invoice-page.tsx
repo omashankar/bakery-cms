@@ -164,7 +164,6 @@ export function CustomerInvoicePage({ orderNumber, settings }: CustomerInvoicePa
           // designer was set to — asserting a tax document above a page that
           // may correctly be headed plain "Invoice", for a shop with no
           // registration number to put on one.
-          description={`${settings.invoiceTitle || "Invoice"} for order ${order.orderNumber}.`}
           breadcrumbs={[
             { label: "Order", href: routes.store.orderDetail(order.orderNumber) },
             { label: "Invoice" },

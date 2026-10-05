@@ -1,41 +1,26 @@
-import { routes } from "./routes";
-
 export interface MegaMenuLink {
   label: string;
   href: string;
   description?: string;
 }
 
-export const shopMegaMenu = {
-  categories: [
-    { label: "All Cakes", href: routes.store.collections },
-    { label: "Birthday Cakes", href: routes.store.collection("birthday") },
-    { label: "Wedding Cakes", href: routes.store.weddingCakes },
-    { label: "Photo Cakes", href: routes.store.collection("photo-cakes") },
-    { label: "Eggless Cakes", href: routes.store.collection("eggless") },
-    { label: "Seasonal", href: routes.store.collection("seasonal") },
-    { label: "Best Sellers", href: `${routes.store.collections}?sort=popular` },
-  ] satisfies MegaMenuLink[],
-  /**
-   * These are hardcoded, and the catalogue they point into is not — so every
-   * entry here is a promise this file cannot keep on its own.
-   *
-   * "Kids Party" used to sit at the end, pointing at a "custom" category. A shop
-   * that has no such category — and the seeded catalogue is one — served a menu
-   * item that opened "0 cakes". Add an entry here only when the slug is one the
-   * shop is guaranteed to have; anything shop-specific belongs in the catalogue,
-   * where deleting the category also removes the way in.
-   */
-  occasions: [
-    { label: "Birthday", href: routes.store.collection("birthday") },
-    { label: "Anniversary", href: routes.store.collection("anniversary") },
-    { label: "Wedding", href: routes.store.weddingCakes },
-  ] satisfies MegaMenuLink[],
-  featured: {
-    title: "Seasonal Collection",
-    description: "Limited-edition flavours for this season.",
-    href: routes.store.collection("seasonal"),
-    image:
-      "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=400&h=500&fit=crop",
-  },
-};
+/*
+  `shopMegaMenu` stood here: a hardcoded Shop menu — seven bakery category
+  links, three occasion links and a fixed "Seasonal Collection" promo card with
+  a stock photo of somebody else's cake.
+
+  Every entry was a promise this file could not keep, and the file said so
+  itself, in a comment above the occasions list: "These are hardcoded, and the
+  catalogue they point into is not." A shop that had no `photo-cakes` category
+  served a menu row that opened an empty grid; a shop that created one got no
+  row at all; and a florist got five cake pages.
+
+  All three columns read the shop's own data now — categories and occasions
+  from the catalogue via `getStorefrontChrome`, and the promo card is whichever
+  of the shop's categories has a picture it uploaded, or nothing. The fallback
+  a brand-new shop with no categories sees is down to the two rows that are
+  true for any shop at all: everything, and the best-selling of it.
+
+  `MegaMenuLink` stays because the menu still has a shape; the DATA is what had
+  no business being in constants.
+*/

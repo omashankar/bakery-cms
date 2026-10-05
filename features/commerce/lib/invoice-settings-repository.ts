@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import type { InvoiceSettings, InvoiceSettingsFormData } from "@/types/invoice";
 import {
   defaultInvoiceSettings,
@@ -23,7 +24,7 @@ function emitUpdated(): void {
 
 function writeSettings(settings: InvoiceSettings): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  safeSetItem(STORAGE_KEY, JSON.stringify(settings));
   emitUpdated();
 }
 
@@ -36,7 +37,7 @@ export function loadInvoiceSettings(): InvoiceSettings {
   if (!raw || version !== String(STORAGE_VERSION)) {
     const seeded = { ...defaultInvoiceSettings, updatedAt: nowIso() };
     writeSettings(seeded);
-    localStorage.setItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
+    safeSetItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
     return seeded;
   }
 
@@ -55,7 +56,7 @@ export async function saveInvoiceSettings(
     updatedAt: nowIso(),
   };
   writeSettings(next);
-  localStorage.setItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
+  safeSetItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
   return { value: next, persisted: await saveInvoiceSettingsRequest(data) };
 }
 
@@ -63,13 +64,13 @@ export async function saveInvoiceSettings(
 export function persistServerInvoiceSettings(data: Partial<InvoiceSettings>): void {
   writeSettings(mergeInvoiceSettings(data));
   if (typeof window !== "undefined") {
-    localStorage.setItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
+    safeSetItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
   }
 }
 
 export function resetInvoiceSettings(): InvoiceSettings {
   const seeded = { ...defaultInvoiceSettings, updatedAt: nowIso() };
   writeSettings(seeded);
-  localStorage.setItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
+  safeSetItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
   return seeded;
 }

@@ -3,6 +3,32 @@ import { expect, test } from "@playwright/test";
 import { connect } from "./shop-state";
 
 /**
+ * The shop's OWN plural noun, read from its settings.
+ *
+ * Two assertions in this file were written as /no cakes found/i and
+ * /no cakes in/i. The page renders the shop's configured plural, and this
+ * shop's override is "products" — so one failed outright and reported that an
+ * emptied page has no empty state when it has one, and the other asserted the
+ * ABSENCE of a phrase that can never appear, passing whether or not the bug it
+ * guards was present.
+ *
+ * Hardcoding a trade noun in a CMS that sells anything is the defect this whole
+ * project has been removing. A test may not do it either.
+ */
+async function shopProductsWord(): Promise<string> {
+  try {
+    const db = await connect();
+    const settings = await db.collection("settings").findOne({});
+    const override = (
+      settings as { labelOverrides?: { productWordPlural?: string } } | null
+    )?.labelOverrides?.productWordPlural;
+    return (override ?? "products").trim().toLowerCase() || "products";
+  } catch {
+    return "products";
+  }
+}
+
+/**
  * The category pages, in a browser.
  *
  * This shop's three wedding cakes cost ₹12,499, ₹15,999 and ₹18,999, and the
@@ -22,21 +48,49 @@ test.describe("browsing a category", () => {
     // that says it has cakes and shows none.
     await expect(page.getByRole("heading", { name: /wedding/i }).first()).toBeVisible();
 
-    const cards = page.locator('a[href^="/store/cakes/"]');
+    const cards = page.locator('a[href^="/store/p/"]');
     await expect(cards.first(), "the wedding cakes were filtered off their own page").toBeVisible();
 
-    // And they are the expensive ones — the count line is the shop's own claim
-    // about how many it is showing.
-    await expect(page.getByText(/showing [1-9]\d* of [1-9]\d*/i)).toBeVisible();
+    /*
+      And they are the expensive ones — the count is the shop's own claim
+      about how many it has.
+
+      IT USED TO READ "Showing 8 of 10", and that said two things, one of them
+      about pagination, which nobody asked. The bar prints the TOTAL, and the
+      second number only while a filter or a search is narrowing — so a
+      category with nothing filtered now reads "4 products". The assertion
+      follows the wording and keeps the claim: a real, non-zero count is on
+      the page.
+    */
+    await expect(page.getByText(/\b[1-9]\d* [a-z]+\b/i).first()).toBeVisible();
+    const countLine = await page
+      .getByText(/^\((?:[1-9]\d* of )?[1-9]\d* [a-z]+\)$/i)
+      .first()
+      .textContent();
+    expect(countLine, "the bar states no count at all").toMatch(/[1-9]\d*/);
   });
 
   test("does not claim a filter is active when the slider is at the top", async ({ page }) => {
     await page.goto("/store/collections");
 
-    // The desktop panel labels the slider's position. At the top it must not
-    // read as a limit — "Up to ₹19,000" next to an unfiltered grid says the
-    // customer is being shown a subset when they are not.
-    await expect(page.getByText(/any price/i).first()).toBeVisible();
+    /*
+      THE PRICE CONTROL IS A BAND NOW, in the bar.
+
+      It was a slider in a 240px sidebar; the shop asked for the reference's
+      bar and for no other filters, so the panel came off this page and price
+      is one dropdown of catalogue-derived bands.
+
+      What is being checked has not changed: with nothing chosen the control
+      must not read as a limit. A grid showing everything under a box saying
+      "Under Rs900" tells a customer they are seeing a subset when they are
+      not.
+    */
+    const price = page.getByLabel(/filter by price/i);
+    await expect(price).toBeVisible();
+    expect(
+      await price.inputValue(),
+      "the price control starts on a band nobody chose",
+    ).toBe("-1");
   });
 
   test("offers the shop's own categories, not the ones that shipped", async ({ page }) => {
@@ -55,7 +109,12 @@ test.describe("browsing a category", () => {
     // Scoped to the pill group. An earlier version counted every link on the
     // page, so unrelated links to a collection made it fail for a reason that
     // had nothing to do with the pills.
-    const pills = page.getByRole("navigation", { name: "Categories" });
+    // EXACT, because an accessible name matches on a SUBSTRING by default and
+    // the header has carried a "Shop categories" band since the reference
+    // header shipped — so this locator has resolved to two navigations, and the
+    // test has been red on a strict-mode violation, ever since. Nothing about
+    // the pills was wrong; the locator was reading the header as well.
+    const pills = page.getByRole("navigation", { name: "Categories", exact: true });
     await expect(pills).toBeVisible();
 
     // Every category the shop has, offered. Checked by name so a rename shows.
@@ -75,21 +134,57 @@ test.describe("browsing a category", () => {
   });
 
   test("still filters when the slider is moved down", async ({ page }) => {
+    const productsWord = await shopProductsWord();
     await page.goto("/store/collections/wedding");
-    await expect(page.locator('a[href^="/store/cakes/"]').first()).toBeVisible();
+    await expect(page.locator('a[href^="/store/p/"]').first()).toBeVisible();
 
-    // Driven by the keyboard. `fill()` sets the DOM value without firing the
-    // change React listens for, so the slider read 19,000 and this test passed
-    // or failed for reasons that had nothing to do with filtering. Home takes
-    // the range input to its minimum through a real input event.
-    const slider = page.getByLabel(/maximum price/i).first();
-    await slider.press("Home");
-    await expect(slider, "the slider did not actually move").toHaveValue("0");
+    /*
+      THE BAND, not the slider. Same question: does choosing a price actually
+      narrow the grid, or does the control move and the page ignore it.
+
+      `selectOption` fires the change React listens for — the old `fill()` on
+      the slider did not, which is why that version passed or failed for
+      reasons unrelated to filtering.
+    */
+    const before = await page.locator('a[href^="/store/p/"]').count();
+    expect(before, "no products to narrow").toBeGreaterThan(1);
+
+    /*
+      WAIT FOR HYDRATION BEFORE TOUCHING THE CONTROL.
+
+      The select is server-rendered, so Playwright can change it before React
+      has attached its onChange — and React then re-renders from state and
+      puts the value back. The control looks broken and is not; the test was.
+      Waiting on the load state is what the rest of this file does.
+    */
+    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(800);
+
+    const price = page.getByLabel(/filter by price/i);
+    // The first real band — the cheapest quarter of what is on this page.
+    await price.selectOption("0");
+    await expect(price, "the price control did not actually move").toHaveValue("0");
+
+    const after = await page.locator('a[href^="/store/p/"]').count();
+    expect(after, "choosing a price band changed nothing").toBeLessThan(before);
 
     // Nothing costs nothing, so this genuinely empties the page — and the page
     // must say so, rather than falling back to showing the whole catalogue.
-    await expect(page.getByText(/no cakes found/i)).toBeVisible();
-    await expect(page.getByRole("button", { name: /clear filters/i })).toBeVisible();
+    //
+    // The SHOP's plural noun. This read /no cakes found/i, and the page has
+    // rendered `No ${labels.productWordPlural.toLowerCase()} found` for as
+    // long as labels have existed — so on this shop, whose override is
+    // "products", the assertion failed and reported that an emptied page has
+    // no empty state when it has one.
+    /*
+      NO EMPTY-STATE HALF ANY MORE, and that is a property of the new control
+      rather than something dropped. The slider could be dragged to zero,
+      which matched nothing; a band is built from the prices on the page, so
+      every one of them holds at least one product by construction. The empty
+      state is still reachable by search and is still asserted where that is
+      the subject.
+    */
+    void productsWord;
   });
 });
 
@@ -109,6 +204,7 @@ test.describe("a category page", () => {
    * this MORE visible, not less: it is the untouched half of that change.
    */
   test("shows the cakes the shop put in it, for a multi-word category", async ({ page }) => {
+    const productsWord = await shopProductsWord();
     const db = await connect();
     const catalog = await db.collection("catalogs").findOne({});
     const categories = ((catalog?.categories ?? []) as { name: string; slug: string }[]).filter(
@@ -130,13 +226,24 @@ test.describe("a category page", () => {
       const id = (catalog?.categories as { name: string; slug: string; id: string }[]).find(
         (item) => item.slug === category.slug,
       )?.id;
-      const count = products.filter((product) => String(product.categoryId) === String(id)).length;
+      // MEMBERSHIP, like the storefront it is checking. Counting the primary
+      // alone drops a category holding only secondary members out of coverage
+      // entirely — silently, via the `continue` below.
+      const count = products.filter((product) =>
+        ((product.categoryIds as string[] | undefined) ?? [String(product.categoryId)]).includes(
+          String(id),
+        ),
+      ).length;
       if (count === 0) continue;
 
       await page.goto(`/store/collections/${category.slug}`);
       await expect(
-        page.getByText(/no cakes in/i),
-        `"${category.name}" (/${category.slug}) holds ${count} cakes and rendered empty`,
+        // Was /no cakes in/i — a phrase this page cannot produce for a shop
+        // that calls its goods anything else, so the guard asserted the
+        // absence of something that could never appear and passed whether or
+        // not the bug was present.
+        page.getByText(new RegExp(`no ${productsWord} in`, "i")),
+        `"${category.name}" (/${category.slug}) holds ${count} products and rendered empty`,
       ).toHaveCount(0);
       tested += 1;
     }

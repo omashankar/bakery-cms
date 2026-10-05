@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import type { CmsPage, CmsPageFormData } from "@/types/content";
 import { brandInfo } from "@/constants/landing-data";
 import { slugify } from "@/features/products/lib/product-utils";
@@ -164,7 +165,7 @@ export function seedPages(): CmsPage[] {
 
 function persist(pages: CmsPage[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(pages));
+  safeSetItem(STORAGE_KEY, JSON.stringify(pages));
 }
 
 export function loadPages(): CmsPage[] {

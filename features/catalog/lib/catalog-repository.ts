@@ -1,12 +1,19 @@
-import type { ProductCategory, ProductFlavour, ProductOccasion } from "@/types/product";
-import type { CatalogStore, CatalogWeightOption } from "@/types/catalog";
+import { safeSetItem } from "@/lib/safe-storage";
+import type {
+  ProductCategory,
+  ProductCollection,
+  ProductDepartment,
+  ProductOccasion,
+} from "@/types/product";
+import type { CatalogStore, CatalogTab } from "@/types/catalog";
 import { slugify } from "@/utils/slug";
 import {
+  collectionsWithProduct,
   defaultCatalogStore,
   defaultCategories,
-  defaultFlavours,
+  defaultCollections,
+  defaultDepartments,
   defaultOccasions,
-  defaultWeightOptions,
 } from "./catalog-utils";
 import {
   pushCatalogSection,
@@ -52,16 +59,21 @@ export const CATALOG_UPDATED_EVENT = "bakery-catalog-updated";
 
 function persist(store: CatalogStore): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  safeSetItem(STORAGE_KEY, JSON.stringify(store));
   window.dispatchEvent(new Event(CATALOG_UPDATED_EVENT));
 }
 
 function mergeStore(partial: Partial<CatalogStore>): CatalogStore {
   return {
+    /*
+      A document written before departments existed has no such key, so this
+      falls through to the empty default — which is also what a shop that has
+      never opened the tab should have.
+    */
+    departments: partial.departments ?? defaultDepartments,
     categories: partial.categories ?? defaultCategories,
-    flavours: partial.flavours ?? defaultFlavours,
     occasions: partial.occasions ?? defaultOccasions,
-    weights: partial.weights ?? defaultWeightOptions,
+    collections: partial.collections ?? defaultCollections,
     updatedAt: partial.updatedAt ?? nowIso(),
   };
 }
@@ -122,17 +134,25 @@ export function getCategories(): ProductCategory[] {
   return loadCatalogStore().categories;
 }
 
-export function getFlavours(): ProductFlavour[] {
-  return loadCatalogStore().flavours;
-}
 
 export function getOccasions(): ProductOccasion[] {
   return loadCatalogStore().occasions;
 }
 
-export function getWeightOptions(): CatalogWeightOption[] {
-  return [...loadCatalogStore().weights].sort((a, b) => a.sortOrder - b.sortOrder);
+export function getCollections(): ProductCollection[] {
+  return loadCatalogStore().collections;
 }
+
+export function getDepartments(): ProductDepartment[] {
+  return loadCatalogStore().departments;
+}
+
+/*
+  `getWeightOptions` and its three writers stood here. Sizes are typed on the
+  product now — the shop-wide list forced one product's sizes onto every other,
+  and once products stopped deriving from it, editing it changed nothing a
+  customer could see.
+*/
 
 /**
  * The taxonomy, but only once the server's copy has actually arrived.
@@ -158,7 +178,7 @@ function rollBackCache(previousRaw: string | null, attempted: CatalogStore): voi
   if (localStorage.getItem(STORAGE_KEY) !== JSON.stringify(attempted)) return;
 
   if (previousRaw === null) localStorage.removeItem(STORAGE_KEY);
-  else localStorage.setItem(STORAGE_KEY, previousRaw);
+  else safeSetItem(STORAGE_KEY, previousRaw);
 }
 
 /**
@@ -175,7 +195,7 @@ async function updateStore(
   const saved = saveCatalogStore({ ...current, ...patch });
 
   // `pushCatalogSection` already returned a boolean; this used to discard it
-  // with `void`. Categories, flavours, occasions and weights are what the
+  // with `void`. Categories and occasions are what the
   // product form and the storefront filters are built from, so a section the
   // server refused leaves the admin editing a taxonomy nobody else has.
   const sections = Object.keys(patch).filter((key) =>
@@ -235,46 +255,6 @@ export async function deleteCategories(ids: string[]): Promise<WriteResult<numbe
   return { value: persisted ? store.categories.length - next.length : 0, persisted };
 }
 
-export async function createFlavour(
-  data: Omit<ProductFlavour, "id" | "createdAt" | "updatedAt">
-): Promise<WriteResult<ProductFlavour | null>> {
-  const store = await hydratedStore();
-  if (!store) return { value: null, persisted: false };
-
-  const item: ProductFlavour = {
-    ...data,
-    id: newId("fl"),
-    slug: data.slug || slugify(data.name),
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-  };
-  const { persisted } = await updateStore(store, { flavours: [...store.flavours, item] });
-  return { value: item, persisted };
-}
-
-export async function updateFlavour(
-  id: string,
-  patch: Partial<ProductFlavour>
-): Promise<WriteResult<ProductFlavour | null>> {
-  const store = await hydratedStore();
-  if (!store) return { value: null, persisted: false };
-
-  const index = store.flavours.findIndex((item) => item.id === id);
-  if (index < 0) return { value: null, persisted: false };
-  const next = [...store.flavours];
-  next[index] = { ...next[index], ...patch, updatedAt: nowIso() };
-  const { persisted } = await updateStore(store, { flavours: next });
-  return { value: next[index], persisted };
-}
-
-export async function deleteFlavours(ids: string[]): Promise<WriteResult<number>> {
-  const store = await hydratedStore();
-  if (!store) return { value: 0, persisted: false };
-
-  const next = store.flavours.filter((item) => !ids.includes(item.id));
-  const { persisted } = await updateStore(store, { flavours: next });
-  return { value: persisted ? store.flavours.length - next.length : 0, persisted };
-}
 
 export async function createOccasion(
   data: Omit<ProductOccasion, "id" | "createdAt" | "updatedAt">
@@ -317,47 +297,213 @@ export async function deleteOccasions(ids: string[]): Promise<WriteResult<number
   return { value: persisted ? store.occasions.length - next.length : 0, persisted };
 }
 
-export async function createWeightOption(
-  data: Omit<CatalogWeightOption, "id" | "createdAt" | "updatedAt" | "sortOrder"> & {
-    sortOrder?: number;
-  }
-): Promise<WriteResult<CatalogWeightOption | null>> {
+/*
+  The collection quartet, copied from the occasion one above rather than
+  written fresh — same `hydratedStore()` gate, same `updateStore` replace-all,
+  same WriteResult shape. The gate is the part that matters: without it a
+  write composed from a cold browser cache publishes an empty list over the
+  shop's real one.
+*/
+export async function createCollection(
+  data: Omit<ProductCollection, "id" | "createdAt" | "updatedAt">,
+): Promise<WriteResult<ProductCollection | null>> {
   const store = await hydratedStore();
   if (!store) return { value: null, persisted: false };
 
-  const item: CatalogWeightOption = {
+  const item: ProductCollection = {
     ...data,
-    id: newId("wt"),
-    sortOrder: data.sortOrder ?? store.weights.length + 1,
+    id: newId("col"),
+    slug: data.slug || slugify(data.name),
+    // Never undefined. The storefront resolver maps over this, and an absent
+    // array would throw on a collection created and not yet filled.
+    productIds: data.productIds ?? [],
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };
-  const { persisted } = await updateStore(store, { weights: [...store.weights, item] });
+  const { persisted } = await updateStore(store, {
+    collections: [...store.collections, item],
+  });
   return { value: item, persisted };
 }
 
-export async function updateWeightOption(
+export async function updateCollection(
   id: string,
-  patch: Partial<CatalogWeightOption>
-): Promise<WriteResult<CatalogWeightOption | null>> {
+  patch: Partial<ProductCollection>,
+): Promise<WriteResult<ProductCollection | null>> {
   const store = await hydratedStore();
   if (!store) return { value: null, persisted: false };
 
-  const index = store.weights.findIndex((item) => item.id === id);
+  const index = store.collections.findIndex((item) => item.id === id);
   if (index < 0) return { value: null, persisted: false };
-  const next = [...store.weights];
+  const next = [...store.collections];
   next[index] = { ...next[index], ...patch, updatedAt: nowIso() };
-  const { persisted } = await updateStore(store, { weights: next });
+  const { persisted } = await updateStore(store, { collections: next });
   return { value: next[index], persisted };
 }
 
-export async function deleteWeightOptions(ids: string[]): Promise<WriteResult<number>> {
+export async function deleteCollections(ids: string[]): Promise<WriteResult<number>> {
   const store = await hydratedStore();
   if (!store) return { value: 0, persisted: false };
 
-  const next = store.weights.filter((item) => !ids.includes(item.id));
-  const { persisted } = await updateStore(store, { weights: next });
-  return { value: persisted ? store.weights.length - next.length : 0, persisted };
+  const next = store.collections.filter((item) => !ids.includes(item.id));
+  const { persisted } = await updateStore(store, { collections: next });
+  return { value: persisted ? store.collections.length - next.length : 0, persisted };
+}
+
+export async function createDepartment(
+  data: Omit<ProductDepartment, "id" | "createdAt" | "updatedAt">,
+): Promise<WriteResult<ProductDepartment | null>> {
+  const store = await hydratedStore();
+  if (!store) return { value: null, persisted: false };
+
+  const item: ProductDepartment = {
+    ...data,
+    id: newId("dept"),
+    slug: data.slug || slugify(data.name),
+    /*
+      Never undefined. The storefront maps over this, and an absent array
+      would throw on a department created and not yet filled — which is
+      every department, for the minute between naming it and filing
+      something under it.
+    */
+    categoryIds: data.categoryIds ?? [],
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  };
+  const { persisted } = await updateStore(store, {
+    departments: [...store.departments, item],
+  });
+  return { value: item, persisted };
+}
+
+export async function updateDepartment(
+  id: string,
+  patch: Partial<ProductDepartment>,
+): Promise<WriteResult<ProductDepartment | null>> {
+  const store = await hydratedStore();
+  if (!store) return { value: null, persisted: false };
+
+  const index = store.departments.findIndex((item) => item.id === id);
+  if (index < 0) return { value: null, persisted: false };
+  const next = [...store.departments];
+  next[index] = { ...next[index], ...patch, updatedAt: nowIso() };
+  const { persisted } = await updateStore(store, { departments: next });
+  return { value: next[index], persisted };
+}
+
+export async function deleteDepartments(ids: string[]): Promise<WriteResult<number>> {
+  const store = await hydratedStore();
+  if (!store) return { value: 0, persisted: false };
+
+  const next = store.departments.filter((item) => !ids.includes(item.id));
+  const { persisted } = await updateStore(store, { departments: next });
+  return { value: persisted ? store.departments.length - next.length : 0, persisted };
+}
+
+/**
+ * Put one product in exactly these collections, and in no others.
+ *
+ * MEMBERSHIP STILL LIVES ON THE COLLECTION. There is no `collectionIds` on a
+ * product and this does not add one: two copies of one fact drift, and the
+ * cost of keeping them in step is paid on every screen that writes either. So
+ * the product form edits the same `productIds` the Catalog screen does, from
+ * the other end — which is what makes both directions the same edit rather
+ * than two features that agree by hand.
+ *
+ * ADDED AT THE END, never inserted. The order of `productIds` IS the curation
+ * — a shop puts its best seller first — so a product ticked on its own form
+ * joins the back of the queue rather than displacing whatever the shop put at
+ * the front. Removing takes it out and leaves the rest in order.
+ *
+ * ONE write for every collection that changed, and none for the ones that did
+ * not: each section is a replace-all, so touching a collection the owner did
+ * not mean to touch is how a curated order gets rewritten by a product save.
+ *
+ * The reconciliation itself is `collectionsWithProduct` below — a pure
+ * function, so what it decides can be tested without a browser, a cache or a
+ * server, which is the half of this that has rules worth pinning.
+ */
+
+export async function setProductCollections(
+  productId: string,
+  collectionIds: readonly string[],
+): Promise<WriteResult<number>> {
+  const store = await hydratedStore();
+  if (!store) return { value: 0, persisted: false };
+
+  const { next, changed } = collectionsWithProduct(store.collections, productId, collectionIds);
+  /* Nothing to say to the server, and nothing to roll back if it refuses. */
+  if (changed === 0) return { value: 0, persisted: true };
+
+  const { persisted } = await updateStore(store, { collections: next });
+  return { value: persisted ? changed : 0, persisted };
+}
+
+/**
+ * Which collections hold this product. The read half of the pair above.
+ *
+ * Reads the CACHE rather than waiting for hydration, because it answers a
+ * render: the product form draws its ticks from this on first paint and again
+ * whenever the catalog event fires. A cold cache means no ticks for a moment,
+ * which the sync then corrects — the same way the category and occasion lists
+ * on that form already behave.
+ */
+export function collectionsHolding(productId: string): string[] {
+  return getCollections()
+    .filter((collection) => (collection.productIds ?? []).includes(productId))
+    .map((collection) => collection.id);
+}
+
+/**
+ * Move ONE row up or down within its list, and write the order down.
+ *
+ * Order used to be whatever order the rows were created in, which is the one
+ * thing a shop cannot change without deleting and recreating a row — and
+ * deleting a category leaves every product filed under it pointing at nothing.
+ *
+ * NUMBERS THE WHOLE LIST, not just the pair that moved. `sortOrder` is optional
+ * and most rows have never had one, so swapping two numbers where neither
+ * exists writes 0 and 1 onto two rows and leaves the other nine unnumbered —
+ * which the reader sorts AFTER them, so a row moved down would jump to the top.
+ * Writing every index makes the stored order and the shown order the same list.
+ *
+ * The shown order is what it renumbers, not the stored array: the reader sorts
+ * and de-dupes before the admin ever sees a row, so renumbering the raw array
+ * would move whichever rows the shop is not looking at.
+ */
+export async function moveCatalogRow(
+  section: CatalogTab,
+  id: string,
+  direction: -1 | 1,
+): Promise<WriteResult<boolean>> {
+  const store = await hydratedStore();
+  if (!store) return { value: false, persisted: false };
+
+  /*
+    The three lists hold three different shapes and this only touches what they
+    share, so it works on the common one and puts the rows back untyped. The
+    alternative is the same twenty lines written out three times.
+  */
+  const rows = store[section] as { id: string; sortOrder?: number }[];
+  const shown = [...rows].sort((a, b) => {
+    const left = typeof a.sortOrder === "number" ? a.sortOrder : Number.POSITIVE_INFINITY;
+    const right = typeof b.sortOrder === "number" ? b.sortOrder : Number.POSITIVE_INFINITY;
+    if (left !== right) return left - right;
+    return rows.indexOf(a) - rows.indexOf(b);
+  });
+
+  const at = shown.findIndex((row) => row.id === id);
+  const to = at + direction;
+  /* The ends are not an error — the button is simply disabled there. */
+  if (at < 0 || to < 0 || to >= shown.length) return { value: false, persisted: false };
+
+  [shown[at], shown[to]] = [shown[to]!, shown[at]!];
+
+  const next = shown.map((row, index) => ({ ...row, sortOrder: index }));
+  const { persisted } = await updateStore(store, {
+    [section]: next,
+  } as Partial<CatalogStore>);
+  return { value: persisted, persisted };
 }
 
 export function getCategoryById(id: string): ProductCategory | undefined {
@@ -371,9 +517,3 @@ export function getCategoryByName(name: string): ProductCategory | undefined {
   );
 }
 
-export function getFlavourByName(name: string): ProductFlavour | undefined {
-  const normalized = name.toLowerCase();
-  return getFlavours().find(
-    (item) => item.name.toLowerCase() === normalized || item.slug === normalized
-  );
-}

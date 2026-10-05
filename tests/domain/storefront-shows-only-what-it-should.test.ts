@@ -61,7 +61,7 @@ describe("draft content crossing to the browser", () => {
       // them — it is still the one place that hands this content to a client
       // component, so it is still the file that has to filter.
       "apps/website/lib/homepage-render-data.server.ts",
-      "apps/website/pages/wedding-page.tsx",
+
     ]) {
       const source = read(path);
       expect(source, `${path} still ships raw content`).toContain("publishedOnly(");
@@ -183,14 +183,4 @@ describe("the track-order page", () => {
   });
 });
 
-describe("the footer's wedding link", () => {
-  it("is gated like the header's copy of the same link", () => {
-    // The default footer ships a "Wedding Cakes" quick link. The navbar gates
-    // its own; this one was left, so a shop with the module off kept a link to
-    // a 404 on every page.
-    const footer = read("apps/website/landing/components/landing-footer.tsx");
 
-    expect(footer).toContain("data-gate-wedding");
-    expect(footer).toContain("routes.store.weddingCakes");
-  });
-});

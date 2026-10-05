@@ -2,25 +2,77 @@ import type { BaseEntity, EntityStatus, SeoFields } from "./common";
 
 export type StockStatus = "in_stock" | "low_stock" | "out_of_stock";
 
-export type ProductVariantGroupType = "egg" | "photo" | "custom";
+/**
+ * The outlines a customer photograph can be printed inside.
+ *
+ * Declared here rather than beside the drawing code because it is a fact
+ * about the PRODUCT: it crosses the Mongoose schema, the validator, the
+ * storefront mapper and the admin form, and only then reaches a canvas.
+ * `lib/images/photo-print-layout` holds the geometry for each one.
+ */
+export type PhotoFrameShapeId =
+  | "circle"
+  | "square"
+  | "heart"
+  | "portrait"
+  | "landscape"
+  | "wrap";
 
 /**
- * Machine-readable meaning of a variant option.
+ * `shape` joined these when the flat `shapes: string[]` was retired.
  *
- * Business logic must branch on this, never on `label`. Labels are display text:
- * merchants rename them ("No egg"), translate them ("अंडा रहित"), and word them
- * for their own storefront. A label is for humans; a semantic is for code.
- *
- * The mechanism is generic — a flower shop would define its own semantics and
- * leave these unused. Only the values below are bakery-specific.
+ * That list held NAMES with nowhere to put a price, so a shop could say a cake
+ * came in Round and Heart and could not charge more for the Heart — and the
+ * four names it offered were hardcoded, so a shop wanting “Number” or a bouquet
+ * size had no way to say so. A typed group is what egg preference and photo
+ * cakes were at the time, so shapes stopped being a second system — and the
+ * type is what lets `modules.shape` keep gating them. Those two have since
+ * gone, and `shape` is the last typed one left.
  */
-export type VariantOptionSemantic = "eggless" | "photo-print";
+export type ProductVariantGroupType = "shape" | "custom";
+
+/**
+ * How a block of options is DRAWN — the shop's own answer, not ours.
+ *
+ * All three renderings already existed. The storefront picked between them by
+ * reading the data: two options meant buttons, one option with no default meant
+ * a tickbox, one option WITH a default meant a stated fact. The shop was never
+ * told that rule, and could not see it — ticking Default on a lone option
+ * silently changed the whole rendering, and the form said nothing.
+ *
+ *   buttons   [0.5 kg] [1 kg] [1.5 kg]   pick one of several
+ *   checkbox  [ ] Gift wrap              have it if you ask
+ *   stated    ✓ Eggless                  it simply is this
+ *
+ * Deliberately NOT part of `ProductVariantGroupType`, which is a different
+ * question with a different answer: `type` says which module may hide a group,
+ * and its union has been wrong for most of this shop's catalogue for a long
+ * time — live rows carry `egg` and `photo` that the union has never listed. One
+ * field cannot mean both "who hides this" and "how does it look", and folding
+ * them together is how the first one came to be read as the second.
+ *
+ * OPTIONAL, and that is the deploy plan. A group with no `render` is drawn the
+ * way it has always been drawn, by the same two predicates; the key is written
+ * only when the shop saves a product, freezing what it already looked like.
+ * So nothing moves on the day this ships, and there is no migration.
+ */
+export type ProductBlockRender = "buttons" | "checkbox" | "stated";
+
+/*
+  `VariantOptionSemantic` stood here — a machine-readable meaning an option
+  could carry so business logic branched on it rather than on a merchant's
+  label. It had two values, and both were bakery special cases: `eggless`,
+  which went when eggless became an ordinary priced option, and `photo-print`,
+  which went with the photo-print option itself.
+
+  A product that takes a photograph now says so with `allowsPhotoUpload` and
+  prices it into its own price. There is nothing left for an option to MEAN
+  that its label and its price do not already say.
+*/
 
 export interface ProductVariantOption {
   id: string;
   label: string;
-  /** Optional: absent means the option carries no special meaning (e.g. "Regular"). */
-  semantic?: VariantOptionSemantic;
   priceAdjustment: number;
   isDefault?: boolean;
 }
@@ -29,38 +81,181 @@ export interface ProductVariantGroup {
   id: string;
   name: string;
   type: ProductVariantGroupType;
-  required: boolean;
+  /**
+   * LEGACY, and inert. Nothing reads it.
+   *
+   * Its only reader was the admin checkbox that wrote it. No picker blocks on
+   * it, and `calculateVariantAdjustment` substitutes the group's default option
+   * whenever a selection is absent — so a group marked required was priced and
+   * recorded exactly like one that was not, and the merchant was told a
+   * purchase would be stopped without a choice that it never stopped.
+   *
+   * Optional rather than deleted, and for the same reason
+   * `PaymentMethodSettings.upi/card` were kept: every stored product, and every
+   * backup an owner has taken, already carries it. Optional so a caller that
+   * has no opinion — an import, an API client — is not forced to invent one.
+   * Do not gate anything on it without making it mean something first.
+   */
+  required?: boolean;
+  /**
+   * What the shop chose this to look like, once it has chosen.
+   *
+   * Absent means "nobody has said" — which is every group stored before this
+   * existed — and the storefront then derives it exactly as it always did. See
+   * `ProductBlockRender` above for why that is the whole migration.
+   */
+  render?: ProductBlockRender;
   options: ProductVariantOption[];
 }
 
-export interface ProductDetails {
-  barcode?: string;
-  preparationTimeMinutes?: number;
-  shelfLifeDays?: number;
-  calories?: number;
-  allergens?: string;
-  careInstructions?: string;
+/**
+ * A fact about the product, in the merchant's own words.
+ *
+ * Brand: Samsung. Material: Ceramic. Warranty: 1 year. RAM: 8 GB. Not a choice
+ * the customer makes and not a price — which is what separates it from
+ * `ProductVariantOption`.
+ *
+ * WHERE THE LINE NOW FALLS, because this comment used to draw it in the wrong
+ * place. It said a one-option variant group was an ABUSE, for two reasons that
+ * were both true when it was written and are not now: that the page renders
+ * every group as clickable buttons, and that `formatVariantSummary` would stamp
+ * it on the order as though the customer had chosen it.
+ *
+ * The first is fixed — `asStatement` gives a one-option defaulted group its own
+ * rendering, a tick and the word, with nothing to press. The second turns out to
+ * be the distinction itself rather than an objection to it:
+ *
+ *   A CATALOGUE fact is one nobody makes anything from. Brand: Samsung. Country
+ *   of Origin. RAM: 8 GB. It belongs here, in a description block, and it must
+ *   stay off the order — an order line reading "Brand: Samsung" is noise on an
+ *   invoice and noise in a kitchen.
+ *
+ *   A MANUFACTURING fact changes what gets made. This cake is eggless. This
+ *   shelf ships assembled. That belongs on the line, because the person building
+ *   the thing has to be told, and it is a one-option variant group with Default
+ *   ticked.
+ *
+ * So the two are not rivals. Ask whether anybody downstream acts on it.
+ *
+ * Deliberately NOT part of `ProductDetails`. Those six are typed food scalars
+ * that four formatters consume as numbers — `${calories} kcal / serving`,
+ * shelf-life in days — and turning them into label/value strings would make all
+ * of that string parsing. They stay; this sits beside them.
+ *
+ * Optional, because `mapLandingProductToAdmin` builds a whole `Product` literal
+ * for the seed and a required field would break it.
+ */
+/**
+ * One labelled list in the product description.
+ *
+ * Six reference storefronts, six different shapes. A cake had Product Details,
+ * Delivery Information, Care Instructions and a Note. A plant had no heading at
+ * all over its first list, then Benefits, Disclaimer, Do's and Dont's. A candle
+ * called the same two blocks Delivery DETAILS and Care DIRECTIVES.
+ *
+ * So the headings are not three fixed slots, and they are not shop-wide either:
+ * they belong to the PRODUCT, and there can be any number of them. A shop
+ * selling cakes and phone chargers writes “our delivery boy hand-delivers it”
+ * on one and “shipped by our courier partners, you will get a tracking number”
+ * on the other — opposite policies, same shop.
+ *
+ * `heading` may be blank: two of the six list their facts with no label over
+ * them, and a heading nobody typed should not be invented.
+ *
+ * `body` is one line per bullet, like every other list this project renders —
+ * the same rule as the delivery setting, so a shop learns it once. A line that
+ * is not `Label: Value` is fine: the reference lists whole sentences beside its
+ * key-value pairs.
+ */
+export interface ProductDescriptionBlock {
+  id: string;
+  heading: string;
+  body: string;
 }
 
-export interface Product extends BaseEntity, ProductDetails {
+/*
+  `ProductDetails` stood here, and by the end it was empty.
+
+  It held seven fields a product could state about itself: Barcode / SKU,
+  Preparation time, Shelf life, Calories, Ingredients, Allergens and Care
+  instructions. The shop asked for all of them to go, and none drove any
+  logic — no delivery date was computed from a preparation time, no stock was
+  found by barcode, no order was stopped by an allergen. All seven were
+  display, and four of them printed a second time as a chip beside the name.
+
+  The shop was told plainly what dropping Allergens costs — a list of what is
+  in the food is the one field here where being wrong can hurt somebody — and
+  asked for it anyway. It can still say so in a description block, which is
+  where everything a shop wants stated now goes.
+
+  Care instructions were the last to leave, and not because they were wrong:
+  they were one free-text box under one fixed heading, and six reference
+  storefronts wanted Care Instructions, Care Directives, Do's and Dont's. A
+  block carries its own heading, so the shop names it.
+*/
+export interface Product extends BaseEntity {
   name: string;
   slug: string;
   description: string;
-  shortDescription?: string;
+  /*
+    `shortDescription` stood here, and it was not a description.
+
+    Nothing on the storefront ever rendered it. Its one destination was the
+    META description, as the middle link of a three-step fallback:
+
+      seo.metaDescription  ->  shortDescription  ->  description
+
+    So it duplicated the SEO tab's own box, under a name that promised a
+    summary customers would read, in the tab about what a product IS. A shop
+    wanting a shorter line for Google has the field for it; a shop that does
+    not now falls straight through to the description, which is what the last
+    step always was.
+
+    The seed set it to `description.slice(0, 100)` — a truncation of the very
+    field it fell through to — so it carried nothing of its own for any
+    product this shop has.
+  */
   price: number;
   compareAtPrice?: number;
   images: string[];
   categoryId: string;
-  flavourId?: string;
+  /**
+   * EVERY category this product is filed under, primary first.
+   *
+   * `categoryIds[0] === categoryId` always. The full membership rather than
+   * "the extra ones" is deliberate: with seven admin reads and six storefront
+   * matchers and no shared predicate, "remember to union with the primary" is
+   * a rule that gets forgotten at one site — and that site fails silently, a
+   * product quietly missing from a page nobody is looking at.
+   *
+   * Established in exactly two places: `normalizeCommerceFields` on every
+   * read, and the admin payload builder on every write. Nothing downstream
+   * has to check two fields.
+   */
+  categoryIds: string[];
   occasionIds: string[];
+  /**
+   * The delivery speeds this product can actually be sent by.
+   *
+   * EMPTY OR ABSENT MEANS EVERY SPEED THE SHOP OFFERS, and that is not a
+   * convenience — it is what every product in every shop means today, so any
+   * other reading would make the whole catalogue undeliverable on the day
+   * this shipped.
+   *
+   * It exists because "Express" cannot otherwise be honest. Delivery was
+   * shop-wide — one cutoff, one set of tiers — so a page of express-eligible
+   * products would have been the entire catalogue, which is the static
+   * category the requirement explicitly refuses. A two-tier wedding cake
+   * cannot go out in two hours; a box of chocolates can.
+   */
+  deliveryTierIds?: string[];
   weights: ProductWeight[];
+  /** What this product's size tiers are CALLED. Blank means the generic word. */
+  weightLabel?: string;
   status: EntityStatus;
   isFeatured: boolean;
   isBestSeller: boolean;
   isTrending: boolean;
-  isEggless: boolean;
-  isPhotoCake: boolean;
-  isSeasonal: boolean;
   shapes: string[];
   flavourOptions: string[];
   stockStatus: StockStatus;
@@ -69,8 +264,26 @@ export interface Product extends BaseEntity, ProductDetails {
   lowStockThreshold?: number;
   allowsMessage: boolean;
   allowsPhotoUpload: boolean;
-  ingredients?: string;
+  /**
+   * Which shape the customer's photograph is printed in.
+   *
+   * A print area is GEOMETRY — the browser has to clip to it — so unlike a
+   * size or an option label the shop picks from a list rather than typing its
+   * own. Absent means round, which is what every photo product printed before
+   * there was a choice.
+   */
+  photoFrameShape?: PhotoFrameShapeId;
   variantGroups: ProductVariantGroup[];
+  /**
+   * The product description, as the shop writes it. See
+   * ProductDescriptionBlock — never a choice, never priced.
+   *
+   * This was `attributes: { label, value }[]`, which could only say
+   * "Brand: Samsung" and had exactly one heading above the lot. Two of the
+   * six reference pages need no heading, one needs five, and none of them
+   * keeps to Label: Value throughout.
+   */
+  descriptionBlocks?: ProductDescriptionBlock[];
   rating: number;
   reviewCount: number;
   seo: SeoFields;
@@ -82,22 +295,155 @@ export interface ProductWeight {
   serves?: string;
 }
 
-export interface ProductCategory extends BaseEntity {
+/**
+ * What every row of the catalog carries, whichever of the three lists it is in.
+ *
+ * Categories, occasions and collections had name, slug and nothing else in
+ * common — so a shop could not switch one off without deleting it, and the
+ * order they appeared in was the order somebody happened to create them. Both
+ * are things every one of the three needs and none of them had.
+ *
+ * BOTH OPTIONAL, and that is load-bearing rather than lazy. These lists are
+ * stored as Mixed and read with `.lean()`, so a row written before today comes
+ * back without either field; a required one would make every existing row fail
+ * its own type. The readers below supply the defaults — present and unset means
+ * ON, and unset order means "wherever it already was".
+ */
+export interface CatalogRow extends BaseEntity {
   name: string;
   slug: string;
+  /**
+   * Off the storefront without being deleted.
+   *
+   * Absent means ON. A shop that has never seen this switch has every row
+   * showing, which is what it had before the switch existed — the alternative
+   * is an upgrade that empties the menu.
+   */
+  isActive?: boolean;
+  /**
+   * Where the row sits among its siblings. Lower first.
+   *
+   * Absent sorts after everything numbered, in the order stored — so a shop
+   * that orders three rows out of eleven gets those three at the top and the
+   * rest untouched, rather than a list that reshuffles itself.
+   */
+  sortOrder?: number;
+  /**
+   * What the listing page is HEADED, when the row's name is not the phrase.
+   *
+   * A category is filed as "Orchids" and the page selling them is headed
+   * "Orchid Flower Bouquets"; "White Chocolates" is filed once and the page
+   * reads "White Chocolates Online". The name is the taxonomy's word and this
+   * is the shop's, and a reference storefront writes a different one for every
+   * listing page it has.
+   *
+   * ON `CatalogRow` so a category, an occasion and a collection all get it
+   * from one declaration — the listing page draws all three and would
+   * otherwise head two of them and not the third.
+   *
+   * NO DEFAULT, anywhere. Absent means the page is headed by the row's own
+   * name, which is what it has always been. A generated phrase here would be
+   * this software writing a shop's page title for it, in a voice it never
+   * chose, on a page a customer lands on from a search engine.
+   */
+  headline?: string;
+}
+
+/*
+  `cakeCount` stood here: a stored number of products per category. It was
+  denormalised, nothing kept it in step, and it was named for one trade in a
+  CMS meant to sell anything. The admin counted the real published products
+  instead, and the homepage stopped reading the stored value after a seed typed
+  one that was wrong — it advertised "48 cakes" under Birthday in a shop that
+  held 25 products in total. This shop's own data had "Engagement Cake — 10"
+  against a category holding one.
+*/
+export interface ProductCategory extends CatalogRow {
   description?: string;
   image?: string;
-  cakeCount?: number;
 }
 
-export interface ProductFlavour extends BaseEntity {
-  name: string;
-  slug: string;
+
+/**
+ * WHAT a product is FOR — Birthday, Diwali, a housewarming.
+ *
+ * Not a category, which says what the product IS, and not a collection, which
+ * is a list somebody wrote. Optional on a product and many per product, and it
+ * has its own address: /store/occasions/<slug>.
+ */
+export interface ProductOccasion extends CatalogRow {
+  description?: string;
+  image?: string;
 }
 
-export interface ProductOccasion extends BaseEntity {
-  name: string;
-  slug: string;
+/**
+ * A CURATED group — "Diwali Gifts", "Under ₹500", "Best for Him".
+ *
+ * A category says what a thing IS; a collection says why you would buy it
+ * now. The difference that matters here is where membership lives: a category
+ * is chosen on the product (`categoryIds`), a collection is filled from its
+ * own side. That is the whole point — a shop building a Diwali row should not
+ * have to open forty product forms.
+ *
+ * `productIds` is REQUIRED and ORDERED. Required so the compiler forces every
+ * writer to say what is in it rather than leaving an accidental empty group
+ * live on the storefront; ordered because the order IS the curation — a shop
+ * puts its best seller first, and re-deriving that later is impossible.
+ *
+ * The cost of storing ids here rather than on the product is a dangling id
+ * when a product is deleted. That is tolerated and filtered on read, the same
+ * way `product-mapper` already tolerates a deleted category id.
+ */
+/**
+ * A DEPARTMENT — the kind of thing, above the category that says which kind.
+ *
+ * CAKES, FLOWERS, MOBILES. The catalogue had three FLAT lists and no way to
+ * say that Chocolate Cakes sits under CAKES and Smartphones under MOBILES, so
+ * a shop selling a dozen kinds of thing had one undifferentiated pile of
+ * categories.
+ *
+ * MEMBERSHIP LIVES HERE, not on the product and not as a parent pointer.
+ *
+ * NOT `parentId` on CatalogRow: one parent cannot say that Roses belongs
+ * under FLOWERS and under GIFTS, and a shop that named both in one sentence
+ * is exactly where that is normal. `offeredRows` and `offeredAxes` also hand
+ * every row back flat, so eight readers would start mixing a department into
+ * the category list with no error anywhere.
+ *
+ * NOT `departmentId` on the product: that is the shape `cakeCount` had, and the
+ * note where it was removed is a few lines below. It would also put the
+ * header on a product read to draw its own menu, which is the one line the
+ * chrome exists to hold — it renders on cart and checkout.
+ *
+ * So: ids, here, exactly as `ProductCollection` already holds `productIds`. The
+ * cost is the same one that docblock states — a dangling id when a category
+ * is deleted — tolerated and filtered on read.
+ */
+export interface ProductDepartment extends CatalogRow {
+  description?: string;
+  image?: string;
+  /**
+   * The categories filed under this department, in the shop's own order.
+   *
+   * A category may appear in more than one. That is the point, and it is what
+   * a parent pointer could not express.
+   */
+  categoryIds: string[];
+}
+export interface ProductCollection extends CatalogRow {
+  description?: string;
+  image?: string;
+  /**
+   * How this group decides what is in it.
+   *
+   * Only "manual" exists, and every stored row is one — the field is here so
+   * that adding a rule-driven group later is a new value rather than a
+   * migration of every reader. Absent means manual, for the rows written
+   * before the field.
+   */
+  type?: "manual" | "dynamic";
+  productIds: string[];
 }
 
 export type ProductFormData = Omit<Product, "id" | "createdAt" | "updatedAt">;
+

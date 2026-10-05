@@ -44,9 +44,21 @@ function DialogContent({
   children,
   showCloseButton = true,
   forceBackdrop = false,
+  overlayClassName,
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
+  /**
+   * The dim behind this one dialog, for the rare case that needs its own.
+   *
+   * Added for the product image viewer: a photograph is judged against what
+   * surrounds it, and the house 45% leaves a lit page showing through, so the
+   * product is being compared to the shop's own cream and brown rather than to
+   * nothing. Every other dialog on the site is a form or a message, where 45%
+   * is right — it says "the page is still there" — which is exactly why this
+   * is a prop and not a change to the default.
+   */
+  overlayClassName?: string
   /**
    * Draw the dim even when this dialog is NESTED inside another.
    *
@@ -60,7 +72,7 @@ function DialogContent({
 }) {
   return (
     <DialogPortal>
-      <DialogOverlay forceRender={forceBackdrop} />
+      <DialogOverlay forceRender={forceBackdrop} className={overlayClassName} />
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(

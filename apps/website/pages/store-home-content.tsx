@@ -25,6 +25,14 @@ import type { StorefrontTrust } from "@/apps/website/lib/storefront-trust.server
 interface HomepageSectionData {
   /** Product rails built on the server, so both passes render the same cakes. */
   rails: Partial<Record<HomepageProductSource, LandingProduct[]>>;
+  /** The same, for rows named after one of the shop's own categories. */
+  categoryRails?: Record<string, LandingProduct[]>;
+  /** What the cheapest thing in each category costs, so a card can say so. */
+  categoryStartingPrices?: Record<string, number>;
+  /** The flagged rows cut by category, for a tabbed row that is about both. */
+  flaggedCategoryRails?: Partial<
+    Record<HomepageProductSource, Record<string, LandingProduct[]>>
+  >;
   /** Active hero banners read from the server, so both passes render the same banners. */
   banners: Banner[];
   /** Categories read from the server, so both passes render the same category cards. */
@@ -89,8 +97,17 @@ function renderSections(
     if (pair && section.instanceId === pair.otherId) return null;
 
     if (pair && section.instanceId === pair.anchorId) {
+      /*
+        `bandY`, like every other band on this page.
+
+        This pair is drawn HERE rather than by SectionShell, so it never got
+        the homepage's own rhythm — it kept `sectionY`, which is the padding a
+        whole page of one subject wants (checkout, a product, a CMS page) and
+        twice what its neighbours above and below now use. On a page of twenty
+        bands that reads as a gap rather than as a section.
+      */
       return (
-        <section key="newsletter-cta-row" className={cn("bg-white", layoutSpacing.sectionY)}>
+        <section key="newsletter-cta-row" className={cn("bg-background", layoutSpacing.bandY)}>
           <div className={layoutSpacing.container}>
             <StaggerReveal className="grid items-stretch gap-6 lg:grid-cols-2">
               <HomepageSectionRenderer {...data} section={pair.newsletter} embedded />

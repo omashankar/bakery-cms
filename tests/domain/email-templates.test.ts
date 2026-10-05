@@ -140,6 +140,10 @@ describe("the seeded transactional templates", () => {
       delivery_date: "2026-08-01, 2:00 PM – 4:00 PM",
       // `invoice_url` is declared by the seeded copy but has no sender yet.
       invoice_url: "https://example.test/invoice",
+      // The confirmation now names what was bought. It supplied a total, a date
+      // and a link and no product at all, so the only record a customer gets
+      // without logging in could not say what was in the order.
+      order_items: "  1 x Black Forest\n      1 kg · Egg preference: Eggless",
     });
 
     expect(extractTemplateVariables(rendered)).toEqual([]);

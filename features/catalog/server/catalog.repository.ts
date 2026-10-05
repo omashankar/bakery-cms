@@ -18,9 +18,10 @@ export async function getOrCreateCatalog() {
   return CatalogModel.create({
     key: SINGLETON,
     categories: defaultCatalogStore.categories,
-    flavours: defaultCatalogStore.flavours,
     occasions: defaultCatalogStore.occasions,
-    weights: defaultCatalogStore.weights,
+    // Empty, but SEEDED — so the path exists on a fresh singleton and a first
+    // write does not have to create it.
+    collections: defaultCatalogStore.collections,
   });
 }
 

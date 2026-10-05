@@ -5,24 +5,15 @@ import {
   commerceSchema,
   modulesSchema,
   contactSchema,
-  businessTypeEnum,
 } from "./settings.validators";
 
 describe("settings validators", () => {
-  it("accepts every supported business type", () => {
-    for (const type of businessTypeEnum.options) {
-      expect(businessTypeEnum.safeParse(type).success).toBe(true);
-    }
-    expect(businessTypeEnum.safeParse("spaceship").success).toBe(false);
-  });
-
-  it("general requires a site name and valid business type", () => {
+  it("general requires a site name", () => {
     expect(
       generalSchema.safeParse({
         siteName: "",
         timezone: "Asia/Kolkata",
         currency: "INR",
-        businessType: "bakery",
       }).success,
     ).toBe(false);
 
@@ -31,7 +22,6 @@ describe("settings validators", () => {
         siteName: "My Shop",
         timezone: "Asia/Kolkata",
         currency: "INR",
-        businessType: "flower-shop",
       }).success,
     ).toBe(true);
   });
@@ -41,7 +31,6 @@ describe("settings validators", () => {
       siteName: "My Shop",
       timezone: "Asia/Kolkata",
       currency: "INR",
-      businessType: "bakery" as const,
     };
 
     // Both fields reach an href/src attribute — the favicon a `<link rel="icon">`
@@ -89,7 +78,6 @@ describe("settings validators", () => {
       siteName: "My Shop",
       timezone: "Asia/Kolkata",
       currency: "INR",
-      businessType: "bakery" as const,
     };
 
     // `Intl.NumberFormat` throws a RangeError on an unknown currency code, and
@@ -128,12 +116,13 @@ describe("settings validators", () => {
     expect(commerceSchema.safeParse({ ...base, taxRate: 0.05 }).success).toBe(true);
   });
 
-  it("modules requires all six booleans", () => {
+  it("modules requires all five booleans", () => {
+    // It was six. `eggEggless` went with the egg special case — a shop that
+    // offers eggless prices an option for it now.
     expect(
       modulesSchema.safeParse({
         weddingBuilder: true,
         flavour: true,
-        eggEggless: true,
         weight: true,
         shape: true,
         photoCake: true,

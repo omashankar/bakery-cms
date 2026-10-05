@@ -29,6 +29,16 @@ import {
 } from "@/apps/admin/media/lib/media-folders";
 import { defaultMediaFolders } from "@/features/media/lib/media-folder-defaults";
 
+/**
+ * The built-in folder’s name, read rather than typed.
+ *
+ * These cases are about DUPLICATE NAMES, not about any particular word. They
+ * were written against the literal “Cakes” and went red the day that default
+ * was renamed for shops that do not sell cakes — a wording change breaking a
+ * test about name collisions.
+ */
+const BUILT_IN = defaultMediaFolders[0].name;
+
 describe("media folders", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -48,14 +58,14 @@ describe("media folders", () => {
   });
 
   it("refuses a name that is already taken", async () => {
-    const { value } = await createMediaFolder("Cakes");
+    const { value } = await createMediaFolder(BUILT_IN);
 
     expect(value).toBeNull();
-    expect(loadMediaFolders().filter((f) => f.name === "Cakes")).toHaveLength(1);
+    expect(loadMediaFolders().filter((f) => f.name === BUILT_IN)).toHaveLength(1);
   });
 
   it("treats case and surrounding space as the same name", async () => {
-    expect((await createMediaFolder("  cakes ")).value).toBeNull();
+    expect((await createMediaFolder(`  ${BUILT_IN.toLowerCase()} `)).value).toBeNull();
     expect((await createMediaFolder("GALLERY")).value).toBeNull();
     expect(mediaFolderNameTaken("banners & offers")).toBe(true);
   });

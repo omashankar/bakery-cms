@@ -88,6 +88,60 @@ const seoSchema = z
  * sort rather than an error. Reachable through backup restore, which posts a
  * hand-editable file straight to this endpoint.
  */
+/**
+ * One link inside a mega-menu group.
+ *
+ * Validated for the same reason the nav row above it is: this endpoint takes a
+ * hand-editable file through backup restore, and `links.map(...)` renders into
+ * the storefront shell with no guard of its own.
+ */
+/**
+ * The axis a picked link points into.
+ *
+ * `.strict()` rather than the `.passthrough()` of the rows around it: unlike
+ * those there is nothing here a later version could add without the resolver
+ * knowing about it, and a wrong `axis` has to be a 400 rather than a link
+ * that silently vanishes at render while the admin still shows it saved.
+ */
+const menuLinkRefSchema = z
+  .object({
+    axis: z.enum(["category", "occasion", "collection"]),
+    id: z.string().min(1),
+  })
+  .strict();
+
+const megaMenuLinkSchema = z
+  .object({
+    id: z.string().min(1),
+    label: z.string(),
+    href: z.string(),
+    badge: z.string().optional(),
+    /*
+      OPTIONAL, never defaulted: absent means "the shop typed this link",
+      which is every link stored before today.
+
+      DECLARED, though the object around it is `.passthrough()` and would
+      store it either way. Passthrough stores what it is handed, and this
+      endpoint takes a hand-editable file through backup restore — an
+      `axis: "brand"` would save with a 200 and then resolve to nothing.
+    */
+    ref: menuLinkRefSchema.optional(),
+  })
+  .passthrough();
+
+const megaMenuGroupSchema = z
+  .object({
+    id: z.string().min(1),
+    heading: z.string(),
+    sortOrder: z.number().int().default(0),
+    isVisible: z.boolean().default(true),
+    // `.default([])` here and NOT on `menu` below — a group with no links is a
+    // heading over nothing, which the renderer drops; a nav row with no `menu`
+    // is a plain link, which is different and must stay distinguishable.
+    links: z.array(megaMenuLinkSchema).default([]),
+  })
+  .passthrough();
+
 const headerNavSchema = z
   .object({
     id: z.string().min(1),
@@ -95,15 +149,91 @@ const headerNavSchema = z
     href: z.string(),
     isVisible: z.boolean().default(true),
     sortOrder: z.number().int().default(0),
+    /**
+     * OPTIONAL, never defaulted.
+     *
+     * `absent` means "this row is a plain link" and `[]` means "this row has a
+     * menu the shop emptied". Defaulting would erase that distinction on every
+     * save — and, more to the point, would give every existing row a menu,
+     * which the renderer would then draw INSTEAD of the taxonomy columns the
+     * Collections row has always shown.
+     */
+    menu: z.array(megaMenuGroupSchema).optional(),
+    /**
+     * The four that make a row a PROMOTED row rather than a plain link.
+     *
+     * All optional, all absent on every row in every shop today, and all
+     * inert when absent — the row renders exactly as it does now. `icon` is a
+     * free string here and resolved against an allowlist at render, so a name
+     * this build does not know is no icon rather than a crash.
+     */
+    highlight: z.boolean().optional(),
+    icon: z.string().optional(),
+    badge: z.string().optional(),
+    dividerBefore: z.boolean().optional(),
+    /**
+     * THE ROW OPENS ITS MENU AND GOES NOWHERE.
+     *
+     * DECLARED, though the `.passthrough()` below would store it either way —
+     * the same reason `ref` and `showBannerStrip` are declared in this file.
+     * Left undeclared, a hand-edited restore file holding `menuOnly: "yes"`
+     * saves with a 200, and a string is truthy, so the row silently loses its
+     * destination with nothing on screen to say why.
+     *
+     * `href` above stays REQUIRED. This field is what a menu-only row IS; a
+     * missing `href` is a malformed document, and conflating the two would
+     * leave nothing able to refuse the second.
+     *
+     * NO REFINE REFUSES A ROW WITH NO MENU YET. This endpoint takes the whole
+     * header in one payload, so a 400 here would block a save the shop made
+     * to change its logo letter, and would refuse an entire backup restore
+     * over one unfinished row. The Header screen refuses it by name and both
+     * renderers draw nothing; the three read one predicate.
+     */
+    menuOnly: z.boolean().optional(),
   })
   .passthrough();
 
-const headerSchema = z
+export const headerSchema = z
   .object({
     logoLetter: z.string().default(""),
+    // Optional: blank and absent both mean "use the shop's own plural".
+    searchPlaceholder: z.string().optional(),
     nav: z.array(headerNavSchema),
+    /*
+      Declared, because the schema is `.passthrough()` and the renderer reads
+      this as `?? true`. Left undeclared, a stored "false" — a string, which
+      is what a hand-edited document or an older form would hold — is truthy,
+      and the switch silently stops working in the one direction anybody uses
+      it in.
+    */
+    showBannerStrip: z.boolean().optional(),
   })
-  .passthrough();
+  .passthrough()
+  /*
+    THE FIVE KEYS THE HEADER NO LONGER HAS, DROPPED ON EVERY SAVE.
+
+    Nothing reads `showCta`, `ctaLabel`, `ctaHref`, `utilityNav` or
+    `showCurrencyNote` any more. But this endpoint takes a whole-document
+    replace and the object is `.passthrough()`, so whatever the browser posts
+    BECOMES the document — and the admin's form is the defaults spread over a
+    localStorage blob that still carries all five. Without this, the next save
+    of the logo letter would write them back over a cleaned database, and no
+    amount of cleaning it would stick.
+
+    A DROP, NOT A REFUSAL. A document stored before today still saves, so
+    restoring an old backup works and a shop can still change its logo letter.
+    A leftover `showCta: "yes"` is discarded rather than 400ing, which is the
+    right answer once there is no switch for a truthy string to turn on.
+
+    Spelled as a rest-destructure and NOT as an `Omit<>` annotation: `keyof`
+    an index-signature type is `string`, so `Omit` over a `.passthrough()`
+    output collapses the whole type and every caller that reads `parsed.nav`
+    stops compiling.
+  */
+  .transform(
+    ({ showCta, ctaLabel, ctaHref, utilityNav, showCurrencyNote, ...rest }) => rest,
+  );
 
 /**
  * `links` is what the footer actually renders, and it was unvalidated.

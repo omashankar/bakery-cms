@@ -19,6 +19,7 @@ import type { ProductReview, ProductReviewFormData } from "@/types/review";
 import { PRODUCTS_UPDATED_EVENT } from "@/features/products/lib/products-repository";
 import { toast } from "sonner";
 import type { Product } from "@/types/product";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 interface ReviewFormDialogProps {
   open: boolean;
@@ -33,6 +34,7 @@ export function ReviewFormDialog({
   initial,
   onSubmit,
 }: ReviewFormDialogProps) {
+  const labels = useBusinessLabels();
   /**
    * The catalogue, re-read whenever it changes and whenever the dialog opens.
    *
@@ -106,7 +108,7 @@ export function ReviewFormDialog({
      */
     const cake = cakes.find((item) => item.slug === productSlug);
     if (!cake) {
-      toast.error("Choose a product for this review");
+      toast.error(`Choose a ${labels.productWord.toLowerCase()} for this review`);
       return;
     }
     if (!authorName.trim()) {
@@ -146,7 +148,7 @@ export function ReviewFormDialog({
         <DialogHeader>
           <DialogTitle>{initial ? "Edit review" : "Add review"}</DialogTitle>
           <DialogDescription>
-            Product reviews appear on cake detail pages after approval.
+            Reviews appear on {labels.productWord.toLowerCase()} detail pages after approval.
           </DialogDescription>
         </DialogHeader>
 
@@ -234,7 +236,7 @@ export function ReviewFormDialog({
               checked={isFeatured}
               onCheckedChange={(checked) => setIsFeatured(checked === true)}
             />
-            Feature this review on the product page
+            Feature this review on the {labels.productWord.toLowerCase()} page
           </label>
         </div>
 

@@ -64,7 +64,7 @@ async function postJson(path: string, body: unknown): Promise<{ ok: boolean; dat
       | null;
     return { ok: res.ok, data: parsed?.data, message: parsed?.message };
   } catch {
-    return { ok: false, message: "Could not reach the bakery. Check your connection." };
+    return { ok: false, message: "Could not reach the store. Check your connection." };
   }
 }
 

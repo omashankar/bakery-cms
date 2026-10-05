@@ -356,7 +356,7 @@ export function SeoAdminPage() {
                 onChange={(e) =>
                   editGlobal((prev) => ({ ...prev, titleSuffix: e.target.value }))
                 }
-                placeholder="| Your Bakery"
+                placeholder="| Your Store"
               />
             </div>
           </div>
@@ -507,6 +507,16 @@ export function SeoAdminPage() {
                 !isValidJson(global.organizationSchemaJson ?? "")
               }
             />
+            {/*
+              THIS BOX IS LIVE, AND THE CAPTION USED TO DENY IT.
+
+              It read "Demo placeholder for structured data." whenever the JSON
+              was valid. The value is injected verbatim into an
+              application/ld+json script tag on every storefront page
+              (layouts/storefront-layout.tsx). Telling a shop owner their own
+              published output is a stand-in is how the box gets left wrong, or
+              left empty, by someone who believes nothing reads it.
+            */}
             <p
               className={`text-xs ${
                 isValidJson(global.organizationSchemaJson ?? "")
@@ -515,7 +525,7 @@ export function SeoAdminPage() {
               }`}
             >
               {isValidJson(global.organizationSchemaJson ?? "")
-                ? "Demo placeholder for structured data."
+                ? "Added to every page of your shop, so search engines can read who you are."
                 : "Invalid JSON — fix before saving."}
             </p>
           </div>

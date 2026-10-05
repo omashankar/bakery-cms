@@ -4,7 +4,7 @@ import {
   getActiveSocialLinks,
   getContactSettings,
   getGeneralSettings,
-  isWeddingEnabled,
+  getLabelSettings,
 } from "@/features/settings/lib/settings-repository";
 import {
   isSafeSocialUrl,
@@ -12,8 +12,11 @@ import {
   normalizeMapEmbedUrl,
 } from "@/features/settings/lib/settings-utils";
 import { chosen } from "./shipped-placeholder";
-import { getBusinessLabels, type BusinessLabels } from "@/config/business-labels";
-import type { BusinessType } from "@/types/settings";
+import {
+  getBusinessLabels,
+  resolveLabels,
+  type BusinessLabels,
+} from "@/config/business-labels";
 
 /*
  * `getStorefrontBrandInfo` was here, and it is gone rather than merely unused.
@@ -73,18 +76,6 @@ export function getStorefrontBusinessHours() {
   return chosenList(contact.businessHours, businessHours, hoursIdentity);
 }
 
-export function getStorefrontBusinessType(): BusinessType {
-  return getGeneralSettings().businessType;
-}
-
-export function getStorefrontBusinessLabels(): BusinessLabels {
-  return getBusinessLabels(getStorefrontBusinessType());
-}
-
-/** Wedding cakes are bakery-only and gated by the wedding module. */
-export function isStorefrontWeddingEnabled(): boolean {
-  return isWeddingEnabled();
-}
 
 /**
  * The client twin of `getStorefrontChrome`'s social read. Kept in step with it

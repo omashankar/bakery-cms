@@ -29,7 +29,7 @@ export function PaymentMethodCard({ method, selected, onSelect }: PaymentMethodC
   return (
     <div
       className={cn(
-        "rounded-xl border bg-white transition-colors",
+        "rounded-xl border bg-card transition-colors",
         selected ? "border-bakery-700 ring-1 ring-bakery-700/20" : "border-border hover:border-bakery-300"
       )}
     >

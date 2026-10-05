@@ -3,9 +3,7 @@ import path from "node:path";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { syncLegacyFlagsFromVariants } from "@/features/products/lib/variant-utils";
 import { loadProducts } from "@/features/products/lib/products-repository";
-import type { ProductVariantGroup } from "@/types/product";
 
 const root = process.cwd();
 const read = (relative: string) => readFileSync(path.join(root, relative), "utf8");
@@ -264,37 +262,15 @@ describe("a name with no Latin characters", () => {
   });
 });
 
-describe("the eggless tick survives a save", () => {
-  const noGroups: ProductVariantGroup[] = [];
-  const eggGroup: ProductVariantGroup[] = [
-    {
-      id: "g1",
-      name: "Egg",
-      type: "egg",
-      required: true,
-      options: [
-        { id: "o1", label: "With egg", priceDelta: 0, isDefault: true, semantic: "with-egg" },
-        { id: "o2", label: "Eggless", priceDelta: 50, isDefault: false, semantic: "eggless" },
-      ],
-    } as unknown as ProductVariantGroup,
-  ];
+/*
+  "the eggless tick survives a save" stood here, and then its photo twin.
 
-  it("keeps the admin's tick when there is no egg variant group", () => {
-    // Most products have none, and the flag was derived unconditionally — so the
-    // tick came back off, and the eggless filter and badge never applied.
-    const flags = syncLegacyFlagsFromVariants(noGroups, {}, { isEggless: true });
-    expect(flags.isEggless).toBe(true);
-  });
-
-  it("still derives from the variants when there IS a group", () => {
-    const flags = syncLegacyFlagsFromVariants(eggGroup, {}, { isEggless: true });
-    expect(flags.isEggless).toBe(false);
-  });
-
-  it("defaults to false when nothing says otherwise", () => {
-    expect(syncLegacyFlagsFromVariants(noGroups, {}).isEggless).toBe(false);
-  });
-});
+  Both described a flag DERIVED from what a product's options meant, and the
+  trap that came with it: derive it unconditionally and the merchant's own
+  tick is overwritten with false on every save. There is no such flag left.
+  A shop says a product takes a photograph with one tick, and prices the
+  printing into the product.
+*/
 
 describe("an unreadable product cache", () => {
   beforeEach(() => localStorage.clear());

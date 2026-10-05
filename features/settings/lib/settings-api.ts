@@ -39,6 +39,14 @@ export const SERVER_SECTIONS = [
   "maintenance",
   "commerce",
   "modules",
+  /**
+   * The shop's own words for what it sells.
+   *
+   * Absent from this list a save is written to localStorage and never reaches
+   * Mongo, so the label would survive until the next device and no further —
+   * and a backup would restore a shop without it.
+   */
+  "labelOverrides",
 ] as const;
 
 async function getJson<T>(path: string): Promise<T | null> {

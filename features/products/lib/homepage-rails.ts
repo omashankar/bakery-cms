@@ -4,7 +4,11 @@ import {
   getPublishedStorefrontProducts,
   type TaxonomyNames,
 } from "@/features/products/lib/product-mapper";
-import { filterProductsByCategory } from "@/features/products/lib/product-catalog";
+import {
+  filterProductsByCategory,
+  productsInCollection,
+  productsTaggedForOccasion,
+} from "@/features/products/lib/product-catalog";
 
 /**
  * Homepage rail selection.
@@ -20,6 +24,129 @@ export type HomepageProductSource =
   | "photo-cakes"
   | "eggless"
   | "seasonal";
+
+/**
+ * The rows whose heading is a claim about the product, not a curation.
+ * See the note at the top-up below for why they are exempt from it.
+ */
+const UNPADDED_SOURCES: ReadonlySet<HomepageProductSource> = new Set([
+  "eggless",
+  "seasonal",
+  "photo-cakes",
+]);
+
+/**
+ * A ROW OF ANY CATEGORY THE SHOP HAS — the open path beside the closed one.
+ *
+ * `HomepageProductSource` is six fixed values, and three of them are bakery
+ * category slugs written as literals: photo-cakes, eggless, seasonal. A plant
+ * shop was offered "Eggless Cakes" in Add Section and had no way to add
+ * "Succulents" — the builder could arrange rows but not name one after a
+ * category the shop invented.
+ *
+ * The union stays, because layouts already stored carry those values and a
+ * shop that published an Eggless row keeps it. `eggless` and `seasonal` now
+ * call THIS, so there is one implementation rather than two that can drift.
+ *
+ * Never padded. Every category rail is a row that says what its products
+ * ARE — "Succulents" topped up with a cake is a false statement about the
+ * row, the same reason the three named sources are exempt from the top-up
+ * below.
+ */
+/**
+ * WHAT THE CHEAPEST THING IN A CATEGORY COSTS — over all of it.
+ *
+ * Not `Math.min` over a RAIL. A rail is capped (ROW_CAP is 12) and ordered
+ * by curation, so its cheapest member is the cheapest of the first twelve —
+ * which is the true minimum today only because no category here has twelve
+ * products yet. The day one does, a card reading "Starting from" would name
+ * a price that is not the lowest on the page it links to, and nothing would
+ * fail: the number would simply be wrong.
+ *
+ * Membership comes from `filterProductsByCategory`, the same function the
+ * rails and the collection page use, because the promise a card makes is
+ * about the page it links to and no other definition of the category.
+ *
+ * A category with nothing priced in it gets no entry at all, so the caller
+ * renders no price rather than a zero.
+ */
+export function categoryStartingPrices(
+  all: LandingProduct[],
+  categories?: { name: string; slug: string }[],
+): Record<string, number> {
+  const out: Record<string, number> = {};
+
+  for (const category of categories ?? []) {
+    const prices = filterProductsByCategory(all, category.slug, categories)
+      .map((product) => product.price)
+      .filter((price) => typeof price === "number" && Number.isFinite(price) && price > 0);
+
+    if (prices.length) out[category.slug] = Math.min(...prices);
+  }
+
+  return out;
+}
+
+export function buildCategoryRail(
+  slug: string,
+  maxCount: number,
+  adminMapped: LandingProduct[],
+  all: LandingProduct[],
+  categories?: { name: string; slug: string }[],
+  /**
+   * The shop's curated groups, so a row can point at one.
+   *
+   * Optional, and absent simply means a slug that names a collection finds
+   * nothing here — which is what happened before this existed.
+   */
+  collections?: { slug: string; productIds?: string[] }[],
+): LandingProduct[] {
+  /**
+   * COLLECTION, THEN CATEGORY, THEN OCCASION — the same order
+   * /store/collections/<slug> resolves in, and for the same reason: a row on
+   * the homepage and the page its "View all" opens have to hold the same
+   * products, or the row is advertising a page that does not match it.
+   *
+   * This was category only, and the day the shop's catalogue stopped filing
+   * products under occasion-shaped categories the homepage's Birthday row went
+   * empty while /store/collections/birthday — which resolves the occasion —
+   * still held nineteen. Two answers to one slug, on two screens one click
+   * apart.
+   */
+  const collection = collections?.find((group) => group.slug === slug);
+  if (collection) {
+    /*
+      `productsInCollection` walks the IDS, and that is the point: the order of
+      a collection IS its content — a shop puts its best seller first — and a
+      `filter` over the catalogue would hand back catalogue order instead,
+      quietly discarding the one thing the shop curated. The page behind this
+      row uses the same function for the same reason.
+    */
+    const merged = mergeWithCatalog(
+      productsInCollection(adminMapped, collection.productIds ?? []),
+      productsInCollection(all, collection.productIds ?? []),
+    );
+    if (merged.length > 0) return merged.slice(0, maxCount);
+  }
+
+  const admin = filterProductsByCategory(adminMapped, slug, categories);
+  const byCategory = mergeWithCatalog(
+    admin,
+    filterProductsByCategory(all, slug, categories),
+  );
+  if (byCategory.length > 0) return byCategory.slice(0, maxCount);
+
+  /*
+    Last, and only when nothing else claimed the slug — a category and an
+    occasion may share one, and the category is what a row labelled with a
+    category name should hold.
+  */
+  const byOccasion = mergeWithCatalog(
+    productsTaggedForOccasion(adminMapped, slug),
+    productsTaggedForOccasion(all, slug),
+  );
+  return byOccasion.slice(0, maxCount);
+}
 
 function mergeWithCatalog(adminCakes: LandingProduct[], fallback: LandingProduct[]): LandingProduct[] {
   if (adminCakes.length === 0) return fallback;
@@ -51,16 +178,42 @@ export function buildHomepageProducts(
    * different answers inside one row. The browser did not have the bug, which
    * is why it went unnoticed: there the store is real.
    */
-  names?: TaxonomyNames
+  names?: TaxonomyNames,
+  /**
+   * The shop own categories, so a slug can be resolved to its NAME.
+   *
+   * `filterProductsByCategory` falls back to slugifying the product category
+   * name, and that only works where a shop has not renamed a category away
+   * from its slug. This shop has “Eggless Cakes” at /eggless, so the fallback
+   * compares “eggless-cakes” with “eggless” and the row comes back empty.
+   * Seasonal happened to work only because its name IS its slug.
+   */
+  categories?: { name: string; slug: string }[],
+  /**
+   * The shop's curated groups, so a row can point at one.
+   *
+   * Threaded through for the same reason `categories` is: only the catalogue
+   * knows which products a collection holds, and a row whose slug names one
+   * would otherwise come back empty while the page it links to is full.
+   */
+  collections?: { slug: string; productIds?: string[] }[],
+  /**
+   * Return the SELECTION, not a full grid.
+   *
+   * Private to `matchHomepageSource` below, which is the readable name for
+   * it. The padding is a display decision about keeping a grid full, and a
+   * caller that wants to ask "which products carry this flag" must not get
+   * it — least of all by asking for a huge maxCount, which pads with the
+   * entire shop.
+   */
+  unpadded = false,
 ): LandingProduct[] {
   const published = adminProducts.filter((cake) => cake.status === "published");
   const flags = {
     featured: published.filter((cake) => cake.isFeatured),
     trending: published.filter((cake) => cake.isTrending),
     bestSellers: published.filter((cake) => cake.isBestSeller),
-    photo: published.filter((cake) => cake.isPhotoCake),
-    eggless: published.filter((cake) => cake.isEggless),
-    seasonal: published.filter((cake) => cake.isSeasonal),
+    photo: published.filter((cake) => cake.allowsPhotoUpload),
   };
 
   const adminMapped = getPublishedStorefrontProducts(adminProducts, names);
@@ -86,18 +239,97 @@ export function buildHomepageProducts(
       const admin = pickAdmin(flags.photo);
       return mergeWithCatalog(admin, filterProductsByCategory(all, "photo-cakes"));
     },
-    eggless: () => {
-      const admin = pickAdmin(flags.eggless);
-      return mergeWithCatalog(admin, filterProductsByCategory(all, "eggless"));
-    },
-    seasonal: () => {
-      const admin = pickAdmin(flags.seasonal);
-      return mergeWithCatalog(admin, filterProductsByCategory(all, "seasonal"));
-    },
+
+    /**
+     * The CATEGORY, not a flag on the product.
+     *
+     * There was an `isSeasonal` tick, and it disagreed with the rest of the
+     * site: the nav's “Seasonal” link and the mega-menu card both point at
+     * `/collections/seasonal`, which is served by the category — so a cake
+     * ticked Seasonal but filed under Birthday appeared in this row and was
+     * missing from the page the row links to. Two answers to one question.
+     *
+     * One list now: put the product in the Seasonal category and every
+     * surface agrees.
+     */
+    /**
+     * Also the CATEGORY. `isEggless` was a boolean on the product, and a
+     * claim about a RECIPE that the software derived from an option label;
+     * it went with the egg special case. What a shop files under Eggless is
+     * the shop saying so in its own catalogue, which is the same answer the
+     * nav link and /collections/eggless already give.
+     */
+    // Both go through `buildCategoryRail`, so the legacy rows and any row a
+    // shop adds are one implementation. `maxCount` is applied again by the
+    // caller below; passing it here changes nothing and keeps the helper
+    // honest about its own contract.
+    eggless: () =>
+      buildCategoryRail("eggless", maxCount, adminMapped, all, categories, collections),
+    seasonal: () =>
+      buildCategoryRail("seasonal", maxCount, adminMapped, all, categories, collections),
   };
 
   const matched = sourceMatchers[source]();
+  if (unpadded) return matched;
+  return padRail(source, matched, all, maxCount);
+}
+
+/**
+ * WHAT MATCHES A SOURCE, and nothing else.
+ *
+ * `buildHomepageProducts` pads its answer up to `maxCount` from the wider
+ * catalogue, which is a display decision about keeping a grid full. Any
+ * caller that wants the SELECTION rather than a full grid has to come here
+ * instead — and asking for the selection by calling the padded one with a
+ * huge maxCount does the opposite of what it looks like: it pads with the
+ * entire shop. That is not hypothetical. It shipped for an hour, and the
+ * Bestsellers row's Birthday tab listed eight products of which three were
+ * not bestsellers at all.
+ */
+export function matchHomepageSource(
+  source: HomepageProductSource,
+  adminProducts: Product[],
+  all: LandingProduct[],
+  names?: TaxonomyNames,
+  categories?: { name: string; slug: string }[],
+  collections?: { slug: string; productIds?: string[] }[],
+): LandingProduct[] {
+  return buildHomepageProducts(
+    source,
+    Number.POSITIVE_INFINITY,
+    adminProducts,
+    all,
+    names,
+    categories,
+    collections,
+    true,
+  );
+}
+
+function padRail(
+  source: HomepageProductSource,
+  matched: LandingProduct[],
+  all: LandingProduct[],
+  maxCount: number,
+): LandingProduct[] {
   if (matched.length >= maxCount) return matched.slice(0, maxCount);
+
+  /**
+   * A row that says what its products ARE cannot be topped up.
+   *
+   * The padding below keeps a grid full when too few products match, which
+   * is a fair display decision for a row the shop CURATES — Featured,
+   * Trending, Best Sellers are its own selection, and a fourth cake beside
+   * three chosen ones says nothing untrue about any of them.
+   *
+   * It is not fair for a row that names a property. “Eggless Collection”
+   * padded with an ordinary sponge is not untidy, it is a false statement
+   * about food; the eggless rail was removed rather than left to do exactly
+   * that. “Photo Cakes” padded with a cake that takes no photograph sends
+   * the customer to a page with no uploader on it, and “Seasonal” pads with
+   * whatever is in stock. A shop with two eggless cakes has a row of two.
+   */
+  if (UNPADDED_SOURCES.has(source)) return matched;
 
   // Keep grids full even when few cakes carry a given flag — relevant ones first,
   // then top up from the wider catalogue so a section never shows a lone card.

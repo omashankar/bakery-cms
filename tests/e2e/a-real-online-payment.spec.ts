@@ -49,7 +49,7 @@ test.describe("paying for real, on a test key", () => {
     await signInAsCustomer(page, customerEmail);
 
     await page.goto("/store");
-    const href = await page.locator('a[href^="/store/cakes/"]').first().getAttribute("href");
+    const href = await page.locator('a[href^="/store/p/"]').first().getAttribute("href");
     expect(href, "the storefront lists no product to buy").toBeTruthy();
     await page.goto(href!);
     await page.getByRole("button", { name: /add to cart/i }).first().click();
@@ -59,12 +59,21 @@ test.describe("paying for real, on a test key", () => {
 
     await page.getByLabel(/full name/i).fill("E2E Pay Probe");
     await page.getByLabel(/email/i).fill(customerEmail);
-    await page.getByLabel(/phone/i).fill("9000000002");
+    // EXACT. The address step also carries "Alternate phone (optional)", so
+    // a loose /phone/i matches two boxes and the fill refuses to guess.
+    await page.getByLabel("Phone", { exact: true }).fill("9000000002");
     await page.getByLabel(/address line 1|address/i).first().fill("2 Probe Lane");
     await page.getByLabel(/city/i).fill("Mumbai");
     await page.getByLabel(/state/i).fill("MH");
     await page.getByLabel(/PIN code/i).fill("400001");
 
+    await page.getByRole("button", { name: /continue|next/i }).first().click();
+
+    // ---- the personalize step ----
+    // Date and slot moved here from the address step when the flow became
+    // Cart → Address → Personalize → Payment. Both are still enforced on the
+    // server: the date must be a real calendar day at or after the lead time,
+    // and the slot must be one the shop offers.
     const earliest = new Date();
     earliest.setDate(earliest.getDate() + 5);
     await page
@@ -80,12 +89,42 @@ test.describe("paying for real, on a test key", () => {
     const options = await slot.locator("option").allTextContents();
     const firstReal = options.find((text) => text && !/select a time/i.test(text));
     if (firstReal) await slot.selectOption({ label: firstReal });
+
     await page.getByRole("button", { name: /continue|next/i }).first().click();
 
     await page.getByText(/pay online/i).first().click();
-    await page.getByRole("button", { name: /continue|next|review/i }).first().click();
+    // The Review hop stood here. Payment and Review are one screen now, so
+    // the method is chosen and the order placed without leaving it.
+    /**
+     * The terms tick GATES the order button.
+     *
+     * It was a grey sentence saying agreement had already happened; it is a
+     * control now, and unticked to begin with, so a journey that does not tick
+     * it reaches a button that can never enable.
+     */
+    /**
+     * The visible control, not the label around it.
+     *
+     * Base UI puts the id on a hidden input and renders the tick beside it, so
+     * the id locates the pair but cannot be clicked. The LABEL can, and does
+     * toggle it — but it is a full-width centred row, so the click lands at its
+     * midpoint, which is the terms sentence and not always on top. Clicking the
+     * control itself is both what a customer aims at and a target that cannot
+     * be covered by its own text.
+     */
+    const terms = page.locator("label:has(#acceptTerms) [role=\"checkbox\"]");
+    await terms.scrollIntoViewIfNeeded();
+    await terms.click();
+
+    /**
+     * Anchored on the AMOUNT, not on the word.
+     *
+     * The method card is named "Pay Online" and shares this screen with the
+     * money button now — the old flow had them one step apart — so `/^pay\b/`
+     * matched the card first, and clicking it only re-selected the method.
+     */
     await page
-      .getByRole("button", { name: /^(pay\b|place order)/i })
+      .getByRole("button", { name: /^(pay[^a-z]*\d|place order)/i })
       .filter({ hasNotText: /go back|edit/i })
       .first()
       .click();

@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import type { CheckoutAddress } from "@/features/orders/lib/checkout-draft";
 
 const ADDRESSES_STORAGE_KEY = "bakery-cms-customer-addresses";
@@ -27,7 +28,7 @@ function readAddresses(): SavedAddress[] {
 
 function writeAddresses(addresses: SavedAddress[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(ADDRESSES_STORAGE_KEY, JSON.stringify(addresses));
+  safeSetItem(ADDRESSES_STORAGE_KEY, JSON.stringify(addresses));
   window.dispatchEvent(new Event("bakery-addresses-updated"));
 }
 

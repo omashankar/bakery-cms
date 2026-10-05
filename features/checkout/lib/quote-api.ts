@@ -1,5 +1,9 @@
 import type { CartLineItem } from "@/features/cart/lib/cart";
 import type { CartTotals } from "@/features/orders/lib/cart-totals";
+import type {
+  CheckoutAddress,
+  OrderPersonalisation,
+} from "@/features/orders/lib/checkout-draft";
 
 /**
  * Asks the SERVER what this cart costs.
@@ -27,24 +31,26 @@ export interface QuoteRequest {
   items: CartLineItem[];
   couponCode?: string;
   giftWrap?: boolean;
+  /** WHICH speed. The amount is the shop's to decide, not the browser's. */
+  deliveryTierId?: string;
   deliveryAddress?: { city?: string; pincode?: string };
   /**
    * The rest of the order intent. Sent so the SERVER can finish this order from
    * the draft alone if the browser never comes back — a payment that completes
    * after the tab closes used to leave money with no order behind it.
    */
-  address?: {
-    fullName: string;
-    email: string;
-    phone: string;
-    addressLine1: string;
-    addressLine2?: string;
-    city: string;
-    state: string;
-    pincode: string;
-  };
+  /**
+   * The type itself, not a copy of its fields.
+   *
+   * This was an inline duplicate of `CheckoutAddress`, which meant a field
+   * added to the address had two more places to be forgotten — here, and in
+   * the server schema this posts to. One of them is now impossible to miss.
+   */
+  address?: CheckoutAddress;
   deliverySlot?: { date?: string; timeSlot?: string };
   orderNotes?: string;
+  /** Sent so the webhook can finish this order without the browser. */
+  personalisation?: OrderPersonalisation;
 }
 
 export interface QuoteOutcome {
@@ -76,10 +82,12 @@ export async function requestCartQuote(input: QuoteRequest): Promise<QuoteOutcom
         items,
         couponCode: input.couponCode,
         giftWrap: input.giftWrap,
+        deliveryTierId: input.deliveryTierId,
         deliveryAddress: input.deliveryAddress,
         address: input.address,
         deliverySlot: input.deliverySlot,
         orderNotes: input.orderNotes,
+        personalisation: input.personalisation,
       }),
     });
 
@@ -92,6 +100,6 @@ export async function requestCartQuote(input: QuoteRequest): Promise<QuoteOutcom
     }
     return { quote: body.data };
   } catch {
-    return { quote: null, error: "Could not reach the bakery. Check your connection." };
+    return { quote: null, error: "Could not reach the store. Check your connection." };
   }
 }

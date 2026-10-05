@@ -52,8 +52,14 @@ export function getPageStatusVariant(
   return "secondary";
 }
 
+/**
+ * Where a CMS page is read.
+ *
+ * "about" used to be special-cased to a hardcoded /store/about. That page is
+ * gone, so a page the shop writes with that slug is served from the CMS route
+ * like any other — which is also the only place its content was ever editable.
+ */
 export function getStorefrontPageUrl(slug: string): string {
-  if (slug === "about") return routes.store.about;
   if (slug === "privacy") return routes.store.privacy;
   if (slug === "terms") return routes.store.terms;
   return routes.store.page(slug);

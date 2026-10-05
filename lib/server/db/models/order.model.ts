@@ -30,6 +30,8 @@ const orderSchema = new mongoose.Schema(
     paymentReference: { type: String, index: true, sparse: true },
     coupon: { type: mongoose.Schema.Types.Mixed },
     orderNotes: { type: String },
+    // Mixed for the same reason the draft's copy is.
+    personalisation: { type: mongoose.Schema.Types.Mixed, default: null },
     placedAt: { type: String, required: true },
     status: {
       type: String,

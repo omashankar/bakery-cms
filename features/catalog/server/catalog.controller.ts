@@ -13,7 +13,7 @@ const CATALOG_ROLES = ["owner", "admin"] as const;
 type SectionContext = { params: Promise<{ section: string }> };
 
 export const getCatalogController = withErrorHandler(async () => {
-  // Public — the storefront needs categories/flavours to render filters.
+  // Public — the storefront needs categories and occasions to render filters.
   return ok(await service.getCatalog(), "Catalog");
 });
 

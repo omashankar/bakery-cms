@@ -3,7 +3,25 @@
  */
 
 import { demoPhotoIds, unsplash } from "./demo-images";
-import type { ProductVariantGroup } from "@/types/product";
+import type {
+  PhotoFrameShapeId,
+  ProductDescriptionBlock,
+  ProductVariantGroup,
+} from "@/types/product";
+
+/**
+ * One variant group as a card carries it: the shop's own question, and the
+ * answers it offers. No ids, no prices, no defaults — a filter needs to read
+ * the words, and `variantGroups` itself stays off the card payload.
+ *
+ * Named, deliberately, rather than keyed by `group.id`: `createVariantGroup`
+ * mints a fresh id per product, so "Shape" carries 29 different ids across this
+ * shop's 29 cakes. The name is the only thing two products' groups share.
+ */
+export interface ProductOptionGroup {
+  name: string;
+  labels: string[];
+}
 
 export interface LandingProduct {
   id: string;
@@ -13,27 +31,76 @@ export interface LandingProduct {
   price: number;
   compareAtPrice?: number;
   image: string;
+  /**
+   * Every photo the shop uploaded, in the order it arranged them.
+   *
+   * `image` stays, and stays FIRST: cards, search results and the link preview
+   * when a page is shared all read it, and none of them wants an array. This is
+   * the product page’s gallery and only the product page’s — `toCard` does not
+   * carry it.
+   */
+  images?: string[];
   category: string;
+  /**
+   * Every category this product is filed under, by NAME.
+   *
+   * Optional because the demo literals in this file set only `category`, and
+   * `category` stays required because `slugify` and `.toLowerCase()` read it
+   * bare. Names rather than ids: the storefront has no concept of a category
+   * id, and every matcher compares names.
+   */
+  categories?: string[];
+  /**
+   * The same memberships, by ID rather than name.
+   *
+   * Carried alongside the names because a COUPON scope matches on ids and
+   * names are not unique — this shop already holds two categories called
+   * "Seasonal" sharing a slug. Optional for the same reason `categories` is:
+   * the demo literals in this file set neither.
+   */
+  categoryIds?: string[];
+  /**
+   * The delivery speeds this product can go out by; empty means all of them.
+   *
+   * Carried so the listing page can offer a speed filter — the only way an
+   * "Express" page can show what is actually express rather than the whole
+   * catalogue.
+   */
+  deliveryTierIds?: string[];
   badge?: string;
   rating?: number;
   reviewCount?: number;
-  isEggless?: boolean;
   flavours?: string[];
+  /** Every visible variant option’s label — what the search haystack matches. */
+  optionLabels?: string[];
+  /**
+   * The same labels, still under the question the shop asked them for.
+   *
+   * `optionLabels` throws the grouping away, and the collections sidebar was
+   * built on it: every option in the catalogue poured into one checkbox list
+   * under a hard-coded “Flavour”. On this shop that heading offered Regular,
+   * Eggless, Round, Square and Heart — not one of them a flavour — and on a
+   * shop selling chargers it would offer 65W and Type-C.
+   *
+   * Kept BESIDE the flat list rather than replacing it: search wants one bag of
+   * words and the filter wants the questions. `toCard` derives the flat one
+   * from this, so the two cannot drift.
+   */
+  optionGroups?: ProductOptionGroup[];
   /** Occasion names this cake is tagged with, for the storefront filter. */
   occasions?: string[];
   inStock?: boolean;
   shapes?: string[];
   allowsMessage?: boolean;
   allowsPhotoUpload?: boolean;
-  ingredients?: string;
+  photoFrameShape?: PhotoFrameShapeId;
   weights?: Array<{ label: string; price: number; serves?: string }>;
-  barcode?: string;
-  preparationTimeMinutes?: number;
-  shelfLifeDays?: number;
-  calories?: number;
-  allergens?: string;
-  careInstructions?: string;
+  /** The shop's own word for the size axis — “Weight”, “Size”, “Length”. */
+  weightLabel?: string;
+
   variantGroups?: ProductVariantGroup[];
+  /** Owner-defined facts, printed as a spec list. Never a choice, never priced. */
+  descriptionBlocks?: ProductDescriptionBlock[];
 }
 
 export interface LandingCategory {
@@ -419,7 +486,6 @@ export const egglessCakes: LandingProduct[] = [
     category: "Eggless",
     badge: "Eggless",
     rating: 4.8,
-    isEggless: true,
   },
   {
     id: "eg-2",
@@ -431,7 +497,6 @@ export const egglessCakes: LandingProduct[] = [
     category: "Eggless",
     badge: "Eggless",
     rating: 4.7,
-    isEggless: true,
   },
   {
     id: "eg-3",
@@ -443,7 +508,6 @@ export const egglessCakes: LandingProduct[] = [
     category: "Eggless",
     badge: "Bestseller",
     rating: 4.9,
-    isEggless: true,
   },
   {
     id: "eg-4",
@@ -454,7 +518,6 @@ export const egglessCakes: LandingProduct[] = [
     image: unsplash(demoPhotoIds.dessertPlate, 600, 600),
     category: "Eggless",
     rating: 4.6,
-    isEggless: true,
   },
 ];
 

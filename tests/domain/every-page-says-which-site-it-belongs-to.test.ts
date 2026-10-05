@@ -83,7 +83,7 @@ describe("a storefront page that names its own canonical", () => {
      * is the one that was missing both. The generic sweep above cannot see an
      * absent `openGraph` — nothing is there to match.
      */
-    const code = stripComments(read("app/(storefront)/store/cakes/[slug]/page.tsx"));
+    const code = stripComments(read("app/(storefront)/store/p/[slug]/page.tsx"));
 
     expect(code, "the product canonical no longer carries the shop's domain").toContain(
       "buildCanonicalUrl(",

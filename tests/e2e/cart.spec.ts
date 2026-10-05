@@ -10,7 +10,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 async function addFirstProduct(page: Page) {
   await page.goto("/store");
-  const firstProduct = page.locator('a[href^="/store/cakes/"]').first();
+  const firstProduct = page.locator('a[href^="/store/p/"]').first();
   await expect(firstProduct).toBeVisible();
   const href = await firstProduct.getAttribute("href");
   await page.goto(href!);
@@ -26,7 +26,9 @@ test.describe("the cart", () => {
 
     // A cart with a line in it must price that line. "₹0" with an item on
     // screen is the shape of a total computed before the item was read.
-    const summary = page.getByRole("heading", { name: /order summary/i });
+    // Headed "Order summary" until it started counting what it summarises —
+    // matched on the part that is the shop's, not on the item count.
+    const summary = page.getByRole("heading", { name: /price details/i });
     await expect(summary).toBeVisible();
     await expect(page.getByText(/₹\s*[1-9]/).first()).toBeVisible();
   });

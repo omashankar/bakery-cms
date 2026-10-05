@@ -36,6 +36,9 @@ const checkoutDraftSchema = new mongoose.Schema(
     address: { type: mongoose.Schema.Types.Mixed, default: null },
     deliverySlot: { type: mongoose.Schema.Types.Mixed, default: null },
     orderNotes: { type: String, default: null },
+    // Mixed, like `address` above it: what Personalize asks for will grow,
+    // and a declared sub-schema drops undeclared keys without a word.
+    personalisation: { type: mongoose.Schema.Types.Mixed, default: null },
 
     /** Set once a gateway order is opened for this draft. */
     razorpayOrderId: { type: String, default: null, index: true },

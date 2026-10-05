@@ -4,12 +4,24 @@ import { getSettings } from "@/features/settings/server/settings.service";
 import { getCoupons, getZones } from "@/features/commerce/server/commerce.service";
 import { calculateCartTotals, type CartTotals } from "@/features/orders/lib/cart-totals";
 import { getProductWeightOptions } from "@/features/products/lib/product-catalog";
-import { calculateProductUnitPrice } from "@/features/products/lib/product-pricing";
+import {
+  calculateProductUnitPrice,
+  displayCompareAtPrice,
+  formatVariantSummary,
+} from "@/features/products/lib/product-pricing";
 import {
   getProductVariantGroups,
+  mapLegacyChoice,
   variantGroupsEnabledBy,
 } from "@/features/products/lib/variant-utils";
-import { resolveCouponDiscount } from "@/features/orders/lib/coupons";
+import {
+  resolveCouponDiscount,
+  type CouponCartLine,
+} from "@/features/orders/lib/coupons";
+import {
+  categoriesOf,
+  deliverableBy,
+} from "@/features/products/lib/products-repository";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import type { CommerceSettings, GeneralSettings, ModuleSettings } from "@/types/settings";
 import type { LandingProduct } from "@/constants/landing-data";
@@ -51,6 +63,8 @@ export interface QuoteInput {
   items: QuoteLineInput[];
   couponCode?: string;
   giftWrap?: boolean;
+  /** WHICH speed, never its price. See `CartTotalsInput.deliveryTierId`. */
+  deliveryTierId?: string;
   deliveryAddress?: { city?: string; pincode?: string };
 }
 
@@ -88,6 +102,28 @@ export interface CartQuote {
   currency: string;
 }
 
+/**
+ * The cart asked for a delivery speed one of its products cannot go out by.
+ *
+ * Refused rather than priced, the same way an unknown slug and an unknown
+ * size are — the cart and the shop disagree about what is on offer, and
+ * charging for the faster tier and sending it late is the one outcome worse
+ * than a refusal.
+ *
+ * It carries BOTH names because the customer needs to know which product is
+ * the problem: "your order cannot go out today" over a six-line cart is an
+ * error nobody can act on.
+ */
+export class UndeliverableAtSpeedError extends Error {
+  constructor(
+    readonly productName: string,
+    readonly tierLabel: string,
+  ) {
+    super(`${productName} cannot be delivered by ${tierLabel}`);
+    this.name = "UndeliverableAtSpeedError";
+  }
+}
+
 export class UnknownProductError extends Error {
   constructor(readonly slug: string) {
     super(`No such product: ${slug}`);
@@ -111,13 +147,39 @@ export class UnknownWeightError extends Error {
   }
 }
 
-/** The unit price of one line, given the options the customer picked. */
+/**
+ * What one line costs, AND what the customer chose to make it cost that.
+ *
+ * The two are returned together because they must be derived from the same
+ * groups. `QuotedLine.variantSummary` existed and was never assigned —
+ * `formatVariantSummary` was not imported here at all — so the field was empty
+ * on every order this shop has taken, and the kitchen email read "2 x Black
+ * Forest" with no size, flavour or message. The customer was charged for those
+ * choices the whole time: `calculateVariantAdjustment` applies every enabled
+ * group, falling back to its default option when no selection arrives.
+ *
+ * Computing the summary anywhere else would let the order narrate one set of
+ * options and bill another — a group added, gated, or defaulted differently on
+ * the two paths. One list, used twice.
+ */
 function priceLine(
   product: LandingProduct,
   line: QuoteLineInput,
   /** The modules this shop has switched on. A group it does not sell is not priced. */
   modules: ModuleSettings,
-): number {
+): {
+  price: number;
+  variantSummary: string[];
+  /** Present so the ORDER records the choice, not only the display text. */
+  variantSelections: Record<string, string>;
+  /** The shop's word for the size axis, so every later surface can head it. */
+  weightLabel?: string;
+  /** The struck-through price for this configuration, or undefined. */
+  compareAtPrice?: number;
+  /** Cleared, and only where a legacy value was mapped onto a real option. */
+  shape?: undefined;
+  flavour?: undefined;
+} {
   const weightOptions = getProductWeightOptions(product);
 
   // An unrecognised weight label is REFUSED, not repriced.
@@ -140,16 +202,122 @@ function priceLine(
   const chosen = weightOptions[index] ?? weightOptions[0];
   const weightPrice = product.weights?.[index]?.price ?? product.price + (chosen?.modifier ?? 0);
 
-  return calculateProductUnitPrice({
-    basePrice: product.price,
-    weightPrice,
-    // Only the groups this shop sells. A module that is off used to hide the
-    // picker and keep charging its default option's surcharge — and since the
-    // adjustment falls back to that default whenever no selection is sent,
-    // omitting the selection would not have stopped it either.
-    variantGroups: variantGroupsEnabledBy(getProductVariantGroups(product), modules),
-    variantSelections: line.variantSelections ?? {},
-  });
+  // Only the groups this shop sells. A module that is off used to hide the
+  // picker and keep charging its default option's surcharge — and since the
+  // adjustment falls back to that default whenever no selection is sent,
+  // omitting the selection would not have stopped it either.
+  const variantGroups = variantGroupsEnabledBy(getProductVariantGroups(product), modules);
+  const shapeGroup = variantGroups.find((group) => group.type === "shape");
+  /**
+   * The same treatment for the legacy flat `flavour`.
+   *
+   * `flavourOptions` was a second, unpriced option system with its own
+   * hard-coded picker; it is a variant group now. A line built by Reorder from
+   * an older order, or sitting in a browser from before the change, still
+   * carries the flat field — and without this it would be printed beside a
+   * recomputed “Flavour: <default>”, which is the doubling shape already had.
+   *
+   * Matched by NAME rather than by a type, because flavour has no dedicated
+   * variant type: a shop names the group itself, and calling it anything else
+   * simply means the old value is preserved rather than mapped.
+   */
+  const flavourGroup = variantGroups.find(
+    (group) => group.name.trim().toLowerCase() === "flavour",
+  );
+  /**
+   * A line that still carries the OLD flat `shape` string.
+   *
+   * Shapes used to be `shapes: string[]` and a `shape` field on the line; they
+   * are a variant group now. Two kinds of line still hold the old field: one
+   * built by Reorder from an order placed before the change, and one sitting in
+   * a customer’s localStorage cart from before the deploy — carts have no
+   * expiry, so those arrive for as long as the browser keeps them.
+   *
+   * Without this the line said the shape TWICE and could say two different
+   * things: `...line` kept “Heart” while `formatVariantSummary` fell back to the
+   * group’s default and added “Shape: Round”. `cartLineChoices` concatenates
+   * both, so the customer’s confirmation, the invoice and the kitchen email all
+   * read “Heart · Shape: Round” — and the kitchen copy is the one acted on.
+   *
+   * The old choice is MAPPED rather than dropped. Dropping it would silently
+   * turn a reordered Heart into whatever the group defaults to, which is the
+   * same damage in the other direction.
+   */
+  const carried = line.variantSelections ?? {};
+  const mappedShape = mapLegacyChoice(shapeGroup, line.shape, carried);
+  const mappedFlavour = mapLegacyChoice(flavourGroup, line.flavour, carried);
+  const variantSelections = {
+    ...carried,
+    ...(mappedShape ? { [mappedShape.groupId]: mappedShape.optionId } : {}),
+    ...(mappedFlavour ? { [mappedFlavour.groupId]: mappedFlavour.optionId } : {}),
+  };
+
+  return {
+    /**
+     * Cleared only where the old value was actually MAPPED onto an option.
+     *
+     * Gated on `shapeGroup` alone, this destroyed a legacy shape the group
+     * cannot match — one the shop has since renamed or removed — leaving the
+     * line asserting the group's default with no record of what the customer
+     * actually asked for. Before the fix the invoice at least still read
+     * "Rectangle · Shape: Round", which is contradictory but not silent.
+     */
+    ...(mappedShape ? { shape: undefined } : {}),
+    ...(mappedFlavour ? { flavour: undefined } : {}),
+    /**
+     * Taken from the PRODUCT, never from the line.
+     *
+     * The client sends what it chose; what that choice is CALLED is the
+     * shop's to say, and a line that sat in a browser since before the shop
+     * renamed the axis would otherwise keep printing the old word on a new
+     * invoice.
+     */
+    ...(product.weightLabel?.trim() ? { weightLabel: product.weightLabel.trim() } : {}),
+    /**
+     * Recomputed here too, from the product rather than the line.
+     *
+     * A browser can send any number it likes, and this one is a CLAIM — “this
+     * normally costs more” — that ends up on the invoice. It is priced the same
+     * way the product page prices it, so the two agree, and a stale line whose
+     * shop has since dropped the compare-at stops claiming a saving.
+     */
+    compareAtPrice: displayCompareAtPrice(
+      product.price,
+      product.compareAtPrice,
+      calculateProductUnitPrice({
+        basePrice: product.price,
+        weightPrice,
+        variantGroups,
+        variantSelections,
+      }),
+    ),
+    price: calculateProductUnitPrice({
+      basePrice: product.price,
+      weightPrice,
+      variantGroups,
+      variantSelections,
+    }),
+    /**
+     * RETURNED, not merely used to price.
+     *
+     * The mapping above wrote into a local and this returned only `price` and
+     * `variantSummary`, so the stored line kept neither the flat `shape` nor a
+     * selection for the group — the customer's choice survived as display text
+     * and nothing else. A reorder then showed "Shape: Heart" from the copied
+     * summary while the re-quote recorded and cooked "Shape: Round", and with
+     * every migrated option priced at 0 nothing moved to warn anybody.
+     *
+     * It also let two lines collapse: with no selection and no shape,
+     * `cartLineId`'s variant key is the literal "default" for both a Heart and
+     * a Round of the same cake, so `addToCart` merged them and added the
+     * quantities — the exact bug `cartLineId`'s own comment records.
+     */
+    variantSelections,
+    // The same list the price came from, resolved the same way — including the
+    // fallback to a group's default, so a line never states a price it does not
+    // explain, and never mentions a group the shop has switched off.
+    variantSummary: formatVariantSummary(variantGroups, variantSelections),
+  };
 }
 
 export async function priceCart(input: QuoteInput): Promise<CartQuote> {
@@ -169,7 +337,27 @@ export async function priceCart(input: QuoteInput): Promise<CartQuote> {
     ...((settings.modules ?? {}) as Partial<ModuleSettings>),
   };
 
+  /**
+   * The speed the customer chose, resolved against the shop's own list.
+   *
+   * `undefined` for no choice AND for an id the shop no longer offers — the
+   * same fall-through `calculateCartTotals` already takes, so the eligibility
+   * check below and the CHARGE agree about which tier is in play.
+   */
+  const chosenTier = input.deliveryTierId
+    ? (commerce.deliveryTiers ?? []).find((tier) => tier.id === input.deliveryTierId)
+    : undefined;
+
   const items: QuotedLine[] = [];
+  /**
+   * The same lines again, as much of them as a COUPON needs.
+   *
+   * Built inside the loop because that is the only place a line and its
+   * product are both in hand — `product` is fetched per iteration and dropped
+   * at the end of it. A coupon scoped to Plants has to know which of these
+   * lines are plants, and `QuotedLine` carries no category at all.
+   */
+  const couponLines: CouponCartLine[] = [];
   for (const line of input.items) {
     const quantity = Math.max(1, Math.floor(line.quantity));
     /**
@@ -189,6 +377,38 @@ export async function priceCart(input: QuoteInput): Promise<CartQuote> {
     // a cake it has deleted.
     if (!product) throw new UnknownProductError(line.productSlug);
 
+    /**
+     * THE SPEED, CHECKED AGAINST THE PRODUCT — server-side, or not at all.
+     *
+     * Delivery used to be shop-wide, so every product could go out at every
+     * speed by definition. It cannot now: a two-tier wedding cake is not a
+     * two-hour delivery, and a shop that says so on the product must be held
+     * to it where the money is decided. A browser-only check is a check the
+     * customer can skip by editing a request.
+     *
+     * Only when a tier was actually CHOSEN, and only against a tier the shop
+     * still offers: an id naming a deleted tier is already ignored by
+     * `calculateCartTotals`, which charges the base fee, so refusing here
+     * would reject an order the shop is perfectly able to fulfil.
+     */
+    if (chosenTier && !deliverableBy(product, chosenTier.id)) {
+      throw new UndeliverableAtSpeedError(product.name, chosenTier.label);
+    }
+
+    // Priced ONCE. `priceLine` is the shop’s own arithmetic over weights,
+    // variants and modules; calling it twice to fill two lists is how the
+    // coupon comes to be measured against a different number from the one the
+    // customer is charged.
+    const priced = priceLine(product as unknown as LandingProduct, line, modules);
+    couponLines.push({
+      productSlug: line.productSlug,
+      // EVERY category it is filed under, so a cake the shop also filed under
+      // Plants is discounted by a plants coupon.
+      categoryIds: categoriesOf(product),
+      price: priced.price,
+      quantity,
+    });
+
     items.push({
       ...line,
       id: cartLineId(line),
@@ -199,26 +419,36 @@ export async function priceCart(input: QuoteInput): Promise<CartQuote> {
       // made the admin order page crash on `src.trim()`.
       image: product.images?.[0] ?? "",
       // The two shapes DO agree on everything the pricing reads — price,
-      // weights, variant groups — so this cast is narrow and deliberate, unlike
-      // the one above it replaced.
-      price: priceLine(product as unknown as LandingProduct, line, modules),
+      // weights, variant groups — so the cast above is narrow and deliberate,
+      // unlike the one it replaced.
+      ...priced,
     });
   }
 
-  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  /*
+    A `subtotal` was computed here and passed to the coupon. It has no other
+    reader — `calculateCartTotals` sums the lines itself — so once the coupon
+    took the lines instead, this was a number nobody used. Left in place it
+    would have been the obvious thing for the next person to hand back to
+    `resolveCouponDiscount`, which is exactly the regression
+    `the-SERVER-decides-what-a-scoped-coupon-may-discount` exists to catch.
+  */
 
   // The coupon is RESOLVED here, not accepted. It used to arrive as
   // `z.record(z.string(), z.unknown())` — an object the caller invented, whose
   // discount bore no relation to anything, and which then appeared in the
   // admin's coupon performance report as if it were real.
   const applied = input.couponCode
-    ? resolveCouponDiscount(await Promise.resolve(coupons), input.couponCode, subtotal)
+    // The LINES, not the subtotal. Given only a number, a scoped coupon has no
+    // way to tell plants from cake and refuses rather than guessing.
+    ? resolveCouponDiscount(await Promise.resolve(coupons), input.couponCode, couponLines)
     : null;
 
   const totals = calculateCartTotals({
     items: items as never,
     discount: applied?.discountAmount ?? 0,
     giftWrap: Boolean(input.giftWrap),
+    deliveryTierId: input.deliveryTierId,
     deliveryAddress: input.deliveryAddress,
     commerceOverride: commerce,
     zonesOverride: (await Promise.resolve(zones)) as DeliveryZone[],

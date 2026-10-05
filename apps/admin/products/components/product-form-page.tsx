@@ -4,7 +4,7 @@ import Link from "next/link";
 import { PhotoField } from "@/apps/admin/media/components/photo-field";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ExternalLink, Loader2 } from "lucide-react";
+import { ExternalLink, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,17 +14,33 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DEFAULT_SIZE_AXIS_LABEL,
+  weightAxisLabel,
+} from "@/features/products/lib/product-pricing";
 import { routes } from "@/constants/routes";
 import { AdminMobileActionBar, AdminPage, AdminPageHeader } from "@/apps/admin/components";
 import type { ProductFormData, EntityStatus } from "@/types";
 import {
   adminCategories,
-  adminFlavours,
+  adminCollections,
   adminOccasions,
   rederiveWeights,
 } from "@/features/products/lib/catalog-options";
-import { slugify } from "@/features/products/lib/product-utils";
-import { createEmptyProductForm } from "@/features/products/lib/products-repository";
+import { reportWrite } from "@/apps/admin/lib/report-write";
+import {
+  CATALOG_UPDATED_EVENT,
+  collectionsHolding,
+  setProductCollections,
+} from "@/features/catalog/lib/catalog-repository";
+import { slugify, slugOrFallback } from "@/features/products/lib/product-utils";
+import {
+  createEmptyProductForm,
+  sizeLabelsInUse,
+  usualPriceForSize,
+  fileUnderCategories,
+  refileUnder,
+} from "@/features/products/lib/products-repository";
 import {
   createProductRequest,
   fetchProduct,
@@ -38,6 +54,11 @@ import { StockStatusBadge } from "@/apps/admin/commerce/components/stock-status-
 import { resolveSaveStatus, type SaveIntent } from "@/lib/publishing/save-status";
 import { formatStatusLabel } from "@/features/products/lib/product-utils";
 import { getInventorySettings } from "@/apps/admin/commerce/lib/inventory-repository";
+import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
+import { useUnsavedChangesGuard } from "@/apps/admin/builders/shared/use-unsaved-changes-guard";
+import { MAX_PRODUCT_PHOTOS } from "@/features/products/lib/product-limits";
+import { loadSeoStore, SEO_UPDATED_EVENT } from "@/features/seo/lib/seo-repository";
+import { getActiveLocale } from "@/features/settings/lib/active-locale";
 import type { ModuleSettings } from "@/types/settings";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import {
@@ -46,43 +67,133 @@ import {
 } from "@/features/settings/lib/settings-repository";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { AdminSelect, adminTextareaClassName } from "./admin-field";
-import { ProductDetailsFields } from "./product-details-fields";
+import { PHOTO_FRAME_SHAPES } from "@/lib/images/photo-print-layout";
+import type { PhotoFrameShapeId } from "@/types/product";
+import { ProductDescriptionBlocksFields } from "./product-description-blocks-fields";
 import { ProductVariantManager } from "./product-variant-manager";
-import {
-  createVariantGroup,
-  createVariantOption,
-  getDefaultVariantSelections,
-  setGroupDefaultBySemantic,
-  syncLegacyFlagsFromVariants,
-} from "@/features/products/lib/variant-utils";
+import { resolveBlockRender } from "@/features/products/lib/variant-utils";
+import { displayCompareAtPrice } from "@/features/products/lib/product-pricing";
+import { formatCurrency } from "@/utils/format";
 
 interface ProductFormPageProps {
   mode: "add" | "edit";
   cakeId?: string;
 }
 
+/**
+ * One photo replaced, the others left alone.
+ *
+ * Written out rather than done inline because the list is rendered from
+ * `photoSlots`, which can be one slot longer than `form.images` — an empty box
+ * for a photo not chosen yet. Indexing straight into `form.images` would drop
+ * that write on the floor.
+ */
+export function withPhotoAt(images: string[], index: number, url: string): string[] {
+  const next = [...images];
+  while (next.length <= index) next.push("");
+  next[index] = url;
+  return next;
+}
+
 /** What the admin is told, per status actually written. */
 const SAVED_MESSAGE: Record<EntityStatus, string> = {
-  published: "Cake published — it is live on the shop",
+  published: "Published — it is live on the shop",
   draft: "Saved as a draft — not on the shop yet",
-  archived: "Cake archived — hidden from the shop",
+  archived: "Archived — hidden from the shop",
 };
 
 export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
   const router = useRouter();
   const [form, setForm] = useState<ProductFormData>(createEmptyProductForm);
+  /**
+   * Always at least one box, so a product with no photo yet has somewhere to
+   * put the first one. Blank slots are dropped on submit — `handleSubmit`
+   * already sends `images: form.images.filter(Boolean)`.
+   */
+  const photoSlots = form.images.length > 0 ? form.images : [""];
+  /**
+   * A write that reads the array it is changing, at the moment it changes it.
+   *
+   * `patchForm({ images: withPhotoAt(form.images, ...) })` captured `form.images`
+   * when the row rendered. An upload takes seconds — shrink, then a round trip —
+   * so its `onChange` fires long afterwards and put that stale copy back, wiping
+   * any photo added to another row while it was in flight.
+   */
+  function setPhotoSlot(index: number, url: string) {
+    setForm((prev) => ({ ...prev, images: withPhotoAt(prev.images, index, url) }));
+  }
+
+  /**
+   * Removing a row EMPTIES it rather than closing the gap.
+   *
+   * Splicing renumbers every row below, and a row's identity here is its index —
+   * for React's reconciliation and for an upload that has not landed yet. So
+   * removing one row while another was uploading moved the pending upload onto
+   * a different photo. Emptying keeps every other index exactly where it was.
+   *
+   * Trailing empties are dropped, so removing the last row still shrinks the
+   * list, and blanks never reach the database: `handleSubmit` already sends
+   * `images: form.images.filter(Boolean)`.
+   */
+  function removePhotoSlot(index: number) {
+    setForm((prev) => {
+      const next = withPhotoAt(prev.images, index, "");
+      while (next.length > 0 && next[next.length - 1] === "") next.pop();
+      return { ...prev, images: next };
+    });
+  }
+  /**
+   * The form as it was last SAVED — or as a new one is born.
+   *
+   * The two builders in this admin have had an unsaved-changes guard since
+   * the day one of them lost somebody's work; the longest form in the admin,
+   * with six tabs and its own “Back to products” link three inches from the
+   * last field, had none. Every item in the sidebar was a silent discard.
+   *
+   * Compared by JSON rather than by a dirty FLAG, because a flag has to be
+   * set by every writer — and this file has nine `setForm` call sites, so one
+   * of them would eventually forget.
+   */
+  const [baseline, setBaseline] = useState(() => JSON.stringify(createEmptyProductForm()));
   const [isLoading, setIsLoading] = useState(mode === "edit");
   const [isSaving, setIsSaving] = useState(false);
   /** The status the SERVER holds, which is the only one the storefront honours. */
   const [savedStatus, setSavedStatus] = useState<EntityStatus | null>(null);
   const [slugTouched, setSlugTouched] = useState(mode === "edit");
-  // Once the admin types a meta title of their own, the name stops driving it.
-  // In edit mode the stored value is already theirs.
-  const [metaTitleTouched, setMetaTitleTouched] = useState(mode === "edit");
+  /*
+    `metaTitleTouched` stood here, tracking whether the admin had typed a meta
+    title of their own so the name could stop driving it. Nothing drives it now:
+    the box is left blank and shows the name as a placeholder, and the route
+    falls back to the name when it is blank. A flag with nothing to gate.
+  */
   // Optional bakery modules hide fields from the form UI only — the underlying
   // form data is never dropped, so a hidden field keeps whatever it had.
   const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
   const labels = useBusinessLabels();
+  const productLower = labels.productWord.toLowerCase();
+
+  /*
+    THE COMPARE-AT, AS TYPED AND AS THE CARD WOULD DRAW IT.
+
+    `compareAtShown` runs the number through the SAME function the storefront
+    card calls, so the admin cannot come to disagree with the shop's own
+    pages about what is being advertised. It is undefined for a compare-at at
+    or below the price, which is exactly the case the shop could not see.
+  */
+  const compareAtTyped = Number(form.compareAtPrice) > 0 ? Number(form.compareAtPrice) : 0;
+  const compareAtShown = displayCompareAtPrice(
+    form.price,
+    compareAtTyped || undefined,
+    form.price,
+  );
+  /**
+   * The speeds this shop offers, read once.
+   *
+   * Empty for a shop that has not set any up, and the control below hides
+   * itself rather than printing a heading over nothing.
+   */
+  const deliveryTiers = getCommerceSettings().deliveryTiers ?? [];
+  const productsLower = labels.productWordPlural.toLowerCase();
 
   /**
    * An archived cake is off the shop, and the two buttons say something
@@ -94,12 +205,96 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
   const saveLabel = isArchived ? "Save changes" : "Save Draft";
   const publishLabel = isArchived ? "Restore & publish" : "Publish";
 
+  /**
+   * Sizes this shop has already typed on its other products.
+   *
+   * Filled in the effect below rather than read during the render: it goes
+   * through the product cache in localStorage, and a render that reads storage
+   * is a render that can be asked to seed it.
+   */
+  const [sizeSuggestions, setSizeSuggestions] = useState<string[]>([]);
+
+
   useEffect(() => {
-    const sync = () => setModules(getModuleSettings());
+    const sync = () => {
+      setModules(getModuleSettings());
+      setSizeSuggestions(sizeLabelsInUse());
+    };
     sync();
     window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
     return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
   }, []);
+
+  /**
+   * The shop's own domain for the search-result preview.
+   *
+   * The card printed "bakery.com/store/cakes/<slug>" — a domain this shop does
+   * not own, shown to every owner as the address their product would live at,
+   * and the only occurrence of that literal in the app. SEO settings have held
+   * `canonicalBaseUrl` all along.
+   *
+   * Read after mount rather than during render: `loadSeoStore` reads
+   * localStorage, which the server cannot, and an empty first paint shows the
+   * path alone rather than a wrong host.
+   */
+  const [previewOrigin, setPreviewOrigin] = useState("");
+  useEffect(() => {
+    const sync = () =>
+      setPreviewOrigin((loadSeoStore().global.canonicalBaseUrl ?? "").replace(/\/+$/, ""));
+    sync();
+    // The base URL is edited on the SEO screen, which broadcasts its own event.
+    // Subscribing means a form left open does not keep showing the old domain.
+    window.addEventListener(SEO_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(SEO_UPDATED_EVENT, sync);
+  }, []);
+
+  /**
+   * THE SHOP'S OWN LISTS, HELD IN STATE — not read during render.
+   *
+   * `adminCategories()` and the two beside it read localStorage, and this form
+   * called them straight from its JSX. On a cold browser that cache holds the
+   * SHIPPED SEED, and `CatalogServerSync` replaces it with the shop's real
+   * catalogue shortly after mount — but nothing here re-rendered when it did,
+   * so the form spent the whole visit offering the demo taxonomy.
+   *
+   * It went unnoticed for categories and occasions because the seed has some
+   * of each, so the boxes looked populated and merely listed the wrong rows.
+   * The seed has NO collections, so the section built on the same read simply
+   * did not appear — which is how the staleness finally became visible.
+   *
+   * The homepage builder already does exactly this, with the same event.
+   */
+  const [catalogLists, setCatalogLists] = useState(() => ({
+    categories: adminCategories(),
+    occasions: adminOccasions(),
+    collections: adminCollections(),
+  }));
+
+  useEffect(() => {
+    const sync = () =>
+      setCatalogLists({
+        categories: adminCategories(),
+        occasions: adminOccasions(),
+        collections: adminCollections(),
+      });
+    sync();
+    window.addEventListener(CATALOG_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(CATALOG_UPDATED_EVENT, sync);
+  }, []);
+
+  /**
+   * WHICH COLLECTIONS HOLD THIS PRODUCT, kept beside the form rather than in it.
+   *
+   * Not part of `ProductFormData`: membership lives on the collection, in its
+   * own `productIds`, and there is no `collectionIds` on a product. Putting
+   * one there would be a second copy of one fact, and the cost of keeping two
+   * copies in step is paid on every screen that writes either.
+   *
+   * So this is the same list the Catalog screen edits, read from the other
+   * end and written back after the product is saved — which is what makes
+   * both directions the same edit instead of two features that agree by hand.
+   */
+  const [collectionIds, setCollectionIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (mode !== "edit" || !cakeId) return;
@@ -112,11 +307,12 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
         if (cancelled) return;
         const { id: _id, createdAt: _c, updatedAt: _u, ...data } = existing;
         setForm(data);
+        setBaseline(JSON.stringify(data));
         setSavedStatus(data.status);
         setIsLoading(false);
       } catch {
         if (cancelled) return;
-        toast.error("Cake not found");
+        toast.error(`${labels.productWord} not found`);
         router.replace(routes.admin.cakes.list);
       }
     }
@@ -128,6 +324,64 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
     };
   }, [mode, cakeId, router]);
 
+  /**
+   * The collections this product is already in.
+   *
+   * Read from the catalog CACHE, and read again when the catalog changes —
+   * `CatalogServerSync` replaces a cold cache with the server's copy shortly
+   * after mount, and without the listener this form would draw its ticks from
+   * the demo seed for the whole visit. That is the same failure the Catalog
+   * screen had and fixed with the same event.
+   *
+   * Add mode leaves it empty: a product that does not exist yet is in nothing.
+   */
+  useEffect(() => {
+    if (mode !== "edit" || !cakeId) return;
+
+    const read = () => setCollectionIds(collectionsHolding(cakeId));
+    read();
+    window.addEventListener(CATALOG_UPDATED_EVENT, read);
+    return () => window.removeEventListener(CATALOG_UPDATED_EVENT, read);
+  }, [mode, cakeId]);
+
+  /**
+   * Put the product in exactly the collections that are ticked.
+   *
+   * SEPARATE FROM THE PRODUCT WRITE, and after it, because they are two
+   * documents: the product is a row of its own and membership lives in the
+   * catalog. A failure here leaves the product saved and its membership not,
+   * which is worth a word — the alternative is a silent half-save, and the
+   * owner would have no way to tell which half.
+   */
+  async function saveCollectionMembership(productId: string) {
+    const { persisted } = await setProductCollections(productId, collectionIds);
+    /*
+      REPORTED THROUGH THE SHARED REPORTER, not with a `toast.error` of its
+      own. "Collections were not saved" is a claim about the VALUE, and the
+      most likely reason a write is refused here is that the admin's session
+      ended — which needs the opposite response: sign in again, not check the
+      input and retry. `reportWrite` asks who was asking first.
+
+      Called only on failure, because the form announces its own success and a
+      second toast saying the same thing twice is noise.
+    */
+    if (!persisted) {
+      reportWrite(false, "Collections saved", {
+        failure: `The ${productLower} was saved, but its collections were not`,
+      });
+    }
+  }
+
+  /**
+   * Anything typed and not yet saved.
+   *
+   * Compared against the baseline rather than tracked as a flag: this file has
+   * nine `setForm` call sites and a flag would eventually be forgotten by one
+   * of them. It also means undoing an edit by hand correctly stops counting.
+   */
+  const isDirty = !isLoading && JSON.stringify(form) !== baseline;
+  useUnsavedChangesGuard(isDirty);
+
   function patchForm(patch: Partial<ProductFormData>) {
     setForm((prev) => ({ ...prev, ...patch }));
   }
@@ -136,17 +390,25 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
     setForm((prev) => ({
       ...prev,
       name,
-      slug: slugTouched ? prev.slug : slugify(name),
+      slug: slugTouched ? prev.slug : slugOrFallback(name),
       seo: {
         ...prev.seo,
-        // Tracks the name until the admin edits the meta title themselves.
-        //
-        // This was `prev.seo.metaTitle || `${name} | Acme``, so the FIRST
-        // keystroke made it truthy and the `||` short-circuited for every one
-        // after: typing "Rose Truffle Delight" left the SEO tab, the search
-        // preview card and the stored record all reading "R | Acme". The
-        // brand was hard-coded too, in a CMS meant to run more than one shop.
-        metaTitle: metaTitleTouched ? prev.seo.metaTitle : name,
+        /*
+          The name is NOT copied in here any more.
+
+          It used to track the name while adding, so every product shipped
+          with a stored meta title equal to whatever it was called at
+          creation. In edit mode the tracking is off, so a later rename left
+          the stored title behind — a cake renamed “Belgian Truffle” went on
+          telling Google “Chocolate Cake”, and nothing on the screen said why.
+
+          The box is empty and shows the name as its PLACEHOLDER instead. The
+          route already falls back to `cake.name` when the field is blank, so
+          a shop that never opens this tab gets the right title for ever, and
+          one that types here means it. Same shape as `weightLabel` two tabs
+          over, which shows its default the same way.
+        */
+        metaTitle: prev.seo.metaTitle,
       },
     }));
   }
@@ -163,6 +425,63 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
     }));
   }
 
+  /**
+   * The PRIMARY category, and what ticking a new one does to the rest.
+   *
+   * Not `patchForm({ categoryId })`. `form.categoryIds` is the product as the
+   * server returned it, and that array already holds the primary — so a plain
+   * merge left the outgoing category sitting in the list and saved it as a
+   * secondary. `refileUnder` is the rule, written once beside
+   * `fileUnderCategories` so the two halves of the invariant cannot drift.
+   */
+  function chooseCategory(id: string) {
+    setForm((prev) => ({
+      ...prev,
+      categoryId: id,
+      categoryIds: refileUnder(prev, id),
+    }));
+  }
+
+  /**
+   * The categories BESIDE the primary one.
+   *
+   * Functional `setForm`, copied from `toggleOccasion` below rather than
+   * written fresh, so ticking two boxes quickly cannot capture a stale array
+   * and drop the first.
+   */
+  function toggleCategory(id: string, checked: boolean) {
+    setForm((prev) => ({
+      ...prev,
+      categoryIds: checked
+        ? [...prev.categoryIds, id]
+        : prev.categoryIds.filter((item) => item !== id),
+    }));
+  }
+
+  /**
+   * WHICH SPEEDS THIS PRODUCT CAN GO OUT BY.
+   *
+   * Functional `setForm`, like the two toggles above and below, so ticking
+   * two boxes quickly cannot capture a stale array and drop the first.
+   */
+  function toggleDeliveryTier(id: string, checked: boolean) {
+    setForm((prev) => {
+      const current = prev.deliveryTierIds ?? [];
+      return {
+        ...prev,
+        deliveryTierIds: checked
+          ? [...current, id]
+          : current.filter((item) => item !== id),
+      };
+    });
+  }
+
+  function toggleCollection(id: string, checked: boolean) {
+    setCollectionIds((prev) =>
+      checked ? [...prev, id] : prev.filter((item) => item !== id),
+    );
+  }
+
   function toggleOccasion(id: string, checked: boolean) {
     setForm((prev) => ({
       ...prev,
@@ -172,32 +491,162 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
     }));
   }
 
-  function updateWeightPrice(index: number, price: number) {
+
+  /**
+   * Renaming a size, with a price offered the first time it is named.
+   *
+   * A blank row priced at anything is the trap: `priceLine` skips a falsy label
+   * and charges tier ZERO instead, so a nameless third row does not fail — it
+   * quietly sells at the first row's price. The label is what the customer
+   * picks and what the order records, so it is what has to be filled in;
+   * `handleSubmit` drops any row still missing one.
+   */
+  function renameSize(index: number, label: string) {
     setForm((prev) => ({
       ...prev,
-      weights: prev.weights.map((weight, i) =>
-        i === index ? { ...weight, price: Math.max(0, price) } : weight
+      weights: prev.weights.map((tier, i) => {
+        if (i !== index) return tier;
+        // Only while the row is still priced at nothing: once the shop has
+        // typed a price, a rename must not overwrite it.
+        const suggested = tier.price > 0 ? null : usualPriceForSize(label);
+        return { ...tier, label, price: suggested ?? tier.price };
+      }),
+    }));
+  }
+
+  function updateSizePrice(index: number, price: number) {
+    setForm((prev) => ({
+      ...prev,
+      weights: prev.weights.map((tier, i) =>
+        // Never below zero: the number input accepts a typed minus sign, and a
+        // negative tier price is money off for choosing a bigger cake.
+        i === index ? { ...tier, price: Math.max(0, price) } : tier,
       ),
     }));
   }
 
-  function toggleShape(shape: string, checked: boolean) {
+  function addSize() {
+    // Priced at the base to start with, which is the commonest smallest tier —
+    // and the number the shop is looking at while it adds the row.
     setForm((prev) => ({
       ...prev,
-      shapes: checked
-        ? [...prev.shapes, shape]
-        : prev.shapes.filter((item) => item !== shape),
+      weights: [...prev.weights, { label: "", price: prev.price }],
     }));
   }
 
+  function removeSize(index: number) {
+    setForm((prev) => ({
+      ...prev,
+      weights: prev.weights.filter((_, i) => i !== index),
+    }));
+  }
+
+
   async function saveProduct(intent: SaveIntent, redirectToList = true) {
     if (!form.name.trim()) {
-      toast.error("Cake name is required");
+      toast.error("A name is required");
       return;
     }
     if (!form.slug.trim()) {
       toast.error("Slug is required");
       return;
+    }
+    /**
+     * Said here so the admin reads a sentence rather than a 400.
+     *
+     * The server refuses this too — a browser check is not a rule. What this
+     * adds is the WHY, at the moment of pressing Save, for a product stored
+     * with more photos than the cap now allows: the boxes are all still on
+     * screen with their Remove buttons, and this says which one to press.
+     */
+    const photos = form.images.filter(Boolean);
+    if (photos.length > MAX_PRODUCT_PHOTOS) {
+      toast.error(
+        `A ${productLower} can have at most ${MAX_PRODUCT_PHOTOS} photos — this one has ${photos.length}. Remove ${photos.length - MAX_PRODUCT_PHOTOS} and save again.`,
+      );
+      return;
+    }
+
+    /**
+     * A product may not go on the shop priced at nothing.
+     *
+     * `price` starts at 0 now — unset, rather than the invented 999 — and the
+     * server takes `z.number().min(0)`, so 0 is a perfectly valid PUBLISHED
+     * price as far as validation is concerned. This was the only field on the
+     * form with no check at all, on the number the whole shop turns on.
+     *
+     * Read the way `priceLine` reads it, not as a bare `form.price > 0`. Once a
+     * product has named size rows the base is never charged — `weights[i].price`
+     * is — so a shop that prices every size and leaves the base at 0 has priced
+     * its product and must not be stopped. A NAMED row at 0 is the failure,
+     * because that size sells free. Blank rows are dropped from the payload
+     * below and are nobody's answer to anything.
+     *
+     * The row half is asked only while `modules.weight` is on. Modules hide
+     * fields without clearing the data under them, so a shop with the size axis
+     * switched off can still hold legacy rows — and refusing to publish over a
+     * row that is not on screen is a dead end with no way out of it.
+     *
+     * Drafts are exempt on purpose: a half-built product must stay parkable.
+     */
+    if (intent === "publish") {
+      /**
+       * A product on the shop is filed somewhere.
+       *
+       * The box no longer answers itself, so this is what stops a blank one
+       * reaching customers — and it is a PUBLISH rule, not a save rule: a
+       * half-built product must stay parkable while the shop decides where it
+       * belongs, or works out that it needs a new category first.
+       */
+      if (!form.categoryId.trim()) {
+        toast.error("Choose a category before publishing", {
+          description: `Basics, under the name. It decides where this ${productLower} is found on your shop.`,
+        });
+        return;
+      }
+
+      const namedSizes = modules.weight
+        ? form.weights.filter((tier) => tier.label.trim().length > 0)
+        : [];
+      const freeSizes = namedSizes.filter((tier) => tier.price <= 0);
+
+      if (freeSizes.length > 0) {
+        toast.error(
+          `Price every ${weightAxisLabel(form.weightLabel).toLowerCase()} before publishing`,
+          {
+            description: `${freeSizes
+              .map((tier) => tier.label.trim())
+              .join(", ")} would sell for nothing. Options, at the top.`,
+          },
+        );
+        return;
+      }
+
+      if (namedSizes.length === 0 && form.price <= 0) {
+        toast.error("Set a base price before publishing", {
+          description: `Price & stock, at the top. Save as a draft to keep this ${productLower} while you decide.`,
+        });
+        return;
+      }
+
+      /*
+        THE BROWSER SAYS IT, because the wire cannot.
+
+        `productFormSchema` refuses this now, and the save handler catches a
+        server error into a bare `toast.error(error.message)` with no
+        path-to-field mapping anywhere in this file — so on its own the
+        refusal reads as "could not save" with nothing marked, on a field the
+        owner may not have touched. This is the repo's own pattern for a
+        cross-field rule: check here, and name the tab.
+      */
+      if (compareAtTyped && compareAtTyped <= form.price) {
+        toast.error("The compare-at price is not above the price", {
+          description: `${formatCurrency(compareAtTyped)} is not above ${formatCurrency(
+            form.price,
+          )}, so there is no saving to show. Price & stock, at the top — clear it or swap the two.`,
+        });
+        return;
+      }
     }
 
     setIsSaving(true);
@@ -217,31 +666,102 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
       slug: slugify(form.slug),
       status,
       images: form.images.filter(Boolean),
-      ...resolveStockFields(form),
-      ...syncLegacyFlagsFromVariants(
-        form.variantGroups,
-        getDefaultVariantSelections(form.variantGroups),
-        // Without the form's own flags, a product with no egg variant group
-        // had its "Eggless" tick overwritten with false on every save.
-        { isEggless: form.isEggless, isPhotoCake: form.isPhotoCake },
+      /**
+       * REBUILT, never accumulated — this is the write half of the invariant
+       * that `categoryIds[0]` is always the primary. The blank is dropped for
+       * the same reason the sizes below are: an unchosen category is not a
+       * category.
+       *
+       * This used to claim that rebuilding here was what stopped a move
+       * leaving the old primary behind. It is not, and it never was: this
+       * rebuilds from `form.categoryIds`, which starts life as the product the
+       * server returned — an array that already CONTAINS the primary. So
+       * changing the dropdown from Cakes to Plants built
+       * `["cat-plants", "cat-cakes"]` and the cake stayed on the Birthday
+       * page. What actually holds the line is `refileUnder`, in
+       * `chooseCategory` above, which takes the outgoing category out of the
+       * state this reads.
+       */
+      categoryIds: fileUnderCategories(form.categoryId, form.categoryIds),
+      /**
+       * A size with no name is dropped, and dropped SILENTLY on purpose.
+       *
+       * It is an empty row the shop added and did not fill in, and it cannot
+       * be sold: the customer would be shown a nameless button, and worse,
+       * `priceLine` skips a falsy label and charges tier ZERO — so a blank
+       * third row priced at ₹2,400 does not fail, it quietly sells at the
+       * first row's price.
+       */
+      weights: form.weights.filter((tier) => tier.label.trim().length > 0),
+      /**
+       * WHAT EACH OPTION BLOCK LOOKS LIKE, written down on the way out.
+       *
+       * This is the whole migration, and it happens one product at a time as
+       * the shop touches them. A block stored before the dropdown existed
+       * carries no `render`, and the storefront draws it by the same two
+       * predicates it always did — so the day this ships nothing moves. The
+       * first save of a product freezes what it ALREADY looked like, resolved
+       * by the same function the customer's page resolves it with, so the
+       * freezing cannot change the picture either.
+       *
+       * `resolveBlockRender` and not `group.render`: a stored answer the
+       * options no longer fit is ignored by the page, and writing it back
+       * would keep a lie on the record.
+       */
+      variantGroups: form.variantGroups.map((group) => ({
+        ...group,
+        render: resolveBlockRender(group).render,
+      })),
+      /**
+       * And a block with nothing under its heading, for the same reason.
+       *
+       * The validator refuses one — a heading over no bullets is the empty
+       * section this project keeps deleting — so leaving it in meant the
+       * whole save bounced on a row the admin had merely started. The photo
+       * slots and the size rows beside it were already dropped silently; this
+       * was the one that argued instead.
+       */
+      descriptionBlocks: (form.descriptionBlocks ?? []).filter(
+        (block) => block.body.trim().length > 0,
       ),
+      ...resolveStockFields(form),
     };
 
     try {
       if (mode === "add") {
-        await createProductRequest(payload);
+        /*
+          The id comes back from the create, and it has to: a product that
+          does not exist yet cannot be in a list of products. So membership is
+          written second, with the id the server just minted.
+        */
+        const created = await createProductRequest(payload);
+        await saveCollectionMembership(created.id);
         toast.success(SAVED_MESSAGE[status]);
       } else if (cakeId) {
-        await updateProductRequest(cakeId, payload);
-        setSavedStatus(payload.status);
+        // The baseline is what this form loaded (or last saved), so its stock
+        // is the number the admin was looking at. Sent alongside, it lets the
+        // server keep sales and restocks made since if the field was untouched.
+        const loadedStock = (JSON.parse(baseline) as ProductFormData).stockQuantity;
+        const saved = await updateProductRequest(cakeId, payload, loadedStock);
+        await saveCollectionMembership(cakeId);
+        // The stock the server actually kept, which may not be the form's.
+        const next = {
+          ...payload,
+          stockQuantity: saved.stockQuantity ?? payload.stockQuantity,
+          stockStatus: saved.stockStatus ?? payload.stockStatus,
+        };
+        setSavedStatus(next.status);
+        setBaseline(JSON.stringify(next));
         // The form's own copy too, so the badge and the button labels cannot
         // disagree with what the server was just told.
-        setForm(payload);
+        setForm(next);
         toast.success(SAVED_MESSAGE[status]);
       }
     } catch (error) {
       // Keep the user on the form with their input intact so they can retry.
-      toast.error(error instanceof Error ? error.message : "Could not save this cake");
+      toast.error(
+        error instanceof Error ? error.message : `Could not save this ${productLower}`,
+      );
       return;
     } finally {
       setIsSaving(false);
@@ -266,7 +786,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
     }
 
     if (mode === "add" || !cakeId) {
-      toast.error("Save the cake first", {
+      toast.error(`Save the ${productLower} first`, {
         description: "There is nothing to preview until it exists.",
       });
       return;
@@ -298,15 +818,30 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
   }
 
   const title = mode === "add" ? `Add ${labels.productWord}` : `Edit ${labels.productWord}`;
+  const previewUrl = `${previewOrigin}${routes.store.cake(form.slug || "product-slug")}`;
 
   return (
     <AdminPage className="space-y-4 sm:space-y-5 pb-20 xl:pb-0">
       <AdminPageHeader
         title={title}
+        /*
+          THE FIRST LINE ANYBODY READS, and it named three sections that are
+          not on the screen. "Commerce" and "Classification" are the two tab
+          names this file deleted for being ours rather than the shop's — the
+          note at the tab strip says so — and the subtitle three inches above
+          it kept both. "Classification" is not a word a shop uses at all.
+
+          A list of sections is the wrong shape anyway: the six tabs are
+          rendered in full immediately below, so a list would be the same
+          words twice and would still not tell a first-timer what to do first.
+          The button names come from the variables, so an archived product
+          reads "Restore & publish" rather than naming a button that is not
+          there.
+        */
         description={
           mode === "add"
-            ? "Create a product with pricing, commerce options, classification, and SEO."
-            : "Update product details, stock, customization options, and publishing status."
+            ? `Name it, price it, add a photo, then ${publishLabel}. The other tabs can wait.`
+            : `Change anything in the tabs below, then ${saveLabel} or ${publishLabel}.`
         }
         actions={
           <div className="hidden flex-wrap items-center gap-2 xl:flex">
@@ -328,192 +863,193 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(260px,320px)]">
         <Card>
           <CardContent className="pt-6">
-            <Tabs defaultValue="basic">
+            <Tabs defaultValue="basics">
+              {/*
+                SIX TABS, each one a question a shop owner already asks.
+
+                There were eight, and the strip scrolled sideways on anything
+                narrower than a desktop — so the last two were behind an arrow
+                most people never press. Worse, three of the names were ours
+                rather than theirs: “Basic” and “Classification” split what a
+                product IS across two tabs, and “Commerce” held four unrelated
+                subjects — stock levels, a flavour list, two customisation ticks
+                and a read-only review score.
+
+                And “Details” had come to hold exactly one editor, whose own
+                first block is usually headed “Product Details”. Two different
+                Details on one screen.
+
+                Nothing here changes what is stored. Every field is the same
+                field, under the heading somebody would look for it under.
+              */}
               <TabsList className="mb-6 w-full justify-start overflow-x-auto">
-                <TabsTrigger value="basic">Basic</TabsTrigger>
-                <TabsTrigger value="pricing">Pricing</TabsTrigger>
-                <TabsTrigger value="details">Details</TabsTrigger>
-                <TabsTrigger value="variants">Variants</TabsTrigger>
-                <TabsTrigger value="classification">Classification</TabsTrigger>
-                <TabsTrigger value="commerce">Commerce</TabsTrigger>
-                <TabsTrigger value="media">Media</TabsTrigger>
+                <TabsTrigger value="basics">Basics</TabsTrigger>
+                <TabsTrigger value="price">Price &amp; stock</TabsTrigger>
+                {/*
+                  “Options” rather than “Variants”: this is the tab that answers
+                  what most shops actually need — a size, a colour, a capacity.
+                  “Variant” is a word a developer chose; “Options” is what the
+                  customer is being asked for.
+                */}
+                <TabsTrigger value="options">Options</TabsTrigger>
+                <TabsTrigger value="description">Description</TabsTrigger>
+                <TabsTrigger value="photos">Photos</TabsTrigger>
                 <TabsTrigger value="seo">SEO</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="basic" className="space-y-4">
+              <TabsContent value="basics" className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="name">{labels.productWord} name</Label>
                   <Input
                     id="name"
                     value={form.name}
                     onChange={(e) => handleNameChange(e.target.value)}
-                    placeholder="Chocolate Truffle Delight"
+                    placeholder="e.g. Chocolate Truffle Cake, 65W Type-C Charger"
                   />
                 </div>
+
+                {/*
+                  Category and occasions were a tab of their own called
+                  “Classification”. Where a product is filed is part of what it
+                  is, and a shop owner setting one up says the name and the
+                  category in the same breath.
+                */}
                 <div className="space-y-2">
-                  <Label htmlFor="slug">URL slug</Label>
-                  <Input
-                    id="slug"
-                    value={form.slug}
-                    onChange={(e) => {
-                      setSlugTouched(true);
-                      patchForm({ slug: slugify(e.target.value) });
-                    }}
-                    placeholder="chocolate-truffle-delight"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="shortDescription">Short description</Label>
-                  <Input
-                    id="shortDescription"
-                    value={form.shortDescription ?? ""}
-                    onChange={(e) => patchForm({ shortDescription: e.target.value })}
-                    placeholder="One line, shown in Google results"
-                  />
-                  {/*
-                    The placeholder said "One-line summary for cards" and no card
-                    rendered it — nothing did. It is now the meta description
-                    this cake's page ships when the SEO tab is left blank, which
-                    is a real destination, so the hint says that instead.
-                  */}
-                  <p className="text-xs text-muted-foreground">
-                    Used as the search-result description when the SEO tab is empty.
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Full description</Label>
-                  <textarea
-                    id="description"
-                    className={adminTextareaClassName}
-                    value={form.description}
-                    onChange={(e) => patchForm({ description: e.target.value })}
-                    placeholder="Describe flavours, layers, and serving notes..."
-                  />
-                </div>
-              </TabsContent>
+                  <Label htmlFor="category">Category</Label>
+                  <AdminSelect
+                    id="category"
+                    value={form.categoryId}
+                    onChange={(e) => chooseCategory(e.target.value)}
+                  >
+                    {/*
+                      AN UNANSWERED BOX LOOKS UNANSWERED.
 
-              <TabsContent value="pricing" className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="price">Base price (INR)</Label>
-                    <Input
-                      id="price"
-                      type="number"
-                      min={0}
-                      value={form.price}
-                      onChange={(e) => handlePriceChange(Number(e.target.value) || 0)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="compareAtPrice">Compare-at price</Label>
-                    <Input
-                      id="compareAtPrice"
-                      type="number"
-                      min={0}
-                      value={form.compareAtPrice ?? ""}
-                      onChange={(e) =>
-                        patchForm({
-                          compareAtPrice: e.target.value
-                            ? Number(e.target.value)
-                            : undefined,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-                {modules.weight ? (
-                  <>
-                    <Separator />
-                    <div className="space-y-3">
-                      <p className="text-sm font-medium">Weight variants</p>
-                      {form.weights.map((weight, index) => (
-                        <div
-                          key={weight.label}
-                          className="grid gap-3 rounded-lg border border-border px-3 py-3 sm:grid-cols-[1fr_120px]"
-                        >
-                          <div>
-                            <p className="text-sm font-medium">{weight.label}</p>
-                            {weight.serves ? (
-                              <p className="text-xs text-muted-foreground">Serves {weight.serves}</p>
-                            ) : null}
-                          </div>
-                          <div className="space-y-1">
-                            <Label htmlFor={`weight-${index}`}>Price (INR)</Label>
-                            <Input
-                              id={`weight-${index}`}
-                              type="number"
-                              min={0}
-                              value={weight.price}
-                              onChange={(e) =>
-                                updateWeightPrice(index, Number(e.target.value) || 0)
-                              }
-                            />
-                          </div>
-                        </div>
-                      ))}
-                      <p className="text-xs text-muted-foreground">
-                        Weight presets come from Catalog. Edit prices per variant for this product.
-                      </p>
-                    </div>
-                  </>
-                ) : null}
-              </TabsContent>
+                      A new product used to open on whatever category happened
+                      to be first in this browser's list — the shipped demo's
+                      "Birthday Cakes" on a fresh install. The box looked
+                      filled in, so it was moved past, and four shops walked
+                      through this form all shipped: a phone charger, a Snake
+                      Plant and a Kanjivaram silk saree, every one of them
+                      filed under Birthday Cakes.
 
-              <TabsContent value="details" className="space-y-4">
-                <ProductDetailsFields
-                  value={form}
-                  onChange={(patch) => patchForm(patch)}
-                />
-              </TabsContent>
-
-              <TabsContent value="variants" className="space-y-4">
-                <ProductVariantManager
-                  groups={form.variantGroups}
-                  basePrice={form.price}
-                  onChange={(variantGroups) => patchForm({ variantGroups })}
-                />
-              </TabsContent>
-
-              <TabsContent value="classification" className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="category">Category</Label>
-                    <AdminSelect
-                      id="category"
-                      value={form.categoryId}
-                      onChange={(e) => patchForm({ categoryId: e.target.value })}
-                    >
-                      {adminCategories().map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </AdminSelect>
-                  </div>
-                  {modules.flavour ? (
-                    <div className="space-y-2">
-                      <Label htmlFor="flavour">Flavour</Label>
-                      <AdminSelect
-                        id="flavour"
-                        value={form.flavourId ?? ""}
-                        onChange={(e) =>
-                          patchForm({ flavourId: e.target.value || undefined })
-                        }
-                      >
-                        <option value="">Select flavour</option>
-                        {adminFlavours().map((flavour) => (
-                          <option key={flavour.id} value={flavour.id}>
-                            {flavour.name}
-                          </option>
-                        ))}
-                      </AdminSelect>
-                    </div>
+                      A blank first row is what makes "not answered" visible.
+                      `saveProduct` refuses to publish over it and still lets a
+                      draft be parked, which is the same rule the price follows.
+                    */}
+                    <option value="">Choose a category…</option>
+                    {catalogLists.categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </AdminSelect>
+                  {catalogLists.categories.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      No categories yet. Add them under Catalog, then come back —
+                      a {productLower} needs one before it can go on the shop.
+                    </p>
                   ) : null}
                 </div>
+
+                {/*
+                  ALSO FILE IT HERE — the box that lets one thing be two things.
+
+                  A product belonged to exactly one category, so a shop selling a
+                  cake-and-plant combo had to choose which page it lived on, or
+                  create it twice and keep two stock counts in step by hand.
+
+                  The category chosen above is EXCLUDED from this list, so the two
+                  controls cannot disagree about the same row — and the list is
+                  hidden entirely until a category is chosen, because "also" has
+                  no meaning before there is a first one.
+                */}
+                {form.categoryId && catalogLists.categories.length > 1 ? (
+                  <div className="space-y-2">
+                    <Label>Also show it under (optional)</Label>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {catalogLists.categories
+                        .filter((category) => category.id !== form.categoryId)
+                        .map((category) => (
+                          <label
+                            key={category.id}
+                            className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
+                          >
+                            <Checkbox
+                              checked={form.categoryIds.includes(category.id)}
+                              onCheckedChange={(checked) =>
+                                toggleCategory(category.id, checked === true)
+                              }
+                            />
+                            {category.name}
+                          </label>
+                        ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      It appears on each of these pages. One {productLower}, one stock
+                      count, one price.
+                    </p>
+                  </div>
+                ) : null}
+                {/*
+                  A “Flavour” dropdown stood here, picking one row out of a
+                  shop-wide Catalog list.
+
+                  It bought nothing. The list was a second place to keep in
+                  step, the id it wrote reached no customer and no order, and
+                  the box that actually decides what a customer is offered —
+                  “Flavour options”, further down this same form — was
+                  already free text this shop types for itself. A flavour is
+                  a word on a product, not a taxonomy.
+                */}
+                {/*
+                  HOW FAST THIS ONE CAN ACTUALLY GO OUT.
+
+                  Delivery was shop-wide — one cutoff, one set of speeds — so
+                  every product was express-eligible by definition and an
+                  "Express" page would have been the whole catalogue. A
+                  two-tier wedding cake is not a two-hour delivery.
+
+                  Nothing ticked means EVERY speed, which is what every
+                  product means today, so the heading says so rather than
+                  leaving an owner to infer it from an empty grid. Hidden
+                  entirely when the shop offers no speeds of its own — there
+                  is nothing to choose between.
+                */}
+                {deliveryTiers.length > 0 ? (
+                  <div className="space-y-2">
+                    <Label>Can be delivered by</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Leave everything unticked and it can go out at any speed you
+                      offer.
+                    </p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {deliveryTiers.map((tier) => (
+                        <label
+                          key={tier.id}
+                          className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
+                        >
+                          <Checkbox
+                            checked={(form.deliveryTierIds ?? []).includes(tier.id)}
+                            onCheckedChange={(checked) =>
+                              toggleDeliveryTier(tier.id, checked === true)
+                            }
+                          />
+                          {tier.label}
+                        </label>
+                      ))}
+                    </div>
+                    {(form.deliveryTierIds ?? []).length > 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        Checkout refuses any other speed for this {productLower}.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 <div className="space-y-2">
-                  <Label>Occasions</Label>
+                  <Label>{labels.occasionWordPlural}</Label>
                   <div className="grid gap-2 sm:grid-cols-2">
-                    {adminOccasions().map((occasion) => (
+                    {catalogLists.occasions.map((occasion) => (
                       <label
                         key={occasion.id}
                         className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
@@ -529,89 +1065,201 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                     ))}
                   </div>
                 </div>
+
+                {/*
+                  THE SAME LIST THE CATALOG SCREEN FILLS, from the other end.
+
+                  A collection could only be filled from inside itself, which
+                  is the right way round for building a Diwali row out of forty
+                  products and the wrong way round for the one moment a shop
+                  actually thinks about it — naming a new product and saying
+                  where it belongs. Both ends now edit `productIds`; nothing is
+                  copied onto the product.
+                */}
+                {catalogLists.collections.length > 0 ? (
+                  <div className="space-y-2">
+                    <Label>{labels.collectionWordPlural}</Label>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {catalogLists.collections.map((collection) => (
+                        <label
+                          key={collection.id}
+                          className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
+                        >
+                          <Checkbox
+                            checked={collectionIds.includes(collection.id)}
+                            onCheckedChange={(checked) =>
+                              toggleCollection(collection.id, checked === true)
+                            }
+                          />
+                          {collection.name}
+                        </label>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      A collection is a group you curate — Best Sellers, New
+                      Arrivals. Ticking one adds this to the end of it.
+                    </p>
+                  </div>
+                ) : null}
+
+                {/*
+                  THE RULE SITS HERE NOW.
+
+                  It used to cut the name off from the category, which is the
+                  one pair a shop names in the same breath. It divides what the
+                  product IS — its name, where it is filed, what it is for —
+                  from where it LIVES, which is its address.
+                */}
+                <Separator />
+                {/*
+                  TWO BOXES STOOD HERE, and between them and the Description
+                  tab there were three things called a description.
+
+                  "Short description" was not one: nothing on the storefront
+                  rendered it, and its only destination was the meta
+                  description, as the middle step of a fallback whose first
+                  step is the SEO tab's own box. A second field for one job.
+
+                  "Full description" is real — it is the paragraph under the
+                  bullets on the product page — so it has moved to the
+                  Description tab, beside the blocks it prints with. What the
+                  page SAYS is now edited in one place.
+                */}
+
+                <div className="space-y-2">
+                  <Label htmlFor="slug">Web address</Label>
+                  <Input
+                    id="slug"
+                    value={form.slug}
+                    onChange={(e) => {
+                      setSlugTouched(true);
+                      /**
+                       * LENIENT WHILE TYPING, tidied when the box is left.
+                       *
+                       * `slugify` ran on every keystroke, and its last step
+                       * strips a trailing hyphen — so the separator was deleted
+                       * the instant it was typed. "chocolate truffle cake"
+                       * became "chocolatetrufflecake", and a hyphen typed by
+                       * hand simply never appeared. The box could not be typed
+                       * into; it could only be watched.
+                       */
+                      patchForm({ slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, "-") });
+                    }}
+                    onBlur={(e) => patchForm({ slug: slugify(e.target.value) })}
+                    placeholder={`${slugify(labels.productWord) || "product"}-name`}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    The end of this {productLower}&apos;s address on your shop. Filled in
+                    from the name — change it only if you want a shorter or clearer link.
+                  </p>
+                </div>
               </TabsContent>
 
-              <TabsContent value="commerce" className="space-y-4">
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {modules.eggEggless ? (
-                    <label className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
-                      <Checkbox
-                        checked={form.isEggless}
-                        onCheckedChange={(checked) => {
-                          const isEggless = checked === true;
-                          // Move the egg group's default too, so the variant data
-                          // agrees with the toggle. Without this the derived flag
-                          // overwrites the tick on save.
-                          patchForm({
-                            isEggless,
-                            variantGroups: setGroupDefaultBySemantic(
-                              form.variantGroups,
-                              "egg",
-                              "eggless",
-                              isEggless
-                            ),
-                          });
-                        }}
-                      />
-                      Eggless
-                    </label>
-                  ) : null}
-                  {modules.photoCake ? (
-                  <label className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
-                    <Checkbox
-                      checked={form.isPhotoCake}
-                      onCheckedChange={(checked) => {
-                        const isPhotoCake = checked === true;
-                        const hasPhotoGroup = form.variantGroups.some(
-                          (group) => group.type === "photo"
-                        );
-                        // isPhotoCake is derived from whether a photo-print option
-                        // is offered, so the group must be added AND removed in
-                        // step with the toggle — otherwise the derived value
-                        // overwrites the merchant's choice on save.
-                        const variantGroups = isPhotoCake
-                          ? hasPhotoGroup
-                            ? form.variantGroups
-                            : [
-                                ...form.variantGroups,
-                                createVariantGroup(
-                                  "Photo cake",
-                                  "photo",
-                                  [
-                                    createVariantOption("Standard design", 0, true),
-                                    createVariantOption(
-                                      "Custom photo print",
-                                      250,
-                                      false,
-                                      "photo-print"
-                                    ),
-                                  ],
-                                  false
-                                ),
-                              ]
-                          : form.variantGroups.filter((group) => group.type !== "photo");
-
-                        patchForm({
-                          isPhotoCake,
-                          allowsPhotoUpload: isPhotoCake ? true : form.allowsPhotoUpload,
-                          variantGroups,
-                        });
-                      }}
-                    />
-                    Photo cake
-                  </label>
-                  ) : null}
-                  <label className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
-                    <Checkbox
-                      checked={form.isSeasonal}
-                      onCheckedChange={(checked) =>
-                        patchForm({ isSeasonal: checked === true })
+              <TabsContent value="price" className="space-y-6">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="price">Base price ({getActiveLocale().currency})</Label>
+                    <Input
+                      id="price"
+                      type="number"
+                      min={0}
+                      /*
+                        EMPTY reads as unset, the way the compare-at box beside
+                        it already does. `form.price` starts at 0 now, and a box
+                        showing a literal 0 is a shop claiming this is free;
+                        clearing it to retype snapped straight back to 0 too.
+                      */
+                      value={form.price === 0 ? "" : form.price}
+                      /*
+                        Clamped here as the size rows already are. A typed minus
+                        went through to the server, which answers "Price cannot
+                        be negative" — a 400 for something the field can simply
+                        decline to hold.
+                      */
+                      onChange={(e) =>
+                        handlePriceChange(Math.max(0, Number(e.target.value) || 0))
                       }
                     />
-                    Seasonal
-                  </label>
+                    {/*
+                      "Add sizes below" pointed at nothing. The size rows moved to
+                      the Options tab and this line stayed, on a tab whose only
+                      remaining content below it is stock — and the publish
+                      refusal beside it named the same wrong place, at the one
+                      moment an owner is blocked and told where to go.
+                    */}
+                    <p className="text-xs text-muted-foreground">
+                      What you charge for one, before the customer chooses anything.{" "}
+                      {modules.weight
+                        ? "On the Options tab, each size carries its own price instead of this one, and every other option adds to it or takes off it."
+                        : "Options on the Options tab add to it or take off it."}
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="compareAtPrice">Compare-at price</Label>
+                    <Input
+                      id="compareAtPrice"
+                      type="number"
+                      min={0}
+                      value={form.compareAtPrice ?? ""}
+                      onChange={(e) =>
+                        patchForm({
+                          /*
+                            `"0"` IS TRUTHY, so the old test stored a zero and
+                            a shop clearing this box by typing over it left one
+                            behind. Zero and absent mean the same thing here —
+                            no compare-at — and only one of them should ever
+                            reach the wire.
+                          */
+                          compareAtPrice:
+                            Number(e.target.value) > 0
+                              ? Number(e.target.value)
+                              : undefined,
+                        })
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Optional. The old price, shown crossed out next to the new one.
+                      It has to be higher than the base price — at or below it there
+                      is no saving to show, so nothing is shown.
+                    </p>
+                    {/*
+                      THE REAL NUMBERS, WHILE THEY ARE BEING TYPED.
+
+                      The sentence above states the rule; this says what this
+                      product will actually do. Two of this shop's published
+                      products hold a compare-at BELOW their price — typed the
+                      wrong way round — and nothing anywhere told anyone: the
+                      storefront quietly draws no saving, which looks exactly
+                      like not having set one.
+
+                      Read through `displayCompareAtPrice`, the same function
+                      the card calls, rather than repeating its comparison
+                      here — a second copy is how the admin and the storefront
+                      come to disagree about what a shop is advertising.
+                    */}
+                    {compareAtShown ? (
+                      <p className="text-xs font-medium text-bakery-700">
+                        {`Customers see ${formatCurrency(form.price)}, was ${formatCurrency(
+                          compareAtShown,
+                        )} — ${Math.round(((compareAtShown - form.price) / compareAtShown) * 100)}% off`}
+                      </p>
+                    ) : compareAtTyped ? (
+                      <p className="text-xs font-medium text-destructive">
+                        {`${formatCurrency(compareAtTyped)} is not above ${formatCurrency(
+                          form.price,
+                        )}, so no saving would be shown.`}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
 
+                <Separator />
+
+                {/*
+                  Stock sat under “Commerce” with a flavour list and a review
+                  score. How many there are is a question about selling this
+                  product, which is what the rest of this tab is about.
+                */}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm sm:col-span-2">
                     <Checkbox
@@ -665,29 +1313,291 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                     showQuantity
                   />
                 </div>
+              </TabsContent>
 
-                {modules.shape ? (
-                  <div className="space-y-2">
-                    <Label>Available shapes</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {["Round", "Square", "Heart", "Rectangle"].map((shape) => (
-                        <label
-                          key={shape}
-                          className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
-                        >
-                          <Checkbox
-                            checked={form.shapes.includes(shape)}
-                            onCheckedChange={(checked) =>
-                              toggleShape(shape, checked === true)
-                            }
-                          />
-                          {shape}
-                        </label>
-                      ))}
+              <TabsContent value="options" className="space-y-6">
+                {/*
+                  SIZE IS AN OPTION, and it lived on another tab.
+
+                  It was under Price & stock because every row carries a price,
+                  and that is a true thing about it and the wrong reason: the
+                  customer is being asked a QUESTION here — which size do you
+                  want — exactly like colour and gift wrap two inches below. A
+                  shop setting up a product met the same job in two places, in
+                  two different shapes, and nothing on either screen said they
+                  were the same job.
+
+                  It sits FIRST because it is the question that decides the
+                  price the others adjust — and because that is the order the
+                  product page draws them in.
+
+                  Its price column is the one that stays ABSOLUTE. Every other
+                  block adds to the price; this one IS the price. Two blocks
+                  both claiming to be the whole price cannot both be right, and
+                  the size ladder is the one the pricing code already reads that
+                  way — `priceLine` charges `weights[i].price` and never reaches
+                  the base once a row exists.
+                */}
+                {modules.weight ? (
+                  <>
+                    <Separator />
+                    <div className="space-y-3">
+                      {/*
+                        The heading was the literal “Weight variants” here and
+                        the literal “Weight” over the customer's buttons, while
+                        every OTHER option group on both screens has been named
+                        by the shop since variant groups existed. A shop selling
+                        t-shirts had no way to say “Size”.
+                      */}
+                      <p className="text-sm font-medium">
+                        {weightAxisLabel(form.weightLabel)} options
+                      </p>
+                      <div className="space-y-2">
+                        <Label htmlFor="weightLabel">What customers see this called</Label>
+                        <Input
+                          id="weightLabel"
+                          value={form.weightLabel ?? ""}
+                          placeholder={DEFAULT_SIZE_AXIS_LABEL}
+                          onChange={(e) => patchForm({ weightLabel: e.target.value })}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          The heading above these buttons on the product page — Weight,
+                          Size, Length, Capacity. Leave it blank for
+                          “{DEFAULT_SIZE_AXIS_LABEL}”.
+                        </p>
+                      </div>
+                      {/*
+                        THE SIZES THIS PRODUCT COMES IN, typed here.
+
+                        They used to be a shop-wide Catalog taxonomy that every
+                        product drew from, and that is the wrong shape for a shop
+                        selling more than one kind of thing: a cake shop that also
+                        sells chargers had “0.5 kg” offered for a charger and
+                        nowhere to put a cable length. A product's options are the
+                        merchant's to declare, per product.
+
+                        The other half of that problem is real too, and is why the
+                        label box suggests: a shop with thirty products should not
+                        type “500 gm” thirty times, and two spellings of one size
+                        split the storefront filter in two. The suggestions are a
+                        reading of what this shop has already typed elsewhere —
+                        not a list anybody maintains, and it goes away on its own
+                        when the last product using it does.
+                      */}
+                      <div className="space-y-2">
+                        <datalist id="size-labels-in-use">
+                          {sizeSuggestions.map((label) => (
+                            <option key={label} value={label} />
+                          ))}
+                        </datalist>
+
+                        {form.weights.map((tier, index) => (
+                          <div
+                            key={index}
+                            className="grid gap-3 rounded-lg border border-border px-3 py-3 sm:grid-cols-[1fr_140px_auto]"
+                          >
+                            <div className="space-y-1">
+                              <Label htmlFor={`size-label-${index}`}>
+                                {weightAxisLabel(form.weightLabel)}
+                              </Label>
+                              <Input
+                                id={`size-label-${index}`}
+                                list="size-labels-in-use"
+                                value={tier.label}
+                                placeholder="500 gm"
+                                onChange={(e) => renameSize(index, e.target.value)}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label htmlFor={`size-price-${index}`}>
+                                Price ({getActiveLocale().currency})
+                              </Label>
+                              <Input
+                                id={`size-price-${index}`}
+                                type="number"
+                                min={0}
+                                value={tier.price}
+                                onChange={(e) => updateSizePrice(index, Number(e.target.value) || 0)}
+                              />
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="self-end"
+                              onClick={() => removeSize(index)}
+                              aria-label="Remove size"
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </div>
+                        ))}
+
+                        <Button type="button" variant="outline" size="sm" onClick={addSize}>
+                          Add a {weightAxisLabel(form.weightLabel).toLowerCase()}
+                        </Button>
+                        <p className="text-xs text-muted-foreground">
+                          Add a row for every size this {productLower} is sold in, and
+                          price each one. No rows means it is sold in one size, and the
+                          customer is shown no picker at all.
+                        </p>
+                      </div>
                     </div>
-                  </div>
+                  </>
                 ) : null}
 
+                <Separator />
+
+                <ProductVariantManager
+                  groups={form.variantGroups}
+                  onChange={(variantGroups) => patchForm({ variantGroups })}
+                />
+
+                <Separator />
+
+                {/*
+                  These three sat under “Commerce”. Every one of them is
+                  something the CUSTOMER chooses or adds on this product — a
+                  flavour, a message, a photograph — which is exactly what the
+                  option groups above are.
+                */}
+                {/*
+                  A row of three ticks stood here — Eggless, Photo cake, and
+                  Seasonal — and all three have gone the same way.
+
+                  Each was a FLAG on the product that some other part of the
+                  shop derived a claim or a list from, and each had a better
+                  answer already in the product itself. Eggless is a recipe,
+                  which a shop states in the name and the description. A photo
+                  print is priced in, behind "Allow photo upload" below.
+                  Seasonal is a CATEGORY: the nav link, the mega-menu card and
+                  the homepage row all read that, so a tick beside it was a
+                  second list that could disagree with the first — and did.
+                */}
+                {/*
+                  The four hardcoded shape checkboxes — Round, Square, Heart,
+                  Rectangle — are gone. They wrote a list of NAMES with nowhere
+                  to put a price, so a shop could offer a Heart and could not
+                  charge for it, and a shop wanting any other shape had no way
+                  to say so. Shapes are a variant group in the Options tab now,
+                  with a price on each.
+                */}
+
+                {/*
+                  THE THIRD SECTION ON THIS TAB, and the only one that had no
+                  name. Two headings above it say what they hold; this run of
+                  ticks just began, so a shop reading down the tab met three
+                  unlabelled controls after two labelled sections.
+                */}
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">What you ask the customer for</p>
+                  <p className="text-xs text-muted-foreground">
+                    Each tick adds a box to the {productLower} page for the customer
+                    to fill in.
+                  </p>
+                </div>
+
+                {/*
+                  "PDP" is "product detail page", an abbreviation only a
+                  developer has ever said out loud, printed to a shop owner —
+                  twice, on the two ticks that decide what a customer is asked
+                  for. Both are named here in the words the customer will
+                  actually read on the page, so the two screens join up.
+
+                  The message tick also interpolated the shop's product word and
+                  read "Allow bouquet message" or "Allow dish message" for two of
+                  the shipped business types. A message is not made of the thing
+                  it accompanies, so `productWord` was the wrong mechanism here
+                  rather than a mechanism used wrongly — dropped, not translated.
+                */}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <label className="flex items-start gap-2 text-sm">
+                      <Checkbox
+                        className="mt-0.5"
+                        checked={form.allowsMessage}
+                        onCheckedChange={(checked) =>
+                          patchForm({ allowsMessage: checked === true })
+                        }
+                      />
+                      Ask for a message
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      Puts a &ldquo;Message on this order&rdquo; box on the page. For
+                      something written on or sent with the {productLower}.
+                    </p>
+                  </div>
+                  {modules.photoCake ? (
+                    <div className="space-y-1">
+                      <label className="flex items-start gap-2 text-sm">
+                        <Checkbox
+                          className="mt-0.5"
+                          checked={form.allowsPhotoUpload}
+                          onCheckedChange={(checked) =>
+                            patchForm({ allowsPhotoUpload: checked === true })
+                          }
+                        />
+                        Ask for a photo
+                      </label>
+                      <p className="text-xs text-muted-foreground">
+                        The customer uploads a picture and you receive it cut to the
+                        outline below. The printing is part of the price.
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+
+                {/*
+                  Shown only once the upload is switched on, because until then
+                  there is no print to have a shape.
+
+                  A picker rather than a text box: this is GEOMETRY the browser
+                  clips a photograph to, so unlike a size or an option label the
+                  shop cannot invent one. Round is what every photo product
+                  printed before there was a choice, so a shop that never opens
+                  this sees nothing change.
+                */}
+                {modules.photoCake && form.allowsPhotoUpload ? (
+                  <div className="grid gap-2 sm:max-w-sm">
+                    <Label htmlFor="photo-frame-shape">Printed photo shape</Label>
+                    <AdminSelect
+                      id="photo-frame-shape"
+                      value={form.photoFrameShape ?? "circle"}
+                      onChange={(event) =>
+                        patchForm({
+                          photoFrameShape: event.target.value as PhotoFrameShapeId,
+                        })
+                      }
+                    >
+                      {PHOTO_FRAME_SHAPES.map((shape) => (
+                        <option key={shape.id} value={shape.id}>
+                          {shape.label}
+                        </option>
+                      ))}
+                    </AdminSelect>
+                    {/*
+                      No semicolons, deliberately. `no-new-bakery-wording` reads
+                      bare JSX prose only when the line carries none of the
+                      punctuation an expression would — so a sentence written
+                      with semicolons is a sentence that guard cannot police.
+                    */}
+                    <p className="text-xs text-muted-foreground">
+                      The customer fits their photo inside this outline, and the file
+                      you receive is cut to it. Round, Square and Heart are printed
+                      toppers. Upright and Wide are frame proportions. Long strip is
+                      the band that goes round a mug or a bottle.
+                    </p>
+                  </div>
+                ) : null}
+                <Separator />
+
+                {/*
+                  LAST, because it is the only thing on this tab the customer
+                  never sees. It puts no picker on the page — it feeds the words
+                  a shopper can narrow the listing by — and it sat in the middle
+                  of the controls that DO put something there, with no help line
+                  of its own to say otherwise.
+                */}
                 {modules.flavour ? (
                   <div className="space-y-2">
                     <Label htmlFor="flavourOptions">Flavour options (comma-separated)</Label>
@@ -704,79 +1614,142 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                       }
                       placeholder="Chocolate, Vanilla, Red Velvet"
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Words a customer can narrow the shop by on the listing pages.
+                      This puts no picker on the {productLower} page. For something
+                      the customer chooses, add an option above.
+                    </p>
                   </div>
                 ) : null}
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="flex items-center gap-2 text-sm">
-                    <Checkbox
-                      checked={form.allowsMessage}
-                      onCheckedChange={(checked) =>
-                        patchForm({ allowsMessage: checked === true })
-                      }
-                    />
-                    Allow cake message on PDP
-                  </label>
-                  {modules.photoCake ? (
-                    <label className="flex items-center gap-2 text-sm">
-                      <Checkbox
-                        checked={form.allowsPhotoUpload}
-                        onCheckedChange={(checked) =>
-                          patchForm({ allowsPhotoUpload: checked === true })
-                        }
-                      />
-                      Allow photo upload on PDP
-                    </label>
-                  ) : null}
-                </div>
-
-                {/*
-                  Shown, not edited.
-
-                  Both were editable number inputs whose values `updateProduct`
-                  deliberately re-imposes from the stored record — its comment
-                  says so: they are "owned by the reviews aggregate". So the
-                  admin typed a rating, pressed Save, read "Cake updated &
-                  published", and the number went back to what it was. The one
-                  thing the form must not do is invite a change it discards.
-                */}
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="rating">Rating</Label>
-                    <Input id="rating" value={form.rating || "No reviews yet"} readOnly disabled />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="reviewCount">Review count</Label>
-                    <Input id="reviewCount" value={form.reviewCount} readOnly disabled />
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Set by customer reviews. Moderate them under Commerce → Reviews.
-                </p>
               </TabsContent>
 
-              <TabsContent value="media" className="space-y-4">
-                <PhotoField
-                  id="imageUrl"
-                  label="Photo"
-                  aspect="square"
-                  value={form.images[0] ?? ""}
-                  onChange={(url) => patchForm({ images: [url] })}
-                  placeholder="https://images.unsplash.com/..."
+              <TabsContent value="description" className="space-y-6">
+                <div className="space-y-2">
+                  {/*
+                    It read “Opening paragraph” and its own hint said “under the
+                    blocks below”, which is where the page actually puts it:
+                    `product-detail-page` maps the blocks into bulleted lists
+                    first and renders this prose LAST, deliberately — “the
+                    shop's own words, LAST rather than under the title.”
+                  */}
+                  <Label htmlFor="description">Closing paragraph</Label>
+                  <textarea
+                    id="description"
+                    className={adminTextareaClassName}
+                    rows={4}
+                    value={form.description}
+                    onChange={(e) => patchForm({ description: e.target.value })}
+                    placeholder="What it is, what makes it good, anything a buyer should know..."
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Printed as prose AFTER the blocks below, which print as
+                    bullets. Also the search-result description when the SEO tab
+                    is empty.
+                  </p>
+                </div>
+
+                <Separator />
+
+                {/*
+                  A key-value list under one fixed heading stood here, and six
+                  fixed food fields under it — prep time, shelf life, calories,
+                  allergens, care instructions — right for a bakery and dead
+                  space for a charger.
+
+                  Six reference storefronts were read one by one and not one of
+                  them fits that: a cake has four blocks, a plant has five with
+                  no heading over the first, a candle calls the same two Delivery
+                  DETAILS and Care DIRECTIVES. So the shop writes the headings
+                  and adds as many blocks as the product needs.
+                */}
+                <ProductDescriptionBlocksFields
+                  value={form.descriptionBlocks ?? []}
+                  onChange={(descriptionBlocks) => patchForm({ descriptionBlocks })}
+                  deliveryInformation={getCommerceSettings().deliveryInformation}
                 />
               </TabsContent>
 
-              <TabsContent value="seo" className="space-y-4">
+              <TabsContent value="photos" className="space-y-6">
+                {/*
+                  One box wrote `images: [url]`, so a shop could store exactly
+                  one photo — while the type, the database, the validator and this
+                  form's own submit (`images: form.images.filter(Boolean)`) had all
+                  handled an array from the start. The product page's thumbnail
+                  rail renders on `images.length > 1` and had therefore never
+                  appeared for anybody.
+                */}
+                {photoSlots.map((url, index) => (
+                  <div key={index} className="space-y-2">
+                    <PhotoField
+                      id={index === 0 ? "imageUrl" : `imageUrl-${index}`}
+                      label={index === 0 ? "Main photo" : `Photo ${index + 1}`}
+                      aspect="square"
+                      value={url}
+                      onChange={(next) => setPhotoSlot(index, next)}
+                      placeholder="https://images.unsplash.com/..."
+                    />
+                    {photoSlots.length > 1 ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removePhotoSlot(index)}
+                      >
+                        Remove this photo
+                      </Button>
+                    ) : null}
+                  </div>
+                ))}
+                {photoSlots.length < MAX_PRODUCT_PHOTOS ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setForm((prev) => ({
+                      ...prev,
+                      images: [...(prev.images.length > 0 ? prev.images : [""]), ""],
+                    }))}
+                  >
+                    Add another photo
+                  </Button>
+                ) : null}
+                {/*
+                  A product stored with MORE than the cap keeps its photos and
+                  says so. Trimming them here would delete a photograph the shop
+                  uploaded, silently, on a save it made for some other reason —
+                  so every box stays on screen with its Remove button and the
+                  save is refused until the count is down.
+                */}
+                {photoSlots.filter(Boolean).length > MAX_PRODUCT_PHOTOS ? (
+                  <p className="text-xs text-amber-700">
+                    This {productLower} has {photoSlots.filter(Boolean).length}{" "}
+                    photos and the limit is {MAX_PRODUCT_PHOTOS}. Remove{" "}
+                    {photoSlots.filter(Boolean).length - MAX_PRODUCT_PHOTOS} to save.
+                  </p>
+                ) : null}
+                <p className="text-xs text-muted-foreground">
+                  The first photo is the one customers see on cards and in search,
+                  and the one that appears when somebody shares the link. The rest
+                  become thumbnails on the product page. Up to{" "}
+                  {MAX_PRODUCT_PHOTOS} in all.
+                </p>
+              </TabsContent>
+
+              <TabsContent value="seo" className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="metaTitle">Meta title</Label>
                   <Input
                     id="metaTitle"
                     value={form.seo.metaTitle ?? ""}
-                    onChange={(e) => {
-                      setMetaTitleTouched(true);
-                      patchForm({ seo: { ...form.seo, metaTitle: e.target.value } });
-                    }}
+                    onChange={(e) =>
+                      patchForm({ seo: { ...form.seo, metaTitle: e.target.value } })
+                    }
+                    placeholder={form.name || `${labels.productWord} name`}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Leave it blank to use the {productLower} name, which then
+                    follows a rename. Type here only to say something different.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="metaDescription">Meta description</Label>
@@ -875,29 +1848,33 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Product summary</CardTitle>
-              <CardDescription>Bakery metadata & variants</CardDescription>
+              <CardTitle className="text-base">{labels.productWord} summary</CardTitle>
+              {/* It showed neither stock nor classification. */}
+              <CardDescription>Option blocks and review scores</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
-              {form.barcode ? (
-                <p>
-                  <span className="text-muted-foreground">SKU:</span> {form.barcode}
-                </p>
-              ) : null}
+              {/*
+                SKU, Prep and Shelf life were summarised here. All three were
+                removed from the product at the shop's request — see the note
+                on ProductDescriptionBlocksFields for what went and why.
+              */}
               <p>
-                <span className="text-muted-foreground">Variant groups:</span>{" "}
+                <span className="text-muted-foreground">Option blocks:</span>{" "}
                 {form.variantGroups.length}
               </p>
-              {form.preparationTimeMinutes ? (
+              {/*
+                Shown here rather than in a tab. They are read-only — the
+                reviews aggregate owns them — so they are a fact about the
+                product, like the count above, and not a field to fill in.
+              */}
+              <p>
+                <span className="text-muted-foreground">Rating:</span>{" "}
+                {form.rating || "No reviews yet"}
+              </p>
+              {form.reviewCount > 0 ? (
                 <p>
-                  <span className="text-muted-foreground">Prep:</span>{" "}
-                  {form.preparationTimeMinutes} min
-                </p>
-              ) : null}
-              {form.shelfLifeDays ? (
-                <p>
-                  <span className="text-muted-foreground">Shelf life:</span>{" "}
-                  {form.shelfLifeDays} day{form.shelfLifeDays === 1 ? "" : "s"}
+                  <span className="text-muted-foreground">Reviews:</span>{" "}
+                  {form.reviewCount}
                 </p>
               ) : null}
             </CardContent>
@@ -906,14 +1883,19 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
           <Card>
             <CardContent className="space-y-2">
               <p className="line-clamp-1 text-sm font-medium text-primary">
-                {form.seo.metaTitle || form.name || "Cake title"}
+                {form.seo.metaTitle || form.name || `${labels.productWord} title`}
               </p>
+              {/*
+                The shop's own domain, not "bakery.com" — the one place in the
+                app that literal appeared, shown to every owner as the address
+                their product would live at.
+              */}
               <p className="text-xs text-green-700 dark:text-green-400">
-                bakery.com/store/cakes/{form.slug || "cake-slug"}
+                {previewUrl}
               </p>
               <p className="line-clamp-3 text-xs text-muted-foreground">
                 {form.seo.metaDescription ||
-                  form.shortDescription ||
+                  form.description ||
                   "Meta description preview will appear here."}
               </p>
               <Badge variant="outline">{form.status}</Badge>
@@ -921,7 +1903,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
           </Card>
 
           <Button variant="ghost" className="w-full" render={<Link href={routes.admin.cakes.list} />}>
-            Back to cakes list
+            Back to {productsLower} list
           </Button>
         </div>
       </div>
@@ -942,3 +1924,4 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
     </AdminPage>
   );
 }
+

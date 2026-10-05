@@ -7,6 +7,7 @@ import {
   BarChart3,
   Blocks,
   ChevronRight,
+  Clock,
   Code2,
   CreditCard,
   Database,
@@ -16,6 +17,7 @@ import {
   Mail,
   Menu,
   MessageCircle,
+  PackageCheck,
   Palette,
   Smartphone,
   PanelBottom,
@@ -76,13 +78,14 @@ const groups: SettingsGroup[] = [
     items: [
       {
         title: "General",
-        description: "Store name, logo, timezone, currency, and business type.",
+        description: "Store name, what you call your products, logo, timezone, and currency.",
         href: routes.admin.settings.general,
         icon: Settings,
       },
       {
         title: "Modules",
-        description: "Enable optional bakery features — flavour, weight, shape, and wedding builder.",
+        description:
+          "Switch product options on and off — flavour, weight, shape, printed photo, wedding builder.",
         href: routes.admin.settings.modules,
         icon: Blocks,
       },
@@ -115,11 +118,35 @@ const groups: SettingsGroup[] = [
         href: routes.admin.commerce.payments,
         icon: CreditCard,
       },
+      /*
+        ONE ROW PROMISED THREE SCREENS AND OPENED ONE.
+
+        "Delivery zones, time slots, and shipping rules" linked to zones only,
+        and no other menu in the CMS reaches the other two — so a shop looking
+        for its delivery times, or for when delivery is free, arrived at a list
+        of areas and had nowhere else to go.
+
+        Each row is named after the heading it opens, never a friendlier
+        invention: a row whose name does not match the page is the same defect
+        one size smaller. The plain-language half goes in the description.
+      */
       {
-        title: "Delivery",
-        description: "Delivery zones, time slots, and shipping rules.",
+        title: "Delivery Zones",
+        description: "The areas you deliver to, and what delivery costs in each.",
         href: routes.admin.commerce.deliveryZones,
         icon: Truck,
+      },
+      {
+        title: "Delivery Slots",
+        description: "The delivery times a customer can pick, and how far ahead they must order.",
+        href: routes.admin.commerce.deliverySlots,
+        icon: Clock,
+      },
+      {
+        title: "Shipping Rules",
+        description: "The delivery fee, and when delivery is free.",
+        href: routes.admin.commerce.shippingRules,
+        icon: PackageCheck,
       },
       {
         title: "Taxes",
@@ -135,7 +162,8 @@ const groups: SettingsGroup[] = [
       },
       {
         title: "Order Settings",
-        description: "Gift wrap, minimum order, and free-delivery rules.",
+        description:
+          "Gift wrap, minimum order, free delivery — and what every product page says about delivery.",
         href: routes.admin.settings.commerce,
         icon: ShoppingBag,
       },
@@ -232,7 +260,10 @@ const groups: SettingsGroup[] = [
       },
       {
         title: "Robots.txt & Sitemap",
-        description: "Search-engine crawling and indexing — coming soon.",
+        // Both files are served on every request. This row dims itself and
+        // wears a "Coming soon" badge, so the one line under the title has to
+        // say which half is pending — it is the editing, not the crawling.
+        description: "Live already. Editing them by hand is not built yet.",
         href: routes.admin.settings.seoFiles,
         icon: FileCode2,
         future: true,
@@ -249,7 +280,7 @@ const groups: SettingsGroup[] = [
         icon: Shield,
       },
       {
-        title: "Activity Logs",
+        title: "Activity Log",
         description: "Recent admin actions across the CMS.",
         href: routes.admin.settings.activity,
         icon: Activity,
@@ -335,7 +366,7 @@ export function SettingsOverviewPage() {
           // The shop's NAME is a claim, so it waits for the server's copy.
           hydrated && siteName
             ? `The control center for ${siteName} — store, commerce, communication, website, and security.`
-            : "The control center for this bakery."
+            : "The control center for this store."
         }
         actions={
           <Button

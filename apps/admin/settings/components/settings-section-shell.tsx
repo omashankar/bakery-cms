@@ -16,7 +16,16 @@ import { AdminMobileActionBar, AdminPage, AdminPageHeader } from "@/apps/admin/c
 
 interface SettingsSectionShellProps {
   title: string;
+  /** What this page is for. Always shown — see `status` for why that matters. */
   description: string;
+  /**
+   * The page's current values, in one line, once they have been read.
+   *
+   * This used to be passed AS the description, replacing it the moment the
+   * settings landed. Every one of these screens therefore explained itself
+   * for a few hundred milliseconds and then stopped.
+   */
+  status?: string;
   isDirty: boolean;
   onSave: () => void;
   onDiscard: () => void;
@@ -44,6 +53,7 @@ interface SettingsSectionShellProps {
 export function SettingsSectionShell({
   title,
   description,
+  status,
   isDirty,
   onSave,
   onDiscard,
@@ -59,8 +69,19 @@ export function SettingsSectionShell({
   children,
   extraActions,
   mounted = true,
-  resetTitle = "Reset to defaults?",
-  resetDescription = "Replace this section with the demo defaults. Other settings sections are not changed.",
+  /*
+    THE DEFAULT DIALOG NAMED NO CONSEQUENCE AN OWNER COULD PICTURE.
+
+    "Replace this section with the demo defaults" — "section" is this file's
+    word for a screen, "demo defaults" is what the values are called in the
+    code, and neither says the two things that matter: it SAVES straight away,
+    and visitors see it at once. On an untouched screen it is also the only
+    enabled button on the page, so it is the one a first-timer presses to find
+    out what it does.
+  */
+  resetTitle = "Replace this page with the starting values?",
+  resetDescription =
+    "Everything on this page goes back to the values it started with, and it saves straight away — there is no undo, and visitors see the change at once. Nothing on the other settings pages changes.",
   saveDisabled = false,
   saveLabel = "Save changes",
   isSaving = false,
@@ -87,19 +108,11 @@ export function SettingsSectionShell({
       <AdminPageHeader
         title={title}
         description={description}
+        status={status}
         className="gap-3"
         actions={
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
             {extraActions}
-            <Button
-              variant="outline"
-              className="w-full sm:w-auto"
-              onClick={() => setResetOpen(true)}
-              disabled={resetDisabled}
-            >
-              <RotateCcw className="size-4" />
-              Reset
-            </Button>
             {isDirty ? (
               <Button variant="outline" className="hidden md:inline-flex" onClick={onDiscard}>
                 Discard
@@ -114,6 +127,23 @@ export function SettingsSectionShell({
             >
               <Save className="size-4" />
               {isSaving ? "Saving…" : saveLabel}
+            </Button>
+            {/*
+              LAST, and quiet.
+
+              It led the row and was the full-width control on a phone — so on a
+              screen nobody had touched yet, where Save and Discard are both
+              disabled or absent, the one prominent enabled button on the page
+              was the one that overwrites it.
+            */}
+            <Button
+              variant="ghost"
+              className="w-full justify-center text-muted-foreground hover:text-destructive sm:w-auto"
+              onClick={() => setResetOpen(true)}
+              disabled={resetDisabled}
+            >
+              <RotateCcw className="size-4" />
+              Reset this page
             </Button>
           </div>
         }
@@ -154,7 +184,7 @@ export function SettingsSectionShell({
               Cancel
             </Button>
             <Button variant="destructive" onClick={confirmReset}>
-              Reset defaults
+              Replace these settings
             </Button>
           </DialogFooter>
         </DialogContent>

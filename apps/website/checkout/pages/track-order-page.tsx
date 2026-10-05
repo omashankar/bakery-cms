@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { routes } from "@/constants/routes";
+import { storefrontHeading } from "@/constants/typography";
 import { layoutSpacing } from "@/constants/spacing";
 import { toast } from "sonner";
 
@@ -66,17 +67,16 @@ export function TrackOrderPage() {
     <>
       <StorePageHeader
         title="Track Your Order"
-        description="Enter your order number and email to see live delivery status, ETA, and route preview."
         breadcrumbs={[{ label: "Track Order" }]}
       />
 
       <section className={layoutSpacing.sectionY}>
         <div className={layoutSpacing.container}>
-          <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
-            <div className="rounded-xl border border-border bg-white p-6 shadow-sm sm:p-8">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+            <div className="rounded-xl border border-border bg-card p-6 shadow-sm sm:p-8">
               <div className="mb-6 flex items-center gap-2">
                 <PackageSearch className="size-5 text-bakery-700" />
-                <h2 className="font-heading text-lg font-semibold">Find your order</h2>
+                <h2 className={storefrontHeading.card}>Find your order</h2>
               </div>
 
               <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
@@ -143,15 +143,30 @@ export function TrackOrderPage() {
                   <Truck className="size-4" />
                   <p className="text-sm font-medium">What you can track</p>
                 </div>
+                {/*
+                  Each bullet below is backed by a real field on the delivery
+                  tracking snapshot. A fourth one advertised the fake map in
+                  advance — before the customer even had an order number to type
+                  in — so removing the panel without removing that line would
+                  have left the shop promising a feature it had just stopped
+                  pretending to have.
+
+                  The note sits OUTSIDE the list on purpose:
+                  `the-track-screen-promises-only-what-the-order-screen-delivers`
+                  scans the list element below for the vocabulary of that
+                  promise, and comments are not stripped — so naming the removed
+                  bullet in here would fail the guard that exists to keep it
+                  removed. It also avoids writing a list tag in this comment,
+                  which the guard anchors on to find the list at all.
+                */}
                 <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
                   <li>• Estimated delivery date and time window</li>
-                  <li>• Step-by-step bakery fulfillment timeline</li>
+                  <li>• Step-by-step fulfilment timeline</li>
                   <li>• Delivery partner details when dispatched</li>
-                  <li>• Route map preview while out for delivery</li>
                 </ul>
               </div>
 
-              <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+              <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
                 <div className="flex items-center gap-2 text-bakery-700">
                   <MapPin className="size-4" />
                   <p className="text-sm font-medium">Need help?</p>

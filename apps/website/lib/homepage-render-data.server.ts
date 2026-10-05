@@ -1,3 +1,4 @@
+import { getStorefrontProductCards } from "@/features/products/data/products-service";
 import { getStorefrontInstagram } from "./storefront-social.server";
 import { getStorefrontLocation } from "./storefront-location.server";
 import { getStorefrontTrust } from "./storefront-trust.server";
@@ -25,9 +26,41 @@ import type { Banner } from "@/types/media";
 const ROW_CAP = 12;
 
 export interface HomepageRenderData {
-  rails: Awaited<ReturnType<typeof getHomepageRails>>;
+  rails: Awaited<ReturnType<typeof getHomepageRails>>["rails"];
+  /**
+   * A row per category the shop has, keyed by slug.
+   *
+   * Separate from `rails` rather than merged into it: `rails` is keyed by a
+   * CLOSED union of six known sources and every reader of it is exhaustive,
+   * while this is open and keyed by whatever the shop called its categories.
+   */
+  categoryRails: Awaited<ReturnType<typeof getHomepageRails>>["categoryRails"];
+  /** The cheapest live product in each category, over all of it — not over a rail. */
+  categoryStartingPrices: Awaited<ReturnType<typeof getHomepageRails>>["categoryStartingPrices"];
+  /** The flagged rows cut by category, for a tabbed row that is about both. */
+  flaggedCategoryRails: Awaited<ReturnType<typeof getHomepageRails>>["flaggedCategoryRails"];
   banners: Banner[];
   categories: ReturnType<typeof selectHomepageCategories>;
+  /**
+   * EVERY category, for the bands a shop has picked by hand.
+   *
+   * `categories` above is the automatic row: pictureless ones dropped and
+   * the rest capped. A picked category has to render whether or not it has
+   * a picture and whether or not it sits in the first twelve — otherwise a
+   * shop picks one and nothing appears, with nothing to explain it.
+   */
+  categoryChoices: ReturnType<typeof selectHomepageCategories>;
+  /**
+   * THE SHOP'S PUBLISHED CATALOGUE, for the band that draws what this
+   * browser has looked at.
+   *
+   * Those are slugs in localStorage and nothing else — resolving them needs
+   * the shop's own records, and the browser has none: the product cache is
+   * filled only inside the admin. `getRecentlyViewedProducts` takes the
+   * catalogue as a required argument for exactly this reason, and the cart
+   * page already passes it the same way.
+   */
+  catalog: Awaited<ReturnType<typeof getStorefrontProductCards>>;
   testimonials: Testimonial[];
   faqs: FaqItem[];
   instagram: Awaited<ReturnType<typeof getStorefrontInstagram>>;
@@ -81,6 +114,7 @@ export async function getHomepageRenderData(): Promise<HomepageRenderData> {
     bannersRaw,
     products,
     catalog,
+    storefrontCards,
     testimonialsRaw,
     faqsRaw,
     instagram,
@@ -94,6 +128,10 @@ export async function getHomepageRenderData(): Promise<HomepageRenderData> {
     getContent("banners"),
     getProducts(),
     getCatalog(),
+    // The shop's published cards, for the band that draws what this browser
+    // has looked at. Those are slugs and nothing else; resolving them needs
+    // the shop's own records, and a customer's browser has none.
+    getStorefrontProductCards(),
     getContent("testimonials"),
     getContent("faq"),
     // The shop's real Instagram, for the same reason: the gallery section used
@@ -112,7 +150,10 @@ export async function getHomepageRenderData(): Promise<HomepageRenderData> {
   ]);
 
   return {
-    rails,
+    rails: rails.rails,
+    categoryRails: rails.categoryRails,
+    categoryStartingPrices: rails.categoryStartingPrices,
+    flaggedCategoryRails: rails.flaggedCategoryRails,
     // "homepage", not "all" — `"all"` is the WILDCARD in this selector, meaning
     // "apply no visibility filter", not the visibility value "all". Passing it
     // here made the admin's Visibility field inert: a banner scoped to
@@ -123,10 +164,29 @@ export async function getHomepageRenderData(): Promise<HomepageRenderData> {
       (catalog.categories ?? []) as unknown as Parameters<typeof selectHomepageCategories>[1],
       ROW_CAP,
     ),
+    catalog: storefrontCards,
+    categoryChoices: selectHomepageCategories(
+      products,
+      (catalog.categories ?? []) as unknown as Parameters<typeof selectHomepageCategories>[1],
+      // A shop cannot pick from a list it cannot see; 200 is a ceiling on a
+      // payload, not a limit anybody is expected to reach.
+      200,
+      { requirePicture: false },
+    ),
     testimonials: publishedOnly(testimonialsRaw as Testimonial[] | null),
     faqs: publishedOnly(faqsRaw as FaqItem[] | null),
     instagram,
-    offers: selectStorefrontOffers(coupons, ROW_CAP, { currency: settings.general?.currency }),
+    offers: selectStorefrontOffers(coupons, ROW_CAP, {
+      currency: settings.general?.currency,
+      // So a scoped card reads "On Plants" rather than "On selected items".
+      // The catalogue is already in hand three lines above.
+      categoryNames: new Map(
+        ((catalog.categories ?? []) as { id: string; name: string }[]).map((category) => [
+          category.id,
+          category.name,
+        ]),
+      ),
+    }),
     storeLocation,
     trust,
   };

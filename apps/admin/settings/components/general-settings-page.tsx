@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   reportSettingsReset,
@@ -12,9 +13,9 @@ import { PhotoField } from "@/apps/admin/media/components/photo-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import type { GeneralSettings } from "@/types/settings";
+import type { GeneralSettings, LabelOverrides } from "@/types/settings";
+import { describeWordingProblems, guessPlural } from "@/config/business-labels";
 import {
-  businessTypeOptions,
   currencyOptions,
   defaultGeneralSettings,
   isSafeAssetUrl,
@@ -22,10 +23,14 @@ import {
 } from "@/features/settings/lib/settings-utils";
 import {
   getGeneralSettings,
+  getLabelSettings,
   resetGeneralSettings,
   saveGeneralSettings,
+  saveLabelSettings,
+  SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
 import { useSettingsSection } from "@/features/settings/lib/use-settings-section";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { SettingsSectionShell } from "./settings-section-shell";
 import { FieldError, SettingsHydrationNotice } from "./settings-field-error";
 
@@ -54,6 +59,8 @@ export function GeneralSettingsPage() {
 
   const errors = validate(settings);
   const hasErrors = Object.values(errors).some(Boolean);
+  /** The wording in force right now — used as the placeholder for each box. */
+  const labels = useBusinessLabels();
 
   /**
    * The site name in the tab, the favicon, and the currency and timezone every
@@ -65,6 +72,60 @@ export function GeneralSettingsPage() {
     router.refresh();
   }
 
+  /**
+   * The shop's own word for what it sells.
+   *
+   * Held beside the section rather than inside it because it is a different
+   * settings section on the server (`labelOverrides`), and saved in the same
+   * click because an owner does not think of "what do you call your products"
+   * as a separate screen. Seeded after mount: `getLabelSettings` reads
+   * localStorage, which the server cannot.
+   */
+  const [wording, setWording] = useState<LabelOverrides>({});
+  const [wordingDirty, setWordingDirty] = useState(false);
+  /**
+   * Whether the plural box is the shop’s OWN answer rather than a guess.
+   *
+   * The same rule the product form uses for slug-follows-name: derive until
+   * somebody types in the box themselves, then never touch it again. Seeded
+   * true whenever a plural is already stored, so an existing answer — a shop
+   * that wrote “Mithai” for both — is never overwritten by an English rule.
+   */
+  const [pluralTouched, setPluralTouched] = useState(false);
+  useEffect(() => {
+    const sync = () => {
+      const stored = getLabelSettings();
+      setWording(stored);
+      if (stored.productWordPlural?.trim()) setPluralTouched(true);
+    };
+    sync();
+    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
+  }, []);
+
+  function editWording(patch: Partial<LabelOverrides>) {
+    setWording((prev) => ({ ...prev, ...patch }));
+    setWordingDirty(true);
+  }
+
+  /**
+   * One word typed, two boxes filled.
+   *
+   * Both were blank and independent, so an owner had to fill each and could
+   * fill them the same — this shop put “products” in both, and every plural
+   * surface then read “Add products”. The guess is only ever a starting value;
+   * the box below stays editable because these are English rules and a shop
+   * selling Mithai is right and they are not.
+   */
+  function editProductWord(value: string) {
+    editWording({
+      productWord: value,
+      ...(pluralTouched ? {} : { productWordPlural: guessPlural(value) }),
+    });
+  }
+
+  const wordingProblems = describeWordingProblems(wording);
+
   async function handleSave() {
     if (hasErrors || !canSave) return;
     await runWrite(async () => {
@@ -75,6 +136,14 @@ export function GeneralSettingsPage() {
       if (accepted) refreshServerRender();
       return { value, accepted };
     });
+
+    if (wordingDirty) {
+      const { persisted } = await saveLabelSettings(wording);
+      if (reportSettingsWrite(persisted, "Product wording")) {
+        setWordingDirty(false);
+        refreshServerRender();
+      }
+    }
   }
 
   function handleDiscard() {
@@ -95,15 +164,13 @@ export function GeneralSettingsPage() {
   return (
     <SettingsSectionShell
       title="General"
-      description={
+      description="Your shop's name and logo, what you call the things you sell, and the timezone and currency you sell in."
+      status={
         hydration === "ready"
-          ? `${settings.siteName} · ${
-              businessTypeOptions.find((o) => o.value === settings.businessType)?.label ??
-              settings.businessType
-            } · ${settings.currency}`
-          : "Site identity, business type, branding, timezone, and currency."
+          ? `${settings.siteName} · ${labels.productWordPlural} · ${settings.currency}`
+          : undefined
       }
-      isDirty={isDirty}
+      isDirty={isDirty || wordingDirty}
       // Behind the skeleton until the SERVER's copy has landed: editing the seed
       // makes the form dirty, the resync then skips it to protect the edit, and
       // Save pushes the seeded name/INR/Asia-Kolkata over the shop's own identity.
@@ -126,7 +193,11 @@ export function GeneralSettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="siteName">Site name</Label>
+              {/*
+                The only required field on the screen, and it said so only once
+                you had emptied it and pressed Save.
+              */}
+              <Label htmlFor="siteName">Site name (required)</Label>
               <Input
                 id="siteName"
                 value={settings.siteName}
@@ -135,6 +206,10 @@ export function GeneralSettingsPage() {
                 className={cn(errors.siteName && "border-destructive")}
                 onChange={(e) => edit((prev) => ({ ...prev, siteName: e.target.value }))}
               />
+              <p className="text-xs text-muted-foreground">
+                Your shop&rsquo;s name. It shows in the browser tab, on invoices and
+                at the top of every email your shop sends.
+              </p>
               <FieldError id="siteName-error" message={errors.siteName} />
             </div>
             <div className="space-y-2">
@@ -144,6 +219,9 @@ export function GeneralSettingsPage() {
                 value={settings.siteTagline}
                 onChange={(e) => edit((prev) => ({ ...prev, siteTagline: e.target.value }))}
               />
+              <p className="text-xs text-muted-foreground">
+                One short line under your shop&rsquo;s name on the home page.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="siteDescription">Description</Label>
@@ -156,6 +234,10 @@ export function GeneralSettingsPage() {
                 }
                 rows={4}
               />
+              <p className="text-xs text-muted-foreground">
+                The sentence Google shows under your shop in its results. Two lines
+                is about all it prints.
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -163,30 +245,167 @@ export function GeneralSettingsPage() {
         <Card className="shadow-sm">
           <CardHeader>
             <CardTitle className="text-base">Branding &amp; locale</CardTitle>
-            <CardDescription>Business type, logo paths, and regional defaults.</CardDescription>
+            <CardDescription>What you call your products, logo paths, and regional defaults.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="businessType">Business type</Label>
-              <AdminSelect
-                id="businessType"
-                value={settings.businessType}
-                onChange={(e) =>
-                  edit((prev) => ({
-                    ...prev,
-                    businessType: e.target.value as GeneralSettings["businessType"],
-                  }))
-                }
-              >
-                {businessTypeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </AdminSelect>
-              <p className="text-xs text-muted-foreground">
-                Controls public labels and which optional modules appear. Bakery keeps every feature on.
+            {/*
+              THE BUSINESS TYPE SELECT STOOD HERE, TWICE, AND IS GONE.
+
+              It restricted nothing — audited both times: the only thing it
+              ever gated was the Wedding Builder, and that gate did not come
+              back with it. It had to grow a row every time a shop was a
+              trade nobody had listed, and a shop selling cakes AND chargers
+              AND flowers had no honest answer to give it.
+
+              The second time it came back to spare a new owner a blank page:
+              pick Flower shop, get Bouquet/Flowers pre-filled. The shop that
+              owns this deployment asked for it to go anyway, and the reason
+              is the label: "What kind of shop is this?" reads as
+              configuration, while all it did was fill four boxes that are
+              right there underneath. A control that looks like it decides
+              something and does not is worse than one fewer control.
+
+              WHAT IT COST: a florist now types Bouquet and Flowers itself.
+              WHAT IT WAS COSTING: changing that dropdown silently rewrote
+              the storefront's wording, with nothing on this screen moving,
+              because blank boxes mean "use the layer underneath".
+
+              The boxes below are the whole mechanism now: blank is the
+              neutral default, typed wins.
+            */}
+
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="productWord">What do you call one product?</Label>
+                <Input
+                  id="productWord"
+                  value={wording.productWord ?? ""}
+                  aria-describedby={wordingProblems.productWord ? "productWord-hint" : undefined}
+                  onChange={(e) => editProductWord(e.target.value)}
+                  placeholder={labels.productWord}
+                />
+                {wordingProblems.productWord ? (
+                  <p id="productWord-hint" className="text-xs text-amber-700">
+                    {wordingProblems.productWord}
+                  </p>
+                ) : null}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="productWordPlural">
+                  And more than one?{" "}
+                  {pluralTouched ? null : (
+                    <span className="font-normal text-muted-foreground">— filled in for you</span>
+                  )}
+                </Label>
+                <Input
+                  id="productWordPlural"
+                  value={wording.productWordPlural ?? ""}
+                  aria-describedby={
+                    wordingProblems.productWordPlural ? "productWordPlural-hint" : undefined
+                  }
+                  onChange={(e) => {
+                    // From here on this box is the shop’s own answer, and the
+                    // English guess must never overwrite it again.
+                    setPluralTouched(true);
+                    editWording({ productWordPlural: e.target.value });
+                  }}
+                  placeholder={labels.productWordPlural}
+                />
+                {wordingProblems.productWordPlural ? (
+                  <p id="productWordPlural-hint" className="text-xs text-amber-700">
+                    {wordingProblems.productWordPlural}
+                  </p>
+                ) : null}
+              </div>
+              <p className="text-xs text-muted-foreground sm:col-span-2">
+                Used across the admin and your storefront — &ldquo;Add {labels.productWord}
+                &rdquo;, &ldquo;Search {labels.productWordPlural.toLowerCase()}&rdquo;.
+                {" "}
+                <strong className="font-medium">Leave both blank</strong> if you sell more
+                than one kind of thing — the default wording is the honest one for a
+                mixed catalogue.
               </p>
+
+              {/*
+                SIX BOXES STOOD HERE — Category, Occasion and Collection, each
+                singular and plural, under "What do you file your products
+                under?" — and the shop asked for them to go.
+
+                What started it was the FOURTH axis: departments shipped with
+                a `departmentWord` in the label system and no pair on this
+                screen, so three of the four were editable and one was not.
+                Offered the missing pair or the three removed, the shop chose
+                the three removed: this page is the first thing a new owner
+                opens, and eight wording boxes read as work to do rather than
+                as options.
+
+                THE MECHANISM IS UNTOUCHED. `labelOverrides` still carries
+                these fields, the Zod schema still accepts them,
+                `resolveLabels` still layers them over the neutral floor, and
+                every heading on the storefront still resolves through them.
+                Only the way to type them here is gone — which is the state
+                `departmentWord` was already in, so all four axes now behave
+                the same.
+
+                NOT the words themselves, deliberately. Delete those and
+                "Shop by Category" becomes a literal in the storefront again,
+                which is what the label system exists to prevent and what the
+                wording ratchet guards against.
+              */}
+
+              {/*
+                These two were the half that had no input.
+                `labelOverrides` has always carried four fields — the type, the
+                Zod schema, the merge and the hydrate all handle them — and only
+                the product nouns were editable. So the shop-all page's heading
+                and subtitle could be CHANGED by removing the business-type
+                presets and not changed back from anywhere in the product.
+              */}
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="collectionsTitle">Heading on your shop-all page</Label>
+                <Input
+                  id="collectionsTitle"
+                  value={wording.collectionsTitle ?? ""}
+                  onChange={(e) => editWording({ collectionsTitle: e.target.value })}
+                  placeholder={labels.collectionsTitle}
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="collectionsSubtitle">The line under it</Label>
+                <Input
+                  id="collectionsSubtitle"
+                  value={wording.collectionsSubtitle ?? ""}
+                  onChange={(e) => editWording({ collectionsSubtitle: e.target.value })}
+                  placeholder={labels.collectionsSubtitle}
+                />
+              </div>
+
+              {/*
+                The four headings in the product description block.
+
+                A shop writes everything UNDER them — its own facts under Add
+                detail, its delivery policy in Settings → Commerce, its care
+                notes on the product — and could not write the headings
+                themselves. A florist has no “Care Instructions”; it has
+                “Looking after your flowers”.
+
+                Blank means the default, like every box above: the details one
+                follows the product noun, so a shop that types “Bouquet” gets
+                “Bouquet Details” without touching this at all.
+              */}
+              <p className="text-sm font-medium sm:col-span-2">
+                Heading on the product page
+              </p>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="descriptionHeading">The block heading</Label>
+                <Input
+                  id="descriptionHeading"
+                  value={wording.descriptionHeading ?? ""}
+                  onChange={(e) => editWording({ descriptionHeading: e.target.value })}
+                  placeholder={labels.descriptionHeading}
+                />
+              </div>
             </div>
             {/*
               * These two were bare URL boxes with no picker of any kind, which

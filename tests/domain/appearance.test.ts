@@ -27,7 +27,9 @@ afterEach(() => {
 import {
   appearanceCssVariables,
   defaultAppearanceSettings,
+  readableInkOn,
 } from "@/features/site-layout/lib/appearance-tokens";
+import { appearancePresets } from "@/features/site-layout/lib/appearance-utils";
 import type { AppearanceSettings } from "@/types/appearance";
 
 function source(relativePath: string): string {
@@ -92,6 +94,170 @@ describe("the palette as data", () => {
   });
 });
 
+describe("the palettes a shop can start from", () => {
+  /**
+   * This CMS is not a bakery CMS. Three presets shipped and all three were
+   * brown, so a florist or a gift shop had a hex field and nothing else.
+   *
+   * What these guard is not the taste — it is the two ways a palette list
+   * goes wrong without anyone noticing: an id the type offers that no
+   * definition answers (the button does nothing and the shop silently gets
+   * the demo brown), and a palette whose own button cannot be read.
+   */
+  const luminance = (hex: string) => {
+    const n = parseInt(hex.replace("#", ""), 16);
+    const ch = (c: number) => {
+      const v = c / 255;
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    };
+    return (
+      0.2126 * ch((n >> 16) & 255) + 0.7152 * ch((n >> 8) & 255) + 0.0722 * ch(n & 255)
+    );
+  };
+  const contrast = (a: string, b: string) => {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+  /** Hue in degrees, so "is this list all one colour" can be asked. */
+  const hue = (hex: string) => {
+    const n = parseInt(hex.replace("#", ""), 16);
+    const [r, g, b] = [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+    const max = Math.max(r, g, b);
+    const d = max - Math.min(r, g, b);
+    if (d === 0) return 0;
+    const h =
+      max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return ((h * 60) % 360 + 360) % 360;
+  };
+
+  it("answers every id the type offers", () => {
+    /*
+      An id in the union with no definition behind it is a preset button that
+      selects nothing: `settingsFromPreset` falls through to
+      `defaultAppearanceSettings`, so the shop clicks Teal and gets the
+      shipped brown, saved, with no error anywhere.
+    */
+    const declared = [
+      ...source("types/appearance.ts")
+        .slice(0, source("types/appearance.ts").indexOf(";"))
+        .matchAll(/"([a-z-]+)"/g),
+    ]
+      .map((m) => m[1])
+      .filter((id) => id !== "custom")
+      .sort();
+
+    expect(declared.length, "no preset ids found in the type").toBeGreaterThan(2);
+    expect(appearancePresets.map((p) => p.id).sort()).toEqual(declared);
+  });
+
+  it("gives every palette a button whose words can be read", () => {
+    for (const preset of appearancePresets) {
+      const ink = readableInkOn(preset.primaryColor);
+
+      expect(
+        contrast(ink, preset.primaryColor),
+        `${preset.name}: ${ink} on ${preset.primaryColor} is unreadable`,
+      ).toBeGreaterThanOrEqual(4.5);
+      expect(
+        contrast(preset.primaryColor, preset.surfaceColor),
+        `${preset.name}: its own brand colour cannot be read on its own surface`,
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("keeps every surface light, because the storefront is", () => {
+    // The Appearance screen promises "the public website stays light". A dark
+    // surface would also collapse --cream-100/200/--beige into each other,
+    // because the shading is flat sRGB arithmetic.
+    for (const preset of appearancePresets) {
+      expect(luminance(preset.surfaceColor), `${preset.name} has a dark surface`)
+        .toBeGreaterThan(0.75);
+    }
+  });
+
+  it("is not all one colour, which is what it was", () => {
+    /*
+      The three that shipped were #6f4e37, #4a3324 and #7a4a3a — the same
+      warm brown three times. A shop that does not sell cakes had no starting
+      point at all and had to hand-type hex.
+    */
+    const families = new Set(
+      appearancePresets.map((p) => Math.round(hue(p.primaryColor) / 40)),
+    );
+
+    expect(
+      families.size,
+      `every preset is the same hue: ${appearancePresets.map((p) => p.primaryColor).join(", ")}`,
+    ).toBeGreaterThanOrEqual(4);
+  });
+
+  it("names a colour rather than a trade", () => {
+    // "Classic Bakery" was the first thing a non-bakery shop read here.
+    for (const preset of appearancePresets) {
+      expect(
+        `${preset.name} ${preset.description}`.toLowerCase(),
+        `${preset.name} names a trade`,
+      ).not.toMatch(/bakery|cake|bakes|patisserie/);
+    }
+  });
+});
+
+describe("the ink on a shop's own brand colour", () => {
+  /**
+   * `--primary-foreground` was the literal "#ffffff", welded to whatever the
+   * shop had picked, with no luminance check anywhere in the pipeline.
+   * Measured on the real storefront button: the shipped brown reads at
+   * 7.44:1, a pale mint at 1.41:1, a pale yellow at 1.25:1. The last two are
+   * a button with no words on it — and the Appearance preview showed the
+   * same unreadable button, so it read as a choice rather than a fault.
+   */
+  const luminance = (hex: string) => {
+    const n = parseInt(hex.replace("#", ""), 16);
+    const ch = (c: number) => {
+      const v = c / 255;
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    };
+    return (
+      0.2126 * ch((n >> 16) & 255) + 0.7152 * ch((n >> 8) & 255) + 0.0722 * ch(n & 255)
+    );
+  };
+  const contrast = (a: string, b: string) => {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+
+  it("stays white on a dark brand colour, as it always was", () => {
+    expect(readableInkOn("#6f4e37")).toBe("#ffffff");
+    expect(appearanceCssVariables(defaultAppearanceSettings)["--primary-foreground"]).toBe(
+      "#ffffff",
+    );
+  });
+
+  it("turns dark on a pale one, rather than leaving the button blank", () => {
+    for (const pale of ["#a8e6cf", "#ffe66d", "#f7d6e0", "#ffffff"]) {
+      const ink = readableInkOn(pale);
+
+      expect(ink, `white was kept on ${pale}`).not.toBe("#ffffff");
+      expect(contrast(ink, pale), `${ink} on ${pale} is still unreadable`).toBeGreaterThan(4.5);
+    }
+  });
+
+  it("reaches the token a button actually paints with", () => {
+    const vars = appearanceCssVariables({ ...CUSTOM, primaryColor: "#ffe66d" });
+
+    expect(vars["--primary-foreground"]).toBe(readableInkOn("#ffe66d"));
+    expect(vars["--sidebar-primary-foreground"]).toBe(readableInkOn("#ffe66d"));
+  });
+
+  it("is never left as a hardcoded white in the generator", () => {
+    // The whole defect in one line: a literal here cannot see the fill.
+    const tokens = code("features/site-layout/lib/appearance-tokens.ts");
+
+    expect(tokens).not.toMatch(/"--primary-foreground":s*"#ffffff"/);
+    expect(tokens).not.toMatch(/"--sidebar-primary-foreground":s*"#ffffff"/);
+  });
+});
+
 describe("the customer's first paint", () => {
   it("reads the palette on the server", () => {
     // Nothing did. `getSiteLayout("appearance")` had no caller outside the API,
@@ -130,6 +296,14 @@ describe("the customer's first paint", () => {
     // and makes a unit test depend on a database being up.
     vi.doMock("@/apps/website/lib/storefront-categories.server", () => ({
       getStorefrontCategories: async () => [],
+      // ALL THREE, or the Promise.all calls an undefined export and the whole
+      // chrome read falls to the outage path — which is what this case is
+      // distinguishing itself FROM. This mock replaces the module, so every
+      // export the chrome reaches for has to be here; the count went from two
+      // to three when the menu gained its collections column.
+      getStorefrontDepartments: async () => [],
+      getStorefrontOccasions: async () => [],
+      getStorefrontCollections: async () => [],
     }));
 
     const { getStorefrontChrome } = await import(

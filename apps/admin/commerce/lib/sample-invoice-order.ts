@@ -34,7 +34,7 @@ export const SAMPLE_INVOICE_ORDER: PlacedOrder = {
     {
       id: "preview-item-1",
       productSlug: "chocolate-truffle",
-      name: "Chocolate Truffle Cake",
+      name: "Sample product",
       image: "/images/cakes/chocolate-truffle.jpg",
       price: 850,
       quantity: 1,
@@ -61,6 +61,8 @@ export const SAMPLE_INVOICE_ORDER: PlacedOrder = {
     discount: 50,
     platformCharge: 0,
     giftWrapFee: 49,
+    // Zero, so the preview shows the row a shop with no tiers set up gets.
+    deliveryTierFee: 0,
     taxableAmount: 1220,
     total: 1431.5,
     itemCount: 2,

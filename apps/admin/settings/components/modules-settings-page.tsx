@@ -11,7 +11,6 @@ import { Switch } from "@/components/ui/switch";
 import type { ModuleSettings } from "@/types/settings";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import {
-  getGeneralSettings,
   getModuleSettings,
   resetModuleSettings,
   saveModuleSettings,
@@ -26,12 +25,15 @@ const PRODUCT_MODULES: Array<{ key: ModuleKey; title: string; description: strin
   {
     key: "flavour",
     title: "Flavour",
-    description: "Flavour selector and flavour options on products.",
-  },
-  {
-    key: "eggEggless",
-    title: "Egg / Eggless",
-    description: "Egg or eggless choice on products.",
+    /*
+      This said "and the flavour filter on collections", which stopped being
+      true: there is no single flavour filter any more. Every variant group a
+      product carries gets its own filter box under its own name, and this
+      switch does not touch them — it used to, which is how switching Flavour
+      off also took the Shape filter down.
+    */
+    description:
+      "The flavour options box on a product, and the filter built from it. Variant groups get their own filters under their own names either way.",
   },
   {
     key: "weight",
@@ -43,10 +45,21 @@ const PRODUCT_MODULES: Array<{ key: ModuleKey; title: string; description: strin
     title: "Shape",
     description: "Available shapes for the product.",
   },
+  /*
+    The ONE on this page that is not a trade's own field.
+
+    Flavour, egg, weight and shape name bakery product fields, and naming
+    them is what tells a florist which to switch off. A printed photograph
+    is not like that: a frame, a mug, a cushion and a cake all take one, and
+    a shop that sells frames should not have to switch on something called
+    Photo Cake to offer it. The stored KEY stays `photoCake` — renaming that
+    would rewrite every settings document for a caption.
+  */
   {
     key: "photoCake",
-    title: "Photo Cake",
-    description: "Photo upload / personalised photo option.",
+    title: "Printed photo",
+    description:
+      "Lets a customer upload a photo to be printed on a product. Switch it on per product.",
   },
 ];
 
@@ -55,18 +68,12 @@ const PRODUCT_MODULES: Array<{ key: ModuleKey; title: string; description: strin
  * from it rather than from `Object.values(settings)`, which would silently drift
  * the moment the stored object carries a key this page does not render.
  */
-const MODULE_KEYS: ModuleKey[] = [
-  ...PRODUCT_MODULES.map((mod) => mod.key),
-  "weddingBuilder",
-];
+const MODULE_KEYS: ModuleKey[] = PRODUCT_MODULES.map((mod) => mod.key);
 
 export function ModulesSettingsPage() {
   const router = useRouter();
   const { settings, isDirty, hydration, isWriting, canSave, edit, discard, runWrite } =
     useSettingsSection<ModuleSettings>(getModuleSettings, defaultModuleSettings);
-  // Business type gates the wedding module. Read alongside the section, so it
-  // is only trusted once the same hydration has landed.
-  const isBakery = hydration !== "ready" || getGeneralSettings().businessType === "bakery";
 
   const enabledCount = MODULE_KEYS.filter((key) => settings[key]).length;
 
@@ -107,10 +114,11 @@ export function ModulesSettingsPage() {
   return (
     <SettingsSectionShell
       title="Modules"
-      description={
+      description="Turn parts of the admin on or off. Switching one off only hides it — nothing already saved is deleted."
+      status={
         hydration === "ready"
           ? `${enabledCount} of ${MODULE_KEYS.length} modules enabled`
-          : "Turn optional bakery features on or off. Disabled modules hide from the UI only."
+          : undefined
       }
       isDirty={isDirty}
       // Behind the skeleton until the SERVER's copy has landed: flipping a
@@ -156,19 +164,12 @@ export function ModulesSettingsPage() {
             <CardDescription>Optional website builders for bakery-specific pages.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <ModuleSwitch
-              title="Wedding Builder"
-              description="Wedding cakes page, builder, and storefront link."
-              checked={settings.weddingBuilder}
-              onCheckedChange={(checked) => toggle("weddingBuilder", checked)}
-            />
-            {hydration === "ready" && !isBakery ? (
-              <p className="rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
-                Business type is not <span className="font-medium">Bakery</span>, so the Wedding
-                Builder and Wedding Cakes link are already hidden from the storefront and sidebar
-                regardless of this toggle.
-              </p>
-            ) : null}
+            {/*
+              The Wedding Builder switch stood here. The feature it switched
+              is gone — the page, the builder and the band it published — so
+              the switch went with it rather than staying as a control that
+              decides nothing.
+            */}
           </CardContent>
         </Card>
       </div>
@@ -197,3 +198,4 @@ function ModuleSwitch({
     </div>
   );
 }
+

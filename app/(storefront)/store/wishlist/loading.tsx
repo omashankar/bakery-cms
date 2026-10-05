@@ -10,7 +10,7 @@ export default function Loading() {
   return (
     <StoreLoadingShell>
       <StoreHeaderSkeleton />
-      <div className={`${layoutSpacing.container} py-10`}>
+      <div className={`${layoutSpacing.container} ${layoutSpacing.sectionY}`}>
         <ProductGridSkeleton cards={4} />
       </div>
     </StoreLoadingShell>

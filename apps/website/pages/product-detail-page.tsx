@@ -6,118 +6,285 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Check,
   Heart,
-  Leaf,
-  Share2,
+  ImageUp,
+  Percent,
   ShoppingBag,
+  ThumbsUp,
   Truck,
 } from "lucide-react";
 import { ProductCard } from "@/components/storefront/product-card";
 import { ScrollReveal, StaggerReveal } from "@/components/shared/scroll-reveal";
+import type { ProductVariantGroup, ProductVariantOption } from "@/types/product";
+import { OptimizedImage } from "@/components/shared/optimized-image";
 import { ProductGallery } from "@/components/storefront/product-gallery";
+import { PincodeCheck } from "@/components/storefront/pincode-check";
+import { PhotoPrintEditor } from "@/components/storefront/photo-print-editor";
+import { FrameThumbnail } from "@/components/storefront/frame-thumbnail";
+import {
+  emptyPhotoPrintDraft,
+  type PhotoPrintDraft,
+} from "@/lib/images/photo-print-layout";
 import { PriceDisplay } from "@/components/storefront/price-display";
-import { QuantityStepper } from "@/components/shared/quantity-stepper";
 import { StarRating } from "@/components/shared/star-rating";
+import { RatingSummary } from "@/components/storefront/rating-summary";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
-import { addToCart } from "@/features/cart/lib/cart";
 import {
-  getProductWeightOptions,
-  getDefaultProductWeightOptions,
-  getAllProducts,
-} from "@/features/products/lib/product-catalog";
+  addToCart,
+  getCartItems,
+  removeCartItem,
+  updateCartItemQuantity,
+  type CartLineItem,
+} from "@/features/cart/lib/cart";
+import { getProductWeightOptions } from "@/features/products/lib/product-catalog";
 import { ProductReviewForm } from "@/apps/website/components/product-review-form";
+import { ProductQuestionForm } from "@/apps/website/components/product-question-form";
+import { fetchProductQuestions } from "@/features/inquiries/lib/inquiries-api";
+import type { Inquiry } from "@/types/inquiry";
 import { REVIEWS_UPDATED_EVENT } from "@/features/reviews/lib/reviews-repository";
+import { markReviewHelpfulRequest } from "@/features/reviews/lib/reviews-api";
+import { getHelpfulMarks, rememberHelpfulMark } from "@/features/reviews/lib/helpful-marks";
 import {
-  getProductFlavourOptions,
   getProductGalleryImages,
   getProductReviews,
-  getProductShapeOptions,
-  getDeliveryTimeSlots,
   getDeliveryPromise,
-  getMinDeliveryDate,
-  getProductDetailBadges,
   type ProductReview,
 } from "@/apps/website/lib/product-details";
+import { sameDayCutoffFor } from "@/features/orders/lib/delivery-date";
+import { useSameDayCountdown } from "@/hooks/use-same-day-countdown";
 import {
   calculateProductUnitPrice,
   formatVariantSummary,
+  displayCompareAtPrice,
+  weightAxisLabel,
 } from "@/features/products/lib/product-pricing";
 import {
+  asAddOn,
   getDefaultVariantSelections,
   getProductVariantGroups,
+  mapLegacyChoice,
+  resolveBlockRender,
   variantGroupsEnabledBy,
 } from "@/features/products/lib/variant-utils";
 import type { ModuleSettings } from "@/types/settings";
-import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import {
+  getCommerceSettings,
   getModuleSettings,
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
-import { getCustomerSession } from "@/apps/website/account/lib/customer-session";
-import { openCustomerAuthModal } from "@/apps/website/account/components/customer-auth-modal";
+import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import { isInWishlist, toggleWishlist } from "@/apps/website/lib/wishlist";
 import { getRecommendedProducts } from "@/apps/website/lib/recommended-products";
-import { recordRecentlyViewedProduct } from "@/apps/website/lib/recently-viewed";
+import { recordRecentlyViewedProduct } from "@/features/products/lib/recently-viewed";
 import { ProductRailSection } from "@/apps/website/components/product-rail-section";
 import type { LandingProduct } from "@/constants/landing-data";
+import { storefrontHeading } from "@/constants/typography";
 import { Badge } from "@/components/ui/badge";
+import { productTrustIcon } from "@/config/product-trust-icons";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
-import { formatCurrency, formatDate, formatRelativeTime } from "@/utils/format";
+import { formatCurrency, formatRelativeTime } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useBusinessLabels } from "@/hooks/use-business-labels";
+import { getFreeDeliveryThreshold } from "@/features/orders/lib/cart-totals";
+import {
+  COUPONS_UPDATED_EVENT,
+  getActiveCoupons,
+} from "@/features/commerce/lib/coupons-repository";
+import { couponDiscountLabel, isLiveCoupon } from "@/features/commerce/lib/coupon-offers";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DetailSection } from "@/components/storefront/detail-section";
+import { OptionButton, OptionGroup } from "@/components/storefront/option-group";
 
 interface ProductDetailPageProps {
   cake: LandingProduct;
+  /**
+   * The shop’s modules, read on the SERVER.
+   *
+   * REQUIRED, for the same reason the catalogue props are. This seeded from
+   * `defaultModuleSettings` — every module ON — and corrected itself in a
+   * client effect from localStorage, so a shop that had switched Flavour or
+   * Weight OFF still shipped those pickers in the HTML the browser and the
+   * crawler received, and they vanished a beat later. A gate that fails open
+   * on the server is not a gate; and an optional prop would let the next
+   * caller reintroduce that silently.
+   */
+  modules: ModuleSettings;
+  /**
+   * The cart line the customer pressed Edit on, if any.
+   *
+   * Read from `?line=` on the SERVER and passed down, rather than with
+   * `useSearchParams`: that hook forces a Suspense boundary, and everything
+   * inside one streams in after the initial HTML — on the one page this shop
+   * is found for.
+   *
+   * Editing is a REPLACE, not an update in place. `cartLineId` folds the size,
+   * the options, the message and the photo into a line’s identity precisely so
+   * two similar lines stay apart, so changing any of them necessarily makes a
+   * different line; adding without removing would leave the customer with two.
+   */
+  editLineId?: string;
   /**
    * Catalogue data fetched on the server. Passing it in keeps the rendered
    * product rails identical between the server pass and the client, which the
    * old localStorage reads could not do — the server had no localStorage, so it
    * always rendered seed data and then swapped on hydration.
+   *
+   * REQUIRED, and the client fallbacks that stood behind them are deleted.
+   * Both fell through to `getAllProducts()`, which does not go through
+   * `toCard` — so a rail built from it carries no `quickAdd`, and every card in
+   * it goes back to adding to the cart without recording the size or the
+   * options the shop then charges for. The single render site has always passed
+   * both, which made the fallbacks unreachable and therefore untested; the same
+   * shape as the `cake.category` read that sat dead in `getProductVariantGroups`
+   * until a change made it live. A required prop cannot rot that way.
    */
-  related?: LandingProduct[];
-  catalog?: LandingProduct[];
+  related: LandingProduct[];
+  catalog: LandingProduct[];
+  /**
+   * This product's category, as a crumb — its name and its real address.
+   *
+   * Optional, and absent is a real answer: a product filed under nothing, or
+   * under a category the storefront is not offering, gets no middle crumb
+   * rather than one that leads somewhere empty.
+   */
+  categoryCrumb?: { label: string; href: string };
+  /**
+   * The department that category sits under, when the shop has filed it.
+   *
+   * IT IS A LINK NOW. This read "No `href`: a department has no page of its
+   * own yet. A crumb is a promise that a page exists, so this one is a word
+   * and not a link until it is true." It is true: `/store/departments/<slug>`
+   * lists every product in the department's categories.
+   *
+   * `href` stays OPTIONAL rather than required, and not out of caution — the
+   * trail is drawn by StorePageHeader, which renders a crumb with no href as
+   * plain text, and that is still the right answer for a department whose
+   * slug the shared rule is not offering. A required href would make the
+   * caller invent one.
+   */
+  departmentCrumb?: { label: string; href?: string };
 }
 
 export function ProductDetailPage({
   cake,
+  modules: modulesFromServer,
+  editLineId,
   related: relatedFromServer,
   catalog,
+  categoryCrumb,
+  departmentCrumb,
 }: ProductDetailPageProps) {
+  const labels = useBusinessLabels();
   const router = useRouter();
-  // Related/recommended lists merge localStorage-backed admin cakes (absent during
-  // SSR) — gate them behind mount to avoid a hydration mismatch. weightOptions
-  // shares the gate: its catalog fallback (for products without their own weights)
-  // reads localStorage too, so it renders the seed defaults until mounted.
+  /**
+   * For the RECOMMENDED rail only.
+   *
+   * Both rails used to merge a localStorage-backed catalogue that the server
+   * does not have, so both were gated behind mount. `related` is a server prop
+   * now — and leaving the gate on it kept the one rail the crawler could have
+   * had out of the initial HTML of the page this shop is found for, on a route
+   * whose per-product metadata exists for exactly that reason.
+   *
+   * `recommended` still ranks by recently-viewed and past orders, which live in
+   * this browser and nowhere else. That one genuinely cannot render until it
+   * has one.
+   */
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
   }, []);
-  const weightOptions = useMemo(
-    () =>
-      cake.weights?.length || mounted
-        ? getProductWeightOptions(cake)
-        : getDefaultProductWeightOptions(),
-    [cake, mounted]
-  );
-  const flavourOptions = useMemo(() => getProductFlavourOptions(cake), [cake]);
-  const shapeOptions = useMemo(() => getProductShapeOptions(cake), [cake]);
+  /**
+   * No mount gate any more, because there is nothing left to gate.
+   *
+   * `getProductWeightOptions` used to fall back to the localStorage catalog for a
+   * product with no tiers of its own, which is why this rendered the shipped seed
+   * until mounted. It now reads only the product, so server and client agree by
+   * construction — and keeping the gate would have flashed three cake tiers onto
+   * a charger for one paint before removing them.
+   */
+  const weightOptions = useMemo(() => getProductWeightOptions(cake), [cake]);
   const variantGroups = useMemo(() => getProductVariantGroups(cake), [cake]);
-  const detailBadges = useMemo(() => getProductDetailBadges(cake), [cake]);
+  /**
+   * The description the shop wrote, block by block. One line is one bullet.
+   *
+   * This was two separate things with two fixed headings: `attributes`, a
+   * list of Label: Value pairs under "Product Details", and
+   * `careInstructions`, a box of prose under "Care Instructions". Six
+   * reference storefronts were read one by one and none of them fits that —
+   * a plant lists its first block under no heading at all and then wants
+   * Benefits, Disclaimer, Do's and Dont's; a candle wants Care Directives.
+   *
+   * A block with a heading and nothing under it is dropped: an empty
+   * heading is the thing this page keeps deleting, and the admin can leave a
+   * row half-typed at any moment.
+   */
+  const descriptionBlocks = useMemo(
+    () =>
+      (cake.descriptionBlocks ?? [])
+        .map((block) => ({
+          id: block.id,
+          heading: (block.heading ?? "").trim(),
+          lines: (block.body ?? "")
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0),
+        }))
+        .filter((block) => block.lines.length > 0),
+    [cake],
+  );
   const galleryImages = useMemo(() => getProductGalleryImages(cake), [cake]);
   const [reviews, setReviews] = useState<ProductReview[]>([]);
-  const [deliverySlots, setDeliverySlots] = useState<string[]>([]);
+  /**
+   * Whether the fetch has answered, however it answered.
+   *
+   * Without it “Loading reviews…” has no terminal state: a failed fetch, or a
+   * stored `reviewCount` that no longer matches its approved reviews, leaves a
+   * spinner under a heading claiming a number nothing beneath it supports —
+   * permanently. `review.service` records that stale aggregates were measured
+   * on this shop, so this is not hypothetical.
+   */
+  const [reviewsSettled, setReviewsSettled] = useState(false);
+  /**
+   * The reviews this browser has already marked, and the counts it has seen
+   * move since the page loaded.
+   *
+   * The count is held apart from `reviews` rather than written into it: the
+   * list is re-fetched whenever a review is submitted, and merging would mean
+   * deciding which of the two numbers is newer on every re-read.
+   */
+  const [helpfulMarks, setHelpfulMarks] = useState<string[]>([]);
+  /** Answered questions only — see `listAnsweredForProduct`. */
+  const [questions, setQuestions] = useState<Inquiry[]>([]);
+  const [helpfulCounts, setHelpfulCounts] = useState<Record<string, number>>({});
+  // The count the SERVER knows, so the heading and the empty state do not
+  // contradict the star rating beside them before the fetch lands.
+  const reviewCount = reviews.length || cake.reviewCount || 0;
   const [deliveryPromise, setDeliveryPromise] = useState("");
-  const [minDeliveryDate, setMinDeliveryDate] = useState("");
-  const [deliveryReady, setDeliveryReady] = useState(false);
+  /**
+   * What this shop is offering, said where the decision is made.
+   *
+   * Every one of these already existed and none of them reached the product
+   * page. “Free delivery over Rs 999” is a setting the shop has filled in, and
+   * the only place a customer was ever told is the CART SUMMARY — after they
+   * had chosen. The coupons are live rows a checkout will honour; the homepage
+   * advertises them and the page selling the thing did not.
+   *
+   * Read on the client because both come from local settings, and empty until
+   * they do: a shop running no offers gets no block, not an empty heading.
+   */
+  /**
+   * The shop's commerce settings, for the one line under the price.
+   *
+   * Seeded with the shipped defaults so the server pass and the first client
+   * paint agree, then refreshed by the same `sync` the offers use.
+   */
+  const [commerce, setCommerce] = useState(defaultCommerceSettings);
+  const [offers, setOffers] = useState<string[]>([]);
 
   const [selectedWeight, setSelectedWeight] = useState(0);
-  const [selectedFlavour, setSelectedFlavour] = useState(flavourOptions[0] ?? "");
-  const [selectedShape, setSelectedShape] = useState(shapeOptions[0] ?? "Round");
   const [variantSelections, setVariantSelections] = useState<Record<string, string>>(() =>
     getDefaultVariantSelections(variantGroups)
   );
@@ -125,17 +292,48 @@ export function ProductDetailPage({
   /** The uploaded photo's URL, once the shop has it. Empty until then. */
   const [photoUrl, setPhotoUrl] = useState("");
   const [photoUploading, setPhotoUploading] = useState(false);
-  const [deliveryDate, setDeliveryDate] = useState("");
-  const [deliveryTime, setDeliveryTime] = useState("");
+  /**
+   * The editor's working copy: the customer's own file, and where they have
+   * put it in the frame.
+   *
+   * It lives on the PAGE rather than inside the dialog because a closed
+   * dialog's content is unmounted — so somebody who pressed Change to nudge
+   * the zoom would find their photograph gone and every slider back at the
+   * start. What crosses to the shop is neither of these: it is the flattened
+   * frame the editor paints from them.
+   */
+  const [photoEditorOpen, setPhotoEditorOpen] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoDraft, setPhotoDraft] = useState<PhotoPrintDraft>(emptyPhotoPrintDraft);
   const [quantity, setQuantity] = useState(1);
   const [wishlisted, setWishlisted] = useState(false);
 
-  // Optional bakery modules gate the bakery-specific choosers below. Default ON so
-  // SSR / the bakery template render exactly as before; re-read on the client.
-  const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
+  /**
+   * Seeded from the SERVER, then kept live.
+   *
+   * The effect stays so an admin toggling a module in another tab sees this
+   * page follow — `SETTINGS_UPDATED_EVENT` is dispatched on every settings
+   * write and on hydration. What changed is the starting value: it was
+   * `defaultModuleSettings`, so the server HTML always claimed every module
+   * was on.
+   */
+  const [modules, setModules] = useState<ModuleSettings>(modulesFromServer);
   useEffect(() => {
+    /**
+     * NO SYNC AT MOUNT, and that is the whole point of seeding from the server.
+     *
+     * `getModuleSettings` reads localStorage, and on a cold browser
+     * `loadSettings` PERSISTS the shipped defaults — every module ON — and
+     * returns them. Calling it on mount therefore threw away the correct
+     * server answer on the first visit of every session and put the pickers
+     * straight back.
+     *
+     * The listener alone is right: `SETTINGS_UPDATED_EVENT` fires when the
+     * root providers finish hydrating the real settings, and again on every
+     * admin write — so the page catches up exactly when there is something
+     * truer than the server value to catch up to.
+     */
     const sync = () => setModules(getModuleSettings());
-    sync();
     window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
     return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
   }, []);
@@ -155,6 +353,64 @@ export function ProductDetailPage({
     [variantGroups, modules]
   );
 
+  /**
+   * THE THREE KINDS OF BLOCK, told apart ONCE.
+   *
+   * A real choice needs a heading and a row of buttons; a tick is one small box
+   * on a shared line; a stated fact is a line of text with a mark beside it.
+   *
+   * `resolveBlockRender` is that single decision. It reads the shop's own answer
+   * where there is one and derives it exactly as this page always did where
+   * there is not — which is what makes the dropdown a zero-pixel deploy.
+   *
+   * Three independent reads is what this replaces, and they could disagree. The
+   * tick bucket asked one predicate for MEMBERSHIP and a second for the on/off
+   * PAIR, so a block could be in the bucket with a null pair and the row below
+   * dereferenced it. Carrying the pair out of the same decision makes that
+   * unrepresentable rather than merely untested.
+   */
+  const blocks = useMemo(
+    () => visibleVariantGroups.map((group) => ({ group, ...resolveBlockRender(group) })),
+    [visibleVariantGroups],
+  );
+  const choiceGroups = useMemo(
+    () => blocks.filter((entry) => entry.render === "buttons").map((entry) => entry.group),
+    [blocks],
+  );
+  const statementGroups = useMemo(
+    () =>
+      blocks.filter(
+        (
+          entry,
+        ): entry is { group: ProductVariantGroup; render: "stated"; stated: ProductVariantOption } =>
+          entry.render === "stated",
+      ),
+    [blocks],
+  );
+  const addOnGroups = useMemo(
+    () =>
+      blocks
+        .filter(
+          (
+            entry,
+          ): entry is {
+            group: ProductVariantGroup;
+            render: "checkbox";
+            tick: NonNullable<ReturnType<typeof asAddOn>>;
+          } => entry.render === "checkbox",
+        )
+        // `addOn` is the name the tick row below has always used for the pair.
+        .map((entry) => ({ group: entry.group, addOn: entry.tick })),
+    [blocks],
+  );
+
+  /** The selectors the storefront tests hang the module gates off. */
+  function gatesFor(group: ProductVariantGroup) {
+    return {
+      "data-gate-shape": group.type === "shape" ? "" : undefined,
+    };
+  }
+
   /** Only what the customer could see, and only what the shop will charge for. */
   const visibleSelections = useMemo(() => {
     const allowed = new Set(visibleVariantGroups.map((group) => group.id));
@@ -163,7 +419,77 @@ export function ProductDetailPage({
     );
   }, [visibleVariantGroups, variantSelections]);
 
+  /**
+   * What the shop can actually say about getting this to the customer.
+   *
+   * Three bullets at most, and each is a fact rather than a policy paragraph:
+   * the promise the shop configured, the slot this customer has picked, and
+   * the message card — which is offered only where the product takes one,
+   * because it was once promised to every buyer of a phone charger.
+   *
+   * The reference storefronts pad this out with courier terms and
+   * redirection policies. There is no field behind any of that here, and a
+   * paragraph of invented policy is worse than a short list of true ones.
+   */
+  /*
+    `deliveryNotes` stood here, splitting the shop-wide delivery setting into
+    bullets for every product page. It is a description BLOCK now, written on
+    the product — the setting survives as the draft the admin copies in with
+    one button, because a cake and a phone charger travel differently and one
+    text cannot be true of both.
+  */
+  /**
+   * The whole section hides when the shop has filled in none of it.
+   *
+   * `deliveryNotes` counts now. It used to be written by the software and so
+   * was never empty — asking about it would have kept the heading up for
+   * every product in every shop, which is what the rest of this list exists
+   * to prevent.
+   */
+  const hasDescription = descriptionBlocks.length > 0 || Boolean(cake.description);
+
+  /**
+   * The two forms, behind the bar that invites them.
+   *
+   * Both stood open at all times, so the page ended in two long forms most
+   * visitors will never fill in — between them and the reviews they came to
+   * read. The bar is the affordance and it says exactly what it does, so
+   * nothing is hidden: asking is still one click, and it is a click somebody
+   * makes on purpose.
+   */
+  /**
+   * The countdown, and why it is null until the browser has it.
+   *
+   * The server has no idea what time it is where the customer is, and a
+   * server-rendered clock would be wrong from the moment it was sent — so
+   * this starts empty and fills in after mount. It also stops on its own
+   * when the cutoff passes, which is the whole point: a timer that has run
+   * out is worse than none, because it is still telling somebody to hurry
+   * for a delivery they can no longer have.
+   */
+  /*
+    THE SAME HOOK THE HOMEPAGE BAND MOUNTS, and the gate came with it. This
+    page showed the countdown whenever a cutoff was stored, so a shop with
+    `deliveryLeadDays: 1` and an old 14:00 still in its document said "hours
+    left for today's delivery" under the buy button while the trust bar said
+    "Next-day delivery". `sameDayCutoffFor` answers that once, for both
+    surfaces, and the hook reads the SHOP's clock rather than the visitor's.
+  */
+  const closesAt = sameDayCutoffFor(commerce.sameDayCutoff, commerce.deliveryLeadDays);
+  const timeLeft = useSameDayCountdown(closesAt);
+
+  const [askOpen, setAskOpen] = useState(false);  const [reviewOpen, setReviewOpen] = useState(false);
+
   const weight = weightOptions[selectedWeight] ?? weightOptions[0];
+
+  /**
+   * The shop's own word for the axis, not the literal “Weight”.
+   *
+   * Every OTHER picker on this page is headed by a name the shop typed —
+   * `group.name` — while the first and oldest one was headed by a bakery noun
+   * in the markup. A shop selling t-shirts got “Weight: S / M / L”.
+   */
+  const sizeAxisLabel = weightAxisLabel(cake.weightLabel);
   const weightPrice =
     cake.weights?.[selectedWeight]?.price ?? cake.price + (weight?.modifier ?? 0);
   const displayPrice = useMemo(
@@ -176,60 +502,224 @@ export function ProductDetailPage({
       }),
     [cake.price, weightPrice, visibleVariantGroups, visibleSelections]
   );
+  /**
+   * Struck through, and moved by whatever moved the price beside it.
+   *
+   * `cake.compareAtPrice` is one product-level number while `displayPrice`
+   * changes with the size and every option, so the badge used to disappear at
+   * the larger sizes — silently, at exactly the sizes a shop most wants to
+   * sell.
+   */
+  const displayCompareAt = useMemo(
+    () => displayCompareAtPrice(cake.price, cake.compareAtPrice, displayPrice),
+    [cake.price, cake.compareAtPrice, displayPrice],
+  );
   const variantSummary = useMemo(
     () => formatVariantSummary(visibleVariantGroups, visibleSelections),
     [visibleVariantGroups, visibleSelections]
   );
-  const eggGroup = variantGroups.find((group) => group.type === "egg");
-  const selectedEggOption = eggGroup?.options.find(
-    (option) => option.id === variantSelections[eggGroup.id]
-  );
-  const photoGroup = variantGroups.find((group) => group.type === "photo");
-  const selectedPhotoOption = photoGroup?.options.find(
-    (option) => option.id === variantSelections[photoGroup.id]
-  );
-  // Branch on the option's semantic, never its label — labels are merchant-editable
-  // display text and may be reworded or translated.
-  const isEggless =
-    selectedEggOption?.semantic === "eggless" ||
-    cake.isEggless ||
-    cake.category.toLowerCase().includes("eggless");
-  const showPhotoUpload =
-    (cake.allowsPhotoUpload === true ||
-      cake.category.toLowerCase().includes("photo") ||
-      selectedPhotoOption?.semantic === "photo-print") &&
-    modules.photoCake;
+  /**
+   * The same summary, minus what the page is already stating in full.
+   *
+   * DISPLAY ONLY. The grey line under the price repeats every answered group as
+   * “Shape: Round”, and a statement group is answered from the first paint — so
+   * a cake made only in round would say so twice, forty pixels apart, in two
+   * different voices. That is the duplication the serving line and the Serving
+   * Info panel were both deleted for.
+   *
+   * `variantSummary` above is untouched, because it is what goes on the cart
+   * line: the kitchen still has to be told the cake is round, and a customer
+   * reading their invoice still has to see what they were sold. These two are
+   * one keystroke apart, which is why a test mounts this page, adds to the cart
+   * and asserts the fact is still on the line.
+   */
+
+
+  /**
+   * NO CATEGORY STRING-MATCHING, and no egg claim at all any more.
+   *
+   * This read `category.toLowerCase().includes("eggless")` and
+   * `.includes("photo")` — so what a shop had NAMED a category decided what
+   * the page claimed about the product and which controls it offered. A
+   * category called “Photo Frames” got a photo-cake uploader; one called
+   * “Eggless Sponges” had every product in it described as made without eggs,
+   * whatever the product said. That was business-type control by another name,
+   * decided by a word the shop typed for its own filing.
+   *
+   * The eggless half then went further: the page no longer says a product is
+   * made without eggs at all. That is a claim about a recipe, and the shop
+   * makes it in the name, the description and the ingredients — where it can
+   * be worded, qualified and corrected — rather than in a badge this software
+   * derives. An eggless VERSION is an ordinary priced option, and the buy box
+   * renders it as a tickbox like any other.
+   *
+   * The photo half then went the same way. It used to be an OPTION too — a
+   * "Standard design / Custom photo print +₹250" row a customer chose
+   * between — so the uploader appeared when either the product's own flag
+   * said so OR the paid option had been picked. A product that takes a
+   * photograph takes one; what printing costs is part of what the product
+   * costs, and the shop prices it in. One flag is the whole statement.
+   */
+  const showPhotoUpload = cake.allowsPhotoUpload === true && modules.photoCake;
   const isOutOfStock = cake.inStock === false;
 
+  /*
+    This also read the slot list and the earliest date, to fill the two
+    delivery fields that stood above the buy button. Only the shop's own
+    promise is left — one string, for the “Timely Delivery” card.
+  */
   useEffect(() => {
-    const slots = getDeliveryTimeSlots();
-    const minDate = getMinDeliveryDate();
     setDeliveryPromise(getDeliveryPromise());
-    setDeliverySlots(slots);
-    setMinDeliveryDate(minDate);
-    setDeliveryDate(minDate);
-    setDeliveryTime(slots[3] ?? slots[0] ?? "");
-    setDeliveryReady(true);
   }, []);
+
+  /**
+   * The offers, RE-READ when the caches they come from land.
+   *
+   * Both the free-delivery threshold and the coupon list are read from
+   * localStorage, which the root providers hydrate asynchronously — so an
+   * effect with `[]` deps that runs once on mount states whatever the SHIPPED
+   * DEFAULT is on the first page view of a session and never corrects itself.
+   * A first-time visitor was told “over ₹999” whatever the shop had set.
+   */
+  useEffect(() => {
+    const sync = () => {
+      // The same read the offers already do, for the tax line under the price.
+      setCommerce(getCommerceSettings());
+      const threshold = getFreeDeliveryThreshold();
+      setOffers(
+        [
+          threshold > 0
+            ? `Free delivery on orders over ${formatCurrency(threshold)}`
+            : null,
+          // `getActiveCoupons` already drops the inactive and the expired, and
+          // `isLiveCoupon` is applied on top because it is the predicate the
+          // HOMEPAGE row uses — so the two surfaces cannot come to disagree
+          // about what is on offer.
+          ...getActiveCoupons()
+            .filter((coupon) => isLiveCoupon(coupon))
+            .map((coupon) => {
+              const label = `Use code ${coupon.code} — ${couponDiscountLabel(coupon)}`;
+              /**
+               * The minimum, SAID OUT LOUD.
+               *
+               * `isLiveCoupon` deliberately excludes `minSubtotal` — an offer
+               * with a minimum is a real offer and the customer can qualify by
+               * adding to the basket — and `coupon-offers` says in as many
+               * words that it must therefore be SHOWN, or a card sends someone
+               * to a checkout that refuses the code. This block dropped it.
+               */
+              return coupon.minSubtotal
+                ? `${label} on orders over ${formatCurrency(coupon.minSubtotal)}`
+                : label;
+            }),
+        ].filter((line): line is string => Boolean(line)),
+      );
+    };
+
+    sync();
+    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
+    window.addEventListener(COUPONS_UPDATED_EVENT, sync);
+    return () => {
+      window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
+      window.removeEventListener(COUPONS_UPDATED_EVENT, sync);
+    };
+  }, []);
+
+  /**
+   * The line being edited, read from the cart in the browser.
+   *
+   * The cart lives in localStorage, so only the client can answer this. The
+   * id alone travels in the URL — putting the choices there instead would
+   * mean a link that can assert a size or an option the shop does not sell.
+   */
+  const [editingLine, setEditingLine] = useState<CartLineItem | null>(null);
 
   useEffect(() => {
     setWishlisted(isInWishlist(cake.slug));
-    setVariantSelections(getDefaultVariantSelections(getProductVariantGroups(cake)));
-    setSelectedFlavour(getProductFlavourOptions(cake)[0] ?? "");
-    setSelectedShape(getProductShapeOptions(cake)[0] ?? "Round");
-    setSelectedWeight(0);
-  }, [cake.slug]);
+    setHelpfulMarks(getHelpfulMarks());
+    /*
+      Fetched, not server-rendered: this is one more round trip on a page
+      whose first paint matters, and a question nobody has answered yet is
+      the common case — there is usually nothing here to render at all.
+    */
+    void fetchProductQuestions(cake.slug).then((answered) => {
+      if (answered) setQuestions(answered);
+    });
+
+    const line = editLineId
+      ? getCartItems().find(
+          (item) => item.id === editLineId && item.productSlug === cake.slug,
+        )
+      : undefined;
+    setEditingLine(line ?? null);
+
+    if (!line) {
+      setVariantSelections(getDefaultVariantSelections(getProductVariantGroups(cake)));
+      setSelectedWeight(0);
+      return;
+    }
+
+    /**
+     * The stored choices OVER the defaults, never instead of them: a group the
+     * shop has added since this line was made has no answer on the line, and
+     * an unanswered group is priced at its default anyway — so leaving it out
+     * would show the customer one thing and charge them for another.
+     */
+    const groups = getProductVariantGroups(cake);
+    /**
+     * What the LINE actually says, before any default is laid under it.
+     *
+     * `mapLegacyChoice` refuses to map when the group already has an answer —
+     * a real selection must always beat a legacy field — so merging the
+     * defaults in first would make every group already-answered and the
+     * mapping below a no-op. This is the same order the server uses.
+     */
+    const carried: Record<string, string> = { ...(line.variantSelections ?? {}) };
+    /**
+     * A line from before shapes and flavours became variant groups carries the
+     * old flat field and no selection for it. `priceLine` maps those onto the
+     * matching option and charges accordingly; without the same mapping here,
+     * pressing Edit on such a line showed the group's DEFAULT — so a customer
+     * opening their Heart cake to change the message saw Round, and committing
+     * quietly swapped what the kitchen would bake.
+     *
+     * Unmatched values are left alone, exactly as the server leaves them: a
+     * shape the shop has since renamed is the customer's own word, and the line
+     * keeps carrying it.
+     */
+    for (const [group, legacy] of [
+      [groups.find((candidate) => candidate.type === "shape"), line.shape],
+      [
+        groups.find((candidate) => candidate.name.trim().toLowerCase() === "flavour"),
+        line.flavour,
+      ],
+    ] as const) {
+      const mapped = mapLegacyChoice(group, legacy, carried);
+      if (mapped) carried[mapped.groupId] = mapped.optionId;
+    }
+    // Defaults UNDER the line's own answers: a group the shop has added since
+    // this line was made has no answer on it, and an unanswered group is
+    // priced at its default anyway — so leaving it out would show the customer
+    // one thing and charge them for another.
+    setVariantSelections({ ...getDefaultVariantSelections(groups), ...carried });
+    const tier = getProductWeightOptions(cake).findIndex(
+      (option) => option.label === line.weight,
+    );
+    setSelectedWeight(tier >= 0 ? tier : 0);
+    setQuantity(line.quantity);
+    setMessage(line.message ?? "");
+    setPhotoUrl(line.photoUrl ?? "");
+    /*
+      NOT the delivery date. A line made last week may name a day that has
+      passed, and restoring it would let a customer place an order for it. The
+      picker is already defaulted to the earliest date the shop can actually
+      manage, which is the honest answer to a question being asked again.
+    */
+  }, [cake, editLineId]);
 
   // Same-category first, then top up from the wider catalogue so this row always
   // shows a full set of 4 — never a lone card floating in an empty grid.
-  const related = useMemo(() => {
-    if (relatedFromServer) return relatedFromServer;
-    const all = getAllProducts().filter((item) => item.slug !== cake.slug);
-    const sameCategory = all.filter((item) => item.category === cake.category);
-    const seen = new Set(sameCategory.map((item) => item.slug));
-    const others = all.filter((item) => !seen.has(item.slug));
-    return [...sameCategory, ...others].slice(0, 4);
-  }, [relatedFromServer, cake.slug, cake.category]);
+  const related = relatedFromServer;
   // Recommendations rank by recently-viewed and past orders, which live in this
   // browser — so this stays client-side even though the catalogue comes from
   // the server.
@@ -255,8 +745,12 @@ export function ProductDetailPage({
 
     async function refreshReviews() {
       const fetched = await getProductReviews(cake);
+      if (cancelled) return;
       // Null is a failed read, not an empty list — leave what is on screen.
-      if (!cancelled && fetched) setReviews(fetched);
+      if (fetched) setReviews(fetched);
+      // Settled either way. A FAILED read still ends the loading state, or the
+      // spinner outlives the request that started it.
+      setReviewsSettled(true);
     }
 
     void refreshReviews();
@@ -274,15 +768,13 @@ export function ProductDetailPage({
    * was chosen, which was true about the browser and false about everything
    * else. Nothing is claimed here until the server answers with a URL.
    */
-  async function handlePhotoUpload(file: File) {
-    if (!getCustomerSession()) {
-      toast.info("Please sign in to attach a photo", {
-        description: "It travels with your order, so it needs to belong to an account.",
-      });
-      openCustomerAuthModal("phone");
-      return;
-    }
-
+  async function handlePhotoUpload(file: File): Promise<boolean> {
+    /**
+     * No sign-in gate. This asked for a phone number and an OTP the moment
+     * somebody pressed Upload — before they had bought anything, on the one
+     * control that makes a photo cake a photo cake. Checkout still requires an
+     * account; deciding does not. The endpoint carries its own limits.
+     */
     setPhotoUploading(true);
     try {
       const body = new FormData();
@@ -297,30 +789,51 @@ export function ProductDetailPage({
         | null;
 
       if (!res.ok || !parsed?.data?.url) {
-        setPhotoUrl("");
+        /*
+          The photo already attached is LEFT ALONE.
+
+          This cleared it, so a customer who pressed Change, picked a new
+          photograph and hit a flaky connection lost the one they already
+          had — for a change they never completed. A failed replacement is
+          not a removal.
+        */
         toast.error(parsed?.message ?? "Could not upload that photo");
-        return;
+        return false;
       }
 
       setPhotoUrl(parsed.data.url);
       toast.success("Photo attached");
+      return true;
     } catch {
-      setPhotoUrl("");
-      toast.error("Could not reach the bakery", {
+      toast.error("Could not reach the shop", {
         description: "Please check your connection and try again.",
       });
+      return false;
     } finally {
       setPhotoUploading(false);
     }
   }
 
+  /**
+   * The finished frame, on its way to the shop.
+   *
+   * The editor hands over a flattened JPEG and this puts it through the same
+   * upload the file input used. The dialog closes only once the shop
+   * actually has it — a failure leaves it open with the photograph and the
+   * name still in place, so the customer tries again rather than starts
+   * again.
+   */
+  async function handlePhotoReady(file: File) {
+    if (await handlePhotoUpload(file)) setPhotoEditorOpen(false);
+  }
+
   const handleAddToCart = (redirectToCart = false) => {
     if (isOutOfStock) {
-      toast.error("This cake is currently out of stock");
+      toast.error(`This ${labels.productWord.toLowerCase()} is currently out of stock`);
       return;
     }
 
-    addToCart({
+    const line = addToCart({
       productSlug: cake.slug,
       name: cake.name,
       image: cake.image,
@@ -332,18 +845,36 @@ export function ProductDetailPage({
       // order, invoice and confirmation email, for a size no customer was ever
       // shown and no baker agreed to.
       weight: (modules.weight && weight?.label) || undefined,
-      // Omitted entirely when this cake has no flavour choice, or when the
-      // module is off — the picker is hidden in both cases, and an order line
-      // must not record a choice the customer was never shown. `selectedFlavour`
-      // and `selectedShape` default to the product's first option regardless of
-      // the module, so without this a shop that switched Flavour off still had
-      // "Chocolate" on every order line, invoice and confirmation email.
-      flavour: (modules.flavour && selectedFlavour) || undefined,
-      shape: modules.shape ? selectedShape : undefined,
+      // Carried onto the line so the cart, the invoice and the kitchen email
+      // head the value with the same word this page did. Absent when the shop
+      // has not named the axis — those surfaces fall back the same way.
+      weightLabel: (modules.weight && weight?.label && cake.weightLabel?.trim()) || undefined,
+      // The struck-through price the customer was actually shown, for THIS
+      // configuration. The cart holds lines rather than products and cannot
+      // work it out again — and undefined here is the honest answer for a shop
+      // that has not claimed a higher price.
+      compareAtPrice: displayCompareAt,
+      // No `flavour` on the line any more, for the same reason `shape` went:
+      // it is a variant group, so the choice travels in `variantSummary` with
+      // every other option. The field stays on the type because ORDERS ALREADY
+      // PLACED carry it.
+      // No `shape` on the line any more. A shape is a variant group, so the
+      // choice travels in `variantSummary` as “Shape: Heart” with every other
+      // option — one place, which is what `cartLineChoices` was written for.
+      // The field stays on the type because ORDERS ALREADY PLACED carry it.
       message: message.trim() || undefined,
-      photoUrl: photoUrl || undefined,
-      deliveryDate,
-      deliveryTime,
+      /*
+        Gated the way `weight` above it is gated, and for the same reason.
+
+        `showPhotoUpload` is not only the module switch — it follows the
+        VARIANT too: a shop's photo group ships as “Standard design” (+0) and
+        “Custom photo print” (+₹250). Somebody who picked the paid one,
+        uploaded a photograph, then thought better of the money and switched
+        back made the whole control disappear — and this line put the photo on
+        the cart line anyway. The kitchen got something to print on an order
+        that was never charged for it.
+      */
+      photoUrl: (showPhotoUpload && photoUrl) || undefined,
       // Only the groups the customer could see. `calculateVariantAdjustment`
       // falls back to a group's default option when no selection is sent, so
       // the server-side gate in pricing.server.ts is what actually stops the
@@ -352,12 +883,70 @@ export function ProductDetailPage({
       variantSummary,
     });
 
-    toast.success("Added to cart", {
+    /**
+     * The line this edit came from — removed only when the replacement is a
+     * DIFFERENT line.
+     *
+     * This removed it unconditionally, and that emptied the cart for the
+     * commonest edit there is. `cartLineId` keys on the size, the options, the
+     * message and the photo; it does NOT key on quantity or the delivery date.
+     * So a customer who pressed Edit and changed only the quantity — or
+     * changed nothing and pressed the button — produced the SAME id, `addToCart`
+     * merged into the very line being edited (doubling its quantity), and this
+     * line then deleted it. The item vanished under a “Cart updated” toast.
+     *
+     * `addToCart` returns the resulting line, which is the only thing that
+     * knows which of the two happened.
+     */
+    if (editingLine) {
+      if (line.id === editingLine.id) {
+        // Merged into itself: the merge branch ADDED to the quantity that was
+        // already there, so the edited value has to be set, not accumulated.
+        updateCartItemQuantity(line.id, quantity);
+      } else {
+        removeCartItem(editingLine.id);
+      }
+    }
+
+    toast.success(editingLine ? "Cart updated" : "Added to cart", {
       description: `${quantity} × ${cake.name}`,
     });
 
-    if (redirectToCart) {
+    // An edit came FROM the cart, so it goes back there — the customer asked
+    // to change a line, not to carry on shopping.
+    if (redirectToCart || editingLine) {
       router.push(routes.store.cart);
+    }
+  };
+
+  /**
+   * Counted optimistically, then corrected by the server's own number.
+   *
+   * The mark is remembered whatever the request does. A reader who pressed it
+   * and got a network error has still said what they think, and offering the
+   * button again would invite them to say it twice.
+   */
+  const handleHelpful = async (review: ProductReview) => {
+    /**
+     * Read from the STORE, not from state.
+     *
+     * `helpfulMarks` is a render closure, so two clicks landing before React
+     * re-renders both see the empty array it was rendered with — and the
+     * disabled attribute, which is the other half of this, has not been
+     * applied yet either. `rememberHelpfulMark` writes synchronously, so the
+     * store is the only thing that already knows about the first press.
+     */
+    if (getHelpfulMarks().includes(review.id)) return;
+    rememberHelpfulMark(review.id);
+    setHelpfulMarks((current) => [...current, review.id]);
+    setHelpfulCounts((current) => ({
+      ...current,
+      [review.id]: (current[review.id] ?? review.helpfulCount ?? 0) + 1,
+    }));
+
+    const settled = await markReviewHelpfulRequest(review.id);
+    if (settled !== null) {
+      setHelpfulCounts((current) => ({ ...current, [review.id]: settled }));
     }
   };
 
@@ -367,101 +956,274 @@ export function ProductDetailPage({
     toast.success(added ? "Added to wishlist" : "Removed from wishlist");
   };
 
-  const handleShare = async () => {
-    const url = window.location.href;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: cake.name, url });
-        return;
-      }
-      await navigator.clipboard.writeText(url);
-      toast.success("Link copied to clipboard");
-    } catch {
-      toast.error("Could not share link");
-    }
-  };
 
   return (
     <>
       <StorePageHeader
         title={cake.name}
+        /*
+          HOME › CHOCOLATES › THIS CAKE.
+
+          The middle crumb was the word "Collections" pointing at the shop-all
+          page — the same trail on every product in the shop, saying nothing
+          about where this one lives and offering a way back to a page the
+          customer had probably not come through.
+
+          It is the product's own category now, resolved on the SERVER against
+          the categories the storefront actually offers. Resolved there and not
+          here because the ADDRESS cannot be derived from the name: this shop
+          files cakes under "Chocolate Cakes" at the slug `chocolate`, so a
+          `slugify(cake.category)` would have linked to a page that is not
+          there.
+
+          Absent when nothing resolves — a switched-off category, one whose
+          address a collection has taken, a product filed nowhere — and the
+          trail is then Home › this cake, which is true. A crumb is a promise
+          that a page exists.
+        */
         breadcrumbs={[
-          { label: "Collections", href: routes.store.collections },
+          ...(departmentCrumb ? [departmentCrumb] : []),
+          ...(categoryCrumb ? [categoryCrumb] : []),
           { label: cake.name },
         ]}
-        className="[&_h1]:sr-only"
       />
 
+      {/*
+        ROOM FOR THE BAR THAT FLOATS OVER THE FOOT OF THIS PAGE, and nothing
+        else.
+
+        The top of the page used to be overridden here too — `sectionY` put
+        96px between a single line of breadcrumb and the photograph, and this
+        was the one page that did anything about it. It is the house rhythm
+        now, so the override is down to the one thing that is true here and
+        nowhere else: Add to Cart is fixed to the bottom of a phone screen, and
+        without a floor under the page it covers the last thing on it.
+      */}
       <section className={cn(layoutSpacing.sectionY, "pb-24 lg:pb-16")}>
         <div className={layoutSpacing.container}>
-          <div className="grid gap-10 lg:grid-cols-2 lg:gap-16">
-            <ProductGallery images={galleryImages} productName={cake.name} />
+          <div className="grid items-start gap-10 lg:grid-cols-2 lg:gap-16">
+            {/*
+              The photo stays put while the right column scrolls.
+              With everything below the fold now stacked rather than tabbed,
+              this column is long — and the image used to leave the screen a
+              third of the way down, so a customer reading the ingredients could
+              no longer see what they were reading about.
+            */}
+            {/*
+              `z-20` BECAUSE `sticky` MAKES THIS A STACKING CONTEXT.
+
+              The magnifier panel is `absolute z-30` inside the gallery, and it
+              was being drawn UNDER the option tickboxes in the column beside
+              it — the shop saw two little squares floating on the magnified
+              photograph. Not a z-index that was too low: `position: sticky`
+              creates a stacking context whatever its z-index is, so the
+              panel's 30 only ever competed with the gallery's own children,
+              and this whole box then sat at `auto` against the text column,
+              where document order wins and the text column comes second.
+
+              A z-index here lifts the context itself. 20 is deliberately below
+              the sticky header's 50 and the phone's fixed cart bar at 40 —
+              this has to rise above one column, not above the shop.
+            */}
+            {/*
+              CAPPED BELOW lg, so the price is not pushed off a tablet.
+
+              This page is one column until 1024, so at 768 the gallery took
+              the full width and the price, the size chips and Add to cart
+              all sat below the fold. Splitting into two columns at `md`
+              would be worse: ~340px each shrinks the gallery to the size it
+              already has on a 390px phone, and squeezes the buying controls
+              under the 384px cap set deliberately further down this file.
+
+              416px is the gallery's share at lg, so this is the width it
+              was designed at — it simply stops growing past it while the
+              page is still one column.
+            */}
+            <div className="sm:max-w-[26rem] lg:max-w-none lg:sticky lg:top-24 lg:z-20">
+              <ProductGallery
+                images={galleryImages}
+                productName={cake.name}
+                badge={cake.badge}
+              />
+              {/*
+                The shop's own caveat about its own photos.
+
+                A handmade item varies from the picture and a sealed one does
+                not, so this is a claim only the shop can make. Blank until an
+                owner writes it, and nothing is printed while it is — which is
+                the right answer for most trades.
+              */}
+              {commerce.productImageNote ? (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">NOTE:</span>{" "}
+                  {commerce.productImageNote}
+                </p>
+              ) : null}
+            </div>
 
             <div className="space-y-6">
               <div className="space-y-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="accent">{cake.category}</Badge>
-                  {modules.eggEggless && isEggless ? (
-                    <span className="contents" data-gate-egg>
-                      <Badge variant="outline" className="gap-1">
-                        <Leaf className="size-3" />
-                        Eggless
-                      </Badge>
-                    </span>
-                  ) : null}
-                  {cake.badge ? <Badge variant="gold">{cake.badge}</Badge> : null}
-                </div>
-                <h2 className="font-heading text-3xl font-bold sm:text-4xl">{cake.name}</h2>
+                {/*
+                  The category pill stood here — “Engagement Cake” over
+                  “Ring Ceremony Special Cake”. The shop asked for it gone:
+                  the name says what the thing is, and the customer arrived
+                  through the category in the first place.
+                */}
+                {/*
+                  SMALLER THAN THE PRICE, which is the change. It was 36px
+                  against a price of 30 — so the loudest thing on the page was
+                  the name of the product a customer had just clicked the name
+                  of, and the number they came to find was the quieter of the
+                  two. The storefront this is drawn from sets the name at about
+                  28 and the price at about 40, and that ordering is the point
+                  rather than the exact figures.
+                */}
+                <h2 className={storefrontHeading.page}>{cake.name}</h2>
                 {cake.rating ? (
                   <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                     <StarRating rating={cake.rating} size="md" showValue />
                     {reviews.length ? <span>({reviews.length} reviews)</span> : null}
                   </div>
                 ) : null}
-                <p className="text-muted-foreground">{cake.description}</p>
-                {detailBadges.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {detailBadges.map((badge) => (
-                      <Badge key={badge} variant="outline">
-                        {badge}
-                      </Badge>
-                    ))}
-                  </div>
-                ) : null}
+                {/*
+                  The description moved into Product Description, below.
+
+                  A paragraph of prose stood directly between the product name
+                  and the price block — the two things a customer opens this
+                  page for — and pushed the size picker and the add-ons below
+                  the fold on a phone.
+                */}
+                {/*
+                  A row of chips stood here, and every one of them came from a
+                  field the shop has since removed: "2 hr prep", "Best within 3
+                  days", "280 kcal / serving", "SKU 2542". Three of the four
+                  were also bullets in the description below, and the SKU was
+                  printed a second time at the foot of the page.
+                */}
               </div>
 
-              <div className="rounded-xl border border-border bg-cream-50 p-4">
-                <PriceDisplay price={displayPrice} compareAtPrice={cake.compareAtPrice} />
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Serves {weight?.serves ?? "8–10"} people · {weight?.label ?? "1 kg"}
-                </p>
-                {variantSummary.length > 0 ? (
-                  <p className="mt-1 text-xs text-muted-foreground">{variantSummary.join(" · ")}</p>
+              {/*
+                THE PRICE IS NOT A CARD.
+
+                It sat in a tinted, bordered box — which is how this page said
+                "here is a panel about money" when what a customer wants is to
+                read the number. A box also has to be sized, and it was sized
+                for three lines of small print; with the tax note and the chosen
+                options inside it, the figure itself was the smallest thing in
+                its own container.
+
+                Set on the page instead, at `lg`, which makes it the largest
+                figure on the screen — larger than the product's name above it.
+                The struck-through original and the green percentage were
+                already built into `PriceDisplay` and needed nothing.
+              */}
+              <div>
+                <PriceDisplay
+                  price={displayPrice}
+                  compareAtPrice={displayCompareAt}
+                  size="lg"
+                />
+                {/*
+                  THE OPPOSITE OF WHAT THE REFERENCE SAYS, because it is what
+                  this pipeline does.
+
+                  Winni prints “Inclusive of all taxes” under the price. Copying
+                  that here would be a lie: `computeTaxAmount` returns tax as a
+                  SEPARATE line and the total is `subtotal + … + tax`, so the
+                  number above this sentence is the pre-tax one. The invoice
+                  terms were rewritten for exactly this reason once already —
+                  they used to say “GST is included where applicable” over a
+                  breakdown that printed it separately.
+
+                  Shown only where the shop has switched tax on, and named with
+                  the shop's own label rather than a hard-coded “GST”.
+                */}
+                {commerce.taxEnabled ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {commerce.taxLabel} added at checkout
+                  </p>
                 ) : null}
+                {/*
+                  "Serves 4–6 people · 0.5 kg" stood here, under the price.
+
+                  Removed at the shop's request, and it is the last of the three
+                  places that said it: the Serving Info panel went first, and the
+                  size the customer is buying is on the button they picked it
+                  with. The headcount is still stored per tier and still
+                  editable — nothing about the product has changed, only how
+                  many times the page repeats it.
+
+                  Worth keeping in view: this line was ALSO the only place a
+                  shop with the size module switched off saw its tier, and that
+                  shop still pays tier 0's price. It shows no size now, which
+                  is what switching the module off asks for.
+                */}
+                {/*
+                  "Eggless · Heart shape" stood here, under the price, and the
+                  shop asked for it gone.
+
+                  It was a readout of what the customer had just ticked, three
+                  inches above the ticks themselves — so the page answered a
+                  question nobody had asked and did it in a second voice. The
+                  controls are the record: a ticked box is already showing what
+                  is chosen, and a line repeating it can only ever agree with
+                  them or be wrong.
+
+                  `variantSummary` is untouched and is a different thing: it is
+                  what goes on the CART LINE, where the kitchen and the invoice
+                  need it because the controls are not there to read.
+                */}
               </div>
 
               {/* Only offered when this cake actually comes in several flavours. */}
-              {modules.flavour && flavourOptions.length > 0 ? (
-                <div className="contents" data-gate-flavour>
-                  <OptionGroup label="Flavour">
-                    <div className="flex flex-wrap gap-2">
-                      {flavourOptions.map((flavour) => (
-                        <OptionButton
-                          key={flavour}
-                          active={selectedFlavour === flavour}
-                          onClick={() => setSelectedFlavour(flavour)}
-                        >
-                          {flavour}
-                        </OptionButton>
-                      ))}
-                    </div>
-                  </OptionGroup>
-                </div>
-              ) : null}
+              {/*
+                The hard-coded Flavour picker stood here, two lines above a loop
+                that already renders every group by its OWN name. Two option
+                systems on one screen, and only one of them could carry a price
+                or be named by the shop — so a flavour could never cost more, and
+                a shop selling colours or storage sizes had nowhere to put them.
+
+                `flavourOptions` is migrated into a variant group, exactly as
+                `shapes` was. Nothing is lost: it was an unpriced list of names.
+              */}
 
               {modules.weight ? (
-                <div className="contents" data-gate-weight>
-                  <OptionGroup label="Weight">
+                /*
+                  NOT `display: contents`, AND THAT IS THE SPACING BUG.
+
+                  This wrapper exists to carry `data-gate-weight` for the module
+                  gate, and `contents` was chosen so it would not "affect the
+                  layout". It affects the layout precisely by not existing:
+                  `space-y-6` on the column is `> * + *`, applying a top margin
+                  to each direct child — and a `display: contents` element
+                  cannot take a margin, so the rule resolved against a box that
+                  paints nothing and the gap was simply dropped.
+
+                  Measured before the fix at 1440: the Size buttons ended at
+                  523px and the "Shape" label began at 552, where every other
+                  pair in this column is 24 apart — and "Eggless" sat 10px under
+                  the Shape buttons, close enough to read as part of them. A
+                  plain `<div>` takes the margin and the rhythm is one number
+                  again.
+                */
+                <div data-gate-weight>
+                  <OptionGroup
+                    label={sizeAxisLabel}
+                    count={weightOptions.length}
+                    /*
+                      A “Serving Info” link sat here, opening a panel that
+                      listed every size against the headcount it feeds.
+
+                      The shop asked for both gone, and on this catalogue they
+                      were saying the same thing three times: the price block
+                      already reads “Serves 4–6 people · 0.5 kg”, the size
+                      button already reads “0.5 kg”, and the panel then
+                      repeated “0.5 kg — serves 4–6” underneath. It was written
+                      for a shop selling three tiers side by side, where the
+                      comparison is the point; a shop selling one size gets a
+                      row that only restates the line above it.
+                    */
+                  >
                     <div className="flex flex-wrap gap-2">
                       {weightOptions.map((option, index) => (
                         <OptionButton
@@ -477,14 +1239,42 @@ export function ProductDetailPage({
                 </div>
               ) : null}
 
-              {visibleVariantGroups.map((group) => (
-                <div
-                  key={group.id}
-                  className="contents"
-                  data-gate-egg={group.type === "egg" ? "" : undefined}
-                  data-gate-photo={group.type === "photo" ? "" : undefined}
-                >
-                  <OptionGroup label={group.name}>
+              {/*
+                An ADD-ON reads as a tick, a CHOICE reads as buttons.
+
+                Every group rendered as a labelled row of buttons, so “Eggless”
+                arrived as a heading over [With egg] [Eggless (+₹80)] — two
+                buttons and a title to say one yes-or-no thing. A group with two
+                options whose default costs nothing IS a yes-or-no thing, and
+                the reference storefront shows exactly that: a small tick
+                reading “Eggless”, another reading “Heart Shape”, side by side.
+
+                The rule follows the DATA rather than the group’s name, so a
+                shop gets the compact form by describing an add-on and the
+                buttons by describing a real choice. Round / Square / Heart is
+                three-way and stays buttons; Round / Heart at +₹150 becomes a
+                tick.
+              */}
+              {/*
+                THE PICKERS FIRST, THEN ONE ROW OF TICKS.
+
+                Each add-on was a block-level label, so three of them stacked
+                into three lines of mostly empty space between the size picker
+                and the message box — and a shop with an add-on BETWEEN two
+                pickers got a tick marooned on its own line in the middle of
+                them. They are one row now, wrapping when it runs out of width,
+                which is what the reference storefront does and what these
+                actually are: a handful of small yes-or-no extras.
+
+                Splitting the list is what makes that possible, and it is the
+                only thing it changes — a group that is a real choice still
+                renders as its own labelled row of buttons, in the order the
+                shop arranged them.
+              */}
+              {choiceGroups.map((group) => (
+                /* A plain div, for the same reason as the weight gate above. */
+                <div key={group.id} {...gatesFor(group)}>
+                  <OptionGroup label={group.name} count={group.options.length}>
                     <div className="flex flex-wrap gap-2">
                       {group.options.map((option) => (
                         <OptionButton
@@ -508,292 +1298,829 @@ export function ProductDetailPage({
                 </div>
               ))}
 
-              {modules.shape ? (
-                <div className="contents" data-gate-shape>
-                  <OptionGroup label="Shape">
-                    <div className="flex flex-wrap gap-2">
-                      {shapeOptions.map((shape) => (
-                        <OptionButton
-                          key={shape}
-                          active={selectedShape === shape}
-                          onClick={() => setSelectedShape(shape)}
-                        >
-                          {shape}
-                        </OptionButton>
-                      ))}
-                    </div>
-                  </OptionGroup>
-                </div>
-              ) : null}
+              {/*
+                WHAT THE PRODUCT IS, between what you pick and what you can add.
 
-              {cake.allowsMessage !== false ? (
-                <div className="space-y-2">
-                  <Label htmlFor="cake-message">Cake message</Label>
-                  <Textarea
-                    id="cake-message"
-                    placeholder='e.g. "Happy Birthday Rahul!"'
-                    value={message}
-                    onChange={(event) => setMessage(event.target.value)}
-                    rows={3}
-                  />
+                A COLUMN, not a wrapping row — deliberately unlike the tick row
+                directly beneath it. Copying that row's classes would put two
+                visually identical lines next to each other, one of which can be
+                clicked and one of which cannot, which is the confusion this is
+                supposed to remove. A column also survives a label that is a
+                sentence: “Ships assembled — no tools needed”.
+
+                Green on the GLYPH only. Five green rows read as five
+                confirmations of something the customer just did.
+
+                An <li>, never a Checkbox: a bordered box invites a click, and
+                the add-on tests count `[data-slot="checkbox"]`.
+              */}
+              {/*
+                ONE ROW, for the things that are true and the things that can be
+                asked for.
+
+                They were two blocks: the facts stacked in a column, the ticks on
+                a wrapping row underneath. The reference storefront puts them
+                together, and it is right to — “✓ Eggless   ♡ Heart Shape” reads
+                as one line of small print about this cake, which is what it is.
+                Two blocks with a gap between them read as two unrelated
+                sections, and the first of them looked like a list.
+
+                Facts first, deliberately: what the cake IS, then what can be
+                added to it.
+
+                THE LABEL AND NOTHING ELSE, on both. A fact's surcharge was
+                printed here for one release, on the reasoning that it cannot be
+                ticked so the price block can never demonstrate it. That had it
+                backwards, and this shop's own page showed why: Ring Ceremony
+                stated “Eggless” at +₹80 under a price reading ₹1,079 — which is
+                ₹999 plus that same ₹80. The number is ALREADY in the figure
+                above, so printing it tells a customer to expect ₹1,159. A tick
+                leaves its price out for the mirror reason: it is NOT in the
+                figure until you tick it, and then the figure moves.
+              */}
+              {statementGroups.length > 0 || addOnGroups.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                  {statementGroups.map(({ group, stated }) => (
+                    <span
+                      key={group.id}
+                      className="flex items-center gap-2 text-sm"
+                      {...gatesFor(group)}
+                    >
+                      <Check className="size-4 shrink-0 text-green-700" aria-hidden="true" />
+                      <span className="text-muted-foreground">{stated.label}</span>
+                    </span>
+                  ))}
+                  {addOnGroups.map(({ group, addOn }) => (
+                    <label
+                      key={group.id}
+                      className="flex cursor-pointer items-center gap-2 text-sm"
+                      {...gatesFor(group)}
+                    >
+                      <Checkbox
+                        checked={variantSelections[group.id] === addOn.on.id}
+                        onCheckedChange={(checked) =>
+                          setVariantSelections((current) => {
+                            if (checked === true) {
+                              return { ...current, [group.id]: addOn.on.id };
+                            }
+                            /*
+                              Unticking an add-on with no off-state REMOVES the
+                              answer rather than choosing another one — there is
+                              no other option to choose, and an empty string
+                              would be an id that matches nothing while still
+                              looking like an answer.
+                            */
+                            if (!addOn.off) {
+                              const { [group.id]: _dropped, ...rest } = current;
+                              return rest;
+                            }
+                            return { ...current, [group.id]: addOn.off.id };
+                          })
+                        }
+                      />
+                      {/*
+                        THE LABEL, and only the label.
+
+                        The surcharge used to be printed beside it. It reads as
+                        a price tag on the words — “Eggless +₹80” — next to a
+                        box whose own name is the thing being offered, and on an
+                        add-on that costs nothing it printed “+₹0”, which is an
+                        announcement about nothing.
+
+                        The number has not gone anywhere: the price block sits
+                        directly above these boxes and moves the moment one is
+                        ticked. That is where a total belongs, and it is the one
+                        that stays right when several are ticked at once — three
+                        labels each carrying their own “+₹” never add up to the
+                        figure the customer will actually pay.
+                      */}
+                      <span>{addOn.on.label}</span>
+                    </label>
+                  ))}
                 </div>
               ) : null}
 
               {/*
-                The photo a photo cake is printed with.
-
-                This kept the file NAME in local state and nothing else — never
-                uploaded, never on the cart line, never on the order. The bakery
-                received an order for a photo cake with no photo and no sign one
-                had been chosen, after the customer had watched themselves
-                attach it and paid the photo surcharge.
-
-                It now uploads to `/api/uploads/photo-cake`, which requires a
-                signed-in customer (checkout does too), checks the magic bytes
-                rather than the browser's word for the type, caps the size, and
-                stores it where the bakery can open it.
+                The shape picker that stood here is gone. Shapes are a typed
+                VARIANT GROUP now, rendered by the loop above like egg
+                preference and photo cake — so each one can carry a price, a
+                shop can name its own rather than choosing from four hardcoded
+                ones, and there is one option system instead of two.
               */}
-              {showPhotoUpload ? (
-                <div className="space-y-2" data-gate-photo>
-                  <Label htmlFor="photo-upload">Upload your photo</Label>
-                  <Input
-                    id="photo-upload"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    disabled={photoUploading}
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      // The input is cleared either way, so choosing the same
-                      // file again after a failure still fires a change.
-                      event.target.value = "";
-                      if (file) void handlePhotoUpload(file);
-                    }}
+
+              {/*
+                THE BUYING CONTROLS ARE THEIR OWN COLUMN, and a narrower one.
+
+                They ran the full width of the text column, which is 656px at
+                1440 — a single-line message box two thirds of a metre wide on
+                a laptop, and a PIN-code field with 500px of empty white
+                between the digits and the button. The shop's reference keeps
+                this group at about 380 and lets the title, the price and the
+                weight pills above it run the full column, which is right:
+                those are things to READ and these are things to FILL IN, and
+                a field wider than the answer it wants reads as a mistake.
+
+                `max-w-sm` is 384px and does nothing below that, so a phone
+                still gets the full width it needs. The `space-y-6` is the
+                column's own rhythm carried inside, so wrapping these five
+                into one child does not change the gaps between them.
+              */}
+              <div className="w-full max-w-sm space-y-6">
+                {/*
+                  The photo a photo cake is printed with.
+
+                  This kept the file NAME in local state and nothing else — never
+                  uploaded, never on the cart line, never on the order. The bakery
+                  received an order for a photo cake with no photo and no sign one
+                  had been chosen, after the customer had watched themselves
+                  attach it and paid the photo surcharge.
+
+                  It now uploads to `/api/uploads/photo-cake`, which takes NO
+                  sign-in — asking for a phone number before somebody has bought
+                  anything is where people leave, and checkout still asks. It
+                  checks the magic bytes rather than the browser’s word for the
+                  type, caps the size, refuses cross-site posts, budgets what it
+                  accepts, and deletes any photo no order or draft claims.
+
+                  This comment said “requires a signed-in customer” for a commit
+                  after that stopped being true — directly above the control it
+                  describes.
+                */}
+                {showPhotoUpload ? (
+                  <div className="space-y-2" data-gate-photo>
+                    {/*
+                      ONE control, and it opens an editor.
+
+                      It was a bare file input: whatever the camera produced
+                      went to the shop at whatever crop, and nobody — customer
+                      or baker — saw what would be printed until it was. A
+                      round print area cuts the corners off a rectangular
+                      photograph, so the customer is the only person who can
+                      say which corners are the expendable ones.
+                    */}
+                    <button
+                      type="button"
+                      onClick={() => setPhotoEditorOpen(true)}
+                      className="flex w-full items-center gap-3 rounded-md border border-input bg-card px-3 py-2.5 text-left transition-premium hover:border-bakery-300"
+                    >
+                      {photoUrl ? (
+                        <>
+                          <FrameThumbnail src={photoUrl} shape={cake.photoFrameShape} />
+                          <span className="text-sm font-medium">Photo added</span>
+                          <span className="ml-auto text-sm font-medium text-bakery-700">
+                            Change photo or name
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <ImageUp className="size-5 shrink-0 text-bakery-700" />
+                          <span className="text-sm font-medium">Upload photo and write name</span>
+                        </>
+                      )}
+                    </button>
+                    {/*
+                      NOTHING under the button when there is nothing to say.
+
+                      The line here read "Fit it in the frame, and add a name if
+                      you want one" — which is what the button above it already
+                      says, in the same number of words, one line higher. Two of
+                      the three states are still worth a line: an upload in
+                      flight, and the confirmation that the photo reached the
+                      shop, which is the only place that fact appears at all.
+                    */}
+                    {photoUploading ? (
+                      <p className="text-xs text-muted-foreground">Uploading your photo…</p>
+                    ) : photoUrl ? (
+                      <p className="flex items-center gap-1.5 text-xs text-green-700">
+                        <Check className="size-3.5" />
+                        Photo attached — it will reach the shop with your order.
+                      </p>
+                    ) : null}
+
+                    <PhotoPrintEditor
+                      open={photoEditorOpen}
+                      onOpenChange={setPhotoEditorOpen}
+                      file={photoFile}
+                      onFileChange={setPhotoFile}
+                      draft={photoDraft}
+                      onDraftChange={setPhotoDraft}
+                      shape={cake.photoFrameShape}
+                      busy={photoUploading}
+                      attachedUrl={photoUrl}
+                      onUse={(chosen) => void handlePhotoReady(chosen)}
+                      onProblem={(problem) => toast.error(problem)}
+                    />
+                  </div>
+                ) : null}
+
+                {cake.allowsMessage !== false ? (
+                  /*
+                    TWO ROWS, NOT THREE, and the label is gone.
+
+                    It was a labelled three-row box, which is a paragraph's worth
+                    of space for something that is written on a cake — the whole
+                    control was taller than the price, the size buttons and the
+                    toggles put together. The placeholder already says what goes
+                    in it, in the shop's own example, so the label above was the
+                    same words twice; `aria-label` keeps them for anyone who
+                    cannot see the placeholder.
+
+                    Still a textarea rather than an input: a message runs onto a
+                    second line more often than not, and a single line that
+                    scrolls sideways hides what has already been typed.
+                  */
+                  <Textarea
+                    id="product-message"
+                    aria-label="Message on this order"
+                    placeholder='Message on this order — e.g. "Happy Birthday!"'
+                    value={message}
+                    onChange={(event) => setMessage(event.target.value)}
+                    rows={1}
+                    /*
+                      `min-h-12`, not `h-12`: the shared Textarea floors itself at
+                      `min-h-16` and a height cannot override a minimum, which is
+                      why setting one changed nothing. The component also carries
+                      `field-sizing-content`, so lowering the floor gives the best
+                      of both — one line high beside the other controls, growing
+                      as a longer message is typed rather than hiding it.
+                    */
+                    className="min-h-12 py-3"
                   />
-                  {photoUploading ? (
-                    <p className="text-xs text-muted-foreground">Uploading your photo…</p>
-                  ) : photoUrl ? (
-                    <p className="flex items-center gap-1.5 text-xs text-green-700">
-                      <Check className="size-3.5" />
-                      Photo attached — it will reach the bakery with your order.
-                    </p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">
-                      JPEG, PNG or WebP, up to 6 MB.
-                    </p>
-                  )}
+                ) : null}
+
+                {/*
+                  A Delivery date and a Delivery time stood here.
+
+                  Removed at the shop's request: when a cake arrives is settled
+                  AFTER the cart, not before it. Checkout asks the same two
+                  questions, refuses to move on without an answer, and its
+                  answer already won — `resolveEstimatedDelivery` says so in as
+                  many words: “the slot chosen at checkout is the promise made
+                  to the customer, so it takes precedence over dates picked per
+                  item on the product page.” So this pair set a value that the
+                  checkout then overrode, on a page the customer visits once per
+                  cake and a decision they make once per order.
+
+                  New lines carry no date. The FIELDS stay on the cart line and
+                  the order item, and the cart still prints one when it finds
+                  it, because a cart in somebody's browser from before this
+                  deploy still has values in it and carts do not expire.
+                */}
+
+                {/*
+                  CAN IT REACH ME — the last question before committing, asked
+                  where the shop's reference storefront asks it: under the
+                  message, above Add to Cart.
+
+                  A customer who adds to cart, fills in an address and is told at
+                  checkout that no zone covers their PIN code has spent five
+                  minutes to be turned away, and they do not generally come back
+                  to try a different product. This mounts nothing at all for a
+                  shop that has not set its zones up — see `PincodeCheck`, where
+                  that gate is the reason it reads the list on mount.
+                */}
+                <PincodeCheck />
+
+                {/*
+                  A Quantity stepper stood to the left of these buttons.
+
+                  Removed at the shop's request: the cart has one, and it is the
+                  screen a customer is on when they think about how many. Adding
+                  from a grid card never offered the question either, so the
+                  product page was the only place that asked it.
+
+                  The VALUE stays. `quantity` is still state, still sent with the
+                  line, and still restored by the edit-a-cart-line path — a
+                  customer who edits a line of three must not have it silently
+                  reset to one because the control that set it has gone.
+                */}
+                {/*
+                  PHONES ONLY NOW. On a desktop this button has moved into the
+                  Add to Cart row below, where the reference storefront puts it:
+                  a square heart, then the button, on one line.
+
+                  It stayed a labelled button here because a phone's Add to Cart
+                  lives in the fixed bar at the foot of the screen, so there is no
+                  row for it to join — and an unlabelled heart floating on its own
+                  above the options is a control with nothing to explain it.
+                */}
+                <div className="flex flex-wrap items-center justify-end gap-4 lg:hidden">
+                  <div className="flex gap-2">
+                    {/*
+                      44px, a step under the buy button's 48.
+
+                      It was the shared default, 32px — under every touch
+                      floor — while its desktop twin is `h-14 w-14`. The
+                      cart pairs a 48px primary with a 44px outline directly
+                      beneath it; this is that pair. No `text-base`, so the
+                      primary stays visibly the primary.
+                    */}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11"
+                      onClick={handleWishlist}
+                    >
+                      <Heart className={cn("size-4", wishlisted && "fill-bakery-700 text-bakery-700")} />
+                      Wishlist
+                    </Button>
+                    {/*
+                      A Share button stood beside Wishlist. Removed at the
+                      shop's request — every browser this page runs in already
+                      has one, and the page has a canonical URL for it to use.
+                    */}
+                  </div>
+                </div>
+
+                {/*
+                  ONE button, where there were two.
+
+                  "Buy Now" added the same line as "Add to Cart" and then pushed
+                  to the cart — the same action, differently worded, sitting
+                  beside it in the loudest place on the page. Two primary CTAs
+                  make a customer choose between them before they can do the one
+                  thing they came to do, and the difference between the pair was
+                  a navigation they can make for themselves; the header cart
+                  count and the toast both already point the way.
+                */}
+                {/*
+                  Under the button, because it is about the button.
+
+                  Null until the browser has a clock — the server does not know
+                  what time it is where the customer is — and null again the
+                  moment the cutoff passes, so it can never sit there having run
+                  out.
+                */}
+                <div className="hidden items-center gap-3 lg:flex">
+                  {/*
+                    THE HEART SITS BESIDE THE BUTTON, not on a line of its own
+                    above it. It was a labelled "Wishlist" pill pushed to the
+                    right-hand edge, three rows up — the smallest control in the
+                    column, in the emptiest part of it, above the largest one.
+
+                    Square and unlabelled here because the button beside it says
+                    what this row is for, which is what makes the icon readable
+                    on its own. `aria-label` carries the words for anyone who
+                    cannot see it, and it says which way the tap goes rather than
+                    naming the list: "Save" and "Saved" are different actions, and
+                    a control whose label never changes has already told a screen
+                    reader the wrong thing once it is filled in.
+                  */}
+                  <Button
+                    type="button"
+                    size="lg"
+                    variant="outline"
+                    onClick={handleWishlist}
+                    aria-pressed={wishlisted}
+                    aria-label={wishlisted ? "Remove from wishlist" : "Save to wishlist"}
+                    className="h-14 w-14 shrink-0 p-0"
+                  >
+                    <Heart
+                      className={cn("size-5", wishlisted && "fill-bakery-700 text-bakery-700")}
+                    />
+                  </Button>
+                  <Button
+                    size="lg"
+                    variant="bakery"
+                    className="h-14 flex-1 text-base font-semibold"
+                    disabled={isOutOfStock}
+                    onClick={() => handleAddToCart(false)}
+                  >
+                    <ShoppingBag className="size-4" />
+                    {isOutOfStock ? "Out of stock" : editingLine ? "Update cart" : "Add to Cart"}
+                  </Button>
+                </div>
+                {timeLeft ? (
+                  <p className="text-center text-sm font-medium text-bakery-700">
+                    {timeLeft} hours left for today&apos;s delivery
+                  </p>
+                ) : null}
+              </div>
+
+              {/*
+                THE OFFERS ARE NOT A PANEL, and the words are not decoration.
+
+                This was a dashed, tinted box with the heading AND every line
+                inside it painted `text-bakery-700` — brown on cream, at the
+                weight of a caption. Two things went wrong with that. A dashed
+                border is the border browsers and design systems use for
+                something provisional, a drop target or a placeholder, so the
+                one block on the page that says "here is money off" read as the
+                least settled thing on it. And colouring the LINES as well as
+                the heading made the offers quieter than the product
+                description below them, which is the opposite of what they are
+                for — they are the reason somebody adds a second item.
+
+                So: no box, and the offers set in the page's own text colour at
+                the page's own size. The heading keeps the brand colour, since
+                that is what marks the block as a block now that nothing draws
+                one around it.
+              */}
+              {offers.length > 0 ? (
+                <div>
+                  <p className="flex items-center gap-2 font-semibold text-bakery-700">
+                    {/*
+                      A PER CENT SIGN, not a luggage tag. Both are conventional
+                      for this, and the reference storefront uses the per cent —
+                      but the reason to prefer it is that a tag is also the icon
+                      this repo uses for a product's category chip, and two
+                      unrelated things on one page should not share a glyph.
+                    */}
+                    <Percent className="size-4 shrink-0" aria-hidden="true" />
+                    Available offers
+                  </p>
+                  <ul className="mt-3 space-y-2 text-sm text-foreground">
+                    {offers.map((offer) => (
+                      <li key={offer} className="flex gap-2.5">
+                        <span aria-hidden className="text-bakery-700">
+                          •
+                        </span>
+                        <span>{offer}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               ) : null}
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="delivery-date">Delivery date</Label>
-                  <Input
-                    id="delivery-date"
-                    type="date"
-                    min={minDeliveryDate}
-                    value={deliveryDate}
-                    onChange={(event) => setDeliveryDate(event.target.value)}
-                    disabled={!deliveryReady}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="delivery-time">Delivery time</Label>
-                  <select
-                    id="delivery-time"
-                    value={deliveryTime}
-                    onChange={(event) => setDeliveryTime(event.target.value)}
-                    disabled={!deliveryReady}
-                    className="flex h-8 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
-                  >
-                    {deliverySlots.map((slot) => (
-                      <option key={slot} value={slot}>
-                        {slot}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              {/*
+                WHAT THE SHOP CAN ACTUALLY SAY, and only that.
 
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">Quantity</p>
-                  <QuantityStepper value={quantity} onChange={setQuantity} />
-                </div>
-                <div className="flex gap-2">
-                  <Button type="button" variant="outline" onClick={handleWishlist}>
-                    <Heart className={cn("size-4", wishlisted && "fill-bakery-700 text-bakery-700")} />
-                    Wishlist
-                  </Button>
-                  <Button type="button" variant="outline" onClick={handleShare}>
-                    <Share2 className="size-4" />
-                    Share
-                  </Button>
-                </div>
-              </div>
+                Two rows sat here and both were broken. The delivery promise is
+                filled by a client effect from `""`, so the server HTML shipped
+                an icon with nothing beside it. And “Eggless available” was
+                gated on the egg MODULE rather than on whether this product is
+                eggless — so it printed under every product in the shop, a
+                fallback presented as a fact, in the exact lines that are
+                supposed to be the reason to trust the page.
 
-              <div className="hidden flex-wrap gap-3 lg:flex">
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="flex-1"
-                  disabled={isOutOfStock}
-                  onClick={() => handleAddToCart(false)}
-                >
-                  <ShoppingBag className="size-4" />
-                  {isOutOfStock ? "Out of stock" : "Add to Cart"}
-                </Button>
-                <Button
-                  size="lg"
-                  variant="bakery"
-                  className="flex-1"
-                  disabled={isOutOfStock}
-                  onClick={() => handleAddToCart(true)}
-                >
-                  Buy Now
-                </Button>
-              </div>
+                “Freshly baked” was removed from here earlier for the same
+                reason. Each row now waits for something true to say.
+              */}
+              {/*
+                THE ROW UNDER THE PHOTO, and it is the shop's to write.
 
-              <ul className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-3">
-                <li className="flex items-center gap-2">
-                  <Check className="size-4 text-bakery-700" />
-                  Freshly baked
-                </li>
-                <li className="flex items-center gap-2">
-                  <Truck className="size-4 text-bakery-700" />
-                  {deliveryPromise}
-                </li>
-                {modules.eggEggless ? (
-                  <li className="flex items-center gap-2" data-gate-egg>
-                    <Leaf className="size-4 text-bakery-700" />
-                    Eggless available
+                The reference puts three cards here — “100% Purchase Protection
+                / Assured Quality Secure Payments”, “Serving Excellence / 20M
+                Happy Customers + 100% Satisfaction!”, “Timely Delivery /
+                Different Time Slots Available”. Every one is a claim and two
+                are numbers this software cannot know, so it had two cards
+                hard-coded here instead: a delivery one, and “Free message card
+                / Written as you ask” — two English sentences a shop selling
+                anything else could not change.
+
+                The delivery card stays, because it is not copy: it renders the
+                shop's own `deliveryLeadDays` and so says “Same-day delivery”
+                the day the shop changes its lead time. Everything else is
+                typed in Settings → Commerce, and a shop that has typed nothing
+                gets one card rather than a boast made up for it.
+              */}
+              <ul className="grid gap-3 text-sm sm:grid-cols-3">
+                {deliveryPromise ? (
+                  <li className="flex flex-col items-center gap-2 rounded-xl border border-border bg-cream-50 p-4 text-center">
+                    <Truck className="size-6 text-bakery-700" />
+                    <span className="font-medium text-foreground">Timely Delivery</span>
+                    <span className="text-xs text-muted-foreground">{deliveryPromise}</span>
                   </li>
                 ) : null}
+                {(commerce.productTrustCards ?? [])
+                  .filter((card) => card.title.trim().length > 0)
+                  .map((card) => {
+                    const Icon = productTrustIcon(card.icon);
+                    return (
+                      <li
+                        key={card.id}
+                        className="flex flex-col items-center gap-2 rounded-xl border border-border bg-cream-50 p-4 text-center"
+                      >
+                        <Icon className="size-6 text-bakery-700" />
+                        <span className="font-medium text-foreground">{card.title}</span>
+                        {card.subtitle.trim() ? (
+                          <span className="text-xs text-muted-foreground">
+                            {card.subtitle}
+                          </span>
+                        ) : null}
+                      </li>
+                    );
+                  })}
               </ul>
 
-              <Tabs defaultValue="description">
-                <div className="overflow-x-auto">
-                  <TabsList className="w-max min-w-full">
-                    <TabsTrigger value="description">Description</TabsTrigger>
-                    <TabsTrigger value="ingredients">Ingredients</TabsTrigger>
-                    <TabsTrigger value="nutrition">Nutrition</TabsTrigger>
-                    <TabsTrigger value="allergens">Allergens</TabsTrigger>
-                    <TabsTrigger value="care">Care</TabsTrigger>
-                    <TabsTrigger value="reviews">
-                      Reviews
-                      {reviews.length ? ` (${reviews.length})` : ""}
-                    </TabsTrigger>
-                    <TabsTrigger value="delivery">Delivery</TabsTrigger>
-                  </TabsList>
-                </div>
-                <TabsContent value="description" className="text-sm text-muted-foreground">
-                  {cake.description} Crafted fresh with premium ingredients and finished by
-                  our expert bakers for celebrations of every size.
-                </TabsContent>
-                <TabsContent value="ingredients" className="text-sm text-muted-foreground">
-                  {cake.ingredients ||
-                    "Flour, sugar, butter, fresh cream, premium chocolate, and natural flavours."}
-                  {isEggless
-                    ? " This cake is prepared without eggs."
-                    : " Eggless version available on request."}
-                </TabsContent>
-                <TabsContent value="nutrition" className="space-y-2 text-sm text-muted-foreground">
-                  {cake.calories ? (
-                    <p>
-                      <span className="font-medium text-foreground">Calories:</span>{" "}
-                      {cake.calories} kcal per serving
-                    </p>
-                  ) : (
-                    <p>Calorie information will be updated soon.</p>
-                  )}
-                  {cake.preparationTimeMinutes ? (
-                    <p>
-                      <span className="font-medium text-foreground">Preparation:</span>{" "}
-                      {detailBadges.find((badge) => badge.includes("prep")) ?? `${cake.preparationTimeMinutes} minutes`}
-                    </p>
-                  ) : null}
-                  {cake.shelfLifeDays ? (
-                    <p>
-                      <span className="font-medium text-foreground">Shelf life:</span>{" "}
-                      {cake.shelfLifeDays} day{cake.shelfLifeDays === 1 ? "" : "s"} when stored properly
-                    </p>
-                  ) : null}
-                </TabsContent>
-                <TabsContent value="allergens" className="text-sm text-muted-foreground">
-                  {cake.allergens ||
-                    "May contain milk, wheat, eggs, and nuts. Please contact us for allergen-specific requests."}
-                </TabsContent>
-                <TabsContent value="care" className="text-sm text-muted-foreground">
-                  {cake.careInstructions ||
-                    "Refrigerate within 2 hours of delivery. Bring to room temperature before serving for the best texture and flavour."}
-                </TabsContent>
-                <TabsContent value="reviews" className="space-y-4">
-                  <ProductReviewForm
-                    productSlug={cake.slug}
-                    cakeName={cake.name}
-                    onSubmitted={() => {
-                      // A new review is pending, so this re-read normally comes
-                      // back unchanged — which is the honest outcome. It runs so
-                      // that anything approved since the page loaded appears.
-                      void getProductReviews(cake).then((next) => {
-                        if (next) setReviews(next);
-                      });
-                    }}
-                  />
-                  {reviews.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      No published reviews yet. Be the first to share your experience.
-                    </p>
-                  ) : (
-                    reviews.map((review) => (
-                      <article
-                        key={review.id}
-                        className="rounded-xl border border-border bg-white p-4"
+              {/*
+                STACKED, NOT TABBED.
+
+                These were six tabs, and Base UI unmounts the panel that is not
+                showing — so five sixths of everything the shop had written about
+                its product was absent from the HTML the browser received, absent
+                from what Google indexed, and on a phone sat behind a tab strip
+                that scrolls sideways. The shop typed ingredients, allergens and
+                care instructions into the admin and almost nobody ever saw them.
+
+                Every section still gates itself on the product carrying the
+                field, which is what tabs were really buying: a phone charger
+                shows no Ingredients heading at all rather than an empty one.
+              */}
+              <div className="space-y-6">
+                {/*
+                  ONE SECTION, the way a customer reads it.
+
+                  This was six stacked sections, each with its own heading:
+                  details, ingredients, nutrition, allergens, care, delivery.
+                  Every one of them was true and every one was gated properly,
+                  but six headings for six short blocks reads as six subjects
+                  when it is one — what this thing is and what to know about it.
+
+                  So it is a single Product Description with labelled parts,
+                  which is what the reference storefronts do and what a customer
+                  scanning for “does it have nuts” actually scans. Nothing is
+                  added and nothing is invented: every part still shows only
+                  where the shop filled the field, and disappears entirely when
+                  none of them did.
+                */}
+                {hasDescription ? (
+                  <DetailSection title={labels.descriptionHeading}>
+                    <div className="space-y-5 text-sm text-muted-foreground">
+                      {/*
+                        Three fixed parts stood here — Product Details from a
+                        Label: Value list, Delivery Information from a shop-wide
+                        setting, Care Instructions from a box on the product —
+                        each under a heading the renderer chose.
+
+                        None of the six reference pages fits three fixed parts,
+                        and the delivery one could not be shop-wide at all: a
+                        cake goes out with the shop's own driver and a charger
+                        goes by courier, so one text is false on one of them.
+
+                        A heading nobody typed is not invented — two of the six
+                        list their first block with no label over it.
+                      */}
+                      {descriptionBlocks.map((block) => (
+                        <div key={block.id}>
+                          {block.heading ? (
+                            <p className="mb-2 font-medium text-foreground">
+                              {block.heading}:
+                            </p>
+                          ) : null}
+                          <ul className="list-disc space-y-1 pl-5">
+                            {block.lines.map((line) => (
+                              <li key={line}>{line}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+
+                      {/*
+                        The shop's own words, LAST rather than under the title.
+
+                        It sat directly beneath the product name, above the
+                        price — so a paragraph of prose stood between the
+                        customer and the two things they came for. It belongs
+                        with the rest of what the shop has to say.
+                      */}
+                      {cake.description ? (
+                        <p className="whitespace-pre-line">{cake.description}</p>
+                      ) : null}
+                    </div>
+                  </DetailSection>
+                ) : null}
+
+                <DetailSection id="questions" title="Questions">
+                  <div className="space-y-4">
+                    {questions.length > 0 ? (
+                      <div className="space-y-3">
+                        {questions.map((question) => (
+                          <article
+                            key={question.id}
+                            className="rounded-xl border border-border bg-card p-4"
+                          >
+                            <p className="text-sm font-medium">Q: {question.message}</p>
+                            <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">
+                              A: {question.answer}
+                            </p>
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              Asked by {question.name}
+                              {question.answeredAt
+                                ? ` · answered ${formatRelativeTime(question.answeredAt)}`
+                                : ""}
+                            </p>
+                          </article>
+                        ))}
+                      </div>
+                    ) : null}
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-cream-50 px-4 py-3">
+                      <p className="text-sm font-medium">
+                        Didn&apos;t find the answer you were looking for?
+                      </p>
+                      <Button
+                        type="button"
+                        variant="bakery"
+                        size="sm"
+                        onClick={() => setAskOpen((open) => !open)}
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-medium">{review.author}</p>
-                            {review.isFeatured ? (
-                              <Badge variant="gold">Featured</Badge>
+                        Ask us
+                      </Button>
+                    </div>
+                    {askOpen ? (
+                      <ProductQuestionForm
+                        productSlug={cake.slug}
+                        productName={cake.name}
+                      />
+                    ) : null}
+                  </div>
+                </DetailSection>
+
+                <DetailSection
+                  id="reviews"
+                  title={`Reviews${reviewCount ? ` (${reviewCount})` : ""}`}
+                >
+                  <div className="space-y-4">
+                    {/*
+                      Counted from the rows rendered below it, so the summary
+                      and the list cannot disagree. Renders nothing when there
+                      is nothing to summarise.
+                    */}
+                    <RatingSummary reviews={reviews} />
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-cream-50 px-4 py-3">
+                      <p className="text-sm font-medium">Ordered this before?</p>
+                      <Button
+                        type="button"
+                        variant="bakery"
+                        size="sm"
+                        onClick={() => setReviewOpen((open) => !open)}
+                      >
+                        Write a review
+                      </Button>
+                    </div>
+                    {reviewOpen ? (
+                      <ProductReviewForm
+                        productSlug={cake.slug}
+                        cakeName={cake.name}
+                        onSubmitted={() => {
+                          setReviewOpen(false);
+                          // A new review is pending, so this re-read normally
+                          // comes back unchanged — which is the honest outcome.
+                          // It runs so that anything approved since the page
+                          // loaded appears.
+                          void getProductReviews(cake).then((next) => {
+                            if (next) setReviews(next);
+                          });
+                        }}
+                      />
+                    ) : null}
+                    {reviews.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        {/*
+                          `reviews` is fetched on the CLIENT and starts empty, so
+                          this said “no published reviews” in the server HTML of
+                          products carrying a 4.8-star rating rendered from the
+                          same payload two hundred lines above — a page
+                          contradicting itself, to a crawler, on the commit whose
+                          whole motive was that tabbed content never reached one.
+                          `reviewCount` is on the payload and is server-rendered.
+                        */}
+                        {reviewCount && !reviewsSettled
+                          ? "Loading reviews…"
+                          : "No published reviews yet. Be the first to share your experience."}
+                      </p>
+                    ) : (
+                      reviews.map((review) => (
+                        <article
+                          key={review.id}
+                          className="rounded-xl border border-border bg-card p-4"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-medium">{review.author}</p>
+                              {review.isFeatured ? <Badge variant="gold">Featured</Badge> : null}
+                              {/*
+                                Shown only where the SERVER could match this
+                                reviewer's signed-in account to an order of this
+                                product that actually reached Delivered. It is a
+                                statement that somebody in that city bought this
+                                and received it, so nothing a browser can type
+                                may reach it — and for most reviews it is simply
+                                absent, which is the honest answer.
+                              */}
+                              {review.deliveredCity ? (
+                                <span className="text-xs text-muted-foreground">
+                                  Delivered in {review.deliveredCity}
+                                </span>
+                              ) : null}
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                              {formatRelativeTime(review.date)}
+                            </span>
+                          </div>
+                          {review.title ? (
+                            <p className="mt-1 text-sm font-medium">{review.title}</p>
+                          ) : null}
+                          <StarRating rating={review.rating} className="mt-2" />
+                          <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">
+                            {review.text}
+                          </p>
+                          {/*
+                            The reviewer's own photos of what arrived.
+
+                            Only URLs this shop stored itself reach here: the
+                            submit endpoint is public, and an off-site image on
+                            a product page loads for every visitor and can be
+                            swapped for something else after a moderator has
+                            approved it.
+                          */}
+                          {review.photoUrls?.length ? (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {review.photoUrls.map((url) => (
+                                <a
+                                  key={url}
+                                  href={url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="size-20 overflow-hidden rounded-lg border border-border bg-cream-100"
+                                >
+                                  <OptimizedImage
+                                    src={url}
+                                    alt=""
+                                    width={80}
+                                    height={80}
+                                    className="size-full object-cover"
+                                  />
+                                </a>
+                              ))}
+                            </div>
+                          ) : null}
+                          {review.adminReply ? (
+                            <div className="mt-3 rounded-lg border border-border bg-cream-50 px-3 py-2 text-sm">
+                              <p className="font-medium text-bakery-700">Response from the shop</p>
+                              <p className="mt-1 whitespace-pre-line text-muted-foreground">
+                                {review.adminReply}
+                              </p>
+                            </div>
+                          ) : null}
+                          {/*
+                            One direction only. There is no way to say a review
+                            was UNhelpful: a button that buries what somebody
+                            wrote is a moderation tool wearing a reader’s face,
+                            and this shop moderates on its own screen.
+
+                            The number is shown only once somebody has pressed
+                            it. “Helpful (0)” reads as a verdict on the review.
+                          */}
+                          <div className="mt-3 flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              disabled={helpfulMarks.includes(review.id)}
+                              onClick={() => void handleHelpful(review)}
+                            >
+                              <ThumbsUp className="size-4" />
+                              {helpfulMarks.includes(review.id) ? "Marked helpful" : "Helpful"}
+                            </Button>
+                            {(helpfulCounts[review.id] ?? review.helpfulCount ?? 0) > 0 ? (
+                              <span className="text-xs text-muted-foreground">
+                                {helpfulCounts[review.id] ?? review.helpfulCount}
+                                {" "}
+                                {(helpfulCounts[review.id] ?? review.helpfulCount) === 1
+                                  ? "person"
+                                  : "people"}{" "}
+                                found this helpful
+                              </span>
                             ) : null}
                           </div>
-                          <span className="text-xs text-muted-foreground">
-                            {formatRelativeTime(review.date)}
-                          </span>
-                        </div>
-                        {review.title ? (
-                          <p className="mt-1 text-sm font-medium">{review.title}</p>
-                        ) : null}
-                        <StarRating rating={review.rating} className="mt-2" />
-                        <p className="mt-2 text-sm text-muted-foreground">{review.text}</p>
-                        {review.adminReply ? (
-                          <div className="mt-3 rounded-lg border border-border bg-cream-50 px-3 py-2 text-sm">
-                            <p className="font-medium text-bakery-700">Response from the bakery</p>
-                            <p className="mt-1 text-muted-foreground">{review.adminReply}</p>
-                          </div>
-                        ) : null}
-                      </article>
-                    ))
-                  )}
-                </TabsContent>
-                <TabsContent value="delivery" className="text-sm text-muted-foreground">
-                  {deliveryPromise} on orders placed within city limits.
-                  Scheduled delivery on {deliveryDate ? formatDate(deliveryDate) : "your selected date"}
-                  {deliveryTime ? ` between ${deliveryTime}` : ""}. Custom message card included at
-                  no extra charge.
-                </TabsContent>
-              </Tabs>
+                        </article>
+                      ))
+                    )}
+                  </div>
+                </DetailSection>
+
+                {/*
+                  THE ONE STORED FIELD NO STOREFRONT SURFACE SHOWED.
+
+                  The admin has taken a “Barcode / SKU” for as long as the
+                  product form has existed and nothing anywhere rendered it —
+                  a field an owner fills in and never sees again.
+
+                  Generic Name and Country of Origin are asked for in the same
+                  breath and are deliberately NOT new fields: a shop states
+                  those through `attributes`, which is the system this project
+                  already has for owner-defined facts and which the section
+                  above renders. Three more columns would be a parallel one.
+                */}
+              </div>
+
             </div>
           </div>
 
-          {mounted && related.length > 0 ? (
+          {related.length > 0 ? (
             <div className="mt-16 border-t border-border pt-16">
               <ScrollReveal className="mb-8 flex items-end justify-between gap-4">
-                <h2 className="font-heading text-2xl font-bold">You May Also Like</h2>
+                <h2 className={storefrontHeading.row}>You May Also Like</h2>
                 <Button variant="ghost" render={<Link href={routes.store.collections} />}>
                   View all
                 </Button>
               </ScrollReveal>
-              <StaggerReveal className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {/* Two across from the base, like the listing pages. It was
+                  `sm:grid-cols-2`, so below 640 there was no column count
+                  and four cards became four full-width rows — four and a
+                  half extra screens at the foot of a phone. */}
+              <StaggerReveal className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4">
                 {related.map((item) => (
                   <ProductCard key={item.id} cake={item} />
                 ))}
@@ -813,60 +2140,34 @@ export function ProductDetailPage({
         </div>
       </section>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-white p-4 lg:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card p-4 lg:hidden">
         <div className="mx-auto flex max-w-lg gap-3">
+          {/*
+            THE SAME SIZE AS THE CART'S OWN PHONE BAR, which is 48px.
+
+            This was `className="flex-1"` with no size, so it took the
+            shared button's default — 32px — while the desktop version of
+            the same control a few hundred lines up is `h-14`, 56px. The
+            breakpoints had it backwards: a mouse got 56px of target and a
+            thumb got 32, on the one control the storefront exists to
+            deliver, in a fixed bar at the bottom edge of the screen where a
+            thumb is least precise.
+
+            `h-12 flex-1 text-base` is copied from cart-page.tsx's bar, not
+            chosen — a shopper meets both bars in one purchase and they
+            should be one control.
+          */}
           <Button
-            variant="outline"
-            className="flex-1"
+            variant="bakery"
+            className="h-12 flex-1 text-base"
             disabled={isOutOfStock}
             onClick={() => handleAddToCart(false)}
           >
-            {isOutOfStock ? "Out of stock" : "Add to Cart"}
-          </Button>
-          <Button
-            variant="bakery"
-            className="flex-1"
-            disabled={isOutOfStock}
-            onClick={() => handleAddToCart(true)}
-          >
-            Buy Now
+            {isOutOfStock ? "Out of stock" : editingLine ? "Update cart" : "Add to Cart"}
           </Button>
         </div>
       </div>
     </>
   );
 }
-
-function OptionGroup({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-3">
-      <p className="text-sm font-medium">{label}</p>
-      {children}
-    </div>
-  );
-}
-
-function OptionButton({
-  children,
-  active,
-  onClick,
-}: {
-  children: React.ReactNode;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "rounded-lg border px-4 py-2 text-sm font-medium transition-premium",
-        active
-          ? "border-bakery-700 bg-bakery-700 text-white"
-          : "border-border bg-white hover:border-bakery-300"
-      )}
-    >
-      {children}
-    </button>
-  );
-}
+

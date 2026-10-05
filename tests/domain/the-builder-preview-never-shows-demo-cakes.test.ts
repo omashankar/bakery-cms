@@ -66,9 +66,6 @@ function cake(over: Partial<Product> & { slug: string }): Product {
     isFeatured: false,
     isBestSeller: false,
     isTrending: false,
-    isPhotoCake: false,
-    isEggless: false,
-    isSeasonal: false,
     shapes: [],
     flavourOptions: [],
     stockStatus: "in-stock",
@@ -88,7 +85,7 @@ const SHOP: Product[] = [
   cake({ slug: "shop-choco", isFeatured: true }),
   cake({ slug: "shop-vanilla", isTrending: true }),
   cake({ slug: "shop-red-velvet", isBestSeller: true }),
-  cake({ slug: "shop-pineapple", isPhotoCake: true }),
+  cake({ slug: "shop-pineapple", allowsPhotoUpload: true }),
 ];
 
 const SHOP_SLUGS = new Set(SHOP.map((item) => item.slug));

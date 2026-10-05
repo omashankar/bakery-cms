@@ -36,7 +36,7 @@ export const pricingTiers: PricingTier[] = [
     price: null,
     includes: [
       "Customer-facing storefront with your own branding",
-      "Product catalogue with categories, flavours and weights",
+      "Product catalogue with categories and occasions",
       "Cart, checkout and order tracking",
       "Cash on delivery and online payment via Razorpay",
       "Order management dashboard",

@@ -3,6 +3,11 @@ import { cache } from "react";
 import { getSettings } from "@/features/settings/server/settings.service";
 import { approvedSiteAggregate } from "@/features/reviews/server/review.repository";
 import { deliveryPromiseFor } from "@/apps/website/lib/product-details";
+import {
+  sameDayCutoffFor,
+  shopClockNow,
+  timeLeftToday,
+} from "@/features/orders/lib/delivery-date";
 import type { CommerceSettings } from "@/types/settings";
 
 /**
@@ -28,13 +33,51 @@ export interface StorefrontTrust {
   deliveryPromise: string;
   /** Absent when nothing is approved: a shop with no reviews shows no score. */
   rating: { count: number; average: number } | null;
+  /**
+   * When same-day orders close, `HH:MM` — and ONLY when there is a same-day
+   * window to close. "" for a shop that named no cutoff, stored something that
+   * is not a time, or has a lead time above 0 days.
+   *
+   * The two settings are collapsed into one string here rather than sent
+   * separately, because the browser has exactly one use for them: whether to
+   * draw a deadline. Sending `deliveryLeadDays` as well would put the rule in
+   * two places. `deliveryPromise` beside it is the cautionary tale in the
+   * other direction — it is a SENTENCE, so nothing downstream can ask it a
+   * question, and "Next-day delivery" had to be parsed to recover the number.
+   */
+  sameDayCutoff: string;
+  /**
+   * How long is left today, as the countdown band would read it RIGHT NOW —
+   * or null when there is no window, or it has already closed.
+   *
+   * THIS EXISTS TO STOP THE PAGE MOVING. The band is 292px tall and used to
+   * be absent from the served HTML, because its hook starts at null and
+   * fills in from an effect; it arrived about 900ms in and pushed the
+   * homepage down under the reader. Measured on the production build at
+   * 390: CLS 0.152, against a 0.1 budget, in one shift.
+   *
+   * Sent as data rather than recomputed in the browser, which is the whole
+   * point: the value crosses as a prop, so the server's render and the
+   * browser's first render produce the identical string and there is
+   * nothing to hydrate differently. The hook takes over from the next tick.
+   *
+   * The shop's clock, not the visitor's — "14:00" means 14:00 where the
+   * shop is, and a customer in London ordering for family in Kota must not
+   * be shown four and a half hours that do not exist.
+   */
+  sameDayTimeLeft: string | null;
 }
 
 export const getStorefrontTrust = cache(async function getStorefrontTrust(
-  settings?: { commerce?: CommerceSettings },
+  settings?: { commerce?: CommerceSettings; general?: { timezone?: string } },
 ): Promise<StorefrontTrust | null> {
   try {
-    const resolved = settings ?? ((await getSettings()) as { commerce?: CommerceSettings });
+    const resolved =
+      settings ??
+      ((await getSettings()) as {
+        commerce?: CommerceSettings;
+        general?: { timezone?: string };
+      });
     const commerce = resolved.commerce;
 
     const threshold = Number(commerce?.freeDeliveryThreshold);
@@ -42,11 +85,34 @@ export const getStorefrontTrust = cache(async function getStorefrontTrust(
 
     const aggregate = await approvedSiteAggregate().catch(() => null);
 
+    /*
+      ONE READING OF THE LEAD TIME, feeding the sentence and the clock. Two
+      copies of this expression is how they drift — and the drift is not a
+      wrong label, it is a countdown to a delivery the shop cannot make. An
+      unreadable figure reads as NEXT-day here, which is this function's
+      existing choice: a shop with nothing stored gets "Next-day delivery" and
+      no countdown, rather than a promise and a deadline that contradict.
+    */
+    const lead = Number.isFinite(leadDays) ? leadDays : 1;
+    /* One reading, used by the field below and by the clock beside it. */
+    const cutoff = sameDayCutoffFor(commerce?.sameDayCutoff, lead);
+
     return {
       freeDeliveryThreshold: Number.isFinite(threshold) && threshold > 0 ? threshold : 0,
       // The shipped default is used only when the field is genuinely absent —
       // never as a stand-in for a failed read, which returns null above.
-      deliveryPromise: deliveryPromiseFor(Number.isFinite(leadDays) ? leadDays : 1),
+      deliveryPromise: deliveryPromiseFor(lead),
+      sameDayCutoff: cutoff,
+      /*
+        THE FIRST READING OF THE CLOCK, taken here so the band is in the
+        HTML. `sameDayCutoffFor` has already refused a cutoff for a shop
+        that cannot deliver today; this answers the other half — whether
+        that window is still open at this moment — and hands the browser
+        the exact string to paint.
+      */
+      sameDayTimeLeft: cutoff
+        ? timeLeftToday(cutoff, shopClockNow(resolved.general?.timezone ?? ""))
+        : null,
       rating: aggregate && aggregate.count > 0 ? aggregate : null,
     };
   } catch {

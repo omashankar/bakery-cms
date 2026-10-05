@@ -32,7 +32,16 @@ export interface InventoryItem {
   cakeId: string;
   name: string;
   slug: string;
+  /** The primary category — the one this screen has room to print. */
   categoryName: string;
+  /**
+   * Every category it is filed under, primary first.
+   *
+   * Display shows `categoryName` alone, because the row is one line on a
+   * phone. This is what the SEARCH boxes match on, so an owner typing a
+   * secondary category still finds the stock they are looking for.
+   */
+  categoryNames: string[];
   image?: string;
   status: EntityStatus;
   stockStatus: StockStatus;

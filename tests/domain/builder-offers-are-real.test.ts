@@ -1,14 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { specialOffers, weddingCakes, type LandingProduct } from "@/constants/landing-data";
+import { specialOffers, type LandingProduct } from "@/constants/landing-data";
 import {
   isLiveCoupon,
-  isWeddingCoupon,
   selectStorefrontOffers,
-  selectWeddingCouponOffers,
 } from "@/features/commerce/lib/coupon-offers";
 import type { StoredCoupon } from "@/features/commerce/lib/coupons-repository";
-import { selectWeddingCollectionProducts } from "@/features/products/lib/wedding-catalog";
 
 /**
  * A discount row is a promise.
@@ -195,94 +192,4 @@ describe("storefront offers come from real coupons", () => {
   });
 });
 
-describe("wedding offers", () => {
-  it("does not mistake a Wednesday promotion for a wedding one", () => {
-    // `includes("wed")` is a superset of `includes("wedding")`, so a midweek
-    // promo outranked the real wedding coupon on the wedding page — the one
-    // page where the wedding coupon is what the customer came for.
-    expect(
-      isWeddingCoupon(
-        coupon({
-          id: "a",
-          code: "WED10",
-          label: "Wednesday Wonders",
-          description: "Every Wednesday",
-        }),
-      ),
-    ).toBe(false);
 
-    expect(
-      isWeddingCoupon(
-        coupon({
-          id: "b",
-          code: "WED2026",
-          label: "₹2000 OFF",
-          description: "Flat ₹2000 off on wedding cake bookings",
-        }),
-      ),
-    ).toBe(true);
-  });
-
-  it("leads with wedding coupons but every card is still a real one", () => {
-    const offers = selectWeddingCouponOffers(
-      [
-        coupon({ id: "a", code: "GEN10" }),
-        coupon({ id: "b", code: "W1", description: "wedding package" }),
-        coupon({ id: "c", code: "DEAD", isActive: false, description: "wedding" }),
-      ],
-      5,
-      { now: NOW },
-    );
-
-    expect(offers.map((offer) => offer.code)).toEqual(["W1", "GEN10"]);
-  });
-
-  it("shows nothing rather than demo offers when there are no coupons", () => {
-    expect(selectWeddingCouponOffers([], 3, { now: NOW })).toEqual([]);
-  });
-});
-
-describe("the wedding collection grid", () => {
-  function product(over: Partial<LandingProduct> & { slug: string }): LandingProduct {
-    return {
-      id: over.slug,
-      name: over.slug,
-      description: "",
-      price: 1000,
-      image: "https://example.com/cake.jpg",
-      category: "Cakes",
-      ...over,
-    };
-  }
-
-  it("shows only cakes the shop actually sells", () => {
-    // The grid used to append `weddingCakes` — full links wrapping a photo, a
-    // name and a "Starting from ₹15,999" line, pointing at /store/cakes/<slug>.
-    // They resolve only because the same demo cakes were seeded into the
-    // catalogue; a shop that deletes them keeps advertising them to a 404.
-    const cakes = selectWeddingCollectionProducts(
-      [
-        product({ slug: "our-wedding-tier", category: "Wedding Cakes" }),
-        product({ slug: "birthday-thing", category: "Birthday Cakes" }),
-      ],
-      6,
-    );
-
-    expect(cakes.map((cake) => cake.slug)).toEqual(["our-wedding-tier"]);
-  });
-
-  it("returns nothing when the shop has no wedding cake", () => {
-    const demoSlugs = weddingCakes.map((cake) => cake.slug);
-    expect(demoSlugs.length).toBeGreaterThan(0);
-
-    const cakes = selectWeddingCollectionProducts(
-      [product({ slug: "birthday-thing", category: "Birthday Cakes" })],
-      6,
-    );
-
-    expect(cakes).toEqual([]);
-    for (const slug of demoSlugs) {
-      expect(cakes.map((cake) => cake.slug)).not.toContain(slug);
-    }
-  });
-});

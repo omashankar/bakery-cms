@@ -2,7 +2,7 @@ import { cache } from "react";
 import { connection } from "next/server";
 
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
-import type { BusinessType, ModuleSettings } from "@/types/settings";
+import type { ModuleSettings } from "@/types/settings";
 
 import { getPublicSettings } from "./settings.service";
 
@@ -13,25 +13,17 @@ import { getPublicSettings } from "./settings.service";
  * hides links and pickers, which is right for a chooser inside a page. It is not
  * enough for a page: hiding every link to `/store/wedding-cakes` still leaves it
  * serving 200 to a bookmark, a search result, or anyone who has the URL — so a
- * shop that switched the Wedding module off, or that is not a bakery at all,
- * kept a fully working wedding-cakes page and kept taking wedding enquiries
- * through it.
+ * shop that switched the Wedding module off kept a fully working wedding-cakes
+ * page and kept taking wedding enquiries through it.
  *
  * `cache` dedupes the read between `generateMetadata` and the page body.
  */
 export interface ServerModules {
   modules: ModuleSettings;
-  businessType: BusinessType;
-  /** Bakery-only, and gated by its own switch — mirrors `isWeddingEnabled()`. */
-  weddingEnabled: boolean;
 }
 
-function resolve(modules: ModuleSettings, businessType: BusinessType): ServerModules {
-  return {
-    modules,
-    businessType,
-    weddingEnabled: businessType === "bakery" && modules.weddingBuilder,
-  };
+function resolve(modules: ModuleSettings): ServerModules {
+  return { modules };
 }
 
 export const getServerModules = cache(async (): Promise<ServerModules> => {
@@ -44,21 +36,33 @@ export const getServerModules = cache(async (): Promise<ServerModules> => {
   try {
     const settings = (await getPublicSettings()) as {
       modules?: Partial<ModuleSettings>;
-      general?: { businessType?: BusinessType };
     };
 
-    return resolve(
-      { ...defaultModuleSettings, ...(settings.modules ?? {}) },
-      settings.general?.businessType ?? "bakery",
-    );
+    return resolve({ ...defaultModuleSettings, ...(settings.modules ?? {}) });
   } catch {
-    // A database that cannot be reached must not take a page down. Defaults are
-    // the bakery template with every module on — i.e. nothing newly hidden.
-    return resolve(defaultModuleSettings, "bakery");
+    /**
+     * A database that cannot be reached must not take a page down.
+     *
+     * `defaultModuleSettings` fails open for exactly this reason. It was briefly
+     * flipped so wedding defaulted false, which made an outage 404
+     * /store/wedding-cakes, redirect the owner out of their own builder and drop
+     * the URL from a sitemap that still resolved — harm outlasting the outage
+     * that caused it. The comment on this line was edited in the same commit to
+     * claim the defaults hid nothing new, which was not true; it says what the
+     * code does now.
+     */
+    return resolve(defaultModuleSettings);
   }
 });
 
-/** True when the wedding page, builder and storefront link should exist at all. */
-export async function isWeddingEnabledOnServer(): Promise<boolean> {
-  return (await getServerModules()).weddingEnabled;
-}
+
+/*
+  `getServerDeliveryInformation` stood here, reading the shop-wide delivery copy
+  so the product page could print it in the server HTML.
+
+  The page does not print it any more. Delivery wording belongs to the PRODUCT —
+  a cake goes out with the shop's own driver and a charger goes by courier, so
+  one shop-wide text is false on one of them — and it is a description block
+  written on the product now. The setting survives as the draft the admin copies
+  in with one button, which is a browser read like every other admin one.
+*/

@@ -2,7 +2,7 @@ import type { LandingProduct } from "@/constants/landing-data";
 import { featuredProducts } from "@/constants/landing-data";
 import { getAllProducts } from "@/features/products/lib/product-catalog";
 import { getFrequentlyOrderedSlugs } from "@/apps/website/lib/reorder";
-import { getRecentlyViewedSlugs } from "@/apps/website/lib/recently-viewed";
+import { getRecentlyViewedSlugs } from "@/features/products/lib/recently-viewed";
 
 export function getRecommendedProducts(options?: {
   limit?: number;

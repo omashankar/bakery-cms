@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, HelpCircle, Mail, MessageCircle, Phone, Search } from "lucide-react";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
@@ -14,10 +14,10 @@ import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { routes } from "@/constants/routes";
+import { storefrontHeading } from "@/constants/typography";
 import { formatFaqCategory } from "@/features/content/lib/faq-utils";
 import { getStorefrontFaqs, selectStorefrontFaqs } from "@/features/content/lib/storefront-content";
-import { getStorefrontContactInfo, isStorefrontWeddingEnabled } from "@/apps/website/lib/settings";
-import { SETTINGS_UPDATED_EVENT } from "@/features/settings/lib/settings-repository";
+import { getStorefrontContactInfo } from "@/apps/website/lib/settings";
 import type { FaqCategory, FaqItem } from "@/types/content";
 import { layoutSpacing } from "@/constants/spacing";
 import { cn } from "@/lib/utils";
@@ -42,22 +42,9 @@ export function FaqPage({ faqs, contact }: FaqPageProps) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<(typeof faqCategories)[number]["value"]>("all");
   const contactInfo = contact ?? getStorefrontContactInfo();
-  // "Wedding" is a bakery-only FAQ category — hide that pill when wedding is off.
-  const [weddingEnabled, setWeddingEnabled] = useState(true);
-  useEffect(() => {
-    const sync = () => {
-      const on = isStorefrontWeddingEnabled();
-      setWeddingEnabled(on);
-      if (!on) setCategory((current) => (current === "wedding" ? "all" : current));
-    };
-    sync();
-    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
-    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
-  }, []);
-
-  const categories = weddingEnabled
-    ? faqCategories
-    : faqCategories.filter((item) => item.value !== "wedding");
+  // The Wedding pill was hidden with the Wedding module. Wedding cakes are
+  // still a category this shop sells, so the pill is not optional any more.
+  const categories = faqCategories;
 
   const categoryFiltered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -76,7 +63,6 @@ export function FaqPage({ faqs, contact }: FaqPageProps) {
     <>
       <StorePageHeader
         title="Frequently Asked Questions"
-        description="Everything you need to know about ordering, delivery, and our cakes."
         breadcrumbs={[{ label: "FAQ" }]}
       />
 
@@ -107,7 +93,7 @@ export function FaqPage({ faqs, contact }: FaqPageProps) {
                       "rounded-full border px-4 py-1.5 text-sm font-medium transition-premium",
                       category === item.value
                         ? "border-bakery-700 bg-bakery-700 text-white shadow-sm"
-                        : "border-border bg-white text-muted-foreground hover:border-bakery-300 hover:text-bakery-700"
+                        : "border-border bg-card text-muted-foreground hover:border-bakery-300 hover:text-bakery-700"
                     )}
                   >
                     {item.label}
@@ -136,7 +122,7 @@ export function FaqPage({ faqs, contact }: FaqPageProps) {
                     <AccordionItem
                       key={faq.id}
                       value={faq.id}
-                      className="overflow-hidden rounded-2xl border border-border bg-white transition-colors hover:border-bakery-300"
+                      className="overflow-hidden rounded-2xl border border-border bg-card transition-colors hover:border-bakery-300"
                     >
                       <AccordionTrigger className="px-5 py-4 text-left font-heading font-semibold hover:no-underline">
                         {faq.question}
@@ -159,10 +145,10 @@ export function FaqPage({ faqs, contact }: FaqPageProps) {
             {/* Help sidebar */}
             <ScrollReveal delay={120} className="lg:sticky lg:top-24 lg:self-start">
               <aside className="rounded-3xl border border-border bg-cream-100 p-6 sm:p-8">
-                <span className="flex size-12 items-center justify-center rounded-2xl bg-white text-bakery-700 shadow-sm">
+                <span className="flex size-12 items-center justify-center rounded-2xl bg-card text-bakery-700 shadow-sm">
                   <MessageCircle className="size-6" />
                 </span>
-                <h2 className="mt-5 font-heading text-xl font-bold sm:text-2xl">
+                <h2 className={cn("mt-5", storefrontHeading.card)}>
                   Still have questions?
                 </h2>
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
@@ -176,7 +162,7 @@ export function FaqPage({ faqs, contact }: FaqPageProps) {
                   {contactInfo.phone ? (
                     <a
                       href={`tel:${contactInfo.phone.replace(/\s/g, "")}`}
-                      className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3.5 transition-all hover:border-bakery-300 hover:shadow-sm"
+                      className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3.5 transition-all hover:border-bakery-300 hover:shadow-sm"
                     >
                       <span className="flex size-10 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
                         <Phone className="size-4" />
@@ -192,7 +178,7 @@ export function FaqPage({ faqs, contact }: FaqPageProps) {
                   {contactInfo.email ? (
                     <a
                       href={`mailto:${contactInfo.email}`}
-                      className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3.5 transition-all hover:border-bakery-300 hover:shadow-sm"
+                      className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3.5 transition-all hover:border-bakery-300 hover:shadow-sm"
                     >
                       <span className="flex size-10 items-center justify-center rounded-xl bg-cream-100 text-bakery-700">
                         <Mail className="size-4" />

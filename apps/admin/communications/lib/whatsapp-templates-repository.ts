@@ -1,3 +1,4 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import type { WhatsAppTemplateFormData, WhatsAppTemplateRecord } from "@/types/communication";
 import { mergeTemplateVariables } from "@/lib/template-render";
 import {
@@ -37,7 +38,7 @@ function readTemplates(): WhatsAppTemplateRecord[] {
 
 function writeTemplates(templates: WhatsAppTemplateRecord[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(templates));
+  safeSetItem(STORAGE_KEY, JSON.stringify(templates));
   emitUpdated();
 }
 
@@ -89,7 +90,7 @@ async function persistAndSync(templates: WhatsAppTemplateRecord[]): Promise<bool
     const stillOurs = localStorage.getItem(STORAGE_KEY) === JSON.stringify(templates);
     if (stillOurs) {
       if (previous === null) localStorage.removeItem(STORAGE_KEY);
-      else localStorage.setItem(STORAGE_KEY, previous);
+      else safeSetItem(STORAGE_KEY, previous);
       emitUpdated();
     }
   }
@@ -101,7 +102,7 @@ async function persistAndSync(templates: WhatsAppTemplateRecord[]): Promise<bool
 export function persistServerWhatsAppTemplates(templates: WhatsAppTemplateRecord[]): void {
   if (typeof window === "undefined") return;
   writeTemplates(templates);
-  localStorage.setItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
+  safeSetItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
 }
 
 function normalizeTemplate(template: WhatsAppTemplateRecord): WhatsAppTemplateRecord {
@@ -122,7 +123,7 @@ export function loadWhatsAppTemplates(): WhatsAppTemplateRecord[] {
     const seeded =
       existing === null ? seedWhatsAppTemplates() : existing.map(normalizeTemplate);
     writeTemplates(seeded);
-    localStorage.setItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
+    safeSetItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
     return seeded;
   }
 
@@ -232,7 +233,7 @@ export async function resetWhatsAppTemplates(): Promise<WriteResult<WhatsAppTemp
   const seeded = seedWhatsAppTemplates();
   const result = await mutateWhatsAppTemplates(seeded, () => ({ next: seeded, value: seeded }));
   if (result.persisted) {
-    localStorage.setItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
+    safeSetItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
   }
   return result;
 }

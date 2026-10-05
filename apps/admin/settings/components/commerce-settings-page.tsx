@@ -7,6 +7,7 @@ import {
   reportSettingsWrite,
 } from "@/apps/admin/settings/lib/report-settings-write";
 import { adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
+import { ProductTrustCardsFields } from "./product-trust-cards-fields";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,7 +29,7 @@ import { FieldError, SettingsHydrationNotice } from "./settings-field-error";
 const SAMPLE_ITEM = {
   id: "preview",
   productSlug: "preview",
-  name: "Sample cake",
+  name: "Sample product",
   image: "",
   price: 850,
   quantity: 1,
@@ -48,6 +49,17 @@ function validate(settings: CommerceSettings) {
         : prefix.length > 8
           ? "Keep the prefix to 8 characters or fewer."
           : "",
+    /**
+     * The same rule `commerceSchema` applies, checked here too.
+     *
+     * The server refuses anything but `HH:MM` or blank, and a 422 reaches the
+     * owner as "saved on this device only" — which reads as an outage rather
+     * than a typo, and takes the whole commerce section down with it. The
+     * browser's own time input mostly prevents this; mostly is not a rule.
+     */
+    sameDayCutoff: /^$|^([01]\d|2[0-3]):[0-5]\d$/.test(settings.sameDayCutoff.trim())
+      ? ""
+      : "Use a 24-hour time such as 17:00, or leave it empty.",
   };
 }
 
@@ -134,11 +146,16 @@ export function CommerceSettingsPage() {
 
   return (
     <SettingsSectionShell
-      title="Commerce"
-      description={
+      title="Order Settings"
+      description="What an order costs and how it can be paid for. These rules run the cart and the checkout."
+      status={
         hydration === "ready"
-          ? `Delivery ${formatCurrency(saved.deliveryFee)} · free above ${formatCurrency(saved.freeDeliveryThreshold)} · ${livePaymentMethodsOn} payment method${livePaymentMethodsOn === 1 ? "" : "s"}`
-          : "Shipping, tax, payments, and delivery rules used across cart and checkout."
+          ? `${
+              saved.freeDeliveryThreshold > 0
+                ? `Delivery ${formatCurrency(saved.deliveryFee)} · free above ${formatCurrency(saved.freeDeliveryThreshold)}`
+                : "Delivery free on every order"
+            } · ${livePaymentMethodsOn} payment method${livePaymentMethodsOn === 1 ? "" : "s"}`
+          : undefined
       }
       isDirty={isDirty}
       // Behind the skeleton until the SERVER's copy has landed. Letting the
@@ -200,6 +217,21 @@ export function CommerceSettingsPage() {
                     }))
                   }
                 />
+                {/*
+                  ZERO MEANS THE OPPOSITE HERE FROM WHAT IT MEANS BELOW.
+
+                  The box under this one says "Set to 0 to disable minimum order
+                  enforcement" — so the screen teaches, two inches apart, that 0
+                  switches a rule OFF. In this box 0 switches it fully on: every
+                  order is at or above ₹0, so delivery is free on all of them and
+                  the fee beside it is never charged once.
+                */}
+                <p className="text-xs text-muted-foreground">
+                  Orders at or above this amount are delivered free. 0 here means
+                  EVERY order is free — the fee beside this box is then never
+                  charged. To charge on every order, set this above the largest
+                  order you expect.
+                </p>
               </div>
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="minOrderValue">Minimum order value</Label>
@@ -273,6 +305,77 @@ export function CommerceSettingsPage() {
                   />
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-base">What the product page says</CardTitle>
+              <CardDescription>
+                What every product page adds beyond the product itself. All
+                blank until you write them, and nothing is printed while they
+                are.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="productImageNote">Note under the photo</Label>
+                <Input
+                  id="productImageNote"
+                  value={settings.productImageNote}
+                  onChange={(e) =>
+                    edit((prev) => ({ ...prev, productImageNote: e.target.value }))
+                  }
+                  placeholder="Design and icing may vary from the image shown"
+                />
+                <p className="text-xs text-muted-foreground">
+                  For anything made by hand, where the photo is a likeness rather
+                  than the exact item. Leave it blank for anything sold sealed.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sameDayCutoff">Same-day orders close at</Label>
+                <Input
+                  id="sameDayCutoff"
+                  type="time"
+                  value={settings.sameDayCutoff}
+                  onChange={(e) =>
+                    edit((prev) => ({ ...prev, sameDayCutoff: e.target.value }))
+                  }
+                  aria-invalid={Boolean(errors.sameDayCutoff)}
+                />
+                <FieldError id="sameDayCutoff-error" message={errors.sameDayCutoff} />
+                <p className="text-xs text-muted-foreground">
+                  Shows a countdown on the product page until this time each day.
+                  Leave it empty if you do not promise same-day delivery — a timer
+                  with nothing behind it is pressure, not information.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="deliveryInformation">Delivery information</Label>
+                <textarea
+                  id="deliveryInformation"
+                  className={adminTextareaClassName}
+                  rows={6}
+                  value={settings.deliveryInformation}
+                  onChange={(e) =>
+                    edit((prev) => ({ ...prev, deliveryInformation: e.target.value }))
+                  }
+                  placeholder={"Hand-delivered in a sealed box.\nCandles and a knife are included where available.\nPerishable — delivery is attempted once and cannot be redirected."}
+                />
+                <p className="text-xs text-muted-foreground">
+                  One line per point. A starting draft: the product form has a
+                  button that copies these into a block on the product, where
+                  you can change them. Nothing is printed from here — two
+                  things you sell may not travel the same way.
+                </p>
+              </div>
+              <ProductTrustCardsFields
+                value={settings.productTrustCards ?? []}
+                onChange={(productTrustCards) =>
+                  edit((prev) => ({ ...prev, productTrustCards }))
+                }
+              />
             </CardContent>
           </Card>
 
@@ -363,7 +466,9 @@ export function CommerceSettingsPage() {
               <span>{formatCurrency(previewTotals.total)}</span>
             </div>
             <p className="pt-2 text-xs text-muted-foreground">
-              Free delivery above {formatCurrency(settings.freeDeliveryThreshold)}.
+              {settings.freeDeliveryThreshold > 0
+                ? `Free delivery above ${formatCurrency(settings.freeDeliveryThreshold)}.`
+                : "Delivery is free on every order."}
               {settings.minOrderValue > 0
                 ? ` Minimum order ${formatCurrency(settings.minOrderValue)}.`
                 : ""}

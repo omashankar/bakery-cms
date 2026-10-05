@@ -1,18 +1,34 @@
+import type { ResolvedLabels } from "@/config/business-labels";
 import { routes } from "@/constants/routes";
 import { isSettingsOwnedPath } from "@/lib/admin-settings-pages";
+
+/**
+ * The two nouns a breadcrumb can need. A crumb never says a collections
+ * heading, so this is deliberately narrower than `ResolvedLabels`.
+ */
+export type BreadcrumbLabels = Pick<ResolvedLabels, "productWord" | "productWordPlural">;
 
 export interface AdminBreadcrumb {
   label: string;
   href?: string;
 }
 
+/**
+ * Segments whose wording is FIXED. `cakes`, `add` and `edit` were here too,
+ * reading "Cakes", "Add Cake" and "Edit Cake" — the only three entries that
+ * name what the shop sells rather than a feature of the admin. This is a
+ * module-level constant, so they could never be anything else: a shop that had
+ * renamed its products got a sidebar saying "Flowers" beside a breadcrumb
+ * saying "Dashboard > Cakes > Add Cake". They are built per call now, from the
+ * labels the caller passes.
+ *
+ * Only /admin/cakes/* reaches `add` and `edit` — /admin/pages/* is handled
+ * ahead of this map, and no other admin route has those segments.
+ */
 const SEGMENT_LABELS: Record<string, string> = {
   dashboard: "Dashboard",
   profile: "My Profile",
   password: "Change Password",
-  cakes: "Cakes",
-  add: "Add Cake",
-  edit: "Edit Cake",
   preview: "Preview",
   catalog: "Catalog",
   banners: "Banners",
@@ -76,8 +92,23 @@ function isDynamicSegment(segment: string, prev?: string): boolean {
   return false;
 }
 
-/** Build human-readable admin breadcrumbs from pathname */
-export function getAdminBreadcrumbs(pathname: string): AdminBreadcrumb[] {
+/**
+ * Build human-readable admin breadcrumbs from a pathname and the shop wording.
+ *
+ * `labels` is REQUIRED rather than defaulted. There is one caller and it has
+ * the hook; making it optional would let the next one silently reintroduce the
+ * bug this parameter exists to fix.
+ */
+export function getAdminBreadcrumbs(
+  pathname: string,
+  labels: BreadcrumbLabels,
+): AdminBreadcrumb[] {
+  const segmentLabels: Record<string, string> = {
+    ...SEGMENT_LABELS,
+    cakes: labels.productWordPlural,
+    add: `Add ${labels.productWord}`,
+    edit: `Edit ${labels.productWord}`,
+  };
   const parts = pathname.split("/").filter(Boolean);
 
   if (parts.length <= 1 || (parts.length === 1 && parts[0] === "admin")) {
@@ -114,7 +145,10 @@ export function getAdminBreadcrumbs(pathname: string): AdminBreadcrumb[] {
 
     if (isDynamicSegment(part, prev)) {
       if (next === "edit") {
-        crumbs.push({ label: prev === "pages" ? "Edit Page" : "Edit Cake", href: `${href}/edit` });
+        crumbs.push({
+          label: prev === "pages" ? "Edit Page" : `Edit ${labels.productWord}`,
+          href: `${href}/edit`,
+        });
         i += 1;
         continue;
       }
@@ -123,7 +157,16 @@ export function getAdminBreadcrumbs(pathname: string): AdminBreadcrumb[] {
         i += 1;
         continue;
       }
-      crumbs.push({ label: prev === "pages" ? "Page Details" : prev === "orders" ? "Order Details" : prev === "customers" ? "Customer Details" : "Cake Details" });
+      crumbs.push({
+        label:
+          prev === "pages"
+            ? "Page Details"
+            : prev === "orders"
+              ? "Order Details"
+              : prev === "customers"
+                ? "Customer Details"
+                : `${labels.productWord} Details`,
+      });
       continue;
     }
 
@@ -134,7 +177,7 @@ export function getAdminBreadcrumbs(pathname: string): AdminBreadcrumb[] {
           ? "Wedding Builder"
           : part === "wedding" && prev === "inquiries"
             ? "Wedding"
-            : SEGMENT_LABELS[part] ??
+            : segmentLabels[part] ??
               part.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
     const isLast = i === parts.length - 1;
     const routable = !NON_ROUTABLE_SEGMENTS.has(part);

@@ -1,9 +1,15 @@
+import { safeSetItem } from "@/lib/safe-storage";
 import { migrateLegacyCartItem, withStableLineIds, type CartLineItem } from "@/features/cart/lib/cart";
 import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import type { RefundReasonCode, RefundRecord } from "@/types/refund";
 import type { AppliedCoupon } from "./coupons";
-import type { CheckoutAddress, DeliverySlot, PaymentMethod } from "./checkout-draft";
+import type {
+  CheckoutAddress,
+  DeliverySlot,
+  OrderPersonalisation,
+  PaymentMethod,
+} from "./checkout-draft";
 import type { CartTotals } from "./cart-totals";
 import {
   fetchOrder,
@@ -68,6 +74,8 @@ export interface PlacedOrder {
   paymentReference?: string;
   coupon?: AppliedCoupon;
   orderNotes?: string;
+  /** What the Personalize screen collected. Absent on orders placed before it existed. */
+  personalisation?: OrderPersonalisation;
   placedAt: string;
   status: OrderStatus;
   statusHistory: OrderStatusEvent[];
@@ -172,12 +180,12 @@ function writeOrders(orders: PlacedOrder[]): void {
   if (typeof window === "undefined") return;
 
   try {
-    localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(orders));
+    safeSetItem(ORDERS_STORAGE_KEY, JSON.stringify(orders));
   } catch {
     // Out of room. Orders are newest-first, so keep the ones a customer is
     // most likely to look at and try once more.
     try {
-      localStorage.setItem(
+      safeSetItem(
         ORDERS_STORAGE_KEY,
         JSON.stringify(orders.slice(0, ORDERS_KEPT_UNDER_PRESSURE)),
       );
@@ -417,6 +425,7 @@ export async function placeOrder(input: {
   paymentReference?: string;
   coupon?: AppliedCoupon;
   orderNotes?: string;
+  personalisation?: OrderPersonalisation;
   deliverySlot?: DeliverySlot;
 }): Promise<PlaceOrderResult> {
   const placedAt = new Date().toISOString();
@@ -454,6 +463,7 @@ export async function placeOrder(input: {
     paymentReference: input.paymentReference,
     coupon: input.coupon,
     orderNotes: input.orderNotes,
+    personalisation: input.personalisation,
     deliverySlot: input.deliverySlot,
     placedAt,
     status: "confirmed",

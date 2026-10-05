@@ -35,10 +35,6 @@ import {
   loadInquiries,
 } from "@/features/inquiries/lib/inquiries-repository";
 import {
-  isWeddingEnabled,
-  SETTINGS_UPDATED_EVENT,
-} from "@/features/settings/lib/settings-repository";
-import {
   countInquiriesByStatus,
   defaultInquiryFilters,
   filterInquiries,
@@ -94,7 +90,6 @@ export function InquiriesListPage({
   const [figures, setFigures] = useState<FiguresState>("loading");
   const known = figures === "ready";
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
-  const [weddingEnabled, setWeddingEnabled] = useState(true);
   const [filters, setFilters] = useState<InquiryListFilters>({
     ...defaultInquiryFilters,
     type: fixedType ?? "all",
@@ -135,12 +130,6 @@ export function InquiriesListPage({
     };
   }, []);
 
-  useEffect(() => {
-    const sync = () => setWeddingEnabled(isWeddingEnabled());
-    sync();
-    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
-    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
-  }, []);
 
   function refresh() {
     const loaded = loadInquiries().filter((item) => {
@@ -311,7 +300,7 @@ export function InquiriesListPage({
                 aria-label="Inquiry type"
               >
                 <option value="all">All types</option>
-                {weddingEnabled ? <option value="wedding">Wedding</option> : null}
+                <option value="wedding">Wedding</option>
                 <option value="contact">Contact</option>
               </AdminSelect>
             ) : null}
