@@ -156,7 +156,7 @@ describe("the form does not lose an hour of typing", () => {
     expect(form).toContain("JSON.stringify(form) !== baseline");
     // Re-baselined on load and on save, or the guard fires on a clean form.
     expect(form).toContain("setBaseline(JSON.stringify(data))");
-    expect(form).toContain("setBaseline(JSON.stringify(payload))");
+    expect(form).toContain("setBaseline(JSON.stringify(next))");
   });
 });
 

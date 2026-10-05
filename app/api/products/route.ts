@@ -81,6 +81,9 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ product }, { status: 201 });
   } catch (error) {
+    if (error instanceof AppError) {
+      return NextResponse.json({ error: error.message, errors: error.errors }, { status: error.status });
+    }
     if (isDuplicateSlugError(error)) {
       return NextResponse.json({ error: "That slug is already in use" }, { status: 409 });
     }

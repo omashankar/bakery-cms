@@ -100,11 +100,13 @@ export async function createProductRequest(data: ProductFormData): Promise<Produ
 
 export async function updateProductRequest(
   id: string,
-  data: ProductFormData
+  data: ProductFormData,
+  /** The stock the form opened with — lets the server keep sales made since. */
+  stockQuantityLoaded?: number,
 ): Promise<Product> {
   const { product } = await request<{ product: Product }>(`/api/products/${id}`, {
     method: "PUT",
-    body: JSON.stringify(data),
+    body: JSON.stringify({ ...data, stockQuantityLoaded }),
   });
   return product;
 }

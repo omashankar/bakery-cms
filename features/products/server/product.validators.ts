@@ -174,8 +174,29 @@ export const productFormSchema = z
    */
   .superRefine((product, ctx) => {
     if (product.status !== "published") return;
+    for (const issue of publishIssues(product)) {
+      ctx.addIssue({ code: "custom", path: [issue.field], message: issue.message });
+    }
+  });
 
-    const namedSizes = (product.weights ?? []).filter(
+/**
+ * Why a product cannot be put on sale as it stands — the published-only rules
+ * below, as data.
+ *
+ * Lifted out of the refinement because bulk Publish never runs the schema: it
+ * changes only the status, so a draft parked at ₹0 went on sale from the list
+ * with a tick and one button. Both paths now ask this one question.
+ */
+export function publishIssues(
+  product: {
+    price: number;
+    weights?: ReadonlyArray<{ label?: string; price: number }>;
+    compareAtPrice?: number | null;
+  },
+): { field: string; message: string }[] {
+  const issues: { field: string; message: string }[] = [];
+
+  const namedSizes = (product.weights ?? []).filter(
       (tier) => String(tier.label ?? "").trim().length > 0,
     );
     const priced =
@@ -184,9 +205,8 @@ export const productFormSchema = z
         : product.price > 0;
 
     if (!priced) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["price"],
+      issues.push({
+        field: "price",
         message:
           "A published product needs a price above zero — its own, or one on every size it is sold in.",
       });
@@ -218,19 +238,19 @@ export const productFormSchema = z
      * below the price is the only case that is provably not a discount, which
      * is the only case a validator has standing to reject.
      *
-     * Inside the existing refinement, so it inherits the published-only guard
-     * above: a draft being written can hold anything.
+     * Published-only, like every rule here: a draft being written can hold
+     * anything.
      */
     const compareAt = product.compareAtPrice;
     if (compareAt != null && compareAt > 0 && compareAt <= product.price) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["compareAtPrice"],
+      issues.push({
+        field: "compareAtPrice",
         message:
           "A compare-at price has to be ABOVE the selling price, or there is no saving to show. Clear it, or swap the two numbers.",
       });
     }
-  });
+  return issues;
+}
 
 export type ProductFormInput = z.infer<typeof productFormSchema>;
 

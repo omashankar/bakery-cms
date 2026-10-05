@@ -738,13 +738,23 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
         await saveCollectionMembership(created.id);
         toast.success(SAVED_MESSAGE[status]);
       } else if (cakeId) {
-        await updateProductRequest(cakeId, payload);
+        // The baseline is what this form loaded (or last saved), so its stock
+        // is the number the admin was looking at. Sent alongside, it lets the
+        // server keep sales and restocks made since if the field was untouched.
+        const loadedStock = (JSON.parse(baseline) as ProductFormData).stockQuantity;
+        const saved = await updateProductRequest(cakeId, payload, loadedStock);
         await saveCollectionMembership(cakeId);
-        setSavedStatus(payload.status);
-        setBaseline(JSON.stringify(payload));
+        // The stock the server actually kept, which may not be the form's.
+        const next = {
+          ...payload,
+          stockQuantity: saved.stockQuantity ?? payload.stockQuantity,
+          stockStatus: saved.stockStatus ?? payload.stockStatus,
+        };
+        setSavedStatus(next.status);
+        setBaseline(JSON.stringify(next));
         // The form's own copy too, so the badge and the button labels cannot
         // disagree with what the server was just told.
-        setForm(payload);
+        setForm(next);
         toast.success(SAVED_MESSAGE[status]);
       }
     } catch (error) {

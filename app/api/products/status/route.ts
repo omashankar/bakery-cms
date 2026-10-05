@@ -51,7 +51,10 @@ export async function POST(request: Request) {
       ...requestContext(request),
     });
     return NextResponse.json({ updated });
-  } catch {
+  } catch (error) {
+    if (error instanceof AppError) {
+      return NextResponse.json({ error: error.message, errors: error.errors }, { status: error.status });
+    }
     return NextResponse.json({ error: "Failed to update products" }, { status: 500 });
   }
 }

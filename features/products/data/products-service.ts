@@ -8,6 +8,10 @@ import { getCatalog } from "@/features/catalog/server/catalog.service";
 import { readProducts } from "@/features/products/data/products-store.server";
 import * as productRepo from "@/features/products/server/product.repository";
 import { purgeProductTraces } from "@/features/products/server/product-cascade.server";
+import { deriveStockStatus } from "@/features/inventory/lib/inventory-utils";
+import { publishIssues } from "@/features/products/server/product.validators";
+import { ValidationError } from "@/lib/server/http/errors";
+import { getSettings as getInventorySettings } from "@/features/inventory/server/inventory.service";
 import type { LandingProduct } from "@/constants/landing-data";
 import type { Product, ProductFormData } from "@/types/product";
 import {
@@ -374,6 +378,7 @@ function nextId(): string {
 }
 
 export async function createProduct(data: ProductFormData): Promise<Product> {
+  if (data.status === "published") await assertPublishable([data]);
   const timestamp = nowIso();
   return productRepo.insertOne({
     ...data,
@@ -394,14 +399,17 @@ export async function createProduct(data: ProductFormData): Promise<Product> {
 
 export async function updateProduct(
   id: string,
-  data: ProductFormData
+  data: ProductFormData,
+  options: { stockQuantityLoaded?: number } = {},
 ): Promise<Product | null> {
   const existing = await getProductById(id);
   if (!existing) return null;
+  if (data.status === "published") await assertPublishable([data]);
 
   return productRepo.replaceOne(id, {
     ...existing,
     ...data,
+    ...(await stockForEdit(existing, data, options.stockQuantityLoaded)),
     id,
     // `rating` and `reviewCount` are owned by the reviews aggregate, which
     // writes them directly. Letting an edit form carry its stale copy back would
@@ -411,6 +419,42 @@ export async function updateProduct(
     createdAt: existing.createdAt,
     updatedAt: nowIso(),
   });
+}
+
+/**
+ * The stock an edit should leave behind.
+ *
+ * The form carries the quantity it LOADED. Orders `$inc` that field and the
+ * Inventory screen adjusts it in the database, so by the time the admin fixes a
+ * typo in the description the number on the form can be several sales old —
+ * and the whole-document replace wrote it back, re-selling cakes that had
+ * already gone and undoing a restock made in between.
+ *
+ * So the quantity is the admin's only when they changed it: an untouched field
+ * keeps what the database holds now. A changed one is a counted figure, absolute
+ * by definition, exactly like Inventory's "set". Either way the status is
+ * derived from the number actually written, never from the form's copy.
+ *
+ * A request without `stockQuantityLoaded` (an older admin bundle) keeps the
+ * previous behaviour rather than guessing.
+ */
+async function stockForEdit(
+  existing: Product,
+  data: ProductFormData,
+  stockQuantityLoaded: number | undefined,
+): Promise<Pick<Product, "stockQuantity" | "stockStatus">> {
+  const untouched =
+    stockQuantityLoaded !== undefined && data.stockQuantity === stockQuantityLoaded;
+  const stockQuantity = untouched ? (existing.stockQuantity ?? 0) : data.stockQuantity;
+  const stockStatus = deriveStockStatus(
+    {
+      stockQuantity,
+      unlimitedStock: data.unlimitedStock,
+      lowStockThreshold: data.lowStockThreshold,
+    },
+    await getInventorySettings(),
+  );
+  return { stockQuantity, stockStatus };
 }
 
 /**
@@ -443,7 +487,46 @@ export async function setProductStatus(
   status: Product["status"]
 ): Promise<number> {
   if (ids.length === 0) return 0;
+  if (status === "published") {
+    const products = await Promise.all(ids.map((id) => productRepo.findById(id)));
+    await assertPublishable(products.filter((p): p is Product => p !== null));
+  }
   return productRepo.setStatusMany(ids, status);
+}
+
+/**
+ * Refuse to put on sale anything the edit form would have refused.
+ *
+ * Bulk Publish changes only the status, so it never met the form's rules: a
+ * draft parked at ₹0, or filed nowhere, went live from the list and checkout
+ * charged nothing for it. The category is checked against the catalogue and not
+ * merely for being non-blank — a product whose category was deleted keeps the
+ * dead id, shows "Choose a category…" on its form, and passed a blank-check.
+ *
+ * All or nothing, naming every product held back, so the shop fixes them in one
+ * pass instead of discovering them one refusal at a time.
+ */
+async function assertPublishable(
+  products: Pick<Product, "name" | "price" | "weights" | "compareAtPrice" | "categoryId">[],
+): Promise<void> {
+  const catalog = await getCatalog();
+  const categories = new Set(
+    (catalog.categories as Array<{ id: string }>).map((category) => category.id),
+  );
+  const errors: { field: string; message: string }[] = [];
+  for (const product of products) {
+    const reasons = publishIssues(product).map((issue) => issue.message);
+    if (!categories.has(product.categoryId ?? "")) {
+      reasons.push("Choose a category before publishing — it decides where this is found on your shop.");
+    }
+    for (const message of reasons) errors.push({ field: product.name, message });
+  }
+  if (errors.length === 0) return;
+  const names = [...new Set(errors.map((error) => error.field))];
+  throw new ValidationError(
+    errors,
+    `Not published: ${names.join(", ")}. ${errors[0].message}`,
+  );
 }
 
 /**
