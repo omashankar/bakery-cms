@@ -1,5 +1,4 @@
 "use client";
-
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -15,10 +14,11 @@ import { cn } from "@/lib/utils";
 import type { BusinessHoursEntry, ContactSettings } from "@/types/settings";
 import {
   defaultContactSettings,
-  isValidEmailAddress,
+
   isValidMapEmbedUrl,
   normalizeMapEmbedUrl,
 } from "@/features/settings/lib/settings-utils";
+import { isValidEmailAddress } from "@/features/settings/lib/email-rule";
 import {
   getContactSettings,
   resetContactSettings,

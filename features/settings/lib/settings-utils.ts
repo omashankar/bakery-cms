@@ -1,4 +1,3 @@
-import { z } from "zod";
 
 import {
   brandInfo,
@@ -627,22 +626,16 @@ export function mergeAppSettings(partial: Partial<AppSettings>): AppSettings {
   };
 }
 
-/**
- * The ONE email rule, shared by the form and the schema.
- *
- * The Contact form restated it as a regex "deliberately matching what Zod's
- * `z.email()` accepts" — and it did not, in either direction. `o'brien@bakery.ie`
- * is a legal address that Zod takes and the regex refused, so the field showed
- * "Enter a valid email address", Save stayed disabled for the WHOLE Contact
- * section, and the shop could not change its address, phone or opening hours
- * either until the owner used a different email.
- *
- * Restating a rule is how the two drift. `isSafeAssetUrl`, `isValidMapEmbedUrl`
- * and `isSafeSocialUrl` are already shared between the form and the schema for
- * exactly this reason; this is the fourth.
- */
-const emailRule = z.email();
+/*
+  THE EMAIL RULE LIVES IN features/settings/lib/email-rule.ts NOW.
 
-export function isValidEmailAddress(value: string): boolean {
-  return emailRule.safeParse(value.trim()).success;
-}
+  It was the only thing in this 648-line file that touched Zod, and the
+  `import { z } from "zod"` at the top put the whole library into the
+  client bundle of every page that imported any of the plain default
+  objects below — which is the cart, the product page, the checkout and the
+  filters panel, none of which validates an email.
+
+  Measured: the storefront's FAQ page shipped 487 KB of blocking script and
+  the largest chunk in it, 285 KB raw, was Zod.
+*/
+
