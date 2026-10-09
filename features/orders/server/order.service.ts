@@ -971,10 +971,17 @@ export async function updateStatus(id: string, status: OrderStatus, ctx: Request
   if (refusal) throw new AppError(refusal, 409);
 
   const now = new Date().toISOString();
-  const updated = await repo.patch(id, {
+  // Only if the order is still in the status the rule above judged. A cancel or
+  // a refund landing between the read and this write used to be overwritten —
+  // status back to "delivered", the cancel erased from the history — after its
+  // stock had already gone back on the shelf.
+  const updated = await repo.patchIfStatus(id, order.status, {
     status,
     statusHistory: [...order.statusHistory, { status, at: now }],
   });
+  if (!updated) {
+    throw new AppError("This order was changed by someone else just now. Reload it and try again.", 409);
+  }
   await audit(ctx, "order.status", id, { status });
 
   // Tell the customer their cake has left the bakery.
@@ -1138,6 +1145,17 @@ export async function cancel(id: string, cancellationReason: string | undefined,
   const order = await requireOrder(id);
   if (order.status === "cancelled" || order.status === "refunded") return order;
 
+  // A delivered order is not cancelled, it is refunded.
+  //
+  // Cancelling one emailed a cash customer "no payment was taken, nothing to
+  // refund" — they had paid the rider — and a paid customer "a refund is on its
+  // way" with none made. It also closed the only door left: a COD refund needs
+  // the order to still read `delivered` (the cash was collected at the door),
+  // so once cancelled the shop had no way to record handing the money back.
+  if (order.status === "delivered") {
+    throw new AppError("This order has been delivered. Issue a refund instead of cancelling it.", 409);
+  }
+
   const now = new Date().toISOString();
 
   // THE STATUS CHANGE IS THE GUARD.
@@ -1159,14 +1177,9 @@ export async function cancel(id: string, cancellationReason: string | undefined,
 
   // The cakes are back on the shelf. Nothing in this repo ever added stock, so
   // a cancelled order used to destroy inventory permanently — the shop's own
-  // counts drifted down every time it corrected a mistake.
-  //
-  // Not for a DELIVERED order, though: those cakes have left the building. Adding
-  // them back invents stock, and `createOrderWithStockReduction` will then
-  // happily sell the phantom units to the next customer.
-  if (order.status !== "delivered") {
-    await repo.restoreStock(stockFor(order));
-  }
+  // counts drifted down every time it corrected a mistake. (A delivered order,
+  // whose cakes have left the building, never reaches here — see above.)
+  await repo.restoreStock(stockFor(order));
 
   // Cancelling does not move money. A paid order cancelled here still has the
   // customer's payment sitting in the gateway account, and this is the state

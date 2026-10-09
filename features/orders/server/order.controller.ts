@@ -1,3 +1,4 @@
+import { withoutStaffOnlyFields } from "@/features/orders/server/customer-view";
 import { ok, created } from "@/lib/server/http/response";
 import { withErrorHandler, AppError, NotFoundError } from "@/lib/server/http/errors";
 import { getMaintenanceState } from "@/features/settings/server/maintenance.server";
@@ -166,24 +167,6 @@ export const placeOrderController = withErrorHandler(async (request: Request) =>
  * allow-list that missed one field would blank part of a page the customer is
  * entitled to see. Anything genuinely internal added later belongs here.
  */
-function withoutStaffOnlyFields(order: Awaited<ReturnType<typeof service.getByNumber>>) {
-  if (!order) return order;
-  const { adminNotes: _adminNotes, refundRecord, ...rest } = order;
-
-  return {
-    ...rest,
-    ...(refundRecord
-      ? {
-          refundRecord: {
-            ...refundRecord,
-            notes: undefined,
-            history: refundRecord.history?.map((entry) => ({ ...entry, note: undefined })),
-          },
-        }
-      : {}),
-  };
-}
-
 export const getByNumberController = withErrorHandler(async (request: Request, ctx: NumberContext) => {
   const { orderNumber } = await ctx.params;
   const order = await service.getByNumber(orderNumber);

@@ -495,11 +495,27 @@ export async function stats(): Promise<OrderStatsSummary> {
   return summary;
 }
 
+/**
+ * Write the named fields. A key present with `undefined` CLEARS that field.
+ *
+ * Mongoose drops undefined values from a `$set`, so "clear the delivery
+ * partner" and "blank the internal notes" were sent as an update of
+ * `updatedAt` alone: the admin was told it was done, the rider's name and phone
+ * stayed on the customer's tracking page, and the old notes came back on the
+ * next load. Every caller names its keys explicitly, so a present-but-undefined
+ * key is always a request to remove, never "leave it".
+ */
 export async function patch(id: string, fields: Partial<PlacedOrder>): Promise<PlacedOrder | null> {
   await connectDB();
+  const set: Record<string, unknown> = { updatedAt: new Date().toISOString() };
+  const unset: Record<string, ""> = {};
+  for (const [key, value] of Object.entries(fields)) {
+    if (value === undefined) unset[key] = "";
+    else set[key] = value;
+  }
   const doc = (await OrderModel.findByIdAndUpdate(
     id,
-    { $set: { ...fields, updatedAt: new Date().toISOString() } },
+    Object.keys(unset).length > 0 ? { $set: set, $unset: unset } : { $set: set },
     { new: true },
   ).lean()) as unknown as Raw | null;
   return doc ? toOrder(doc) : null;
@@ -546,13 +562,31 @@ export async function patch(id: string, fields: Partial<PlacedOrder>): Promise<P
  * The status change IS the guard now. Null means someone else did it, and the
  * caller must do none of the follow-on work.
  */
+/**
+ * `patch`, but only while the order is still in `expectedStatus`. Null when it
+ * has moved on — the caller decided on a status that is no longer there.
+ */
+export async function patchIfStatus(
+  id: string,
+  expectedStatus: OrderStatus,
+  fields: Partial<PlacedOrder>,
+): Promise<PlacedOrder | null> {
+  await connectDB();
+  const doc = (await OrderModel.findOneAndUpdate(
+    { _id: id, status: expectedStatus },
+    { $set: { ...fields, updatedAt: new Date().toISOString() } },
+    { new: true },
+  ).lean()) as unknown as Raw | null;
+  return doc ? toOrder(doc) : null;
+}
+
 export async function cancelIfActive(
   id: string,
   fields: Partial<PlacedOrder>,
 ): Promise<PlacedOrder | null> {
   await connectDB();
   const doc = (await OrderModel.findOneAndUpdate(
-    { _id: id, status: { $nin: ["cancelled", "refunded"] } },
+    { _id: id, status: { $nin: ["cancelled", "refunded", "delivered"] } },
     { $set: { ...fields, updatedAt: new Date().toISOString() } },
     { new: true },
   ).lean()) as unknown as Raw | null;

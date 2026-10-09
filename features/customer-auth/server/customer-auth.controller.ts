@@ -1,3 +1,4 @@
+import { withoutStaffOnlyFields } from "@/features/orders/server/customer-view";
 import { requestContext } from "@/lib/server/audit/audit-log";
 import {
   clearCustomerCookie,
@@ -103,5 +104,6 @@ export const updateCustomerProfileController = withErrorHandler(async (request: 
  */
 export const myOrdersController = withErrorHandler(async () => {
   const customer = await requireCustomer();
-  return ok(await orderService.getByCustomer(customer.email), "Your orders");
+  const orders = await orderService.getByCustomer(customer.email);
+  return ok(orders.map(withoutStaffOnlyFields), "Your orders");
 });

@@ -619,13 +619,16 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
               </Button>
               {!isTerminal ? (
                 <>
-                  <Button
-                    variant="destructive"
-                    className="w-full"
-                    onClick={() => setCancelOpen(true)}
-                  >
-                    Cancel order
-                  </Button>
+                  {/* A delivered order is refunded, not cancelled — the server refuses it. */}
+                  {order.status !== "delivered" ? (
+                    <Button
+                      variant="destructive"
+                      className="w-full"
+                      onClick={() => setCancelOpen(true)}
+                    >
+                      Cancel order
+                    </Button>
+                  ) : null}
                   <Button
                     variant="outline"
                     className="w-full"

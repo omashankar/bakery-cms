@@ -135,16 +135,15 @@ describe("cancelling twice", () => {
     expect(second?.status).toBe("cancelled");
   });
 
-  it("does not put a delivered order's stock back", async () => {
-    // Those cakes have left the building; adding them back invents stock the
-    // next customer can be sold.
+  it("refuses to cancel a delivered order, and touches nothing", async () => {
+    // A delivered order is refunded instead: cancelling it emailed a cash
+    // customer "no payment was taken" and shut the COD refund path for good.
     const h = harness({ status: "delivered" });
 
-    await service.cancel("order-1", undefined, CTX);
+    await expect(service.cancel("order-1", undefined, CTX)).rejects.toThrow(/refund/i);
 
     expect(h.restoredStock).toHaveLength(0);
-    // The coupon still comes back — that is not a physical good.
-    expect(h.couponReleases).toEqual(["WELCOME10"]);
+    expect(h.couponReleases).toHaveLength(0);
   });
 
   it("does nothing at all for an order already cancelled", async () => {
@@ -178,9 +177,9 @@ describe("the guards' actual queries", () => {
     return source.slice(start, source.indexOf("\n}", start));
   };
 
-  it("cancelIfActive only matches an order that is not already finished", () => {
+  it("cancelIfActive only matches an order that is not finished or delivered", () => {
     const fn = bodyOf("export async function cancelIfActive(");
-    expect(fn).toContain('status: { $nin: ["cancelled", "refunded"] }');
+    expect(fn).toContain('status: { $nin: ["cancelled", "refunded", "delivered"] }');
   });
 
   it("claimCouponRelease only matches an unreleased order", () => {
