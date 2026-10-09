@@ -27,7 +27,10 @@ import {
  */
 
 vi.mock("@/features/products/lib/product-catalog", () => ({ getAllProducts: () => [] }));
-vi.mock("@/features/products/lib/products-repository", () => ({ loadProducts: () => [] }));
+vi.mock("@/features/products/lib/products-repository", () => ({
+  loadProducts: () => [],
+  PRODUCTS_UPDATED_EVENT: "bakery-products-updated",
+}));
 vi.mock("@/features/content/lib/banners-repository", () => ({ loadBanners: () => [] }));
 
 const HERO = "https://images.example.com/hero-diwali.jpg";

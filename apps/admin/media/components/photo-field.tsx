@@ -5,6 +5,7 @@ import { Camera, ChevronDown, ImageIcon, Loader2, Trash2 } from "lucide-react";
 
 import { MediaPicker } from "@/apps/admin/products/components/media-picker";
 import { SafeImage } from "@/components/shared/safe-image";
+import { thumbnailImageUrl } from "@/lib/image-url";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { isForeignImageHost } from "@/lib/images/image-hosts";
@@ -195,7 +196,8 @@ export function PhotoField({
       >
         {trimmed && !isUploading ? (
           <SafeImage
-            src={trimmed}
+            // A preview, sized for the field; the value it edits is still the stored URL.
+            src={thumbnailImageUrl(trimmed, 480)}
             alt={label}
             /*
               SafeImage bakes `object-cover` into its own class list, so this

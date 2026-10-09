@@ -63,6 +63,33 @@ export function optimizedImageUrl(url: string, size: ImageSizeHint = {}): string
 const UNSPLASH = /^https:\/\/images\.unsplash\.com\//;
 
 /**
+ * A small preview of an image the admin is choosing between.
+ *
+ * Every admin thumbnail used to be the stored original: the Media screen drew
+ * thirty full-size PNGs into 48px and 200px squares — 2.4 MB, its LCP at 11s
+ * on a phone. Cloudinary sizes and re-encodes on the URL; Unsplash takes
+ * `w`/`q`/`auto`. Anything else is returned as it is.
+ */
+export function thumbnailImageUrl(url: string, cssWidth: number): string {
+  const trimmed = url?.trim() ?? "";
+  if (!trimmed) return trimmed;
+  if (CLOUDINARY_UPLOAD.test(trimmed)) return optimizedImageUrl(trimmed, { width: cssWidth });
+  if (UNSPLASH.test(trimmed)) {
+    try {
+      const parsed = new URL(trimmed);
+      parsed.searchParams.set("w", String(Math.round(cssWidth * 2)));
+      parsed.searchParams.set("q", "70");
+      parsed.searchParams.set("auto", "format");
+      if (parsed.searchParams.has("h")) parsed.searchParams.delete("h");
+      return parsed.toString();
+    } catch {
+      return trimmed;
+    }
+  }
+  return trimmed;
+}
+
+/**
  * THE SAME PHOTOGRAPH, BIG ENOUGH TO BE MAGNIFIED.
  *
  * The product page's hover panel shows a slice of the picture at two and a half
