@@ -168,8 +168,9 @@ describe("a payment method the shop switched off", () => {
     expect(source).toContain("commerce.paymentMethods?.[input.paymentMethod] === false");
     // Only for a cart that was never quoted — refusing after the gateway has
     // captured would strand a customer because an admin flipped a switch in
-    // between, which is the same rule the minimum-order check follows.
-    expect(source).toMatch(/if \(!draft && commerce\.paymentMethods/);
+    // between — EXCEPT cash, where no money has moved. The behaviour is proven
+    // in cod-pricing.test.ts.
+    expect(source).toMatch(/\(!draft \|\| input\.paymentMethod === "cod"\) &&\s+commerce\.paymentMethods/);
   });
 
   it("stops being the selected one as soon as the real settings arrive", () => {

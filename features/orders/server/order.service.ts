@@ -7,6 +7,7 @@ import * as productRepo from "@/features/products/server/product.repository";
 import { cartLineChoices } from "@/features/cart/lib/cart";
 import { formatAddress } from "@/features/orders/lib/address-format";
 import { deriveStockStatus } from "@/features/inventory/lib/inventory-utils";
+import { getSettings as getInventorySettings } from "@/features/inventory/server/inventory.service";
 import type { CommerceSettings, GeneralSettings } from "@/types/settings";
 import type { GatewayRefund, RefundRecord } from "@/types/refund";
 import {
@@ -466,10 +467,17 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
    *
    * Only for a cart that was never quoted, for the same reason the minimum is:
    * refusing here would strand a customer whose card the gateway has already
-   * captured because an admin changed a switch in between. The quote endpoint
-   * refuses it before any money moves.
+   * captured because an admin changed a switch in between.
+   *
+   * EXCEPT CASH. The quote endpoint never sees the payment method, so it
+   * refused nothing — and the checkout always sends a draft for COD, which made
+   * this check dead for the one method it was written for. No money moves on a
+   * COD order, so there is nobody to strand: it is refused, draft or not.
    */
-  if (!draft && commerce.paymentMethods?.[input.paymentMethod] === false) {
+  if (
+    (!draft || input.paymentMethod === "cod") &&
+    commerce.paymentMethods?.[input.paymentMethod] === false
+  ) {
     throw new AppError(
       "That payment method is not available at this shop. Please choose another.",
       409,
@@ -858,20 +866,44 @@ async function notifyShopOfOrder(
   }
 }
 
+/**
+ * Put a cancelled or refunded order's cakes back, AND relabel them.
+ *
+ * The quantity came back but the stored `stockStatus` did not, and that label
+ * is what the storefront sells by: the last cake sold, the order was
+ * cancelled, the shelf held one again — and the product page still said "Out
+ * of stock" with Add to Cart disabled. The admin's Inventory screen derives the
+ * status from the quantity, so it read "In stock" and nobody saw the problem.
+ */
+async function restoreStock(reductions: ReturnType<typeof stockFor>): Promise<void> {
+  await repo.restoreStock(reductions);
+  await refreshStockStatuses(reductions.map((r) => r.slug));
+}
+
 async function refreshStockStatuses(slugs: string[]): Promise<void> {
-  const unique = [...new Set(slugs)];
+  const unique = [...new Set(slugs)].filter(Boolean);
+  if (unique.length === 0) return;
+  // The shop's threshold, not the built-in 10 — the Inventory screen and a
+  // manual adjustment both use it, so an order must too, or the same product
+  // reads "Low stock" in one place and "In stock" in the other.
+  const settings = await getInventorySettings().catch(() => undefined);
   await Promise.all(
     unique.map(async (slug) => {
       try {
         const product = await productRepo.findBySlug(slug);
         if (!product || product.unlimitedStock) return;
-        const stockStatus = deriveStockStatus({
-          stockQuantity: product.stockQuantity,
-          unlimitedStock: false,
-          lowStockThreshold: product.lowStockThreshold,
-        });
+        const stockStatus = deriveStockStatus(
+          {
+            stockQuantity: product.stockQuantity,
+            unlimitedStock: false,
+            lowStockThreshold: product.lowStockThreshold,
+          },
+          settings,
+        );
         if (stockStatus !== product.stockStatus) {
-          await productRepo.patchFields(product.id, { stockStatus });
+          // Guarded on the quantity it was derived from, so a sale landing in
+          // between is not labelled by a status computed for a stale number.
+          await productRepo.setStockStatusFor(product.id, product.stockQuantity ?? 0, stockStatus);
         }
       } catch {
         // A stock-status refresh failure must not fail the order.
@@ -1179,7 +1211,7 @@ export async function cancel(id: string, cancellationReason: string | undefined,
   // a cancelled order used to destroy inventory permanently — the shop's own
   // counts drifted down every time it corrected a mistake. (A delivered order,
   // whose cakes have left the building, never reaches here — see above.)
-  await repo.restoreStock(stockFor(order));
+  await restoreStock(stockFor(order));
 
   // Cancelling does not move money. A paid order cancelled here still has the
   // customer's payment sitting in the gateway account, and this is the state
@@ -1504,7 +1536,7 @@ export async function refund(id: string, input: RefundInput, ctx: RequestCtx) {
     );
   }
 
-  if (restoreNow) await repo.restoreStock(stockFor(order));
+  if (restoreNow) await restoreStock(stockFor(order));
   if (releaseCouponNow) await releaseCoupon(order);
 
   await sendRefundEmail(updated, plan.amount, settled);
@@ -1795,7 +1827,7 @@ export async function settleGatewayRefund(input: {
     return false;
   }
 
-  if (restoreNow) await repo.restoreStock(stockFor(order));
+  if (restoreNow) await restoreStock(stockFor(order));
   if (releaseCouponNow) await releaseCoupon(order);
   return true;
 }

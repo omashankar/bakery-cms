@@ -21,6 +21,25 @@ const state = vi.hoisted(() => ({
   order: null as Record<string, unknown> | null,
   restoredStock: [] as unknown[][],
   couponReleases: [] as string[],
+  relabels: [] as Array<{ id: string; quantity: number; status: string }>,
+}));
+
+// After the stock comes back, the product is relabelled from its NEW quantity.
+// Its stored label still says "out_of_stock" — the state the last sale left.
+vi.mock("@/features/products/server/product.repository", () => ({
+  findBySlug: async (slug: string) => ({
+    id: `p-${slug}`,
+    slug,
+    stockQuantity: 3,
+    unlimitedStock: false,
+    stockStatus: "out_of_stock",
+  }),
+  setStockStatusFor: async (id: string, quantity: number, status: string) => {
+    state.relabels.push({ id, quantity, status });
+  },
+}));
+vi.mock("@/features/inventory/server/inventory.service", () => ({
+  getSettings: async () => ({ defaultLowStockThreshold: 2, trackStockHistory: true }),
 }));
 
 vi.mock("@/features/orders/server/order.repository", () => ({
@@ -90,8 +109,21 @@ function harness(over: Record<string, unknown> = {}) {
   };
   state.restoredStock.length = 0;
   state.couponReleases.length = 0;
+  state.relabels.length = 0;
   return state;
 }
+
+describe("cancelling puts the cakes back on sale", () => {
+  it("relabels the product from its restored quantity, by the shop's threshold", async () => {
+    const h = harness();
+
+    await service.cancel("order-1", undefined, CTX);
+
+    // 3 on the shelf, the shop's threshold is 2 — in stock, not out of it, and
+    // not the built-in 10's "low stock" either.
+    expect(h.relabels).toEqual([{ id: "p-choc", quantity: 3, status: "in_stock" }]);
+  });
+});
 
 describe("cancelling twice", () => {
   it("restores the stock once, not once per click", async () => {
