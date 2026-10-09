@@ -195,6 +195,16 @@ const settingsSchema = new mongoose.Schema({
   modules: { type: modulesSchema, default: () => ({}) },
   // Admin-customised white-label wording, e.g. { productWord: "Bouquet" }.
   labelOverrides: { type: mongoose.Schema.Types.Mixed, default: {} },
+  /**
+   * One counter per section, bumped by every save of that section.
+   *
+   * A section save is a whole-section replace built from a browser cache, so a
+   * tab left open since morning saved its morning commerce section over the
+   * delivery fee changed at noon on a phone. A save now names the version it
+   * was composed against and a stale one is refused (409); see
+   * `updateSection`.
+   */
+  sectionVersions: { type: mongoose.Schema.Types.Mixed, default: {} },
 });
 
 applyBaseTransform(settingsSchema);

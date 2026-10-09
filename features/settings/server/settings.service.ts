@@ -173,8 +173,17 @@ async function keepStoredMailPassword(section: string, value: unknown): Promise<
   return { ...(incoming ?? {}), password: stored };
 }
 
-export async function updateSection(section: string, value: unknown, ctx: RequestCtx) {
-  const doc = await repo.updateSection(section, await keepStoredMailPassword(section, value));
+export async function updateSection(
+  section: string,
+  value: unknown,
+  ctx: RequestCtx,
+  expectedVersion?: number,
+) {
+  const doc = await repo.updateSection(
+    section,
+    await keepStoredMailPassword(section, value),
+    expectedVersion,
+  );
   // The mail transport is cached across requests, so new credentials must not
   // keep failing against the old ones.
   if (section === "smtp") resetMailTransport();
