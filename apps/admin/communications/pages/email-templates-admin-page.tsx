@@ -708,6 +708,10 @@ export function EmailTemplatesAdminPage() {
                         <option value="active">Active</option>
                         <option value="draft">Draft</option>
                       </AdminSelect>
+                      <p className="text-xs text-muted-foreground">
+                        Draft stops this email being sent. Sign-in and password-reset codes always
+                        go out, using the built-in wording.
+                      </p>
                     </div>
                   </div>
 

@@ -41,7 +41,13 @@ export async function updatePageRequest(
 ): Promise<CmsPage> {
   const { page } = await request<{ page: CmsPage }>(`/api/pages/${id}`, {
     method: "PUT",
-    body: JSON.stringify(patch),
+    // A cleared schedule is `undefined` on the form, and JSON drops undefined —
+    // so "Clear schedule" sent nothing, the server's merge kept the old date,
+    // and the page published itself on it anyway. `null` survives the trip
+    // and the server reads it as "remove".
+    body: JSON.stringify(patch, (key, value) =>
+      key === "scheduledPublishAt" && value === undefined ? null : value,
+    ),
   });
   return page;
 }
