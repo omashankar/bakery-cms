@@ -517,7 +517,7 @@ describe("the server side", () => {
     // The ORDER is the whole point: moving the read below the write logs the
     // new value as `before`, which is worse than logging nothing.
     expect(service).toMatch(
-      /const before = await store\.read\(\);[\s\S]{0,120}await store\.write\(/,
+      /const before = await store\.read\(\);[\s\S]{0,120}await store\.write(?:Versioned)?\(/,
     );
     expect(service).toContain("metadata: { before, after: value }");
   });

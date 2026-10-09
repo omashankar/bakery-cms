@@ -2,7 +2,7 @@ import { safeSetItem } from "@/lib/safe-storage";
 import { brandInfo } from "@/constants/landing-data";
 import { DEFAULT_LABELS } from "@/config/business-labels";
 import { routes } from "@/constants/routes";
-import { replaceSeoRequest } from "@/features/site-layout/lib/site-layout-api";
+import { replaceSeoRequest, onSiteLayoutConflict } from "@/features/site-layout/lib/site-layout-api";
 import type { WriteResult } from "@/lib/write-result";
 import type { GlobalSeoSettings, SeoRouteEntry, SeoStore } from "@/types/seo";
 
@@ -239,6 +239,10 @@ export function persistServerSeo(store: SeoStore): void {
   serverStore = store;
   persist(store);
 }
+
+// A save refused because another device saved first puts the server's copy
+// here, so the screen shows it; see `onSiteLayoutConflict`.
+onSiteLayoutConflict("seo", persistServerSeo);
 
 /**
  * Local write first, then the server — and the local write is UNDONE when

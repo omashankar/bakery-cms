@@ -14,6 +14,23 @@ interface Envelope<T> {
   data: T | null;
 }
 
+/**
+ * The version each document was read at, sent back with its save.
+ *
+ * Header, footer, appearance and SEO are whole-document replaces built from a
+ * cache filled once per admin session. Without a version, a tab left open since
+ * morning saved its morning copy over a change made since on another device,
+ * and both reported success. The server now refuses a stale version (409); the
+ * conflict writes the server's copy into this tab's cache, so the screen shows
+ * the other change and the admin re-applies theirs on top of it.
+ */
+const versions = new Map<string, number>();
+const conflictSinks = new Map<string, (value: unknown) => void>();
+
+export function onSiteLayoutConflict<T>(key: string, persistServer: (value: T) => void): void {
+  conflictSinks.set(url(key), persistServer as (value: unknown) => void);
+}
+
 async function getJson<T>(path: string): Promise<T | null> {
   try {
     const res = await fetch(path, { headers: { Accept: "application/json" } });
@@ -21,6 +38,8 @@ async function getJson<T>(path: string): Promise<T | null> {
       noteAuthStatus(res.status);
       return null;
     }
+    const version = res.headers?.get?.("X-Content-Version");
+    if (version) versions.set(path, Number(version));
     const json = (await res.json()) as Envelope<T>;
     return json.success ? json.data : null;
   } catch {
@@ -40,11 +59,22 @@ async function getJson<T>(path: string): Promise<T | null> {
  */
 async function putJson(path: string, body: unknown): Promise<boolean> {
   try {
+    const known = versions.get(path);
     const res = await fetch(path, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(known === undefined ? {} : { "X-Content-Version": String(known) }),
+      },
       body: JSON.stringify(body),
     });
+    const version = res.headers?.get?.("X-Content-Version");
+    if (version) versions.set(path, Number(version));
+    if (res.status === 409) {
+      const current = await getJson(path);
+      if (current !== null) conflictSinks.get(path)?.(current);
+      return false;
+    }
     noteAuthStatus(res.status);
     return res.ok;
   } catch {

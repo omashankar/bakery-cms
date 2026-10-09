@@ -1,5 +1,6 @@
 import { ok } from "@/lib/server/http/response";
-import { withErrorHandler, NotFoundError } from "@/lib/server/http/errors";
+import { withErrorHandler, NotFoundError, ConflictError } from "@/lib/server/http/errors";
+import { StoreConflictError } from "@/lib/server/db/cms-store";
 import { validate, readJson } from "@/lib/server/http/validate";
 import { requireRole } from "@/lib/server/auth/dal";
 import { requestContext } from "@/lib/server/audit/audit-log";
@@ -35,7 +36,9 @@ export const getSiteLayoutController = withErrorHandler(async (_req: Request, ct
    */
   await requireRole(...LAYOUT_ROLES);
   const { key } = await ctx.params;
-  return ok(await service.getSiteLayout(key), key);
+  const { value, version } = await service.getSiteLayoutVersioned(key);
+  // The version a save must carry back — the same header the content stores use.
+  return ok(value, key, { headers: { "X-Content-Version": String(version) } });
 });
 
 export const replaceSiteLayoutController = withErrorHandler(async (request: Request, ctx: KeyContext) => {
@@ -46,10 +49,20 @@ export const replaceSiteLayoutController = withErrorHandler(async (request: Requ
   if (!schema) throw new NotFoundError("Unknown site-layout section");
 
   const value = validate(schema, await readJson(request));
-  const result = await service.replaceSiteLayout(key, value, {
-    ...requestContext(request),
-    actorId: session.sub,
-    actorEmail: session.email,
-  });
-  return ok(result, `${key} saved`);
+  const header = request.headers.get("X-Content-Version");
+  const expected = header !== null && header !== "" ? Number(header) : undefined;
+
+  try {
+    const result = await service.replaceSiteLayout(
+      key,
+      value,
+      { ...requestContext(request), actorId: session.sub, actorEmail: session.email },
+      Number.isFinite(expected) ? expected : undefined,
+    );
+    const { version } = await service.getSiteLayoutVersioned(key);
+    return ok(result, `${key} saved`, { headers: { "X-Content-Version": String(version) } });
+  } catch (error) {
+    if (error instanceof StoreConflictError) throw new ConflictError(error.message);
+    throw error;
+  }
 });
