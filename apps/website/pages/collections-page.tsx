@@ -753,6 +753,10 @@ export function CollectionsPage({
                   )}
                 </div>
               ) : (
+                <>
+                {/* The cards' titles are h3; without an h2 above them the page went
+                    h1 -> h3, which screen-reader users navigate by. */}
+                <h2 className="sr-only">{labels.productWordPlural}</h2>
                 <StaggerReveal
                   key={`${categorySlug}-${currentPage}`}
                   /*
@@ -788,6 +792,7 @@ export function CollectionsPage({
                     <ProductCard key={cake.id} cake={cake} priority={index < 4} />
                   ))}
                 </StaggerReveal>
+                </>
               )}
 
               {filtered.length > PAGE_SIZE ? (

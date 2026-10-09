@@ -74,6 +74,16 @@ import { useSameDayCountdown } from "@/hooks/use-same-day-countdown";
 export interface HomepageSectionRendererProps {
   section: HomepageSectionInstance;
   /**
+   * Whether this section is in the first screen of a phone.
+   *
+   * Every picture on the homepage was `loading="lazy"`, including the ones a
+   * phone shows before any scrolling — so the largest one, the collage's first
+   * tile, was not even requested until the layout had run, and it was the
+   * page's LCP: 5.3s in Lighthouse's mobile run. Above the fold, the first
+   * pictures load eagerly and the likely-largest one asks for high priority.
+   */
+  aboveTheFold?: boolean;
+  /**
    * Product rails built on the server. When absent (admin builder preview) the
    * renderer falls back to the browser catalogue.
    */
@@ -712,7 +722,7 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
           items.length >= 8 && "lg:grid-cols-8"
         )}
       >
-        {items.map((category) => (
+        {items.map((category, index) => (
           <Link
             key={category.id}
             href={routes.store.collection(category.slug)}
@@ -787,6 +797,7 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
                     the painted width and every tablet got soft tiles.
                   */
                   sizes="(min-width: 1024px) 160px, (min-width: 640px) 25vw, 88px"
+                  loading={props.aboveTheFold && index < 4 ? "eager" : "lazy"}
                 />
               ) : null}
             </div>
@@ -1600,6 +1611,9 @@ function BannerGridSection(props: HomepageSectionRendererProps) {
                 Below lg the grid is two across.
               */
               sizes={wide ? "(min-width: 1024px) 34vw, 50vw" : "(min-width: 1024px) 20vw, 50vw"}
+              // The first row is on a phone's first screen; see `aboveTheFold`.
+              loading={props.aboveTheFold && index < 2 ? "eager" : "lazy"}
+              fetchPriority={props.aboveTheFold && index === 0 ? "high" : "auto"}
               src={banner.image ?? ""}
               /*
                 The words are pixels inside the picture, so the alt text is

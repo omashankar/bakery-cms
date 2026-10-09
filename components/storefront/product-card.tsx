@@ -139,7 +139,9 @@ export function ProductCard({
             src={cake.image}
             alt={cake.name}
             fill
-            priority={priority}
+            // Next 16 deprecates `priority`; the LCP card loads eagerly and says so.
+            loading={priority ? "eager" : "lazy"}
+            fetchPriority={priority ? "high" : "auto"}
             /*
               THE GRID CHANGED, so this had to. It claimed 25vw from 1024 up
               where the grid was three across, and 50vw below 640 where the

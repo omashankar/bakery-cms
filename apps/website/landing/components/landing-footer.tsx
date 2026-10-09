@@ -82,7 +82,10 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
 
           {footerSettings.columns.map((column) => (
             <div key={column.id} className="space-y-4">
-              <h4 className="text-sm font-semibold text-foreground">{column.title}</h4>
+              {/* h2, not h4: the footer is its own landmark, and an h4 straight after
+                  the page's h2s skipped a level — Lighthouse's heading-order on
+                  every storefront page. The classes keep the look. */}
+              <h2 className="text-sm font-semibold text-foreground">{column.title}</h2>
               <ul className="space-y-2.5">
                 {column.links.map((link) => (
                   <li
@@ -121,7 +124,7 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
           {footerSettings.showContact &&
           (contactInfo.address || contactInfo.phone || contactInfo.email) ? (
             <div className="space-y-4">
-              <h4 className="text-sm font-semibold text-foreground">Contact</h4>
+              <h2 className="text-sm font-semibold text-foreground">Contact</h2>
               {/*
                 A row per detail the shop actually publishes. These used to
                 render unconditionally against a `|| defaultContact.*` read, so
@@ -219,7 +222,7 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
           */}
           {footerSettings.showHours && businessHours.length > 0 ? (
             <div className="space-y-4">
-              <h4 className="text-sm font-semibold text-foreground">Opening Hours</h4>
+              <h2 className="text-sm font-semibold text-foreground">Opening Hours</h2>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {businessHours.map((item, index) => (
                   // Index, not the day: these rows are admin-typed, and two rows

@@ -107,6 +107,10 @@ export function FaqPage({ faqs, contact }: FaqPageProps) {
                   No matching questions found.
                 </div>
               ) : (
+                <>
+                {/* The questions are h3 (the accordion's header); this is the h2
+                    they sit under, so the outline does not jump from h1. */}
+                <h2 className="sr-only">Questions and answers</h2>
                 <Accordion
                   // The accordion is uncontrolled, so its defaultValue is only
                   // read once. Searching or switching category produces a
@@ -133,6 +137,7 @@ export function FaqPage({ faqs, contact }: FaqPageProps) {
                     </AccordionItem>
                   ))}
                 </Accordion>
+                </>
               )}
 
               {category !== "all" ? (

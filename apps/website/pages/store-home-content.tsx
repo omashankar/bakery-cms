@@ -93,7 +93,9 @@ function renderSections(
   // full-width wherever they sat and the published page put them side by side.
   const pair = planNewsletterCtaPair(sections);
 
-  return sections.map((section) => {
+  // A phone's first screen holds the first three bands (measured at 412x823:
+  // the banner strip, the category row and the collage that is the LCP).
+  return sections.map((section, index) => {
     if (pair && section.instanceId === pair.otherId) return null;
 
     if (pair && section.instanceId === pair.anchorId) {
@@ -119,7 +121,12 @@ function renderSections(
     }
 
     return (
-      <HomepageSectionRenderer {...data} key={section.instanceId} section={section} />
+      <HomepageSectionRenderer
+        {...data}
+        key={section.instanceId}
+        section={section}
+        aboveTheFold={index < 3}
+      />
     );
   });
 }
