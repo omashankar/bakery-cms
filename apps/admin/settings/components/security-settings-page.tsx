@@ -360,8 +360,9 @@ export function SecuritySettingsPage() {
                   />
                   <p className="text-xs text-muted-foreground">
                     Wrong passwords allowed per minute before sign-in is refused.
-                    Counted per internet connection, not per person — so everyone
-                    on the shop&rsquo;s WiFi shares this number.
+                    Counted per account — but a browser you have signed in from
+                    before keeps its own count, so a stranger guessing your
+                    password cannot lock you out of it.
                   </p>
                 </div>
               </CardContent>

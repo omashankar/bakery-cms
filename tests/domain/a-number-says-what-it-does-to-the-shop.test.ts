@@ -105,7 +105,8 @@ describe("ending other people's sessions asks first", () => {
      * one person's typo, because the count is per internet connection.
      */
     expect(security).toContain("Wrong passwords allowed per minute");
-    expect(security).toContain("Counted per internet connection, not per person");
+    expect(security).toContain("Counted per account");
+    expect(security).toContain("cannot lock you out");
   });
 });
 

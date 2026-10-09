@@ -443,12 +443,13 @@ export async function verifyOtp(input: VerifyOtpInput): Promise<void> {
   const reset = await repo.findActiveReset(input.email);
   if (!reset) throw new AuthError("Code expired or not found. Request a new one.");
 
-  if (reset.attempts >= OTP_MAX_ATTEMPTS) {
+  // Spent before the comparison, so parallel guesses cannot all slip under
+  // the limit. A correct code spends one too; the budget allows for that.
+  if (!(await repo.claimResetAttempt(String(reset._id), OTP_MAX_ATTEMPTS))) {
     throw new ForbiddenError("Too many attempts. Request a new code.");
   }
 
   if (sha256(input.otp) !== reset.otpHash) {
-    await repo.incrementResetAttempts(String(reset._id));
     throw new AuthError("Incorrect code");
   }
 }
@@ -456,11 +457,10 @@ export async function verifyOtp(input: VerifyOtpInput): Promise<void> {
 export async function resetPassword(input: ResetPasswordInput, ctx: RequestCtx): Promise<void> {
   const reset = await repo.findActiveReset(input.email);
   if (!reset) throw new AuthError("Code expired or not found. Request a new one.");
-  if (reset.attempts >= OTP_MAX_ATTEMPTS) {
+  if (!(await repo.claimResetAttempt(String(reset._id), OTP_MAX_ATTEMPTS))) {
     throw new ForbiddenError("Too many attempts. Request a new code.");
   }
   if (sha256(input.otp) !== reset.otpHash) {
-    await repo.incrementResetAttempts(String(reset._id));
     throw new AuthError("Incorrect code");
   }
 

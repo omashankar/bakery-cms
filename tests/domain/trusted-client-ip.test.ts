@@ -79,8 +79,11 @@ describe("the throttles that used to key on it", () => {
   );
 
   it("budget the ACCOUNT, which a caller cannot rotate", () => {
-    expect(controller).toContain("login:acct:${input.email.trim().toLowerCase()}");
-    expect(controller).toContain("forgot:acct:${input.email.trim().toLowerCase()}");
+    // A device this account has signed in from before keeps its own count, so
+    // a stranger cannot lock the owner out; see the lockout test.
+    expect(controller).toContain("`login:acct:${email}`");
+    expect(controller).toContain("`forgot:acct:${email}`");
+    expect(controller).toContain("const email = input.email.trim().toLowerCase();");
   });
 
   it("only add an address bucket when the address is real", () => {
