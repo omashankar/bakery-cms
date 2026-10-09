@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { hydrateOnce } from "@/lib/hydrate-once";
+import { hydrateOnce, markHydrated } from "@/lib/hydrate-once";
+import type { MediaFile, MediaFolder } from "@/types/media";
 
 import { fetchMediaFiles, fetchMediaFolders, mediaHydration } from "./media-api";
 import { persistServerMedia } from "./media-repository";
@@ -12,6 +13,19 @@ import { persistServerMediaFolders } from "./media-folders";
  * the admin. Files skip an empty server list (so the local seed survives the
  * first run); folders come seeded from the server. Every save dual-writes.
  */
+/**
+ * The library the SERVER read for this page, applied without a request: the
+ * same writes the sync below makes, in the same order, and the same gate. The
+ * Media screen used to draw the cached copy — on a fresh browser, the shipped
+ * demo files — and wait for this fetch to replace it.
+ */
+export function applyServerMedia(files: MediaFile[], folders: MediaFolder[]): void {
+  persistServerMediaFolders(folders);
+  persistServerMedia(files);
+  mediaHydration.markSettled();
+  markHydrated("media");
+}
+
 export function useMediaServerSync(): void {
   useEffect(() => {
     // Keyed, not cancelled: the Media Library page mounts this for itself
