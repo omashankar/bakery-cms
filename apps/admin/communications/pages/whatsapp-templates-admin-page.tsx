@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { reportWrite } from "@/apps/admin/lib/report-write";
-import { AdminMobileActionBar, AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminMobileActionBar, AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
 import { TemplatePreviewPanel } from "@/apps/admin/communications/components/template-preview-panel";

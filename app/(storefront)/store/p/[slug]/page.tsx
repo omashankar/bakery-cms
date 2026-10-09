@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { ProductDetailPage } from "@/apps/website";
+import { ProductDetailPage } from "@/apps/website/pages/product-detail-page";
 import {
   getStorefrontCategories,
   getStorefrontCollections,

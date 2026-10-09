@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { MaintenanceSettingsPage } from "@/apps/admin/settings";
+import { MaintenanceSettingsPage } from "@/apps/admin/settings/components/maintenance-settings-page";
 import { proxyHeadersAreTrusted } from "@/features/settings/server/maintenance.server";
 
 export const metadata: Metadata = {

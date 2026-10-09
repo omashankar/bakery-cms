@@ -25,11 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { routes } from "@/constants/routes";
-import {
-  AdminMobileActionBar,
-  AdminPage,
-  AdminPageHeader,
-} from "@/apps/admin/components";
+import { AdminMobileActionBar, AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import type {
   CmsPageAboutContent,
   CmsPageAboutHighlight,

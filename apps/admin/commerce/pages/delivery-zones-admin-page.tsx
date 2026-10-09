@@ -41,7 +41,8 @@ import {
 import { EmptyState } from "@/components/shared/empty-state";
 import { ListLoading } from "@/components/shared/list-loading";
 import { ListPagination } from "@/components/shared/list-pagination";
-import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
+import { adminShell } from "@/apps/admin/components/admin-shell";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";

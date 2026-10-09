@@ -13,7 +13,7 @@ import {
   TrendingUp,
   Wallet,
 } from "lucide-react";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
 import { useCommerceOverviews } from "@/apps/admin/commerce/lib/use-commerce-overviews";
 import { getPaymentAnalytics } from "@/features/payments/lib/payment-analytics";

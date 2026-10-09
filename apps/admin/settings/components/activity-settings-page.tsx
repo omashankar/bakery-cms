@@ -14,7 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { formatRelativeTime } from "@/utils/format";
 import type { ActivityLog } from "@/types/settings";
 import { clearActivityLog, getActivityLog } from "@/features/settings/lib/settings-repository";

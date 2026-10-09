@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CommerceSettingsPage } from "@/apps/admin/settings";
+import { CommerceSettingsPage } from "@/apps/admin/settings/components/commerce-settings-page";
 
 export const metadata: Metadata = {
   title: "Order Settings",

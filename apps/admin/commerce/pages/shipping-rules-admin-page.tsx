@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { reportSettingsWrite } from "@/apps/admin/settings/lib/report-settings-write";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { TaxBreakdown } from "@/components/shared/tax-breakdown";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

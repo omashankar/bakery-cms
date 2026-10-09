@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PanelLoading } from "@/components/shared/panel-loading";
 import { routes } from "@/constants/routes";
-import { getRecentInquiries } from "@/apps/admin/inquiries";
+import { getRecentInquiries } from "@/features/inquiries/lib/inquiries-repository";
 import { formatRelativeTime } from "@/utils/format";
 import { formatInquiryType } from "@/features/inquiries/lib/inquiry-utils";
 import { InquiryStatusBadge } from "@/apps/admin/inquiries/components/inquiry-status-badge";

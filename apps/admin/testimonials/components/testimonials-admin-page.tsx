@@ -36,7 +36,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { formatRelativeTime } from "@/utils/format";
 import type { Testimonial } from "@/types/content";
-import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
+import { adminShell } from "@/apps/admin/components/admin-shell";
 import {
   bulkUpdateTestimonialStatus,
   deleteTestimonials,

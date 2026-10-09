@@ -37,7 +37,8 @@ import {
 import { routes } from "@/constants/routes";
 import { formatRelativeTime } from "@/utils/format";
 import type { CmsPage } from "@/types/content";
-import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
+import { adminShell } from "@/apps/admin/components/admin-shell";
 import {
   deletePageRequest,
   fetchPages,

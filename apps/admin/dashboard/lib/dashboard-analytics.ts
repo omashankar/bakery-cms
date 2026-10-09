@@ -1,7 +1,7 @@
 import type { ResolvedLabels } from "@/config/business-labels";
 import { getInventoryOverview } from "@/apps/admin/commerce/lib/inventory-repository";
 import { countUnreadNotifications } from "@/apps/admin/commerce/lib/notifications-repository";
-import { countNewInquiries } from "@/apps/admin/inquiries";
+import { countNewInquiries } from "@/features/inquiries/lib/inquiries-repository";
 import {
   type PaymentBreakdownItem,
   type ReportDateRange,

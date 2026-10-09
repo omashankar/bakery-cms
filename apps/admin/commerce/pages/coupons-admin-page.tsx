@@ -5,7 +5,7 @@ import { formatCurrency, formatDate } from "@/utils/format";
 import { useEffect, useMemo, useState } from "react";
 import { Pencil, Plus, RotateCcw, Tag, Trash2 } from "lucide-react";
 import { reportWrite } from "@/apps/admin/lib/report-write";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

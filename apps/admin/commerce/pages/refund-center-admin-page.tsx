@@ -11,7 +11,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import {
   FilterPanel,

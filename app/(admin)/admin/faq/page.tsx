@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { FaqAdminPage } from "@/apps/admin/faq";
+import { FaqAdminPage } from "@/apps/admin/faq/components/faq-admin-page";
 
 export const metadata: Metadata = {
   title: "FAQ",

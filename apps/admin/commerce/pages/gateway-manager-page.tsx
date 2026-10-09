@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { CreditCard, Landmark, Layers } from "lucide-react";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import {
   fetchGatewayCredentialStatus,
   getAllGatewayStates,

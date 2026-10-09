@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ThankYouPage } from "@/apps/website";
+import { ThankYouPage } from "@/apps/website/pages/thank-you-page";
 import { buildRouteMetadataServer } from "@/features/seo/server/seo-store.server";
 
 /**

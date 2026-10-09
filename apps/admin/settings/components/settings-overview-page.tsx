@@ -44,7 +44,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { routes } from "@/constants/routes";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { cn } from "@/lib/utils";
 import {
   ensureSettingsHydrated,

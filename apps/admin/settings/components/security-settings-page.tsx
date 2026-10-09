@@ -1,5 +1,6 @@
 "use client";
 
+import { useSecurityCenterServerSync } from "@/features/settings/lib/use-security-center-server-sync";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -83,6 +84,9 @@ function clamp(value: number, { min, max }: { min: number; max: number }): numbe
 }
 
 export function SecuritySettingsPage() {
+  // The only screen that reads the Security Center, so it opens its own read —
+  // the admin layout no longer loads it on every page.
+  useSecurityCenterServerSync();
   const router = useRouter();
   // The shared section form. This page hand-rolled it and never resynced: a
   // one-shot `[]`-dep effect read localStorage on mount, with no

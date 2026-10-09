@@ -1,5 +1,12 @@
 "use client";
 
+import { useProductCacheSync } from "@/features/products/data/use-product-cache-sync";
+import { useMediaServerSync } from "@/apps/admin/media/lib/use-media-server-sync";
+import { usePagesServerSync } from "@/features/content/lib/use-pages-server-sync";
+import { useInquiriesServerSync } from "@/features/inquiries/lib/use-inquiries-server-sync";
+import { useNewsletterServerSync } from "@/features/inquiries/lib/use-newsletter-server-sync";
+import { useOrdersServerSync } from "@/features/orders/lib/use-orders-server-sync";
+import { useSecurityCenterServerSync } from "@/features/settings/lib/use-security-center-server-sync";
 import { Download, History, RotateCcw, Trash2, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -16,7 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { formatRelativeTime } from "@/utils/format";
 import type { BackupSnapshot } from "@/types/backup";
 import { knownStorageKeys } from "@/features/settings/lib/settings-utils";
@@ -35,6 +42,16 @@ import {
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 
 export function BackupSettingsPage() {
+  // An export copies these browser caches verbatim, so they must hold the
+  // server's rows, not a cold browser's seeds. The admin layout loaded them on
+  // every screen; it no longer does, so the one screen that exports them does.
+  useProductCacheSync();
+  useMediaServerSync();
+  usePagesServerSync();
+  useInquiriesServerSync();
+  useNewsletterServerSync();
+  useOrdersServerSync();
+  useSecurityCenterServerSync();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [mounted, setMounted] = useState(false);
   const [history, setHistory] = useState<BackupSnapshot[]>([]);

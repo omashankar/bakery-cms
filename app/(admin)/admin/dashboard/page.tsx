@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DashboardPage } from "@/apps/admin/dashboard";
+import { DashboardPage } from "@/apps/admin/dashboard/dashboard-page";
 
 export const metadata: Metadata = {
   title: "Dashboard",

@@ -14,7 +14,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { SafeImage } from "@/components/shared/safe-image";
-import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
+import { adminShell } from "@/apps/admin/components/admin-shell";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import { loadProducts } from "@/features/products/lib/products-repository";
 import {

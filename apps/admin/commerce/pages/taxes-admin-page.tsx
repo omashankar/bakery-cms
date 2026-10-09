@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { reportSettingsWrite } from "@/apps/admin/settings/lib/report-settings-write";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import {
   formatTaxRatePercent,
   retagTaxLabel,

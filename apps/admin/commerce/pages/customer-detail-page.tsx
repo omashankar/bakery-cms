@@ -18,7 +18,7 @@ import {
   getCustomerActivity,
   getCustomerAddresses,  type CustomerProfile,
 } from "@/apps/admin/commerce/lib/customer-profile-utils";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import type { PlacedOrder } from "@/features/orders/lib/orders";
 import { Badge } from "@/components/ui/badge";

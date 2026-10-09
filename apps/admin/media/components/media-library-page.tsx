@@ -55,7 +55,8 @@ import { MediaThumbnail } from "./media-thumbnail";
 import { MediaToolsDialog } from "./media-tools-dialog";
 import { MediaUploadDialog } from "./media-upload-dialog";
 import { useMediaUsageSync } from "../lib/use-media-usage-sync";
-import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
+import { adminShell } from "@/apps/admin/components/admin-shell";
 import { useMediaServerSync } from "@/apps/admin/media/lib/use-media-server-sync";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 

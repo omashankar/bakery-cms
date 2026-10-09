@@ -33,7 +33,8 @@ import {
 } from "@/features/commerce/lib/invoice-settings-repository";
 import { ensureInvoiceSettingsHydrated } from "@/features/commerce/lib/use-invoice-settings-server-sync";
 import { defaultInvoiceSettings } from "@/features/commerce/lib/invoice-defaults";
-import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
+import { adminShell } from "@/apps/admin/components/admin-shell";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
 import { type FiguresState } from "@/components/shared/panel-loading";
 import {

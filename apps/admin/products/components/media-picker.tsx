@@ -1,5 +1,6 @@
 "use client";
 
+import { useMediaServerSync } from "@/apps/admin/media/lib/use-media-server-sync";
 import { useMemo, useRef, useState, useEffect } from "react";
 import { ImageIcon, Loader2, Search, Upload } from "lucide-react";
 import { loadMediaFiles, MEDIA_UPDATED_EVENT } from "@/apps/admin/media/lib/media-repository";
@@ -34,6 +35,10 @@ export function MediaPicker({
   onSelect,
   description = "Choose an image, or drop a new one in to upload it.",
 }: MediaPickerProps) {
+  // The library is read where it is used — here — rather than by the admin
+  // layout on every screen. An upload's `addMediaFile` waits on the media
+  // gate, and only this read opens it.
+  useMediaServerSync();
   const [search, setSearch] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [isDragging, setIsDragging] = useState(false);

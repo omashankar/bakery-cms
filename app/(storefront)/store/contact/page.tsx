@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ContactPage } from "@/apps/website";
+import { ContactPage } from "@/apps/website/pages/contact-page";
 import { buildRouteMetadataServer } from "@/features/seo/server/seo-store.server";
 import { getStorefrontContact } from "@/apps/website/lib/storefront-contact.server";
 import { getStorefrontChrome } from "@/apps/website/lib/storefront-chrome.server";

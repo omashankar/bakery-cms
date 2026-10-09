@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { Download, IndianRupee, Loader2, Receipt, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
-import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
+import { adminShell } from "@/apps/admin/components/admin-shell";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
 import { type FiguresState } from "@/components/shared/panel-loading";

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ContactSettingsPage } from "@/apps/admin/settings";
+import { ContactSettingsPage } from "@/apps/admin/settings/components/contact-settings-page";
 
 export const metadata: Metadata = {
   title: "Contact Information",

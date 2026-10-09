@@ -25,7 +25,8 @@ import { ListLoading } from "@/components/shared/list-loading";
 import { type FiguresState } from "@/components/shared/panel-loading";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
-import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
+import { adminShell } from "@/apps/admin/components/admin-shell";
 import { formatRelativeTime } from "@/utils/format";
 import type { NewsletterSubscriber } from "@/types/inquiry";
 import {

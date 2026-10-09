@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getServerLabels } from "@/features/settings/server/labels.server";
-import { ProductsListPage } from "@/apps/admin/products";
+import { ProductsListPage } from "@/apps/admin/products/components/products-list-page";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { productWordPlural } = await getServerLabels();

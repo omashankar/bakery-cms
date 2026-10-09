@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Info } from "lucide-react";
 import { reportWrite } from "@/apps/admin/lib/report-write";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { getGatewayConfig } from "@/features/payments/registry/gateways";
 import {
   getGatewayRuntime,

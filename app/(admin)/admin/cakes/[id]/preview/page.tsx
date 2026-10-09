@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getServerLabels } from "@/features/settings/server/labels.server";
-import { ProductPreviewPage } from "@/apps/admin/products";
+import { ProductPreviewPage } from "@/apps/admin/products/components/product-preview-page";
 
 interface PageProps {
   params: Promise<{ id: string }>;

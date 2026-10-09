@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { AdminMobileActionBar, AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminMobileActionBar, AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 
 interface SettingsSectionShellProps {
   title: string;

@@ -8,6 +8,7 @@ import { shrinkImageFile } from "@/lib/images/shrink-image";
 import type { MediaFile } from "@/types/media";
 import { uploadMediaRequest } from "./media-api";
 import { addMediaFile } from "./media-repository";
+import { useMediaServerSync } from "./use-media-server-sync";
 import { fileNameFromUrl, isPersistableMediaUrl } from "./media-utils";
 
 /**
@@ -82,6 +83,10 @@ export interface BatchResult {
  * record that had not been saved.
  */
 export function useMediaUpload({ onAdded }: UseMediaUploadOptions) {
+  // The library is read where it is used — here — rather than by the admin
+  // layout on every screen. An upload's `addMediaFile` waits on the media
+  // gate, and only this read opens it.
+  useMediaServerSync();
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState<UploadProgress | null>(null);
   /**

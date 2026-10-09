@@ -1,4 +1,5 @@
-export { AdminCommandSearch, AdminCommandSearchTrigger } from "./admin-command-search";
+export { AdminCommandSearch } from "./admin-command-search";
+export { AdminCommandSearchTrigger } from "./admin-command-search-trigger";
 export { AdminSidebar } from "./admin-sidebar";
 export { AdminHeader } from "./admin-header";
 export { AdminBreadcrumbs } from "./admin-breadcrumbs";

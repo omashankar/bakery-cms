@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { IntentLink as Link } from "@/components/shared/intent-link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -56,7 +56,7 @@ import {
 } from "@/constants/navigation";
 import { routes } from "@/constants/routes";
 import { isSettingsOwnedPath } from "@/lib/admin-settings-pages";
-import { countNewInquiries } from "@/apps/admin/inquiries";
+import { countNewInquiries } from "@/features/inquiries/lib/inquiries-repository";
 import { countInventoryAlerts } from "@/apps/admin/commerce/lib/inventory-repository";
 import {
   countUnreadNotifications,

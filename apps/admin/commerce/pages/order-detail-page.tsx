@@ -16,7 +16,7 @@ import { RefundOrderDialog } from "@/apps/admin/commerce/components/refund-order
 import { RefundTimeline } from "@/apps/admin/commerce/components/refund-timeline";
 import { formatRefundReason } from "@/apps/admin/commerce/lib/refund-utils";
 import { runBrowserPrint } from "@/features/commerce/lib/print-invoice";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { OrderStatusTimeline } from "@/components/shared/order-status-timeline";
 import { getOrderTimeline } from "@/features/orders/lib/order-tracking";
 import { isTerminalOrderStatus } from "@/features/orders/lib/order-status-meta";

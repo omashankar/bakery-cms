@@ -37,7 +37,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { formatRelativeTime } from "@/utils/format";
 import type { GlobalSeoSettings, SeoRouteEntry } from "@/types/seo";
-import { adminShell } from "@/apps/admin/components";
+import { adminShell } from "@/apps/admin/components/admin-shell";
 import { SettingsSectionShell } from "@/apps/admin/settings/components/settings-section-shell";
 import { useHydratedForm } from "@/features/settings/lib/use-hydrated-form";
 import { seoHydration } from "@/features/site-layout/lib/site-layout-api";

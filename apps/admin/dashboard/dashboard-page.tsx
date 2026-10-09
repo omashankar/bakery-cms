@@ -26,8 +26,8 @@ import {
 import { EMPTY_DASHBOARD_STATS, getDashboardStats } from "./lib/dashboard-data";
 import { subscribeToAdminData } from "@/apps/admin/lib/admin-data-events";
 import { fetchOrderAnalytics } from "@/features/orders/lib/orders-api";
-import { ORDERS_UPDATED_EVENT } from "@/features/orders/lib/orders";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { ORDERS_UPDATED_EVENT, isOrdersCacheRefill } from "@/features/orders/lib/orders";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { type FiguresState } from "@/components/shared/panel-loading";
 
 const MAX_REFRESH_RETRIES = 4;
@@ -117,14 +117,21 @@ export function DashboardPage() {
     // succession — subscribing to the lot turned one page view into a dozen
     // full-collection requests. Nothing here derives from products, inventory,
     // inquiries or notifications anyway.
-    window.addEventListener(ORDERS_UPDATED_EVENT, load);
+    // Not for a cache refill: the figures are computed on the SERVER, and
+    // copying the server's orders into this browser changes none of them. The
+    // refill announced itself twice on entry, so every visit asked for the same
+    // aggregation three times.
+    const onOrdersChanged = (event: Event) => {
+      if (!isOrdersCacheRefill(event)) void load();
+    };
+    window.addEventListener(ORDERS_UPDATED_EVENT, onOrdersChanged);
 
     return () => {
       // Both, not just the unsubscribe: a request already in flight would
       // otherwise still resolve and set state after this effect is torn down.
       cancelled = true;
       if (retry !== undefined) clearTimeout(retry);
-      window.removeEventListener(ORDERS_UPDATED_EVENT, load);
+      window.removeEventListener(ORDERS_UPDATED_EVENT, onOrdersChanged);
     };
   }, [range, retryKey]);
 

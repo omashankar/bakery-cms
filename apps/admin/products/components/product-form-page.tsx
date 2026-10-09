@@ -1,5 +1,6 @@
 "use client";
 
+import { useSeoServerSync } from "@/features/seo/lib/use-seo-server-sync";
 import Link from "next/link";
 import { PhotoField } from "@/apps/admin/media/components/photo-field";
 import { useRouter } from "next/navigation";
@@ -19,7 +20,7 @@ import {
   weightAxisLabel,
 } from "@/features/products/lib/product-pricing";
 import { routes } from "@/constants/routes";
-import { AdminMobileActionBar, AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminMobileActionBar, AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import type { ProductFormData, EntityStatus } from "@/types";
 import {
   adminCategories,
@@ -103,6 +104,8 @@ const SAVED_MESSAGE: Record<EntityStatus, string> = {
 };
 
 export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
+  // The search-preview domain reads the SEO store; the layout no longer loads it.
+  useSeoServerSync();
   const router = useRouter();
   const [form, setForm] = useState<ProductFormData>(createEmptyProductForm);
   /**

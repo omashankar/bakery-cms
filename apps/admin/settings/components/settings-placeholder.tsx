@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, type LucideIcon } from "lucide-react";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";

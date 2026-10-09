@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { BannersAdminPage } from "@/apps/admin/banners";
+import { BannersAdminPage } from "@/apps/admin/banners/components/banners-admin-page";
 
 export const metadata: Metadata = {
   title: "Banners",

@@ -46,7 +46,8 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { formatRelativeTime } from "@/utils/format";
 import type { Banner } from "@/types/media";
-import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
+import { adminShell } from "@/apps/admin/components/admin-shell";
 import {
   bulkSetBannerActive,
   deleteBanners,

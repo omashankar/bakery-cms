@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { SmsSettingsPage } from "@/apps/admin/settings";
+import { SmsSettingsPage } from "@/apps/admin/settings/components/sms-settings-page";
 
 export const metadata: Metadata = {
   title: "SMS Notifications",

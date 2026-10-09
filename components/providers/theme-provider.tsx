@@ -12,10 +12,8 @@ import {
   type SetStateAction,
 } from "react";
 import { usePathname } from "next/navigation";
-import {
-  applyAppearanceSettings,
-  loadAppearanceSettings,
-} from "@/apps/admin/appearance";
+import { applyAppearanceSettings } from "@/features/site-layout/lib/appearance-utils";
+import { loadAppearanceSettings } from "@/features/site-layout/lib/appearance-repository";
 import {
   THEME_STORAGE_KEY,
   THEME_OPTIONS,

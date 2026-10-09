@@ -88,6 +88,20 @@ function mergeStore(partial: Partial<CatalogStore>): CatalogStore {
  * `CatalogServerSync`: the sync's own `loadCatalogStore()` created it before the
  * server's copy had arrived to replace it.
  */
+/**
+ * Whether this browser holds a catalog the SERVER sent at some point, as
+ * opposed to nothing — in which case `loadCatalogStore` answers with the
+ * shipped defaults.
+ */
+export function hasCatalogCache(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(STORAGE_KEY) !== null;
+  } catch {
+    return false;
+  }
+}
+
 export function loadCatalogStore(): CatalogStore {
   if (typeof window === "undefined") return defaultCatalogStore;
 

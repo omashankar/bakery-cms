@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ModulesSettingsPage } from "@/apps/admin/settings";
+import { ModulesSettingsPage } from "@/apps/admin/settings/components/modules-settings-page";
 
 export const metadata: Metadata = {
   title: "Modules",

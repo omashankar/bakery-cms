@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { AppearancePage } from "@/apps/admin/appearance";
+import { AppearancePage } from "@/apps/admin/appearance/components/appearance-page";
 
 export const metadata: Metadata = {
   title: "Appearance",

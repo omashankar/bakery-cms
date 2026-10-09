@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { TermsPage } from "@/apps/website";
+import { TermsPage } from "@/apps/website/pages/terms-page";
 import { canPreviewDraft } from "@/apps/website/lib/preview-access.server";
 import { buildRouteMetadataServer } from "@/features/seo/server/seo-store.server";
 

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowLeft, Code2, Info } from "lucide-react";
 import { toast } from "sonner";
-import { adminShell } from "@/apps/admin/components";
+import { adminShell } from "@/apps/admin/components/admin-shell";
 import { adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

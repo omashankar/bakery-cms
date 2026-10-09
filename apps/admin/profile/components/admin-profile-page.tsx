@@ -13,7 +13,7 @@ import {
   User,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import {
   getAdminProfile,
   saveAdminProfile,

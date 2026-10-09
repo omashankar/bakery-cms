@@ -12,7 +12,7 @@ import {
   Users,
   XCircle,
 } from "lucide-react";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import {
   CHANNEL_LABELS,
   PAYMENT_NOTIFICATION_TEMPLATES,

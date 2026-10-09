@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { GeneralSettingsPage } from "@/apps/admin/settings";
+import { GeneralSettingsPage } from "@/apps/admin/settings/components/general-settings-page";
 
 export const metadata: Metadata = {
   title: "General Settings",

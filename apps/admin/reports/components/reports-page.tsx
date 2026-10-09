@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { type FiguresState } from "@/components/shared/panel-loading";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import { AdminOrderStatusBadge } from "@/apps/admin/commerce/components/admin-order-status-badge";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,7 +32,7 @@ import {
   fetchOrderAnalytics,
   type OrderAnalyticsResponse,
 } from "@/features/orders/lib/orders-api";
-import { ORDERS_UPDATED_EVENT } from "@/features/orders/lib/orders";
+import { ORDERS_UPDATED_EVENT, isOrdersCacheRefill } from "@/features/orders/lib/orders";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 const rangeOptions: Array<{ value: ReportDateRange; label: string }> = [
@@ -156,11 +156,18 @@ export function ReportsPage() {
     }
 
     void load();
-    window.addEventListener(ORDERS_UPDATED_EVENT, load);
+    // Not for a cache refill: the figures are computed on the SERVER, and
+    // copying the server's orders into this browser changes none of them. The
+    // refill announced itself twice on entry, so every visit asked for the same
+    // aggregation three times.
+    const onOrdersChanged = (event: Event) => {
+      if (!isOrdersCacheRefill(event)) void load();
+    };
+    window.addEventListener(ORDERS_UPDATED_EVENT, onOrdersChanged);
     return () => {
       cancelled = true;
       if (retry !== undefined) clearTimeout(retry);
-      window.removeEventListener(ORDERS_UPDATED_EVENT, load);
+      window.removeEventListener(ORDERS_UPDATED_EVENT, onOrdersChanged);
     };
   }, [range, retryKey]);
 

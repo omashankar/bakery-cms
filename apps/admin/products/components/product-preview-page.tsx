@@ -19,7 +19,7 @@ import {
 } from "@/features/products/lib/products-repository";
 import { fetchProduct } from "@/features/products/data/products-client";
 
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 interface ProductPreviewPageProps {

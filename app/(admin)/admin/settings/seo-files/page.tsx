@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { SeoFilesSettingsPage } from "@/apps/admin/settings";
+import { SeoFilesSettingsPage } from "@/apps/admin/settings/components/seo-files-settings-page";
 
 export const metadata: Metadata = {
   title: "Robots.txt & Sitemap",

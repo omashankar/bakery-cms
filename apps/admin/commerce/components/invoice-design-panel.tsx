@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Printer, RotateCcw, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import { reportWrite } from "@/apps/admin/lib/report-write";
-import { AdminMobileActionBar } from "@/apps/admin/components";
+import { AdminMobileActionBar } from "@/apps/admin/components/admin-page";
 import { adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { InvoiceDocument } from "@/components/shared/invoice-document";
 import { defaultInvoiceSettings } from "@/features/commerce/lib/invoice-defaults";

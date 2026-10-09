@@ -176,7 +176,21 @@ const ORDERS_KEPT_UNDER_PRESSURE = 50;
  * into this same key, so an owner who is signed in to the admin and then opens
  * their own storefront in the same browser is the exact case in the report.
  */
-function writeOrders(orders: PlacedOrder[]): void {
+/**
+ * Whether an ORDERS_UPDATED_EVENT only announced the cache being refilled from
+ * the server — no order changed anywhere. Listeners whose data comes from the
+ * server (the dashboard and Reports figures) ignore these; listeners reading
+ * the cache (the bell, the sidebar) still re-render on them.
+ */
+export function isOrdersCacheRefill(event: Event): boolean {
+  return (event as CustomEvent<{ refill?: boolean }>).detail?.refill === true;
+}
+
+function announceOrders(refill: boolean): void {
+  window.dispatchEvent(new CustomEvent(ORDERS_UPDATED_EVENT, { detail: { refill } }));
+}
+
+function writeOrders(orders: PlacedOrder[], refill = false): void {
   if (typeof window === "undefined") return;
 
   try {
@@ -196,7 +210,7 @@ function writeOrders(orders: PlacedOrder[]): void {
     }
   }
 
-  window.dispatchEvent(new Event(ORDERS_UPDATED_EVENT));
+  announceOrders(refill);
 }
 
 function getCommerceConfig() {
@@ -500,14 +514,12 @@ export function hasOrdersSyncSettled(): boolean {
 export function markOrdersSyncSettled(): void {
   if (ordersSyncSettled) return;
   ordersSyncSettled = true;
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event(ORDERS_UPDATED_EVENT));
-  }
+  if (typeof window !== "undefined") announceOrders(true);
 }
 
 /** Hydration: replace the local order cache with the server's copy. */
 export function persistServerOrders(orders: PlacedOrder[]): void {
-  writeOrders(orders.map(normalizeOrder));
+  writeOrders(orders.map(normalizeOrder), true);
 }
 
 export function getOrdersForCustomer(email: string): PlacedOrder[] {
