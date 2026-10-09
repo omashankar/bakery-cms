@@ -81,13 +81,29 @@ function resolve(currency: string, timezone: string): ActiveLocale {
   };
 }
 
+/**
+ * Answers remembered, and the shipped default known good without asking.
+ *
+ * Constructing an `Intl.DateTimeFormat` is how a zone is validated, and the
+ * first construction on a page is where the browser loads its locale data —
+ * ~100ms of main thread on a mid-range phone, measured in a CPU profile of
+ * /store, spent at module load to confirm that "Asia/Kolkata" exists. Every
+ * page paid it whether or not it formatted a single date.
+ */
+const timezoneVerdicts = new Map<string, boolean>([[DEFAULT_TIMEZONE, true]]);
+
 function isUsableTimezone(timezone: string): boolean {
+  const known = timezoneVerdicts.get(timezone);
+  if (known !== undefined) return known;
+  let usable: boolean;
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: timezone });
-    return true;
+    usable = true;
   } catch {
-    return false;
+    usable = false;
   }
+  timezoneVerdicts.set(timezone, usable);
+  return usable;
 }
 
 export const FALLBACK_LOCALE = resolve(

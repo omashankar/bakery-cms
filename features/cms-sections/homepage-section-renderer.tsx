@@ -16,12 +16,7 @@ import { ProductCard } from "@/components/storefront/product-card";
 import { SectionHeader, sectionHeaderDraws } from "@/components/shared/section-header";
 import { RatingStars } from "@/components/shared/rating-stars";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { FaqList } from "@/components/shared/faq-list";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type {
@@ -2851,22 +2846,15 @@ function FaqSection(props: HomepageSectionRendererProps) {
           />
         </ScrollReveal>
         <ScrollReveal delay={100}>
-          <Accordion className={cn(hasHeading && "mt-8", "space-y-3")}>
-            {items.slice(0, maxItems).map((faq) => (
-              <AccordionItem
-                key={faq.id}
-                value={faq.id}
-                className="overflow-hidden rounded-2xl border border-border bg-card transition-colors"
-              >
-                <AccordionTrigger className="px-5 py-4 text-left font-heading font-semibold hover:no-underline">
-                  {faq.question}
-                </AccordionTrigger>
-                <AccordionContent className="px-5 pb-4 leading-relaxed text-muted-foreground">
-                  {faq.answer}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
+          <FaqList
+            name={`faq-${props.section.instanceId}`}
+            items={items.slice(0, maxItems)}
+            openFirst={0}
+            className={cn(hasHeading && "mt-8", "space-y-3")}
+            itemClassName="overflow-hidden rounded-2xl border border-border bg-card transition-colors"
+            questionClassName="px-5 py-4 font-heading font-semibold"
+            answerClassName="px-5 pb-4 leading-relaxed text-muted-foreground"
+          />
         </ScrollReveal>
       </div>
     </SectionShell>

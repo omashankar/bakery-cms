@@ -40,13 +40,37 @@ export function formatCurrency(
    */
   const resolved = usableCurrencyCode(currency) ?? getActiveLocale().currency;
   const digits = fractionDigits(resolved);
+  const tag = locale ?? localeForCurrency(resolved);
 
-  return new Intl.NumberFormat(locale ?? localeForCurrency(resolved), {
-    style: "currency",
-    currency: resolved,
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  }).format(amount);
+  // One formatter per locale and currency, not one per price: a listing
+  // formats dozens, and each `new Intl.NumberFormat` is a measurable slice of
+  // a phone's main thread.
+  const key = `${tag}|${resolved}|${digits}`;
+  let formatter = currencyFormatters.get(key);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(tag, {
+      style: "currency",
+      currency: resolved,
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    });
+    currencyFormatters.set(key, formatter);
+  }
+  return formatter.format(amount);
+}
+
+const currencyFormatters = new Map<string, Intl.NumberFormat>();
+const dateFormatters = new Map<string, Intl.DateTimeFormat>();
+
+/** A cached `Intl.DateTimeFormat` — see the note on `formatCurrency`. */
+function dateFormatter(locale: string, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const key = `${locale}|${JSON.stringify(options)}`;
+  let formatter = dateFormatters.get(key);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(locale, options);
+    dateFormatters.set(key, formatter);
+  }
+  return formatter;
 }
 
 /**
@@ -85,7 +109,7 @@ export function formatDate(
   if (Number.isNaN(parsed.getTime())) return NO_DATE;
 
   const { locale, timezone } = getActiveLocale();
-  return new Intl.DateTimeFormat(locale, { timeZone: timezone, ...options }).format(parsed);
+  return dateFormatter(locale, { timeZone: timezone, ...options }).format(parsed);
 }
 
 /**
@@ -117,7 +141,7 @@ export function formatCalendarDate(
 
   const [, year, month, date] = parts;
   const { locale } = getActiveLocale();
-  return new Intl.DateTimeFormat(locale, { timeZone: "UTC", ...options }).format(
+  return dateFormatter(locale, { timeZone: "UTC", ...options }).format(
     new Date(Date.UTC(Number(year), Number(month) - 1, Number(date)))
   );
 }
