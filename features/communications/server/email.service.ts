@@ -153,7 +153,9 @@ const FALLBACKS: Record<EmailTemplateSlug, { subject: string; body: string }> = 
 async function findTemplate(slug: EmailTemplateSlug): Promise<EmailTemplateRecord | null> {
   try {
     const templates = (await getTemplates("email-templates")) as EmailTemplateRecord[] | null;
-    return templates?.find((template) => template.slug === slug) ?? null;
+    return (
+      templates?.find((template) => template.slug === slug && template.status === "active") ?? null
+    );
   } catch {
     // A template read must never be the reason a password reset fails.
     return null;
@@ -281,12 +283,6 @@ function isReachableOrigin(value: string): boolean {
   return !/\.(example|invalid|test|localhost)$/.test(host) && host !== "localhost";
 }
 
-/** Emails a person needs to get into their account — never silenced by a Draft. */
-const ALWAYS_SENT: ReadonlySet<EmailTemplateSlug> = new Set<EmailTemplateSlug>([
-  "password_reset",
-  "customer_sign_in",
-]);
-
 export async function sendTemplatedEmail(
   slug: EmailTemplateSlug,
   to: string,
@@ -294,20 +290,7 @@ export async function sendTemplatedEmail(
 ): Promise<MailResult> {
   if (!to?.trim()) return { sent: false, error: "No recipient address on the record." };
 
-  const found = await findTemplate(slug);
-
-  // DRAFT MEANS "DO NOT SEND". A draft used to read as "no template" and the
-  // built-in copy went out instead — so a shop that parked "order_shipped" to
-  // stop it kept emailing customers "your cake is on the way". WhatsApp already
-  // sent nothing for a draft; the two now agree.
-  //
-  // Except the sign-in and reset codes. Those are how anyone gets into an
-  // account; parking one must not lock the owner and every customer out, so a
-  // draft falls back to the built-in wording instead of to silence.
-  if (found && found.status !== "active" && !ALWAYS_SENT.has(slug)) {
-    return { sent: false, error: "This email is set to Draft, so it was not sent." };
-  }
-  const stored = found?.status === "active" ? found : null;
+  const stored = await findTemplate(slug);
   const source = stored ?? FALLBACKS[slug];
 
   // The store's own details are filled here rather than by every caller — they

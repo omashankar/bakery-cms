@@ -709,8 +709,8 @@ export function EmailTemplatesAdminPage() {
                         <option value="draft">Draft</option>
                       </AdminSelect>
                       <p className="text-xs text-muted-foreground">
-                        Draft stops this email being sent. Sign-in and password-reset codes always
-                        go out, using the built-in wording.
+                        Draft keeps your wording off customers while you work on it. The email
+                        still goes out, in the built-in wording.
                       </p>
                     </div>
                   </div>
