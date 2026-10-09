@@ -267,11 +267,18 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
    *
    * The homepage builder already does exactly this, with the same event.
    */
-  const [catalogLists, setCatalogLists] = useState(() => ({
-    categories: adminCategories(),
-    occasions: adminOccasions(),
-    collections: adminCollections(),
-  }));
+  //
+  // Empty to start, on the server AND the client. The initializer used to call
+  // the three readers, which see localStorage in the browser and the shipped
+  // seed on the server — so the first client render listed different category
+  // names from the HTML it was hydrating, React threw hydration error #418 on
+  // every visit to Add Product, and re-rendered the whole form from scratch.
+  // The effect below fills the lists on mount.
+  const [catalogLists, setCatalogLists] = useState<{
+    categories: ReturnType<typeof adminCategories>;
+    occasions: ReturnType<typeof adminOccasions>;
+    collections: ReturnType<typeof adminCollections>;
+  }>({ categories: [], occasions: [], collections: [] });
 
   useEffect(() => {
     const sync = () =>
