@@ -29,6 +29,8 @@ import {
   isOfferedTimeSlot,
   isPastSameDayCutoff,
   isPastTimeSlot,
+  offeredWindows,
+  shopClockNow,
 } from "@/features/orders/lib/delivery-date";
 import { checkMinimumOrder } from "@/features/checkout/lib/minimum-order";
 import {
@@ -273,6 +275,25 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
   if (input.draftId && !draft) {
     throw new AppError("This cart needs to be priced again. Please refresh and retry.", 409);
   }
+
+  // The delivery the cart was QUOTED for, not the one this request names.
+  //
+  // With a draft, the slot checks below are skipped — the quote made them while
+  // refusing was still free — and the order then stored `input.deliverySlot`,
+  // which the quote never saw. Quote tomorrow 10–12, place with today at a
+  // window already gone: accepted, printed on the invoice and the kitchen alert.
+  // The speed (tierId/tierLabel) stays the request's; the date and window are
+  // the draft's.
+  if (draft?.deliverySlot && (draft.deliverySlot.date || draft.deliverySlot.timeSlot)) {
+    input = {
+      ...input,
+      deliverySlot: {
+        ...input.deliverySlot,
+        date: draft.deliverySlot.date,
+        timeSlot: draft.deliverySlot.timeSlot,
+      } as PlaceOrderInput["deliverySlot"],
+    };
+  }
   if (draft?.consumedByOrderId) {
     // Already spent. Fall through to the id-based idempotent path rather than
     // creating a second order for one payment.
@@ -362,7 +383,9 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
     Number((priced.totals as { deliveryMinDays?: number } | undefined)?.deliveryMinDays) || 0,
     Number(commerce.deliveryLeadDays) || 0,
   );
-  if (input.deliverySlot?.date && isBeforeLeadTime(input.deliverySlot.date, leadDays)) {
+  // The shop's clock; see the note in checkout.controller.
+  const now = shopClockNow(((settings.general ?? {}) as GeneralSettings).timezone ?? "Asia/Kolkata");
+  if (input.deliverySlot?.date && isBeforeLeadTime(input.deliverySlot.date, leadDays, now)) {
     throw new AppError(
       `We need ${leadDays} day${leadDays === 1 ? "" : "s"} to prepare an order for this area. Please choose a later delivery date.`,
       409,
@@ -385,7 +408,10 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
   if (
     !draft &&
     input.deliverySlot?.timeSlot &&
-    !isOfferedTimeSlot(input.deliverySlot.timeSlot, commerce.deliveryTimeSlots ?? [])
+    !isOfferedTimeSlot(
+      input.deliverySlot.timeSlot,
+      offeredWindows(commerce, (input.deliverySlot as { tierId?: string }).tierId),
+    )
   ) {
     throw new AppError(
       "That delivery time is not one this shop offers. Please choose another.",
@@ -408,13 +434,13 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
    * while it is still free.
    */
   if (!draft && input.deliverySlot?.date) {
-    if (isPastSameDayCutoff(input.deliverySlot.date, commerce.sameDayCutoff ?? "")) {
+    if (isPastSameDayCutoff(input.deliverySlot.date, commerce.sameDayCutoff ?? "", now)) {
       throw new AppError(
         "We have stopped taking orders for delivery today. Please choose a later date.",
         409,
       );
     }
-    if (isPastTimeSlot(input.deliverySlot.date, input.deliverySlot.timeSlot ?? "")) {
+    if (isPastTimeSlot(input.deliverySlot.date, input.deliverySlot.timeSlot ?? "", now)) {
       throw new AppError(
         "That delivery window has already passed today. Please choose another.",
         409,

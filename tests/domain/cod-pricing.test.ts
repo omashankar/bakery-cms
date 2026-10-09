@@ -284,3 +284,33 @@ describe("Cash on Delivery switched off", () => {
     expect(state.inserted).not.toBeNull();
   });
 });
+
+describe("the delivery an order is placed for", () => {
+  /*
+    With a draft the slot checks are skipped — the quote made them — and the
+    order then stored the REQUEST's slot, which the quote never saw. Quoted for
+    tomorrow 10–12, placed with today at a window already gone: accepted, and
+    printed on the invoice and the kitchen alert.
+  */
+  it("is the one the cart was quoted for, not the one the request names", async () => {
+    setCommerce();
+    state.draft = {
+      id: "draft-1",
+      items: [{ productSlug: "black-forest", name: "Black Forest", price: 5000, quantity: 1 }],
+      totals: { subtotal: 5000, total: 5250, tax: 250, itemCount: 1 },
+      deliveryAddress: address,
+      deliverySlot: { date: "2099-01-02", timeSlot: "10:00 AM – 12:00 PM" },
+    };
+
+    await codOrder({
+      draftId: "draft-1",
+      deliverySlot: { date: "2020-01-01", timeSlot: "06:00 AM – 07:00 AM", tierLabel: "Standard" },
+    });
+
+    expect(state.inserted?.deliverySlot).toMatchObject({
+      date: "2099-01-02",
+      timeSlot: "10:00 AM – 12:00 PM",
+      tierLabel: "Standard",
+    });
+  });
+});

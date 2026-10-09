@@ -106,6 +106,27 @@ export function normaliseTimeSlot(slot: string): string {
     .replace(/\s+/g, " ");
 }
 
+/**
+ * The windows a delivery may be booked in: the chosen SPEED's own, or the
+ * shop-wide list when no speed was chosen (or the shop has none).
+ *
+ * The server only ever checked the shop-wide list. A speed with its own windows
+ * — "Midnight", 11:30 PM – 12:00 AM — offered a window that list does not
+ * contain, so every customer who picked it was refused at the quote with
+ * "That delivery time is not one this shop offers", and the speed could not
+ * be bought at all.
+ */
+export function offeredWindows(
+  commerce: {
+    deliveryTimeSlots?: readonly string[];
+    deliveryTiers?: ReadonlyArray<{ id: string; windows: readonly string[] }>;
+  },
+  tierId: string | undefined,
+): readonly string[] {
+  const tier = tierId ? (commerce.deliveryTiers ?? []).find((t) => t.id === tierId) : undefined;
+  return tier ? tier.windows : (commerce.deliveryTimeSlots ?? []);
+}
+
 export function isOfferedTimeSlot(chosen: string, offered: readonly string[]): boolean {
   const wanted = normaliseTimeSlot(chosen);
   if (!wanted) return true;
