@@ -73,6 +73,11 @@ async function getJson<T>(path: string): Promise<T | null> {
  */
 const sectionVersions = new Map<string, number>();
 
+/** Record the section versions a full read carried; see `applyServerSettings`. */
+export function rememberSectionVersions(data: unknown): void {
+  rememberVersions(data);
+}
+
 function rememberVersions(data: unknown): void {
   const versions = (data as { sectionVersions?: Record<string, unknown> } | null)?.sectionVersions;
   if (!versions || typeof versions !== "object") return;

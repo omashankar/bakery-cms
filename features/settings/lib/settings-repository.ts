@@ -32,6 +32,7 @@ import {
   fetchFullSettings,
   fetchPublicSettings,
   pushSectionDetailed,
+  rememberSectionVersions,
   resetSectionRequest,
   SERVER_SECTIONS,
   settingsHydration,
@@ -160,6 +161,34 @@ export async function hydrateSettingsFromServer(
   const server = full ?? (await fetchPublicSettings());
   if (!server) return false;
 
+  mergeServerSettings(server);
+
+  // Only a FULL read may open the gate: the public subset carries no
+  // smtp/security/analytics, so settling on it would still let those sections
+  // be pushed as this browser's seed.
+  if (full) settingsHydration.markSettled();
+  return Boolean(full);
+}
+
+/**
+ * The full settings the SERVER read for this admin page, applied without a
+ * request.
+ *
+ * Every settings screen waits for the hydration gate before showing its form,
+ * and the gate's opener was a browser fetch of /api/settings that only began
+ * after the admin bundle had loaded — the General screen painted its form at
+ * 6.8s on a throttled phone. The admin layout reads the same document on the
+ * server (password redacted, as the API does) and hands it here before any
+ * screen mounts, so the gate is already open when they ask.
+ */
+export function applyServerSettings(full: Partial<AppSettings> & { sectionVersions?: unknown }): void {
+  if (typeof window === "undefined") return;
+  rememberSectionVersions(full);
+  mergeServerSettings(full);
+  settingsHydration.markSettled();
+}
+
+function mergeServerSettings(server: Partial<AppSettings>): void {
   const current = loadSettings();
   const merged = mergeAppSettings({
     ...current,
@@ -188,12 +217,6 @@ export async function hydrateSettingsFromServer(
   });
 
   saveSettings(merged);
-
-  // Only a FULL read may open the gate: the public subset carries no
-  // smtp/security/analytics, so settling on it would still let those sections
-  // be pushed as this browser's seed.
-  if (full) settingsHydration.markSettled();
-  return Boolean(full);
 }
 
 /**
