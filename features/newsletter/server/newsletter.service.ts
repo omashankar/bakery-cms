@@ -1,9 +1,7 @@
 import { randomUUID } from "node:crypto";
 
-import { createMongoStore } from "@/lib/server/db/cms-store";
 import { writeAuditLog } from "@/lib/server/audit/audit-log";
 import { NotFoundError } from "@/lib/server/http/errors";
-import { seedSubscribers } from "@/features/inquiries/lib/newsletter-repository";
 import type { NewsletterSubscriber } from "@/types/inquiry";
 
 import * as repo from "./newsletter.repository";
@@ -16,18 +14,13 @@ interface RequestCtx {
   actorEmail?: string;
 }
 
-/** One-time demo seed marker (idempotent; survives admin deletions). */
-const seededFlag = createMongoStore<{ done: boolean }>({
-  key: "newsletter-seeded",
-  seed: () => ({ done: false }),
-});
-
-async function ensureSeeded(): Promise<void> {
-  const flag = await seededFlag.read();
-  if (flag.done) return;
-  await repo.seedIfEmpty(seedSubscribers());
-  await seededFlag.write({ done: true });
-}
+/*
+  No demo seed. The first admin read used to insert sample rows for real —
+  addresses at email.com, a real mail provider, most of them "active" — so a
+  new shop's "Copy emails" pasted strangers into its first campaign, and its
+  inbox opened on invented wedding leads. The reviews service dropped its seed
+  for the same reason. An empty list is the honest answer for a new shop.
+*/
 
 // ---- Public (storefront subscribe form) -----------------------------------
 
@@ -61,7 +54,6 @@ export async function subscribe(input: SubscribeInput, ctx: RequestCtx): Promise
 // ---- Admin ----------------------------------------------------------------
 
 export async function getSubscribers(): Promise<NewsletterSubscriber[]> {
-  await ensureSeeded();
   return repo.listAll();
 }
 

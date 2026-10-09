@@ -141,14 +141,24 @@ export function NewsletterSubscribersPage({ embedded = false }: { embedded?: boo
   }
 
   async function copyEmails() {
-    if (filtered.length === 0) {
-      toast.error("No emails to copy");
+    // Active only, whatever the filter shows. This button is the shop's only
+    // export, and it is used to fill a mailing — the default "All" filter put
+    // every unsubscribed address back into the next campaign.
+    const active = filtered.filter((item) => item.isActive);
+    if (active.length === 0) {
+      toast.error("No active subscribers to copy");
       return;
     }
-    const emails = filtered.map((item) => item.email).join(", ");
+    const emails = active.map((item) => item.email).join(", ");
+    const skipped = filtered.length - active.length;
     try {
       await navigator.clipboard.writeText(emails);
-      toast.success(`Copied ${filtered.length} email${filtered.length === 1 ? "" : "s"}`);
+      toast.success(`Copied ${active.length} email${active.length === 1 ? "" : "s"}`, {
+        description:
+          skipped > 0
+            ? `${skipped} unsubscribed ${skipped === 1 ? "address was" : "addresses were"} left out.`
+            : undefined,
+      });
     } catch {
       toast.error("Could not copy emails");
     }
