@@ -76,6 +76,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { brandColors, bakeryColors, surfaces } from "@/constants/colors";
@@ -247,7 +248,10 @@ export function DesignSystemPage() {
     };
   }, []);
 
+  // The only page with tooltips, so the only one that loads their provider —
+  // it used to wrap every page in the app, storefront included.
   return (
+    <TooltipProvider delay={200}>
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-50 border-b border-border bg-card">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
@@ -1175,5 +1179,6 @@ export function DesignSystemPage() {
         </div>
       </div>
     </div>
+    </TooltipProvider>
   );
 }

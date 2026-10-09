@@ -16,7 +16,6 @@ import {
   displayCompareAtPrice,
 } from "@/features/products/lib/product-pricing";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 interface ProductCardProps {
@@ -96,7 +95,11 @@ export function ProductCard({
     event.stopPropagation();
     const added = toggleWishlist(cake.slug);
     setWishlisted(added);
-    toast.success(added ? "Added to wishlist" : "Removed from wishlist");
+    // Loaded on the click: this card is on every listing, and the toast library
+    // was in their first download for a message only a click can raise.
+    void import("sonner").then(({ toast }) =>
+      toast.success(added ? "Added to wishlist" : "Removed from wishlist"),
+    );
   };
 
   /**

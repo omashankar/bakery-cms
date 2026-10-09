@@ -6,8 +6,19 @@ import { SettingsServerSync } from "@/components/shared/settings-server-sync";
 import { CatalogServerSync } from "@/components/shared/catalog-server-sync";
 import { CommerceServerSync } from "@/components/shared/commerce-server-sync";
 import { ContentServerSync } from "@/components/shared/content-server-sync";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { Toaster } from "@/components/ui/sonner";
+import dynamic from "next/dynamic";
+
+/**
+ * The toast host, loaded after the page rather than with it.
+ *
+ * A toast only ever answers something the visitor did, so nothing can need
+ * the host before the page is interactive — and the library was part of every
+ * page's first download. (The tooltip provider that also wrapped every page
+ * moved to the one page that has tooltips, the design system.)
+ */
+const Toaster = dynamic(() => import("@/components/ui/sonner").then((m) => m.Toaster), {
+  ssr: false,
+});
 
 interface AppProvidersProps {
   children: React.ReactNode;
@@ -66,17 +77,15 @@ export function AppProviders({ children }: AppProvidersProps) {
         which is what covers signing in through the login form and soft
         navigating in, the case this component was mounted globally for.
       */}
-      <TooltipProvider delay={200}>
-        {children}
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            classNames: {
-              toast: "font-sans",
-            },
-          }}
-        />
-      </TooltipProvider>
+      {children}
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          classNames: {
+            toast: "font-sans",
+          },
+        }}
+      />
     </ThemeProvider>
   );
 }

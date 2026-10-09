@@ -14,19 +14,17 @@ import {
 import { routes } from "@/constants/routes";
 import { signOutCustomer } from "@/apps/website/account/lib/customer-session";
 import { useHoverMenu } from "@/apps/website/account/hooks/use-hover-menu";
+import { getAccountInitials } from "@/apps/website/account/lib/account-initials";
 
 interface AccountMenuProps {
   name: string;
   phone?: string;
   onSignOut?: () => void;
+  /** Mounted by the lazy loader on the hover that asked for it. */
+  initialOpen?: boolean;
 }
 
-export function getAccountInitials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "U";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
+export { getAccountInitials };
 
 const menuLinks = [
   { href: routes.account.dashboard, label: "My Profile", icon: User },
@@ -34,9 +32,9 @@ const menuLinks = [
   { href: routes.account.addresses, label: "Addresses", icon: MapPin },
 ] as const;
 
-export function AccountMenu({ name, phone, onSignOut }: AccountMenuProps) {
+export function AccountMenu({ name, phone, onSignOut, initialOpen = false }: AccountMenuProps) {
   const router = useRouter();
-  const { open, setOpen, hoverProps } = useHoverMenu();
+  const { open, setOpen, hoverProps } = useHoverMenu(150, initialOpen);
 
   async function handleLogout() {
     // The SERVER ends the session; this device is wiped either way. Awaited so

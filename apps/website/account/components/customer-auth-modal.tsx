@@ -32,16 +32,9 @@ type Step = "email" | "code";
 const CODE_LENGTH = 6;
 const RESEND_SECONDS = 30;
 
-/** Fire from anywhere to open the single customer auth modal (lives in the navbar). */
-export const OPEN_AUTH_MODAL_EVENT = "bakery-open-auth-modal";
-
-export function openCustomerAuthModal(step: "phone" | "signup" = "phone") {
-  if (typeof window === "undefined") return;
-  // The two names are kept for the call sites that use them; both open the same
-  // flow, because with an emailed code there is no separate sign-up — the first
-  // successful sign-in for an address creates the account.
-  window.dispatchEvent(new CustomEvent(OPEN_AUTH_MODAL_EVENT, { detail: { step } }));
-}
+// Re-exported for existing importers; new code imports the events module, which
+// does not pull this modal in. See auth-modal-events.ts.
+export { OPEN_AUTH_MODAL_EVENT, openCustomerAuthModal } from "@/apps/website/account/lib/auth-modal-events";
 
 interface CustomerAuthModalProps {
   open: boolean;

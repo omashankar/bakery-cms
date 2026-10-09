@@ -13,12 +13,12 @@ import {
   MegaMenu,
   MobileShopLinks,
 } from "@/components/storefront/mega-menu";
+import dynamic from "next/dynamic";
+import { OPEN_AUTH_MODAL_EVENT } from "@/apps/website/account/lib/auth-modal-events";
 import {
-  CustomerAuthModal,
-  OPEN_AUTH_MODAL_EVENT,
-} from "@/apps/website/account/components/customer-auth-modal";
-import { AccountMenu } from "@/apps/website/account/components/account-menu";
-import { GuestMenu } from "@/apps/website/account/components/guest-menu";
+  LazyAccountMenu as AccountMenu,
+  LazyGuestMenu as GuestMenu,
+} from "@/apps/website/account/components/lazy-account-menus";
 import { layoutSpacing } from "@/constants/spacing";
 import { routes } from "@/constants/routes";
 import { getCartItemCount } from "@/features/cart/lib/cart";
@@ -39,6 +39,18 @@ import {
   type ProductSuggestion,
 } from "@/features/products/lib/product-suggestions";
 import { cn } from "@/lib/utils";
+
+/**
+ * The sign-in modal, loaded the first time it is opened.
+ *
+ * It is a dialog with a form and its validation — none of which a visitor
+ * needs until they press Login — and it was part of every storefront page's
+ * first download.
+ */
+const CustomerAuthModal = dynamic(
+  () => import("@/apps/website/account/components/customer-auth-modal").then((m) => m.CustomerAuthModal),
+  { ssr: false },
+);
 
 /**
  * HOW FAR THE PAGE MOVES BEFORE THE BAND ANSWERS AT ALL.
@@ -361,6 +373,10 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
   const scrolledRef = useRef(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
+  // Mounted on the first open and kept, so its close animation and its state
+  // survive; never loaded for a visitor who does not sign in.
+  const [authRequested, setAuthRequested] = useState(false);
+  if (authOpen && !authRequested) setAuthRequested(true);
   const [authStep, setAuthStep] = useState<"phone" | "signup">("phone");
 
   useEffect(() => {
@@ -1558,6 +1574,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
         </div>
       ) : null}
     </header>
+    {authRequested ? (
     <CustomerAuthModal
       open={authOpen}
       onOpenChange={setAuthOpen}
@@ -1567,6 +1584,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
         setCustomerName(getCustomerDisplayName());
       }}
     />
+    ) : null}
     </>
   );
 }

@@ -28,7 +28,7 @@ import {
   ProcessingState,
   type PaymentUIState,
 } from "@/features/payments/components/processing-state";
-import { openCustomerAuthModal } from "@/apps/website/account/components/customer-auth-modal";
+import { openCustomerAuthModal } from "@/apps/website/account/lib/auth-modal-events";
 import {
   getCommerceSettings,
   SETTINGS_UPDATED_EVENT,

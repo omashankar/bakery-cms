@@ -8,7 +8,7 @@ import { getOrderByNumber, type PlacedOrder } from "@/features/orders/lib/orders
 import { fetchOrderByNumber } from "@/features/orders/lib/orders-api";
 import { readOrderLookupEmail } from "@/features/orders/lib/order-access";
 import { hasCustomerSession } from "@/apps/website/account/lib/customer-session";
-import { openCustomerAuthModal } from "@/apps/website/account/components/customer-auth-modal";
+import { openCustomerAuthModal } from "@/apps/website/account/lib/auth-modal-events";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import { Button } from "@/components/ui/button";

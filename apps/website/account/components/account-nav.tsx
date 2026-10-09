@@ -9,7 +9,7 @@ import {
   getCustomerSession,
   signOutCustomer,
 } from "@/apps/website/account/lib/customer-session";
-import { getAccountInitials } from "@/apps/website/account/components/account-menu";
+import { getAccountInitials } from "@/apps/website/account/lib/account-initials";
 import { routes } from "@/constants/routes";
 import { cn } from "@/lib/utils";
 

@@ -83,6 +83,9 @@ const nextConfig: NextConfig = {
    * keeps a measurement build out of the dev server's way.
    */
   distDir: process.env.NEXT_DIST_DIR || ".next",
+  // Off unless asked for: a measurement build maps every byte of browser
+  // JavaScript back to the file it came from.
+  productionBrowserSourceMaps: process.env.NEXT_SOURCEMAPS === "1",
   // Mongoose is a large CommonJS package with dynamic requires — let Node load it
   // directly instead of bundling it into the server build (faster, avoids issues).
   serverExternalPackages: ["mongoose", "cloudinary"],

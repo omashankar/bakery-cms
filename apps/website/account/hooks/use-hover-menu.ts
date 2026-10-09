@@ -7,8 +7,8 @@ import { useCallback, useRef, useState } from "react";
  * A small close delay bridges the gap between the trigger and the popup so the
  * menu stays open while the pointer travels between them.
  */
-export function useHoverMenu(closeDelay = 150) {
-  const [open, setOpen] = useState(false);
+export function useHoverMenu(closeDelay = 150, initialOpen = false) {
+  const [open, setOpen] = useState(initialOpen);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const openNow = useCallback(() => {
