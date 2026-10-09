@@ -21,6 +21,8 @@ import { useAdminConfigServerSync } from "@/features/admin-config/lib/use-admin-
 import { ensureSiteLayoutHydrated } from "@/components/shared/site-layout-server-sync";
 import { useIdle } from "@/hooks/use-idle";
 import { applyServerSettings } from "@/features/settings/lib/settings-repository";
+import { applyServerInquiries } from "@/features/inquiries/lib/use-inquiries-server-sync";
+import type { Inquiry } from "@/types/inquiry";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_COLLAPSED_KEY = "bakery-cms-sidebar-collapsed";
@@ -30,6 +32,8 @@ interface AdminLayoutShellProps {
   className?: string;
   /** The full settings, read on the server for this page; see `applyServerSettings`. */
   initialSettings?: Record<string, unknown> | null;
+  /** Every enquiry, read on the server for this page; see `applyServerInquiries`. */
+  initialInquiries?: unknown[] | null;
 }
 
 /**
@@ -88,7 +92,12 @@ function AdminDataHydration(): null {
   return null;
 }
 
-export function AdminLayoutShell({ children, className, initialSettings = null }: AdminLayoutShellProps) {
+export function AdminLayoutShell({
+  children,
+  className,
+  initialSettings = null,
+  initialInquiries = null,
+}: AdminLayoutShellProps) {
   // A LAYOUT effect: it runs after the first render, so nothing reads the
   // seeded cache while hydrating (rendering it then put a status line in the
   // client's General settings header that the server's HTML did not have),
@@ -96,6 +105,7 @@ export function AdminLayoutShell({ children, className, initialSettings = null }
   // `ensureSettingsHydrated` finds the gate already open instead of fetching.
   useLayoutEffect(() => {
     if (initialSettings) applyServerSettings(initialSettings);
+    if (initialInquiries) applyServerInquiries(initialInquiries as Inquiry[]);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
   }, []);
   // Keep the access token fresh (renew on mount + every 10 min + on refocus) so
