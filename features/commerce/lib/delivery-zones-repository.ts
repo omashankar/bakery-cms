@@ -5,7 +5,7 @@ import {
   findDeliveryZone,
   getUniqueZoneCities,
 } from "./delivery-zone-utils";
-import { replaceZonesRequest, zonesHydration } from "./commerce-api";
+import { fetchZones, replaceZonesRequest, zonesHydration } from "./commerce-api";
 import type { WriteResult } from "@/lib/write-result";
 
 const STORAGE_KEY = "bakery-cms-delivery-zones";
@@ -54,6 +54,13 @@ async function persist(zones: DeliveryZone[]): Promise<boolean> {
 
   lowPersist(zones);
   const accepted = await replaceZonesRequest(zones, knownIds);
+  // The server keeps a stored row newer than this tab's copy (see `isStaleCopy`),
+  // so after a save the cache is refreshed: a zone changed on another device
+  // shows its real state here instead of this tab's old one.
+  if (accepted) {
+    const fresh = await fetchZones();
+    if (Array.isArray(fresh)) persistServerZones(fresh);
+  }
 
   // Roll back ONLY if this write is still the one in the cache.
   //

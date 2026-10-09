@@ -19,6 +19,8 @@ const couponSchema = new mongoose.Schema(
     isActive: { type: Boolean, default: true },
     usageCount: { type: Number, default: 0 },
     createdAt: { type: String },
+    /** Stamped on every edit; a save never writes an older row over a newer. */
+    updatedAt: { type: String },
     expiresAt: { type: String },
     /**
      * The categories this code applies to. EMPTY MEANS THE WHOLE SHOP.

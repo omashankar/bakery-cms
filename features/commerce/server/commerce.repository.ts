@@ -51,6 +51,25 @@ export async function listCoupons(): Promise<StoredCoupon[]> {
   return docs.map((d) => toItem<StoredCoupon>(d));
 }
 
+/**
+ * Whether an incoming row is an OLDER copy of what is stored.
+ *
+ * Coupons and delivery zones are saved as the whole list from a browser cache
+ * filled once per admin session. A tab open since morning that toggled one
+ * coupon sent every other coupon back as it was that morning — so a leaked
+ * 50%-off code deactivated on a phone at noon was live again at three, and
+ * both saves reported success. An edit stamps `updatedAt` with the time of
+ * the edit, so a row this tab did not touch carries its old stamp, and a stored
+ * row with a later one has been changed elsewhere since: keep it.
+ *
+ * ISO timestamps compare as strings. A row with no stamp on either side is
+ * written as before.
+ */
+function isStaleCopy(incoming: { updatedAt?: string }, storedUpdatedAt: string | undefined): boolean {
+  if (!storedUpdatedAt) return false;
+  return !incoming.updatedAt || incoming.updatedAt < storedUpdatedAt;
+}
+
 export async function replaceCoupons(
   coupons: StoredCoupon[],
   /**
@@ -83,15 +102,18 @@ export async function replaceCoupons(
    * whatever it was created with. Same rule as `approval` on a WhatsApp template
    * — a server-owned field is not the client's to assert.
    */
+  const stored = await CouponModel.find({ _id: { $in: keepIds } })
+    .select({ usageCount: 1, updatedAt: 1 })
+    .lean();
   const storedCounts = new Map(
-    (
-      await CouponModel.find({ _id: { $in: keepIds } })
-        .select({ usageCount: 1 })
-        .lean()
-    ).map((doc) => [String(doc._id), (doc as { usageCount?: number }).usageCount ?? 0]),
+    stored.map((doc) => [String(doc._id), (doc as { usageCount?: number }).usageCount ?? 0]),
+  );
+  const storedStamps = new Map(
+    stored.map((doc) => [String(doc._id), (doc as { updatedAt?: string }).updatedAt]),
   );
 
-  const ops: Parameters<typeof CouponModel.bulkWrite>[0] = coupons.map((c) => ({
+  const fresh = coupons.filter((c) => !isStaleCopy(c, storedStamps.get(c.id)));
+  const ops: Parameters<typeof CouponModel.bulkWrite>[0] = fresh.map((c) => ({
     replaceOne: {
       filter: { _id: c.id },
       replacement: stripDoc({
@@ -204,7 +226,13 @@ export async function replaceZones(
   await markSeeded(ZONES_SEED_KEY);
 
   const keepIds = zones.map((z) => z.id);
-  const ops: Parameters<typeof DeliveryZoneModel.bulkWrite>[0] = zones.map((z) => ({
+  const storedStamps = new Map(
+    (await DeliveryZoneModel.find({ _id: { $in: keepIds } }).select({ updatedAt: 1 }).lean()).map(
+      (doc) => [String(doc._id), (doc as { updatedAt?: string }).updatedAt],
+    ),
+  );
+  const fresh = zones.filter((z) => !isStaleCopy(z, storedStamps.get(z.id)));
+  const ops: Parameters<typeof DeliveryZoneModel.bulkWrite>[0] = fresh.map((z) => ({
     replaceOne: { filter: { _id: z.id }, replacement: stripDoc(z) as DeliveryZoneDoc, upsert: true },
   }));
 
