@@ -426,6 +426,43 @@ export interface OrderStatsSummary {
  * quietly wrong. An aggregation has no such ceiling and moves no documents over
  * the wire.
  */
+/** Orders still to be fulfilled, whenever they were placed. */
+export async function countInStatuses(statuses: OrderStatus[]): Promise<number> {
+  await connectDB();
+  return OrderModel.countDocuments({ status: { $in: statuses } });
+}
+
+/**
+ * The SETTLED part of an order's refunds, as a Mongo expression — `settledRefundAmount`
+ * (features/orders/lib/order-overviews.ts) for an aggregation. Kept beside it in
+ * meaning; exported so it can be checked against that function.
+ */
+export const SETTLED_REFUND_EXPRESSION = {
+  $cond: [
+    { $gt: [{ $size: { $ifNull: ["$refundRecord.gatewayRefunds", []] } }, 0] },
+    {
+      $sum: {
+        $map: {
+          input: {
+            $filter: {
+              input: "$refundRecord.gatewayRefunds",
+              cond: { $eq: ["$$this.status", "processed"] },
+            },
+          },
+          in: { $ifNull: ["$$this.amount", 0] },
+        },
+      },
+    },
+    {
+      $cond: [
+        { $eq: ["$refundRecord.status", "completed"] },
+        { $ifNull: ["$refundRecord.amount", 0] },
+        0,
+      ],
+    },
+  ],
+};
+
 export async function stats(): Promise<OrderStatsSummary> {
   await connectDB();
 
@@ -445,11 +482,16 @@ export async function stats(): Promise<OrderStatsSummary> {
         //
         // The transactions aggregation already nets `amount - refundedAmount`;
         // this one did not, so the two screens disagreed about the same money.
+        //
+        // And only refunds that SETTLED — `settledRefundAmount`, in Mongo. The
+        // record's `amount` includes a gateway refund still pending, so this
+        // card dropped by a refund the moment it was requested while Reports
+        // and Payments waited for the money to actually move.
         revenue: {
           $sum: {
             $subtract: [
               { $ifNull: ["$totals.total", 0] },
-              { $ifNull: ["$refundRecord.amount", 0] },
+              SETTLED_REFUND_EXPRESSION,
             ],
           },
         },

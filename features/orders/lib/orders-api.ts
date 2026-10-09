@@ -25,6 +25,17 @@ import type { InvoiceOverview, RefundOverview } from "./order-overviews";
 import type { PaymentAnalytics } from "@/features/payments/lib/payment-analytics";
 import type { TransactionView } from "@/features/payments/lib/transactions";
 import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
+import { getActiveLocale } from "@/features/settings/lib/active-locale";
+
+/**
+ * The SHOP's timezone, from General settings — the one every date on the admin
+ * is rendered in (`formatDate`). The browser's own zone used to be sent, so an
+ * admin on a laptop set to UTC saw an order at 02:00 IST on 2 October listed
+ * as "2 Oct" and charted in the 1 October bar.
+ */
+function shopTimeZone(): string {
+  return getActiveLocale().timezone;
+}
 
 /** Mirrors `CommerceOverviews` from the server analytics module. */
 export interface CommerceOverviewsResponse {
@@ -439,15 +450,15 @@ export async function fetchOrdersPage(
 /**
  * Admin: report/dashboard analytics over every order in the range.
  *
- * Sends the browser's timezone offset so daily and monthly buckets follow the
- * admin's calendar rather than the server's.
+ * Sends the shop's timezone so daily and monthly buckets follow the shop's
+ * calendar — the same one its order list is dated in.
  */
 export async function fetchOrderAnalytics(
   range: string,
 ): Promise<OrderAnalyticsResponse | null> {
   const params = new URLSearchParams({
     range,
-    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timeZone: shopTimeZone(),
   });
 
   try {
@@ -474,7 +485,7 @@ export async function fetchOrderAnalytics(
  */
 export async function fetchCommerceOverviews(): Promise<CommerceOverviewsResponse | null> {
   const params = new URLSearchParams({
-    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timeZone: shopTimeZone(),
   });
 
   try {

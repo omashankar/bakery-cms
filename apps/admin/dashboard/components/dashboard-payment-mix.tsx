@@ -72,7 +72,9 @@ export function DashboardPaymentMix({ analytics, figures = "ready" }: DashboardP
 
         {totalRevenue > 0 ? (
           <p className="pt-1 text-xs text-muted-foreground">
-            {formatCurrency(totalRevenue)} collected in selected range
+            {/* Not "collected": this counts COD orders not yet delivered and
+                prepaid orders whose payment is still pending. */}
+            {formatCurrency(totalRevenue)} in orders placed in this range
           </p>
         ) : null}
       </CardContent>

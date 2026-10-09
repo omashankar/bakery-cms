@@ -11,7 +11,6 @@ import { settledRefundAmount } from "@/features/orders/lib/order-overviews";
 import {
   DEFAULT_TIME_ZONE,
   zonedDayKey,
-  zonedMidnight,
   zonedMonthKey,
   zonedParts,
   zonedStartOfDay,
@@ -109,7 +108,7 @@ const monthLabels = [
   "Dec",
 ];
 
-const ACTIVE_STATUSES: PlacedOrder["status"][] = [
+export const ACTIVE_STATUSES: PlacedOrder["status"][] = [
   "pending",
   "confirmed",
   "preparing",
@@ -174,15 +173,13 @@ export function getRangeStart(
   if (range === "all") return null;
 
   if (range === "12m") {
-    const today = zonedParts(nowMs, timeZone);
-    // Subtracting months from a day the target month does not have rolls the
-    // date FORWARD — on 31 March, "11 months back" became 1 May, shortening the
-    // window by a month. Clamp to the target month's last day instead.
-    const target = zonedParts(zonedStartOfMonth(nowMs, timeZone, -11), timeZone);
-    const daysInMonth = new Date(Date.UTC(target.year, target.month + 1, 0)).getUTCDate();
-    return new Date(
-      zonedMidnight(target.year, target.month, Math.min(today.day, daysInMonth), timeZone)
-    );
+    // The 1st of the month eleven months back: eleven whole months plus this
+    // one, which is also exactly the twelve bars the trend draws.
+    //
+    // It was that month on TODAY'S day — so on 5 October the window opened on
+    // 5 November and "Last 12 months" covered eleven, with its first bar a
+    // partial month missing its first four days.
+    return new Date(zonedStartOfMonth(nowMs, timeZone, -11));
   }
 
   const daysBack = range === "7d" ? 6 : range === "30d" ? 29 : 89;
@@ -426,7 +423,9 @@ export function getPaymentBreakdown(orders: PlacedOrder[]): PaymentBreakdownItem
           ? "UPI"
           : key === "card"
             ? "Card"
-            : key;
+            : key === "razorpay"
+              ? "Online (Razorpay)"
+              : key;
 
     const current = map.get(key) ?? { key, label, count: 0, revenue: 0 };
     current.count += 1;
@@ -451,7 +450,11 @@ export function getTopProducts(orders: PlacedOrder[], limit = 5): TopProductItem
     // `keptRevenue / gross` inflated every unrefunded line by the delivery fee,
     // which the existing top-products test caught immediately.
     const gross = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const refunded = order.refundRecord?.amount ?? 0;
+    // SETTLED refunds only, as every other figure here. `refundRecord.amount`
+    // includes a gateway refund still pending or one that failed, so a cake
+    // whose refund never went through read ₹0 here while the summary beside it
+    // still counted its money.
+    const refunded = settledRefundAmount(order);
     const share = gross > 0 ? Math.max(0, 1 - refunded / gross) : 0;
 
     for (const item of order.items) {
