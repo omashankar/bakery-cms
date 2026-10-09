@@ -245,6 +245,8 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    // A side-by-side production build (NEXT_DIST_DIR=.next-prod).
+    ".next-prod/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

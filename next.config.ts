@@ -74,6 +74,15 @@ const HSTS = {
 };
 
 const nextConfig: NextConfig = {
+  /**
+   * Where a build is written, overridable for a side-by-side production build.
+   *
+   * `next build` and a running `next dev` both write generated route types
+   * under `.next`, and doing both at once interleaved them into a file neither
+   * could parse — every later type check failed. `NEXT_DIST_DIR=.next-prod`
+   * keeps a measurement build out of the dev server's way.
+   */
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   // Mongoose is a large CommonJS package with dynamic requires — let Node load it
   // directly instead of bundling it into the server build (faster, avoids issues).
   serverExternalPackages: ["mongoose", "cloudinary"],
