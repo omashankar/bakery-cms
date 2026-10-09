@@ -112,7 +112,14 @@ export function getMediaUsageDetails(url: string): MediaUsageRef[] {
    * from or delete, which is not the same as publishing them as the shop's work.
    */
 
+  // The server's product list backs up this browser's cache, which can be a
+  // session old. Named only when the cache did not already name the product,
+  // so one product is not counted twice.
+  const namedByCache = refs.some(
+    (ref) => ref.context === "admin-product" || ref.context === "storefront-product",
+  );
   for (const source of remoteSources) {
+    if (source.context === "Products" && namedByCache) continue;
     if (source.haystack.includes(normalized)) {
       refs.push({ label: source.label, context: source.context });
     }
