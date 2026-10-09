@@ -4,6 +4,8 @@ import type { WriteResult } from "@/lib/write-result";
 import { fixBrokenImageUrl } from "@/constants/demo-images";
 import { defaultBanners, selectActiveHeroBanners } from "./banners-utils";
 import {
+  BANNERS_PATH,
+  onContentConflict,
   bannersLoaded,
   bannersWritable,
   fetchBanners,
@@ -127,6 +129,10 @@ export function ensureBannersWritable(): Promise<boolean> {
 export function persistServerBanners(banners: Banner[]): void {
   persist(banners);
 }
+
+// A refused save replaces this tab's stale copy with the server's; see
+// `onContentConflict`.
+onContentConflict(BANNERS_PATH, persistServerBanners);
 
 /**
  * Back to the shipped banners — on the SERVER as well as in this browser.

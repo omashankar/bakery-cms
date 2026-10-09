@@ -5,6 +5,8 @@ import type { LandingTestimonial } from "@/constants/landing-data";
 import { testimonials as seedTestimonials } from "@/constants/landing-data";
 import { fixBrokenImageUrl } from "@/constants/demo-images";
 import {
+  TESTIMONIALS_PATH,
+  onContentConflict,
   testimonialsLoaded,
   testimonialsWritable,
   fetchTestimonials,
@@ -77,6 +79,10 @@ export function ensureTestimonialsWritable(): Promise<boolean> {
 export function persistServerTestimonials(items: Testimonial[]): void {
   lowPersist(items);
 }
+
+// A refused save replaces this tab's stale copy with the server's; see
+// `onContentConflict`.
+onContentConflict(TESTIMONIALS_PATH, persistServerTestimonials);
 
 function normalizeTestimonials(items: Testimonial[]): {
   items: Testimonial[];

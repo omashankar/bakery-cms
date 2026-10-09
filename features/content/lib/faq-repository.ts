@@ -4,6 +4,8 @@ import type { WriteResult } from "@/lib/write-result";
 import type { LandingFaq } from "@/constants/landing-data";
 import { faqs as seedFaqs } from "@/constants/landing-data";
 import {
+  FAQS_PATH,
+  onContentConflict,
   faqsLoaded,
   faqsWritable,
   fetchFaqs,
@@ -120,6 +122,10 @@ export function ensureFaqsWritable(): Promise<boolean> {
 export function persistServerFaqs(items: FaqItem[]): void {
   lowPersist(items);
 }
+
+// A refused save replaces this tab's stale copy with the server's; see
+// `onContentConflict`.
+onContentConflict(FAQS_PATH, persistServerFaqs);
 
 export function loadFaqs(): FaqItem[] {
   if (typeof window === "undefined") return seedFromLanding();
