@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { getServerLabels } from "@/features/settings/server/labels.server";
 import { ProductFormPage } from "@/apps/admin/products/components/product-form-page";
+import { whenAdmin } from "@/lib/server/auth/admin-initial";
+import { getProductById } from "@/features/products/data/products-service";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -14,7 +16,13 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+/**
+ * The product in the HTML, so the form is filled when it paints instead of
+ * after the admin bundle has loaded and asked for it. A missing product falls
+ * through to the form's own fetch, which reports "not found" as it always did.
+ */
 export default async function Page({ params }: PageProps) {
   const { id } = await params;
-  return <ProductFormPage mode="edit" cakeId={id} />;
+  const initialProduct = await whenAdmin(() => getProductById(id));
+  return <ProductFormPage mode="edit" cakeId={id} initialProduct={initialProduct} />;
 }

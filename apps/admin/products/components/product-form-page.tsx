@@ -22,6 +22,7 @@ import {
 import { routes } from "@/constants/routes";
 import { AdminMobileActionBar, AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import type { ProductFormData, EntityStatus } from "@/types";
+import type { Product } from "@/types/product";
 import {
   adminCategories,
   adminCollections,
@@ -79,6 +80,8 @@ import { formatCurrency } from "@/utils/format";
 interface ProductFormPageProps {
   mode: "add" | "edit";
   cakeId?: string;
+  /** The product, read on the server; null fetches it as before. */
+  initialProduct?: Product | null;
 }
 
 /**
@@ -103,11 +106,18 @@ const SAVED_MESSAGE: Record<EntityStatus, string> = {
   archived: "Archived — hidden from the shop",
 };
 
-export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
+/** A stored product as the form edits it: no id, no timestamps. */
+function formDataOf(product: Product): ProductFormData {
+  const { id: _id, createdAt: _c, updatedAt: _u, ...data } = product;
+  return data;
+}
+
+export function ProductFormPage({ mode, cakeId, initialProduct = null }: ProductFormPageProps) {
   // The search-preview domain reads the SEO store; the layout no longer loads it.
   useSeoServerSync();
   const router = useRouter();
-  const [form, setForm] = useState<ProductFormData>(createEmptyProductForm);
+  const loadedFromServer = mode === "edit" && initialProduct ? formDataOf(initialProduct) : null;
+  const [form, setForm] = useState<ProductFormData>(() => loadedFromServer ?? createEmptyProductForm());
   /**
    * Always at least one box, so a product with no photo yet has somewhere to
    * put the first one. Blank slots are dropped on submit — `handleSubmit`
@@ -157,11 +167,15 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
    * set by every writer — and this file has nine `setForm` call sites, so one
    * of them would eventually forget.
    */
-  const [baseline, setBaseline] = useState(() => JSON.stringify(createEmptyProductForm()));
-  const [isLoading, setIsLoading] = useState(mode === "edit");
+  const [baseline, setBaseline] = useState(() =>
+    JSON.stringify(loadedFromServer ?? createEmptyProductForm()),
+  );
+  const [isLoading, setIsLoading] = useState(mode === "edit" && !loadedFromServer);
   const [isSaving, setIsSaving] = useState(false);
   /** The status the SERVER holds, which is the only one the storefront honours. */
-  const [savedStatus, setSavedStatus] = useState<EntityStatus | null>(null);
+  const [savedStatus, setSavedStatus] = useState<EntityStatus | null>(
+    loadedFromServer?.status ?? null,
+  );
   const [slugTouched, setSlugTouched] = useState(mode === "edit");
   /*
     `metaTitleTouched` stood here, tracking whether the admin had typed a meta
@@ -308,6 +322,8 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
 
   useEffect(() => {
     if (mode !== "edit" || !cakeId) return;
+    // Already filled from the server's read; see the page.
+    if (initialProduct) return;
 
     let cancelled = false;
 

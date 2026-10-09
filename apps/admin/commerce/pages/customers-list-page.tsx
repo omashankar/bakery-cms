@@ -50,11 +50,16 @@ const EMPTY_STATS = {
 
 const segmentOptions = ["all", "new", "returning", "vip", "at_risk", "inactive"] as const;
 
-export function CustomersListPage() {
+export function CustomersListPage({
+  initial = null,
+}: {
+  /** Read on the server so the table is in the HTML; null fetches as before. */
+  initial?: CustomerProfile[] | null;
+} = {}) {
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
+  const [mounted, setMounted] = useState(Boolean(initial));
   const [failed, setFailed] = useState(false);
-  const [customers, setCustomers] = useState<CustomerProfile[]>([]);
+  const [customers, setCustomers] = useState<CustomerProfile[]>(initial ?? []);
   const [filters, setFilters] = useState<CustomerListFilters>(defaultCustomerFilters);
   const [page, setPage] = useState(1);
 
@@ -74,7 +79,8 @@ export function CustomersListPage() {
       setMounted(true);
     }
 
-    void refresh();
+    // The server already sent the list; the listener still refreshes it.
+    if (!initial) void refresh();
     window.addEventListener(CUSTOMERS_UPDATED_EVENT, refresh);
     return () => {
       cancelled = true;
