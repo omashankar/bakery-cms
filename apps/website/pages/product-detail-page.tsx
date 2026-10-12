@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BadgeCheck,
   Check,
+  ChevronRight,
   Heart,
   ImageUp,
   Percent,
@@ -27,7 +28,7 @@ import {
   type PhotoPrintDraft,
 } from "@/lib/images/photo-print-layout";
 import { PriceDisplay } from "@/components/storefront/price-display";
-import { RatingSummary, ratingTone } from "@/components/storefront/rating-summary";
+import { RatingSummary, ratingTone, ratingWord } from "@/components/storefront/rating-summary";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import {
   addToCart,
@@ -207,6 +208,13 @@ interface ProductDetailPageProps {
   departmentCrumb?: { label: string; href?: string };
 }
 
+/** Open one of the folded detail sections by its id; anything else is ignored. */
+function openDetailSection(id: string) {
+  if (!id) return;
+  const details = document.getElementById(id)?.querySelector("details");
+  if (details) details.open = true;
+}
+
 export function ProductDetailPage({
   cake,
   modules: modulesFromServer,
@@ -302,6 +310,28 @@ export function ProductDetailPage({
   /** The other thumb, held apart for the same reason. */
   const [unhelpfulMarks, setUnhelpfulMarks] = useState<string[]>([]);
   const [unhelpfulCounts, setUnhelpfulCounts] = useState<Record<string, number>>({});
+  /** The sideways row of review cards, and whether more of it is off to the right. */
+  const reviewRowRef = useRef<HTMLDivElement>(null);
+  const [reviewRowMore, setReviewRowMore] = useState(false);
+  const measureReviewRow = useCallback(() => {
+    const row = reviewRowRef.current;
+    if (!row) return;
+    setReviewRowMore(row.scrollLeft + row.clientWidth < row.scrollWidth - 8);
+  }, []);
+  /*
+    Measured whenever the row or a card changes size — which includes the
+    folded section opening, since a closed one lays the row out at zero.
+    The cards are observed as well as the row: a row as wide as its column
+    never resizes when the cards inside it arrive or grow.
+  */
+  useEffect(() => {
+    const row = reviewRowRef.current;
+    if (!row || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measureReviewRow);
+    observer.observe(row);
+    for (const card of row.children) observer.observe(card);
+    return () => observer.disconnect();
+  }, [reviews, measureReviewRow]);
   // The count the SERVER knows, so the heading and the empty state do not
   // contradict the star rating beside them before the fetch lands.
   const reviewCount = reviews.length || cake.reviewCount || 0;
@@ -490,6 +520,21 @@ export function ProductDetailPage({
    * to prevent.
    */
   const hasDescription = descriptionBlocks.length > 0 || Boolean(cake.description);
+  /**
+   * The grey line under the closed description, built from what is inside it —
+   * the reference's "Features, description and more". The shop's own block
+   * headings, never a list of things the product might have.
+   */
+  const descriptionParts = [
+    ...descriptionBlocks
+      .map((block) => block.heading)
+      .filter((heading): heading is string => Boolean(heading)),
+    ...(cake.description ? ["Description"] : []),
+  ];
+  const descriptionSummary =
+    descriptionParts.length > 2
+      ? `${descriptionParts[0]}, ${descriptionParts[1]} and more`
+      : descriptionParts.join(" and ");
 
   /**
    * The two forms, behind the bar that invites them.
@@ -676,6 +721,15 @@ export function ProductDetailPage({
    * mean a link that can assert a size or an option the shop does not sell.
    */
   const [editingLine, setEditingLine] = useState<CartLineItem | null>(null);
+
+  // A link to #reviews or #questions — from this page or from outside it —
+  // opens the folded section it names instead of landing on a closed heading.
+  useEffect(() => {
+    const openFromHash = () => openDetailSection(window.location.hash.slice(1));
+    openFromHash();
+    window.addEventListener("hashchange", openFromHash);
+    return () => window.removeEventListener("hashchange", openFromHash);
+  }, []);
 
   useEffect(() => {
     setWishlisted(isInWishlist(cake.slug));
@@ -1162,6 +1216,9 @@ export function ProductDetailPage({
                 {cake.rating ? (
                   <a
                     href="#reviews"
+                    // The section is folded; a link to it that landed on a
+                    // closed heading would look like it had done nothing.
+                    onClick={() => openDetailSection("reviews")}
                     className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-sm text-foreground hover:bg-secondary"
                     aria-label={
                       reviewCount
@@ -1918,7 +1975,7 @@ export function ProductDetailPage({
                 field, which is what tabs were really buying: a phone charger
                 shows no Ingredients heading at all rather than an empty one.
               */}
-              <div className="space-y-6">
+              <div className="border-b border-border">
                 {/*
                   ONE SECTION, the way a customer reads it.
 
@@ -1936,7 +1993,10 @@ export function ProductDetailPage({
                   none of them did.
                 */}
                 {hasDescription ? (
-                  <DetailSection title={labels.descriptionHeading}>
+                  <DetailSection
+                    title={labels.descriptionHeading}
+                    summary={descriptionSummary || undefined}
+                  >
                     <div className="space-y-5 text-sm text-muted-foreground">
                       {/*
                         Three fixed parts stood here — Product Details from a
@@ -1982,91 +2042,36 @@ export function ProductDetailPage({
                   </DetailSection>
                 ) : null}
 
-                <DetailSection id="questions" title="Questions">
-                  <div className="space-y-4">
-                    {questions.length > 0 ? (
-                      <div className="space-y-3">
-                        {questions.map((question) => (
-                          <article
-                            key={question.id}
-                            className="rounded-xl border border-border bg-card p-4"
-                          >
-                            <p className="text-sm font-medium">Q: {question.message}</p>
-                            <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">
-                              A: {question.answer}
-                            </p>
-                            <p className="mt-2 text-xs text-muted-foreground">
-                              Asked by {question.name}
-                              {question.answeredAt
-                                ? ` · answered ${formatRelativeTime(question.answeredAt)}`
-                                : ""}
-                            </p>
-                          </article>
-                        ))}
-                      </div>
-                    ) : null}
-                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-cream-50 px-4 py-3">
-                      <p className="text-sm font-medium">
-                        Didn&apos;t find the answer you were looking for?
-                      </p>
-                      <Button
-                        type="button"
-                        variant="bakery"
-                        size="sm"
-                        onClick={() => setAskOpen((open) => !open)}
-                      >
-                        Ask us
-                      </Button>
-                    </div>
-                    {askOpen ? (
-                      <ProductQuestionForm
-                        productSlug={cake.slug}
-                        productName={cake.name}
-                      />
-                    ) : null}
-                  </div>
-                </DetailSection>
-
                 {/*
-                  RATINGS & REVIEWS, laid out the way the shop's reference
-                  (Flipkart) lays it out: "Rate Product" beside the heading, the
-                  summary, then each review as a row — a coloured rating chip
-                  and its title first, the words, and who wrote it last.
+                  RATINGS AND REVIEWS, folded the way the shop's reference
+                  (Flipkart's phone page) folds it: closed, the score and how
+                  many ratings it rests on; open, "4.1 ★ Very Good", the bars,
+                  and the reviews as cards in a row that scrolls sideways.
+
+                  The closed line reads `cake.rating` and `reviewCount`, which
+                  are on the server payload — the list itself is fetched in the
+                  browser and is empty in the server HTML.
                 */}
                 <DetailSection
                   id="reviews"
-                  title={`Ratings & Reviews${reviewCount ? ` (${reviewCount})` : ""}`}
-                  action={
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      aria-expanded={reviewOpen}
-                      onClick={() => setReviewOpen((open) => !open)}
-                    >
-                      Rate Product
-                    </Button>
+                  title="Ratings and reviews"
+                  summary={
+                    reviewCount ? (
+                      <>
+                        <span className="font-semibold text-foreground">
+                          {(cake.rating ?? 0).toFixed(1)}
+                        </span>
+                        <span className="text-green-700">★</span> based on{" "}
+                        {groupIndian(reviewCount)} {reviewCount === 1 ? "rating" : "ratings"}
+                      </>
+                    ) : (
+                      "No ratings yet"
+                    )
                   }
                 >
                   <div className="space-y-4">
-                    {reviewOpen ? (
-                      <ProductReviewForm
-                        productSlug={cake.slug}
-                        cakeName={cake.name}
-                        onSubmitted={() => {
-                          setReviewOpen(false);
-                          // A new review is pending, so this re-read normally
-                          // comes back unchanged — which is the honest outcome.
-                          // It runs so that anything approved since the page
-                          // loaded appears.
-                          void getProductReviews(cake).then((next) => {
-                            if (next) setReviews(next);
-                          });
-                        }}
-                      />
-                    ) : null}
                     {/*
-                      Counted from the rows rendered below it, so the summary
+                      Counted from the cards rendered below it, so the summary
                       and the list cannot disagree. Renders nothing when there
                       is nothing to summarise.
                     */}
@@ -2087,150 +2092,285 @@ export function ProductDetailPage({
                           : "No published reviews yet. Be the first to share your experience."}
                       </p>
                     ) : (
-                      <div className="divide-y divide-border border-t border-border">
-                        {reviews.map((review) => {
-                          const helpful = helpfulCounts[review.id] ?? review.helpfulCount ?? 0;
-                          const unhelpful =
-                            unhelpfulCounts[review.id] ?? review.unhelpfulCount ?? 0;
-                          const votedUp = helpfulMarks.includes(review.id);
-                          const votedDown = unhelpfulMarks.includes(review.id);
-                          return (
-                            <article key={review.id} className="py-4">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span
-                                  className={cn(
-                                    "inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-xs font-semibold text-white",
-                                    ratingTone(Math.round(review.rating)),
-                                  )}
-                                  aria-label={`Rated ${review.rating} out of 5`}
-                                >
-                                  {review.rating} ★
-                                </span>
-                                {review.title ? (
-                                  <p className="text-sm font-semibold">{review.title}</p>
-                                ) : null}
-                                {review.isFeatured ? <Badge variant="gold">Featured</Badge> : null}
-                              </div>
-                              <p className="mt-2 whitespace-pre-line text-sm text-foreground/90">
-                                {review.text}
-                              </p>
-                              {/*
-                                The reviewer's own photos of what arrived.
-
-                                Only URLs this shop stored itself reach here: the
-                                submit endpoint is public, and an off-site image on
-                                a product page loads for every visitor and can be
-                                swapped for something else after a moderator has
-                                approved it.
-                              */}
-                              {review.photoUrls?.length ? (
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                  {review.photoUrls.map((url) => (
-                                    <a
-                                      key={url}
-                                      href={url}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="size-16 overflow-hidden rounded-md border border-border bg-muted"
+                      <div className="relative">
+                        <div
+                          ref={reviewRowRef}
+                          onScroll={measureReviewRow}
+                          className="flex snap-x gap-3 overflow-x-auto pb-2"
+                        >
+                          {reviews.map((review) => {
+                            const helpful = helpfulCounts[review.id] ?? review.helpfulCount ?? 0;
+                            const unhelpful =
+                              unhelpfulCounts[review.id] ?? review.unhelpfulCount ?? 0;
+                            const votedUp = helpfulMarks.includes(review.id);
+                            const votedDown = unhelpfulMarks.includes(review.id);
+                            return (
+                              <article
+                                key={review.id}
+                                className="flex w-[85%] max-w-sm shrink-0 snap-start flex-col rounded-xl bg-muted p-4 sm:w-80"
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <p className="flex min-w-0 items-center gap-2">
+                                    <span
+                                      className="inline-flex shrink-0 items-center gap-0.5 rounded bg-card px-1.5 py-0.5 text-xs font-semibold"
+                                      aria-label={`Rated ${review.rating} out of 5`}
                                     >
-                                      <OptimizedImage
-                                        src={url}
-                                        alt=""
-                                        width={64}
-                                        height={64}
-                                        className="size-full object-cover"
-                                      />
-                                    </a>
-                                  ))}
-                                </div>
-                              ) : null}
-                              {review.adminReply ? (
-                                <div className="mt-3 rounded-md bg-muted px-3 py-2 text-sm">
-                                  <p className="font-medium">Response from the shop</p>
-                                  <p className="mt-1 whitespace-pre-line text-muted-foreground">
-                                    {review.adminReply}
-                                  </p>
-                                </div>
-                              ) : null}
-                              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-                                <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                  <span className="font-medium text-foreground/80">{review.author}</span>
-                                  {/*
-                                    Shown only where the SERVER could match this
-                                    reviewer's signed-in account to an order of
-                                    this product that actually reached Delivered.
-                                    It is a statement that somebody in that city
-                                    bought this and received it — which is what
-                                    "Certified Buyer" claims — so nothing a
-                                    browser can type may reach it, and for most
-                                    reviews it is simply absent, which is the
-                                    honest answer.
-                                  */}
-                                  {review.deliveredCity ? (
-                                    <span className="inline-flex items-center gap-1">
-                                      <BadgeCheck aria-hidden="true" className="size-3.5 text-green-700" />
-                                      Certified Buyer, {review.deliveredCity}
+                                      {review.rating}
+                                      <span className={ratingTone(Math.round(review.rating)).star}>
+                                        ★
+                                      </span>
                                     </span>
-                                  ) : null}
-                                  <span>{formatRelativeTime(review.date)}</span>
+                                    {/*
+                                      The reviewer's own heading, or — as the
+                                      reference does when there is none — the
+                                      word for the score they gave.
+                                    */}
+                                    <span className="truncate text-sm font-semibold">
+                                      {review.title || ratingWord(review.rating)}
+                                    </span>
+                                  </p>
+                                  <span className="shrink-0 text-xs text-muted-foreground">
+                                    {formatRelativeTime(review.date)}
+                                  </span>
+                                </div>
+                                {review.isFeatured ? (
+                                  <Badge variant="gold" className="mt-2 w-fit">
+                                    Featured
+                                  </Badge>
+                                ) : null}
+                                <p className="mt-2 whitespace-pre-line text-sm text-foreground/90">
+                                  {review.text}
                                 </p>
                                 {/*
-                                  👍 and 👎 with their counts, as the shop's
-                                  reference shows them. One vote per review per
-                                  browser, and the one pressed stays lit.
+                                  The reviewer's own photos of what arrived.
 
-                                  A count appears only once somebody has pressed
-                                  it: "👎 0" reads as a verdict on the review.
-                                  And neither number moves a review up or down
-                                  the list — burying what somebody wrote is
-                                  moderation, done on the admin screen.
+                                  Only URLs this shop stored itself reach here: the
+                                  submit endpoint is public, and an off-site image on
+                                  a product page loads for every visitor and can be
+                                  swapped for something else after a moderator has
+                                  approved it.
                                 */}
-                                <span className="flex items-center gap-1">
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className={cn(
-                                      "h-7 gap-1 px-2 text-xs",
-                                      votedUp && "text-green-700 disabled:opacity-100",
-                                    )}
-                                    aria-label={votedUp ? "Marked helpful" : "Helpful"}
-                                    aria-pressed={votedUp}
-                                    disabled={votedUp || votedDown}
-                                    onClick={() => void handleHelpful(review)}
-                                  >
-                                    <ThumbsUp
-                                      aria-hidden="true"
-                                      className={cn("size-3.5", votedUp && "fill-current")}
-                                    />
-                                    {helpful > 0 ? groupIndian(helpful) : null}
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className={cn(
-                                      "h-7 gap-1 px-2 text-xs",
-                                      votedDown && "text-red-600 disabled:opacity-100",
-                                    )}
-                                    aria-label={votedDown ? "Marked not helpful" : "Not helpful"}
-                                    aria-pressed={votedDown}
-                                    disabled={votedUp || votedDown}
-                                    onClick={() => void handleUnhelpful(review)}
-                                  >
-                                    <ThumbsDown
-                                      aria-hidden="true"
-                                      className={cn("size-3.5", votedDown && "fill-current")}
-                                    />
-                                    {unhelpful > 0 ? groupIndian(unhelpful) : null}
-                                  </Button>
-                                </span>
-                              </div>
-                            </article>
-                          );
-                        })}
+                                {review.photoUrls?.length ? (
+                                  <div className="mt-3 flex flex-wrap gap-2">
+                                    {review.photoUrls.map((url) => (
+                                      <a
+                                        key={url}
+                                        href={url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="size-14 overflow-hidden rounded-md border border-border bg-card"
+                                      >
+                                        <OptimizedImage
+                                          src={url}
+                                          alt=""
+                                          width={56}
+                                          height={56}
+                                          className="size-full object-cover"
+                                        />
+                                      </a>
+                                    ))}
+                                  </div>
+                                ) : null}
+                                {review.adminReply ? (
+                                  <div className="mt-3 rounded-md bg-card px-3 py-2 text-xs">
+                                    <p className="font-medium">Response from the shop</p>
+                                    <p className="mt-1 whitespace-pre-line text-muted-foreground">
+                                      {review.adminReply}
+                                    </p>
+                                  </div>
+                                ) : null}
+                                <div className="mt-auto flex items-end justify-between gap-2 pt-3 text-xs text-muted-foreground">
+                                  <div className="min-w-0">
+                                    <p className="truncate font-medium text-foreground/80">
+                                      {review.author}
+                                    </p>
+                                    {/*
+                                      Shown only where the SERVER could match this
+                                      reviewer's signed-in account to an order of
+                                      this product that actually reached Delivered.
+                                      It is a statement that somebody in that city
+                                      bought this and received it — which is what
+                                      "Verified Buyer" claims — so nothing a
+                                      browser can type may reach it, and for most
+                                      reviews it is simply absent, which is the
+                                      honest answer.
+                                    */}
+                                    {review.deliveredCity ? (
+                                      <p className="mt-0.5 flex items-center gap-1">
+                                        <BadgeCheck
+                                          aria-hidden="true"
+                                          className="size-3.5 shrink-0 text-green-700"
+                                        />
+                                        <span className="truncate">
+                                          Verified Buyer, {review.deliveredCity}
+                                        </span>
+                                      </p>
+                                    ) : null}
+                                  </div>
+                                  {/*
+                                    👍 and 👎 with their counts, as the shop's
+                                    reference shows them. One vote per review per
+                                    browser, and the one pressed stays lit.
+
+                                    A count appears only once somebody has pressed
+                                    it: "👎 0" reads as a verdict on the review.
+                                    And neither number moves a review along the
+                                    row — burying what somebody wrote is
+                                    moderation, done on the admin screen.
+                                  */}
+                                  <span className="flex shrink-0 items-center">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className={cn(
+                                        "h-7 gap-1 px-1.5 text-xs",
+                                        votedUp && "text-green-700 disabled:opacity-100",
+                                      )}
+                                      aria-label={votedUp ? "Marked helpful" : "Helpful"}
+                                      aria-pressed={votedUp}
+                                      disabled={votedUp || votedDown}
+                                      onClick={() => void handleHelpful(review)}
+                                    >
+                                      <ThumbsUp
+                                        aria-hidden="true"
+                                        className={cn("size-3.5", votedUp && "fill-current")}
+                                      />
+                                      {helpful > 0 ? groupIndian(helpful) : null}
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className={cn(
+                                        "h-7 gap-1 px-1.5 text-xs",
+                                        votedDown && "text-red-600 disabled:opacity-100",
+                                      )}
+                                      aria-label={votedDown ? "Marked not helpful" : "Not helpful"}
+                                      aria-pressed={votedDown}
+                                      disabled={votedUp || votedDown}
+                                      onClick={() => void handleUnhelpful(review)}
+                                    >
+                                      <ThumbsDown
+                                        aria-hidden="true"
+                                        className={cn("size-3.5", votedDown && "fill-current")}
+                                      />
+                                      {unhelpful > 0 ? groupIndian(unhelpful) : null}
+                                    </Button>
+                                  </span>
+                                </div>
+                              </article>
+                            );
+                          })}
+                        </div>
+                        {/*
+                          The reference's arrow: one tap moves the row on by about a card.
+                          Gone once the row is at its end, or when every card already fits.
+                        */}
+                        {reviewRowMore ? (
+                          <button
+                            type="button"
+                            aria-label="More reviews"
+                            onClick={() =>
+                              reviewRowRef.current?.scrollBy({
+                                left: reviewRowRef.current.clientWidth * 0.85,
+                                behavior: "smooth",
+                              })
+                            }
+                            className="absolute top-1/2 right-1 flex size-10 -translate-y-1/2 items-center justify-center rounded-full bg-card text-foreground shadow-md"
+                          >
+                            <ChevronRight aria-hidden="true" className="size-5" />
+                          </button>
+                        ) : null}
                       </div>
                     )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      aria-expanded={reviewOpen}
+                      onClick={() => setReviewOpen((open) => !open)}
+                    >
+                      Rate Product
+                    </Button>
+                    {reviewOpen ? (
+                      <ProductReviewForm
+                        productSlug={cake.slug}
+                        cakeName={cake.name}
+                        onSubmitted={() => {
+                          setReviewOpen(false);
+                          // A new review is pending, so this re-read normally
+                          // comes back unchanged — which is the honest outcome.
+                          // It runs so that anything approved since the page
+                          // loaded appears.
+                          void getProductReviews(cake).then((next) => {
+                            if (next) setReviews(next);
+                          });
+                        }}
+                      />
+                    ) : null}
+                  </div>
+                </DetailSection>
+
+                {/*
+                  After the reviews, as in the reference. Closed, it says how
+                  many answered questions there are — or invites the first,
+                  which is true whether or not the list has loaded yet.
+                */}
+                <DetailSection
+                  id="questions"
+                  title="Questions and Answers"
+                  summary={
+                    questions.length > 0
+                      ? `${questions.length} answered ${questions.length === 1 ? "question" : "questions"}`
+                      : "Ask the shop about this product"
+                  }
+                >
+                  <div className="space-y-4">
+                    {questions.length > 0 ? (
+                      <div className="space-y-3">
+                        {questions.map((question) => (
+                          <article
+                            key={question.id}
+                            className="rounded-xl bg-muted p-4"
+                          >
+                            <p className="text-sm font-medium">Q: {question.message}</p>
+                            <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">
+                              A: {question.answer}
+                            </p>
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              Asked by {question.name}
+                              {question.answeredAt
+                                ? ` · answered ${formatRelativeTime(question.answeredAt)}`
+                                : ""}
+                            </p>
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Be the first to ask about this product
+                      </p>
+                    )}
+                    {/*
+                      Looks like the reference's "Ask a question" box, and opens
+                      the real form — which asks for a name and an email as well,
+                      so the shop has somewhere to send the answer.
+                    */}
+                    <button
+                      type="button"
+                      aria-expanded={askOpen}
+                      onClick={() => setAskOpen((open) => !open)}
+                      className="flex h-11 w-full items-center rounded-lg border border-border bg-card px-3 text-left text-sm text-muted-foreground transition-colors hover:border-foreground/30"
+                    >
+                      Ask a question
+                    </button>
+                    {askOpen ? (
+                      <ProductQuestionForm
+                        productSlug={cake.slug}
+                        productName={cake.name}
+                      />
+                    ) : null}
                   </div>
                 </DetailSection>
 

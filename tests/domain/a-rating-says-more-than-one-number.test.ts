@@ -147,7 +147,7 @@ describe("the shape of the ratings, not just their average", () => {
     // Four reviews: three fives and a one. 4.0, not the 4.2 stored on the
     // product — the bars and the number beside them come from the same rows.
     expect(summary).toContain("4");
-    expect(summary).toContain("4 Ratings & 4 Reviews");
+    expect(summary).toContain("based on 4 ratings");
     expect(summary).toContain("5 ★");
     expect(summary).toContain("1 ★");
   });
