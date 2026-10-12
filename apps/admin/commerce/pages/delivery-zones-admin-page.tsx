@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
   MapPin,
@@ -21,6 +21,7 @@ import {
   type DeliveryZoneListFilters,
 } from "@/types/delivery";
 import {
+  applyServerZones,
   deleteDeliveryZones,
   DELIVERY_ZONES_UPDATED_EVENT,
   filterDeliveryZones,
@@ -95,7 +96,18 @@ function exportZonesToCsv(zones: DeliveryZone[]): void {
   URL.revokeObjectURL(url);
 }
 
-export function DeliveryZonesAdminPage() {
+export function DeliveryZonesAdminPage({
+  initial = null,
+}: {
+  /** Every zone, read on the server; null fetches as before. */
+  initial?: DeliveryZone[] | null;
+} = {}) {
+  // Before this screen's mount read, so it finds the shop's zones — not this
+  // browser's old copy or the shipped demo ones — and the save gate open.
+  useLayoutEffect(() => {
+    if (initial) applyServerZones(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
+  }, []);
   const [mounted, setMounted] = useState(false);
   const [zones, setZones] = useState<DeliveryZone[]>([]);
   const [filters, setFilters] = useState<DeliveryZoneListFilters>(defaultDeliveryZoneFilters);

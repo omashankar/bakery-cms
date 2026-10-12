@@ -11,7 +11,10 @@ import {
   fetchWhatsAppTemplates,
   fetchNotificationSettings,
   fetchNotificationState,
+  type NotificationStatePayload,
 } from "./communications-api";
+import type { EmailTemplateRecord, WhatsAppTemplateRecord } from "@/types/communication";
+import type { NotificationSettings } from "@/types/notification";
 import { persistServerEmailTemplates } from "./email-templates-repository";
 import { persistServerWhatsAppTemplates } from "./whatsapp-templates-repository";
 import {
@@ -26,6 +29,27 @@ import {
  * shell where the session cookie is present. After hydration the local cache
  * matches the server, so admin mutations safely dual-write replace-all.
  */
+/**
+ * The four reads below as the SERVER made them for an admin page, applied
+ * without a request: each cache, then its gate — the end state
+ * `ensureCommunicationsHydrated` reaches, so it then has nothing to fetch.
+ */
+export function applyServerCommunications(read: {
+  email: EmailTemplateRecord[];
+  whatsapp: WhatsAppTemplateRecord[];
+  settings: NotificationSettings;
+  state: NotificationStatePayload;
+}): void {
+  persistServerEmailTemplates(read.email);
+  emailTemplatesHydration.markSettled();
+  persistServerWhatsAppTemplates(read.whatsapp);
+  whatsappTemplatesHydration.markSettled();
+  persistServerNotificationSettings(read.settings);
+  notificationSettingsHydration.markSettled();
+  persistServerNotificationState(read.state);
+  notificationStateHydration.markSettled();
+}
+
 export function useCommunicationsServerSync(): void {
   useEffect(() => {
     void ensureCommunicationsHydrated();

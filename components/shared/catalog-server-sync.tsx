@@ -70,6 +70,17 @@ export function CatalogServerSync() {
  *
  * Exported and pure so the rule can be tested without a browser.
  */
+/**
+ * The catalogue the SERVER read for an admin page, applied without a request:
+ * the same overlay, gate and status the sync above reaches, so screens that
+ * read the cache on mount find the shop's taxonomy, not the shipped seed.
+ */
+export function applyServerCatalog(server: Partial<CatalogStore>): void {
+  saveCatalogStore(overlayServerSections(loadCatalogStore(), server));
+  catalogHydration.markSettled();
+  setCatalogHydrationStatus("ready");
+}
+
 export function overlayServerSections(
   current: CatalogStore,
   server: Partial<CatalogStore>,

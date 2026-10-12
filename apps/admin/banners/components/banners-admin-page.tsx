@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import type { ServerContentRead } from "@/features/content/lib/content-api";
+import { applyServerBanners } from "@/features/content/lib/banners-repository";
 import { bannersWritable } from "@/features/content/lib/content-api";
 import {
   CalendarClock,
@@ -120,7 +122,19 @@ function BannerRowActions({
   );
 }
 
-export function BannersAdminPage() {
+export function BannersAdminPage({
+  initial = null,
+}: {
+  /** Every banners and its version, read on the server; null fetches as before. */
+  initial?: ServerContentRead<Banner[]> | null;
+} = {}) {
+  // Before this screen's passive effects, so its mount read finds the server's
+  // banners — not this browser's old copy or the shipped demo ones — and the
+  // write gate already open.
+  useLayoutEffect(() => {
+    if (initial) applyServerBanners(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
+  }, []);
   const [mounted, setMounted] = useState(false);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [filters, setFilters] = useState<BannerListFilters>(defaultBannerFilters);

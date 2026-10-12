@@ -105,6 +105,21 @@ async function guardedPut(path: string, body: unknown): Promise<boolean> {
 
 const url = (key: string) => `/api/site-layout/${key}`;
 
+/** A section the SERVER read for an admin page, and its version. */
+export interface ServerSiteLayoutRead<T> {
+  value: T;
+  version: number;
+}
+
+/**
+ * Record the version a section was read at by the server page, as `getJson`
+ * does for a fetch — without it the screen's next save carries no version and
+ * the server cannot refuse it for being composed against an older copy.
+ */
+export function rememberSiteLayoutVersion(key: string, version: number): void {
+  versions.set(url(key), version);
+}
+
 export const fetchSeoStore = () => getJson<SeoStore>(url("seo"));
 export const replaceSeoRequest = (store: SeoStore) => guardedSeoPut(url("seo"), store);
 

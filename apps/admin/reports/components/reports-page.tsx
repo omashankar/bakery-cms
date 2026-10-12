@@ -34,6 +34,7 @@ import {
 } from "@/features/orders/lib/orders-api";
 import { ORDERS_UPDATED_EVENT, isOrdersCacheRefill } from "@/features/orders/lib/orders";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
+import { DEFAULT_REPORT_RANGE } from "../lib/reports-defaults";
 
 const rangeOptions: Array<{ value: ReportDateRange; label: string }> = [
   { value: "7d", label: "Last 7 days" },
@@ -109,15 +110,22 @@ const LIST_ROWS = 6;
 const MAX_REFRESH_RETRIES = 4;
 const REFRESH_RETRY_BASE_MS = 5_000;
 
-export function ReportsPage() {
+export function ReportsPage({
+  initial = null,
+}: {
+  /** The default range's analytics, read on the server; null fetches as before. */
+  initial?: OrderAnalyticsResponse | null;
+} = {}) {
   const labels = useBusinessLabels();
-  const [range, setRange] = useState<ReportDateRange>("30d");
-  const [analytics, setAnalytics] = useState<OrderAnalyticsResponse | null>(null);
+  const [range, setRange] = useState<ReportDateRange>(DEFAULT_REPORT_RANGE);
+  const [analytics, setAnalytics] = useState<OrderAnalyticsResponse | null>(initial);
   const [failed, setFailed] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const attempts = useRef(0);
   /** Which range `attempts` is counting for — changing range starts over. */
   const loadedRange = useRef<ReportDateRange | null>(null);
+  // The server answered the default range; its first request would repeat it.
+  const analyticsFromServer = useRef(Boolean(initial));
 
   // Every figure here is a total over the whole range, so it is computed on the
   // server across every matching order. Computing it in the browser meant
@@ -155,7 +163,12 @@ export function ReportsPage() {
       }
     }
 
-    void load();
+    if (analyticsFromServer.current) {
+      analyticsFromServer.current = false;
+      loadedRange.current = range;
+    } else {
+      void load();
+    }
     // Not for a cache refill: the figures are computed on the SERVER, and
     // copying the server's orders into this browser changes none of them. The
     // refill announced itself twice on entry, so every visit asked for the same
@@ -680,7 +693,12 @@ export function ReportsPage() {
                           <td className="py-2.5 pr-3 text-xs capitalize text-muted-foreground">
                             {order.paymentMethod}
                           </td>
-                          <td className="py-2.5 pr-3 whitespace-nowrap text-muted-foreground">
+                          {/* "4m ago" reads the clock, which moves between the
+                              server's render and hydration. */}
+                          <td
+                            className="py-2.5 pr-3 whitespace-nowrap text-muted-foreground"
+                            suppressHydrationWarning
+                          >
                             {formatRelativeTime(order.placedAt)}
                           </td>
                           <td className="py-2.5 text-right font-semibold">
@@ -703,7 +721,10 @@ export function ReportsPage() {
                           <p className="truncate text-sm font-medium text-foreground">
                             {order.orderNumber}
                           </p>
-                          <p className="truncate text-xs text-muted-foreground">
+                          <p
+                            className="truncate text-xs text-muted-foreground"
+                            suppressHydrationWarning
+                          >
                             {order.address.fullName} · {formatRelativeTime(order.placedAt)}
                           </p>
                           <div className="mt-1.5">

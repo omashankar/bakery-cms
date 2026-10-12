@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { applyServerCatalog } from "@/components/shared/catalog-server-sync";
 import {
   Palette,
   Pencil,
@@ -102,7 +103,18 @@ function tabBarFor(
   ];
 }
 
-export function CatalogAdminPage() {
+export function CatalogAdminPage({
+  initial = null,
+}: {
+  /** The taxonomy, read on the server; null waits for the sync as before. */
+  initial?: Partial<CatalogStore> | null;
+} = {}) {
+  // Before this screen's mount effects, so they find the shop's taxonomy and
+  // the status already "ready" — no loading panel, no seed.
+  useLayoutEffect(() => {
+    if (initial) applyServerCatalog(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
+  }, []);
   const labels = useBusinessLabels();
   const [mounted, setMounted] = useState(false);
   const tabs = tabsFor(labels);

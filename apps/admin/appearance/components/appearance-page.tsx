@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useLayoutEffect, useMemo } from "react";
 import { Check } from "lucide-react";
 import { toast } from "sonner";
 import { reportWrite } from "@/apps/admin/lib/report-write";
@@ -15,7 +15,10 @@ import type { AppearanceSettings } from "@/types/appearance";
 import { SettingsSectionShell } from "@/apps/admin/settings/components/settings-section-shell";
 import { useHydratedForm } from "@/features/settings/lib/use-hydrated-form";
 import { siteLayoutHydration } from "@/features/site-layout/lib/site-layout-api";
-import { ensureSiteLayoutHydrated } from "@/components/shared/site-layout-server-sync";
+import {
+  applyServerSiteLayout,
+  ensureSiteLayoutHydrated,
+} from "@/components/shared/site-layout-server-sync";
 import { SettingsHydrationNotice } from "@/apps/admin/settings/components/settings-field-error";
 import {
   loadAppearanceSettings,
@@ -63,7 +66,18 @@ const COLOR_FIELDS = [
   { key: "surfaceColor" as const, label: "Surface colour", hint: "Soft backgrounds and panels" },
 ];
 
-export function AppearancePage() {
+export function AppearancePage({
+  initial = null,
+}: {
+  /** Header, footer and appearance with versions, read on the server. */
+  initial?: Parameters<typeof applyServerSiteLayout>[0] | null;
+} = {}) {
+  // Before the form's own hydration effect, so it finds the gate open and the
+  // server's copy in the cache instead of asking for all three again.
+  useLayoutEffect(() => {
+    if (initial) applyServerSiteLayout(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
+  }, []);
   const labels = useBusinessLabels();
   // The shared hydrated form. This page hand-rolled it: a one-shot `[]`-dep
   // effect read localStorage on mount and declared the form ready in the same

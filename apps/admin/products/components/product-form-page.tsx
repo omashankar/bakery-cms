@@ -4,7 +4,10 @@ import { useSeoServerSync } from "@/features/seo/lib/use-seo-server-sync";
 import Link from "next/link";
 import { PhotoField } from "@/apps/admin/media/components/photo-field";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
+import { applyServerCatalog } from "@/components/shared/catalog-server-sync";
+import { applyServerSeo } from "@/features/site-layout/lib/site-layout-hydration";
+import type { CatalogStore } from "@/types/catalog";
 import { ExternalLink, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -82,6 +85,10 @@ interface ProductFormPageProps {
   cakeId?: string;
   /** The product, read on the server; null fetches it as before. */
   initialProduct?: Product | null;
+  /** The taxonomy the pickers offer, read on the server. */
+  initialCatalog?: Partial<CatalogStore> | null;
+  /** The SEO store the search preview reads, and its version. */
+  initialSeo?: Parameters<typeof applyServerSeo>[0] | null;
 }
 
 /**
@@ -112,9 +119,22 @@ function formDataOf(product: Product): ProductFormData {
   return data;
 }
 
-export function ProductFormPage({ mode, cakeId, initialProduct = null }: ProductFormPageProps) {
+export function ProductFormPage({
+  mode,
+  cakeId,
+  initialProduct = null,
+  initialCatalog = null,
+  initialSeo = null,
+}: ProductFormPageProps) {
+  // Before the mount effects below, so the pickers read the shop's taxonomy
+  // and the preview the shop's SEO store, without asking for either.
+  useLayoutEffect(() => {
+    if (initialCatalog) applyServerCatalog(initialCatalog);
+    if (initialSeo) applyServerSeo(initialSeo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
+  }, []);
   // The search-preview domain reads the SEO store; the layout no longer loads it.
-  useSeoServerSync();
+  useSeoServerSync(!initialSeo);
   const router = useRouter();
   const loadedFromServer = mode === "edit" && initialProduct ? formDataOf(initialProduct) : null;
   const [form, setForm] = useState<ProductFormData>(() => loadedFromServer ?? createEmptyProductForm());

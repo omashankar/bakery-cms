@@ -10,8 +10,12 @@ import { persistServerSeo } from "./seo-repository";
  * once on entering the admin, so SEO edits are durable and visible across
  * devices. Admin mutations dual-write the whole store back to the server.
  */
-export function useSeoServerSync(): void {
+export function useSeoServerSync(
+  /** False when the page already applied the server's store (`applyServerSeo`). */
+  eager = true,
+): void {
   useEffect(() => {
+    if (!eager) return;
     let cancelled = false;
 
     (async () => {
@@ -25,5 +29,5 @@ export function useSeoServerSync(): void {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [eager]);
 }

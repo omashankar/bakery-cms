@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { Copy, Mail, Trash2, UserCheck, UserX, Users } from "lucide-react";
 import { toast } from "sonner";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
@@ -40,11 +40,27 @@ import {
   type NewsletterFilters,
 } from "@/features/inquiries/lib/newsletter-repository";
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
-import { useNewsletterServerSync } from "@/features/inquiries/lib/use-newsletter-server-sync";
+import {
+  applyServerSubscribers,
+  useNewsletterServerSync,
+} from "@/features/inquiries/lib/use-newsletter-server-sync";
 
 const PAGE_SIZE = 12;
 
-export function NewsletterSubscribersPage({ embedded = false }: { embedded?: boolean } = {}) {
+export function NewsletterSubscribersPage({
+  embedded = false,
+  initial = null,
+}: {
+  embedded?: boolean;
+  /** Every subscriber, read on the server; null fetches as before. */
+  initial?: NewsletterSubscriber[] | null;
+} = {}) {
+  // Before the sync below and this screen's mount read, so both find the
+  // server's subscribers already in the cache.
+  useLayoutEffect(() => {
+    if (initial) applyServerSubscribers(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
+  }, []);
   /**
    * This screen's own data, asked for NOW.
    *

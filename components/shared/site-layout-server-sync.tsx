@@ -3,6 +3,8 @@
 import { useEffect } from "react";
 
 import {
+  rememberSiteLayoutVersion,
+  type ServerSiteLayoutRead,
   siteLayoutHydration,
   fetchHeaderSettings,
   fetchFooterSettings,
@@ -12,6 +14,27 @@ import { persistServerHeader } from "@/features/site-layout/lib/header-repositor
 import { persistServerFooter } from "@/features/site-layout/lib/footer-repository";
 import { persistServerAppearance } from "@/features/site-layout/lib/appearance-repository";
 import { shareHydration } from "@/lib/hydrate-once";
+import type { HeaderSettings, FooterSettings } from "@/types/site-layout";
+import type { AppearanceSettings } from "@/types/appearance";
+
+/**
+ * Header, footer and appearance as the SERVER read them for an admin page,
+ * applied without a request: each version, each cache, then the gate — the
+ * same end state `readSiteLayout` reaches, so the batch below is skipped.
+ */
+export function applyServerSiteLayout(read: {
+  header: ServerSiteLayoutRead<HeaderSettings>;
+  footer: ServerSiteLayoutRead<FooterSettings>;
+  appearance: ServerSiteLayoutRead<AppearanceSettings>;
+}): void {
+  rememberSiteLayoutVersion("header", read.header.version);
+  rememberSiteLayoutVersion("footer", read.footer.version);
+  rememberSiteLayoutVersion("appearance", read.appearance.version);
+  persistServerHeader(read.header.value);
+  persistServerFooter(read.footer.value);
+  persistServerAppearance(read.appearance.value);
+  siteLayoutHydration.markSettled();
+}
 
 /**
  * Hydrates header + footer settings from the server once on mount, so the

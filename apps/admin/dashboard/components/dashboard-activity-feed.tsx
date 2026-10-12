@@ -10,16 +10,23 @@ import { routes } from "@/constants/routes";
 import { formatRelativeTime } from "@/utils/format";
 import { fetchAuditLogs } from "@/features/audit/lib/audit-api";
 import { auditToActivity } from "@/features/audit/lib/audit-activity";
+import type { AuditLogEntry } from "@/types/audit";
+import { DASHBOARD_FEED_LIMIT } from "../lib/dashboard-defaults";
 import {
   formatActivityEntry,
   getDashboardActivities,
   type DashboardActivityItem,
 } from "../lib/dashboard-data";
 
-const FEED_LIMIT = 5;
-
-export function DashboardActivityFeed() {
-  const [activities, setActivities] = useState<DashboardActivityItem[]>([]);
+export function DashboardActivityFeed({
+  initial = null,
+}: {
+  /** The audit trail's newest entries, read on the server; null fetches as before. */
+  initial?: AuditLogEntry[] | null;
+} = {}) {
+  const [activities, setActivities] = useState<DashboardActivityItem[]>(() =>
+    initial ? initial.map((entry) => formatActivityEntry(auditToActivity(entry))) : [],
+  );
   /**
    * Whether the first effect has run.
    *
@@ -29,19 +36,21 @@ export function DashboardActivityFeed() {
    * where the browser-held store is empty, and seeding from it would be a
    * hydration mismatch.
    */
-  const [loaded, setLoaded] = useState(false);
+  const [loaded, setLoaded] = useState(Boolean(initial));
 
   useEffect(() => {
+    // The server already read the durable trail for this page.
+    if (initial) return;
     let cancelled = false;
 
     // Show the local log first so the card is never blank while the request is
     // in flight, then replace it with the server's durable trail. The local log
     // only records what this browser did; the audit trail spans every device.
-    setActivities(getDashboardActivities().slice(0, FEED_LIMIT));
+    setActivities(getDashboardActivities().slice(0, DASHBOARD_FEED_LIMIT));
     setLoaded(true);
 
     (async () => {
-      const result = await fetchAuditLogs({ limit: FEED_LIMIT });
+      const result = await fetchAuditLogs({ limit: DASHBOARD_FEED_LIMIT });
       if (cancelled || !result) return;
       setActivities(result.items.map((entry) => formatActivityEntry(auditToActivity(entry))));
     })();
@@ -49,6 +58,7 @@ export function DashboardActivityFeed() {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
   }, []);
 
   return (
@@ -84,7 +94,12 @@ export function DashboardActivityFeed() {
                 <span className="mt-1 size-1.5 shrink-0 rounded-full bg-primary" />
                 <div className="min-w-0 flex-1">
                   <p className="text-xs leading-relaxed text-foreground">{activity.message}</p>
-                  <p className="mt-0.5 text-[11px] capitalize text-muted-foreground">
+                  {/* "4m ago" is computed from the clock, which moves between the
+                      server's render and hydration. */}
+                  <p
+                    className="mt-0.5 text-[11px] capitalize text-muted-foreground"
+                    suppressHydrationWarning
+                  >
                     {activity.entity} · {formatRelativeTime(activity.timestamp)}
                   </p>
                 </div>

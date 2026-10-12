@@ -220,6 +220,15 @@ export function persistServerCoupons(coupons: StoredCoupon[]): void {
   lowWriteCoupons(coupons);
 }
 
+/**
+ * The coupons the SERVER read for an admin page — every code, as staff see
+ * them — applied without a request: the cache, then the gate a save waits on.
+ */
+export function applyServerCoupons(coupons: StoredCoupon[]): void {
+  persistServerCoupons(coupons);
+  couponsHydration.markSettled();
+}
+
 export function loadCoupons(): StoredCoupon[] {
   return readCoupons();
 }

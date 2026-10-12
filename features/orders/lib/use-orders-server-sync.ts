@@ -11,8 +11,12 @@ import { markOrdersSyncSettled, persistServerOrders } from "./orders";
  * the admin sees every order (including those placed on other devices). The
  * server is the source of truth; every placement/change still dual-writes to it.
  */
-export function useOrdersServerSync(): void {
+export function useOrdersServerSync(
+  /** False when the caller already has what it shows; the layout still fills the cache. */
+  eager = true,
+): void {
   useEffect(() => {
+    if (!eager) return;
     // Keyed, not cancelled: the dashboard and the notifications screen both
     // mount this for themselves rather than waiting out the layout's deferral,
     // and the later caller joins this read instead of issuing another.
@@ -23,5 +27,5 @@ export function useOrdersServerSync(): void {
       // fall back to the cache rather than showing a spinner forever.
       markOrdersSyncSettled();
     });
-  }, []);
+  }, [eager]);
 }

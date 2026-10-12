@@ -39,6 +39,31 @@ export function onContentConflict<T>(path: string, persistServer: (items: T) => 
   conflictSinks.set(path, persistServer as (items: unknown) => void);
 }
 
+/** A collection the SERVER read for an admin page, and its version. */
+export interface ServerContentRead<T> {
+  items: T;
+  version: number;
+}
+
+/**
+ * Apply a collection the server read with the page, as if `getJson` had just
+ * fetched it as an admin: the version a save must carry, the cache, and both
+ * gates — an admin page's read is the complete collection, so it is writable.
+ * The cache is written before the gates open, so nothing waiting on them reads
+ * the old copy.
+ */
+export function applyServerContent<T>(
+  path: string,
+  read: ServerContentRead<T>,
+  gates: { loaded: { markSettled: () => void }; writable: { markSettled: () => void } },
+  persistServer: (items: T) => void,
+): void {
+  versions.set(path, read.version);
+  persistServer(read.items);
+  gates.loaded.markSettled();
+  gates.writable.markSettled();
+}
+
 /** A read, and whether it was the complete collection or a visitor's subset. */
 export interface ContentRead<T> {
   items: T;

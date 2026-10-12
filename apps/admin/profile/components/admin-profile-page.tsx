@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   BadgeCheck,
   CalendarClock,
@@ -22,7 +22,10 @@ import {
 } from "@/features/auth/lib/admin-profile";
 import { useHydratedForm } from "@/features/settings/lib/use-hydrated-form";
 import { adminConfigHydration } from "@/features/admin-config/lib/admin-config-api";
-import { ensureAdminConfigHydrated } from "@/features/admin-config/lib/admin-config-hydration";
+import {
+  applyServerAdminConfig,
+  ensureAdminConfigHydrated,
+} from "@/features/admin-config/lib/admin-config-hydration";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -57,7 +60,17 @@ function initials(name: string) {
   return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
 }
 
-export function AdminProfilePage() {
+export function AdminProfilePage({
+  initial = null,
+}: {
+  /** The admin config blobs and account, read on the server; null fetches as before. */
+  initial?: Parameters<typeof applyServerAdminConfig>[0] | null;
+} = {}) {
+  // Before the form's own hydration effect, so it finds the gate open.
+  useLayoutEffect(() => {
+    if (initial) applyServerAdminConfig(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
+  }, []);
   // The shared hydrated form. This page read `getAdminProfile()` once on mount
   // with no gate — and that read DERIVES a placeholder profile from the signed-in
   // email when the local blob is absent, which on a hard load it is. Saving is a

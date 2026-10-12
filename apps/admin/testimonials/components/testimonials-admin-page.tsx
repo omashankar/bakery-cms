@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import type { ServerContentRead } from "@/features/content/lib/content-api";
+import { applyServerTestimonials } from "@/features/content/lib/testimonials-repository";
 import { testimonialsWritable } from "@/features/content/lib/content-api";
 import {
   Archive,
@@ -94,7 +96,19 @@ function TestimonialRowActions({
   );
 }
 
-export function TestimonialsAdminPage() {
+export function TestimonialsAdminPage({
+  initial = null,
+}: {
+  /** Every testimonials and its version, read on the server; null fetches as before. */
+  initial?: ServerContentRead<Testimonial[]> | null;
+} = {}) {
+  // Before this screen's passive effects, so its mount read finds the server's
+  // testimonials — not this browser's old copy or the shipped demo ones — and the
+  // write gate already open.
+  useLayoutEffect(() => {
+    if (initial) applyServerTestimonials(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
+  }, []);
   const [mounted, setMounted] = useState(false);
   const [items, setItems] = useState<Testimonial[]>([]);
   const [filters, setFilters] = useState<TestimonialListFilters>(defaultTestimonialFilters);

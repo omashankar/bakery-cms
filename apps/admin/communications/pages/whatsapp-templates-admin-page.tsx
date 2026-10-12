@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { applyServerCommunications } from "@/apps/admin/communications/lib/use-communications-server-sync";
 import {
   CheckCircle2,
   Eye,
@@ -71,7 +72,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { WhatsAppTemplateRecord } from "@/types/communication";
-import type { MetaTemplateSummary } from "@/types/whatsapp-provider";
+import type { MetaTemplateSummary, WhatsAppConnectionStatus } from "@/types/whatsapp-provider";
 import { cn } from "@/lib/utils";
 
 /**
@@ -94,7 +95,21 @@ function isEdited(
   return strip(a) !== strip(b);
 }
 
-export function WhatsAppTemplatesAdminPage() {
+export function WhatsAppTemplatesAdminPage({
+  initial = null,
+  initialConnection = null,
+}: {
+  /** Templates and notification settings, read on the server; null fetches as before. */
+  initial?: Parameters<typeof applyServerCommunications>[0] | null;
+  /** The stored WhatsApp connection, read on the server; null fetches as before. */
+  initialConnection?: WhatsAppConnectionStatus | null;
+} = {}) {
+  // Before this screen's mount effect, so `ensureCommunicationsHydrated` finds
+  // every gate settled and the server's copies in the caches.
+  useLayoutEffect(() => {
+    if (initial) applyServerCommunications(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
+  }, []);
   const [mounted, setMounted] = useState(false);
   // Real hydration, not "has this component rendered". The form used to be
   // fully editable over the DEMO SEED that `loadWhatsAppTemplates` plants when the
@@ -141,7 +156,11 @@ export function WhatsAppTemplatesAdminPage() {
     configured: boolean;
     enabled: boolean;
     displayName?: string;
-  } | null>(null);
+  } | null>(() =>
+    initialConnection
+      ? { configured: initialConnection.configured, enabled: initialConnection.enabled }
+      : null,
+  );
   const [previewOpen, setPreviewOpen] = useState(false);
   const [testSendOpen, setTestSendOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -587,6 +606,7 @@ export function WhatsAppTemplatesAdminPage() {
         the actual stored state, and offers the fields that change it.
       */}
       <WhatsAppConnectionCard
+        initial={initialConnection}
         onStatus={setConnection}
         onSynced={(summary) => {
           setMetaTemplates(summary?.available ?? []);

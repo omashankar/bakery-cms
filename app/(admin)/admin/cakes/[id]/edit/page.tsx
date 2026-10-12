@@ -3,6 +3,8 @@ import { getServerLabels } from "@/features/settings/server/labels.server";
 import { ProductFormPage } from "@/apps/admin/products/components/product-form-page";
 import { whenAdmin } from "@/lib/server/auth/admin-initial";
 import { getProductById } from "@/features/products/data/products-service";
+import { getCatalog } from "@/features/catalog/server/catalog.service";
+import { readSeoForAdmin } from "@/features/site-layout/server/site-layout.initial";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -23,6 +25,21 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default async function Page({ params }: PageProps) {
   const { id } = await params;
-  const initialProduct = await whenAdmin(() => getProductById(id));
-  return <ProductFormPage mode="edit" cakeId={id} initialProduct={initialProduct} />;
+  // With the taxonomy the pickers offer and the SEO store the preview reads.
+  const [initialProduct, initial] = await Promise.all([
+    whenAdmin(() => getProductById(id)),
+    whenAdmin(async () => {
+      const [catalog, seo] = await Promise.all([getCatalog(), readSeoForAdmin()]);
+      return JSON.parse(JSON.stringify({ catalog, seo }));
+    }),
+  ]);
+  return (
+    <ProductFormPage
+      mode="edit"
+      cakeId={id}
+      initialProduct={initialProduct}
+      initialCatalog={initial?.catalog ?? null}
+      initialSeo={initial?.seo ?? null}
+    />
+  );
 }

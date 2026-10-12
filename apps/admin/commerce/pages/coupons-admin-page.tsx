@@ -2,7 +2,7 @@
 
 import { hasExpired } from "@/lib/expiry-date";
 import { formatCurrency, formatDate } from "@/utils/format";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { Pencil, Plus, RotateCcw, Tag, Trash2 } from "lucide-react";
 import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
@@ -22,7 +22,7 @@ import {
   type StoredCoupon,
 } from "@/features/commerce/lib/coupons-repository";
 import { CouponFormDialog } from "../components/coupon-form-dialog";
-import { COUPONS_UPDATED_EVENT } from "@/features/commerce/lib/coupons-repository";
+import { applyServerCoupons, COUPONS_UPDATED_EVENT } from "@/features/commerce/lib/coupons-repository";
 import { adminCategories } from "@/features/products/lib/catalog-options";
 
 const PAGE_SIZE = 10;
@@ -42,7 +42,18 @@ function scopeOf(coupon: StoredCoupon): string {
   return ids.map((id) => names.get(id) ?? "a deleted category").join(", ");
 }
 
-export function CouponsAdminPage() {
+export function CouponsAdminPage({
+  initial = null,
+}: {
+  /** Every coupon, read on the server; null fetches as before. */
+  initial?: StoredCoupon[] | null;
+} = {}) {
+  // Before this screen's mount read, so it finds the shop's coupons — not this
+  // browser's old copy or the shipped demo codes — and the save gate open.
+  useLayoutEffect(() => {
+    if (initial) applyServerCoupons(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
+  }, []);
   const [mounted, setMounted] = useState(false);
   const [coupons, setCoupons] = useState<StoredCoupon[]>([]);
   const [formOpen, setFormOpen] = useState(false);

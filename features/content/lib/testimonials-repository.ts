@@ -6,7 +6,9 @@ import { testimonials as seedTestimonials } from "@/constants/landing-data";
 import { fixBrokenImageUrl } from "@/constants/demo-images";
 import {
   TESTIMONIALS_PATH,
+  applyServerContent,
   onContentConflict,
+  type ServerContentRead,
   testimonialsLoaded,
   testimonialsWritable,
   fetchTestimonials,
@@ -83,6 +85,14 @@ export function persistServerTestimonials(items: Testimonial[]): void {
 // A refused save replaces this tab's stale copy with the server's; see
 // `onContentConflict`.
 onContentConflict(TESTIMONIALS_PATH, persistServerTestimonials);
+
+/**
+ * The testimonials the SERVER read for this page, applied without a request — see
+ * `applyServerContent`.
+ */
+export function applyServerTestimonials(read: ServerContentRead<Testimonial[]>): void {
+  applyServerContent(TESTIMONIALS_PATH, read, { loaded: testimonialsLoaded, writable: testimonialsWritable }, persistServerTestimonials);
+}
 
 function normalizeTestimonials(items: Testimonial[]): {
   items: Testimonial[];

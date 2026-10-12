@@ -96,6 +96,15 @@ export function persistServerZones(zones: DeliveryZone[]): void {
   lowPersist(zones);
 }
 
+/**
+ * The zones the SERVER read for an admin page — switched-off ones included —
+ * applied without a request: the cache, then the gate a save waits on.
+ */
+export function applyServerZones(zones: DeliveryZone[]): void {
+  persistServerZones(zones);
+  zonesHydration.markSettled();
+}
+
 export function seedZones(): DeliveryZone[] {
   const timestamp = nowIso();
   return [

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { applyServerCommunications } from "@/apps/admin/communications/lib/use-communications-server-sync";
 import {
   AlertTriangle,
   Bell,
@@ -107,7 +108,18 @@ function buildPreferenceItems(labels: { productWordPlural: string }) {
   ];
 }
 
-export function NotificationsAdminPage() {
+export function NotificationsAdminPage({
+  initial = null,
+}: {
+  /** Templates and notification settings, read on the server; null fetches as before. */
+  initial?: Parameters<typeof applyServerCommunications>[0] | null;
+} = {}) {
+  // Before this screen's mount effect, so `ensureCommunicationsHydrated` finds
+  // every gate settled and the server's copies in the caches.
+  useLayoutEffect(() => {
+    if (initial) applyServerCommunications(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
+  }, []);
   const labels = useBusinessLabels();
   const preferenceItems = buildPreferenceItems(labels);
   /**
