@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowLeft, FileText, Mail, Printer } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/lazy-toast";
 import { canViewOrder, readOrderLookupEmail } from "@/features/orders/lib/order-access";
 import { getCustomerSession } from "@/apps/website/account/lib/customer-session";
 import { emailInvoiceRequest, fetchOrderByNumber } from "@/features/orders/lib/orders-api";

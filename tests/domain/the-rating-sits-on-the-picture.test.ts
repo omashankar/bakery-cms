@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readSource } from "../renderer-source";
 
 /**
  * WHERE THE RATING GOES, AND WHO GETS A HEART.
@@ -15,7 +14,7 @@ import { join } from "node:path";
  * in the price row still renders, and a heart back on the homepage still
  * works. So they are pinned here.
  */
-const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+const read = (path: string) => readSource(path);
 
 const CARD = "components/storefront/product-card.tsx";
 const RENDERER = "features/cms-sections/homepage-section-renderer.tsx";
@@ -90,8 +89,10 @@ describe("the wishlist heart", () => {
     expect(src, "the heart stopped defaulting to shown").toMatch(
       /showWishlist = true/,
     );
+    // The heart is its own client component, so the card can be drawn on the
+    // server; it is still only drawn when the row asked for it.
     expect(src, "the heart is drawn whatever the row asked for").toMatch(
-      /\{showWishlist \? \(/,
+      /\{showWishlist \? <ProductCardWishlist /,
     );
   });
 

@@ -8,7 +8,7 @@ import {
   EMPTY_CHECKOUT_ADDRESS,
   type CheckoutAddress,
 } from "@/features/orders/lib/checkout-draft";
-import { toast } from "sonner";
+import { toast } from "@/lib/lazy-toast";
 import { AccountShell } from "@/apps/website/account/components/account-shell";
 import { useCustomerAuth } from "@/apps/website/account/hooks/use-customer-auth";
 import {

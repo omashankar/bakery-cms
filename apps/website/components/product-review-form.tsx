@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/lazy-toast";
 import { StarRating } from "@/components/shared/star-rating";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

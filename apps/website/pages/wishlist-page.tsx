@@ -8,7 +8,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { StaggerReveal } from "@/components/shared/scroll-reveal";
 import { Button } from "@/components/ui/button";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
-import { toast } from "sonner";
+import { toast } from "@/lib/lazy-toast";
 import { getWishlistSlugs, pruneWishlist } from "@/apps/website/lib/wishlist";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { routes } from "@/constants/routes";

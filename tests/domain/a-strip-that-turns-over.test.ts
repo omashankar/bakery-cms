@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readSource } from "../renderer-source";
 
 import {
   BANNER_STRIP_MAX,
@@ -16,7 +15,7 @@ import {
  * moves on its own has to: a way to stop it, and silence for a visitor whose
  * system asks for less movement.
  */
-const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+const read = (path: string) => readSource(path);
 
 const RENDERER = "features/cms-sections/homepage-section-renderer.tsx";
 

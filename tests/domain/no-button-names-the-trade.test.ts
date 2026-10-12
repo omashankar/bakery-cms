@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 
 import { HOMEPAGE_SECTION_REGISTRY } from "@/constants/section-registry";
 import type { SectionFieldDef } from "@/types/homepage-builder";
+import { readSource } from "../renderer-source";
 
 /**
  * NO BUTTON ON THE HOMEPAGE NAMES THE TRADE.
@@ -21,7 +20,7 @@ import type { SectionFieldDef } from "@/types/homepage-builder";
  * A LABEL A SHOP TYPED ITSELF IS NOT IN SCOPE. This is only about wording the
  * software puts there when nobody has said anything.
  */
-const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+const read = (path: string) => readSource(path);
 
 const RENDERER = "features/cms-sections/homepage-section-renderer.tsx";
 
@@ -177,8 +176,10 @@ describe("no button on the homepage names the trade", () => {
     const file = codeOf(read(RENDERER));
     const from = file.indexOf("function ViewAllLink(");
     expect(from, "ViewAllLink is gone").toBeGreaterThan(-1);
-    const next = file.indexOf("\nfunction ", from + 10);
-    const link = file.slice(from, next < 0 ? file.length : next);
+    // To the next declaration, exported or not — the pill is exported from
+    // `section-parts.tsx` now, and so is what follows it.
+    const after = file.slice(from + 10).search(/\n(?:export )?function /);
+    const link = file.slice(from, after < 0 ? file.length : from + 10 + after);
 
     expect(link, "the pill draws itself when the shop named nothing").toContain(
       "if (!href || !label) return null;",

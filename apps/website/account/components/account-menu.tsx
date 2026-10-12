@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LogOut, MapPin, Package, User } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/lazy-toast";
 import {
   DropdownMenu,
   DropdownMenuContent,

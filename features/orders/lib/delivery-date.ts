@@ -300,6 +300,33 @@ export function sameDayCutoffFor(cutoff: string | undefined, leadDays: number): 
 }
 
 /**
+ * One formatter per zone, kept. The homepage countdown asks for the shop's
+ * clock once a second, and a fresh `Intl.DateTimeFormat` each time was a
+ * measurable slice of a phone's main thread while the page was loading.
+ * Constructing it is also what throws on an unusable zone, so a bad zone is
+ * never cached and still falls through to the visitor's clock below.
+ */
+const shopClockFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function shopClockFormatter(timezone: string): Intl.DateTimeFormat {
+  let formatter = shopClockFormatters.get(timezone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-GB", {
+      timeZone: timezone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    shopClockFormatters.set(timezone, formatter);
+  }
+  return formatter;
+}
+
+/**
  * `new Date()` as the SHOP'S clock reads it, not the visitor's.
  *
  * "14:00" means 14:00 where the shop is. Run on the browser's clock, somebody
@@ -327,16 +354,7 @@ export function sameDayCutoffFor(cutoff: string | undefined, leadDays: number): 
  */
 export function shopClockNow(timezone: string, now: Date = new Date()): Date {
   try {
-    const parts = new Intl.DateTimeFormat("en-GB", {
-      timeZone: timezone,
-      hourCycle: "h23",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    }).formatToParts(now);
+    const parts = shopClockFormatter(timezone).formatToParts(now);
 
     const read = (type: Intl.DateTimeFormatPartTypes) =>
       Number(parts.find((part) => part.type === type)?.value);

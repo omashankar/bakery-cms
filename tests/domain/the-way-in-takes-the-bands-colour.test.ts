@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readSource } from "../renderer-source";
 
 /**
  * THE VIEW-ALL PILL TAKES THE BAND'S OWN COLOUR.
@@ -15,7 +14,7 @@ import { join } from "node:path";
  * over its own untinted rows.
  */
 const N = String.fromCharCode(10);
-const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+const read = (path: string) => readSource(path);
 
 const codeOf = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");

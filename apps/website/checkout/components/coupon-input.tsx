@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Loader2, Tag as TagIcon } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/lazy-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {

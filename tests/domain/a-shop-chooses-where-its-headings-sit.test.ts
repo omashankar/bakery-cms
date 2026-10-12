@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 
 import { HOMEPAGE_SECTION_REGISTRY } from "@/constants/section-registry";
 import { sectionAlignOf } from "@/features/cms-sections/lib/section-utils";
+import { readSource } from "../renderer-source";
 
 /**
  * WHERE A SECTION'S HEADING SITS — left, centre or right, the shop's choice.
@@ -26,7 +25,7 @@ import { sectionAlignOf } from "@/features/cms-sections/lib/section-utils";
  * tests/e2e/a-shop-chooses-where-its-headings-sit.spec.ts; this file holds the
  * wiring that lets them be measured at all.
  */
-const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+const read = (path: string) => readSource(path);
 
 const RENDERER = "features/cms-sections/homepage-section-renderer.tsx";
 

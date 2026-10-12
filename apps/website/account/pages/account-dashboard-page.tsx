@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { ChevronRight, Heart, LifeBuoy, Loader2, MapPin, Package } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/lazy-toast";
 import { AccountShell } from "@/apps/website/account/components/account-shell";
 import { useCustomerAuth } from "@/apps/website/account/hooks/use-customer-auth";
 import { updateCustomerProfile } from "@/apps/website/account/lib/customer-session";

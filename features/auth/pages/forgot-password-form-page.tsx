@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Loader2, MailCheck } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/lazy-toast";
 import { AuthCard } from "@/features/auth/components/auth-card";
 import { AuthDemoNotice } from "@/features/auth/components/auth-demo-notice";
 import { startResetFlow } from "@/features/auth/lib/reset-flow";

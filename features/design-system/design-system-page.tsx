@@ -11,7 +11,7 @@ import {
   User,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/lazy-toast";
 import { routes } from "@/constants/routes";
 import { ColorSwatch } from "@/components/design-system/color-swatch";
 import {

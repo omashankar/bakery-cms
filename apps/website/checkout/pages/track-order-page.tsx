@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { routes } from "@/constants/routes";
 import { storefrontHeading } from "@/constants/typography";
 import { layoutSpacing } from "@/constants/spacing";
-import { toast } from "sonner";
+import { toast } from "@/lib/lazy-toast";
 
 type TrackOrderForm = {
   orderNumber: string;

@@ -27,11 +27,10 @@
  * different way, and no rendering test would catch it.
  */
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readSource } from "../renderer-source";
 
 const RENDERER = "features/cms-sections/homepage-section-renderer.tsx";
-const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+const read = (path: string) => readSource(path);
 const code = (path: string) =>
   read(path)
     .replace(/\/\*[\s\S]*?\*\//g, "")

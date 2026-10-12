@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/lazy-toast";
 import { AuthCard } from "@/features/auth/components/auth-card";
 import { AuthDemoNotice } from "@/features/auth/components/auth-demo-notice";
 import { setDemoSession } from "@/features/auth/lib/session";

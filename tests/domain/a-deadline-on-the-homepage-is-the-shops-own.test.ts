@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -9,6 +8,7 @@ import {
   timeLeftToday,
 } from "@/features/orders/lib/delivery-date";
 import { HOMEPAGE_SECTION_REGISTRY } from "@/constants/section-registry";
+import { readSource } from "../renderer-source";
 
 /**
  * A COUNTDOWN ON THE HOMEPAGE IS THE SHOP'S OWN DEADLINE, OR THERE IS NONE.
@@ -21,7 +21,7 @@ import { HOMEPAGE_SECTION_REGISTRY } from "@/constants/section-registry";
  * The pure rules that decide whether there is a deadline at all live in
  * a-countdown-is-only-shown-when-there-is-one.test.ts, beside the arithmetic.
  */
-const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+const read = (path: string) => readSource(path);
 
 /**
  * The source with its prose taken out.

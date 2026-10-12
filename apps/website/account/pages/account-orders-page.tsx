@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Package } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/lazy-toast";
 import { AccountOrderStatusBadge } from "@/apps/website/account/components/account-order-status-badge";
 import { AccountShell } from "@/apps/website/account/components/account-shell";
 import { useCustomerAuth } from "@/apps/website/account/hooks/use-customer-auth";

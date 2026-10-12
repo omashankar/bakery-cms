@@ -12,7 +12,7 @@ import {
   Trash2,
   Truck,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/lazy-toast";
 import {
   DELIVERY_LOCATION_UPDATED_EVENT,
   readDeliveryLocation,

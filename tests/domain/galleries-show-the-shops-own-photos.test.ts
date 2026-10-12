@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 
 import { HOMEPAGE_SECTION_REGISTRY } from "@/constants/section-registry";
+import { readSource } from "../renderer-source";
 
 /**
  * A bakery's photographs are the thing customers choose it by.
@@ -18,7 +17,7 @@ import { HOMEPAGE_SECTION_REGISTRY } from "@/constants/section-registry";
  * section with no photos does not render at all.
  */
 
-const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+const read = (path: string) => readSource(path);
 const stripComments = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
 

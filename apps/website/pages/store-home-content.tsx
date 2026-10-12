@@ -1,5 +1,3 @@
-"use client";
-
 import { HomepageSectionRenderer } from "@/features/cms-sections/homepage-section-renderer";
 import { planNewsletterCtaPair } from "@/features/cms-sections/lib/section-utils";
 import { StaggerReveal } from "@/components/shared/scroll-reveal";
@@ -13,6 +11,7 @@ import type { FaqItem, Testimonial } from "@/types/content";
 import type { StorefrontInstagram } from "@/apps/website/lib/storefront-social.server";
 import type { StorefrontLocation } from "@/apps/website/lib/storefront-location.server";
 import type { StorefrontTrust } from "@/apps/website/lib/storefront-trust.server";
+import type { ResolvedLabels } from "@/config/business-labels";
 
 /**
  * Everything the sections need, read on the server.
@@ -53,6 +52,8 @@ interface HomepageSectionData {
    * than the demo constants these replaced.
    */
   trust: StorefrontTrust | null;
+  /** The shop's own wording, read on the server so the HTML says it. */
+  labels?: ResolvedLabels;
 }
 
 interface StoreHomeContentProps extends HomepageSectionData {

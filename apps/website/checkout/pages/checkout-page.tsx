@@ -9,7 +9,7 @@ import {
   CreditCard,
   Loader2,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/lazy-toast";
 import {
   getCustomerSession,
   syncCustomerSession,

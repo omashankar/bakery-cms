@@ -4,6 +4,7 @@ import {
   getPublishedHomepageSections,
 } from "@/features/cms-sections/data/homepage-sections.server";
 import { getHomepageRenderData } from "@/apps/website/lib/homepage-render-data.server";
+import { getServerLabels } from "@/features/settings/server/labels.server";
 
 interface StoreHomePageProps {
   /** CMS preview flag comes from the URL: ?cmsPreview=1 */
@@ -29,10 +30,18 @@ interface StoreHomePageProps {
  * equivalent — most visibly, product grids drawn from the shipped demo cakes.
  */
 export async function StoreHomePage({ isPreview = false }: StoreHomePageProps) {
-  const [sections, data] = await Promise.all([
+  const [sections, data, labels] = await Promise.all([
     isPreview ? getDraftHomepageSections() : getPublishedHomepageSections(),
     getHomepageRenderData(),
+    getServerLabels(),
   ]);
 
-  return <StoreHomeContent sections={sections} {...data} isPreview={isPreview} />;
+  /*
+    A SERVER RENDER, all of it. `StoreHomeContent` and the section renderer
+    used to be client components, so every band on the homepage shipped its
+    code and hydrated in the browser — the largest single cost on a phone.
+    Only the parts that move (the hero and banner carousels, tabs, the
+    countdown, wishlist hearts, recently viewed) are client components now.
+  */
+  return <StoreHomeContent sections={sections} {...data} labels={labels} isPreview={isPreview} />;
 }

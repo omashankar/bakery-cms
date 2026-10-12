@@ -18,7 +18,7 @@ import type { ProductVariantGroup, ProductVariantOption } from "@/types/product"
 import { OptimizedImage } from "@/components/shared/optimized-image";
 import { ProductGallery } from "@/components/storefront/product-gallery";
 import { PincodeCheck } from "@/components/storefront/pincode-check";
-import { PhotoPrintEditor } from "@/components/storefront/photo-print-editor";
+import dynamic from "next/dynamic";
 import { FrameThumbnail } from "@/components/storefront/frame-thumbnail";
 import {
   emptyPhotoPrintDraft,
@@ -86,7 +86,7 @@ import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
 import { formatCurrency, formatRelativeTime } from "@/utils/format";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
+import { toast } from "@/lib/lazy-toast";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { getFreeDeliveryThreshold } from "@/features/orders/lib/cart-totals";
 import {
@@ -97,6 +97,20 @@ import { couponDiscountLabel, isLiveCoupon } from "@/features/commerce/lib/coupo
 import { Checkbox } from "@/components/ui/checkbox";
 import { DetailSection } from "@/components/storefront/detail-section";
 import { OptionButton, OptionGroup } from "@/components/storefront/option-group";
+
+/**
+ * The photo editor, loaded when a customer opens it.
+ *
+ * It is a dialog with a cropper, a slider and tabs — about 40 KB of script —
+ * and only photo products have it at all. Imported statically it was in every
+ * product page's first download and parse, on a phone, for a dialog most
+ * visitors never open. Its state (the file and the draft) lives in this page,
+ * so mounting it only while it is in use loses nothing.
+ */
+const PhotoPrintEditor = dynamic(
+  () => import("@/components/storefront/photo-print-editor").then((m) => m.PhotoPrintEditor),
+  { ssr: false },
+);
 
 interface ProductDetailPageProps {
   cake: LandingProduct;
@@ -1497,19 +1511,21 @@ export function ProductDetailPage({
                       </p>
                     ) : null}
 
-                    <PhotoPrintEditor
-                      open={photoEditorOpen}
-                      onOpenChange={setPhotoEditorOpen}
-                      file={photoFile}
-                      onFileChange={setPhotoFile}
-                      draft={photoDraft}
-                      onDraftChange={setPhotoDraft}
-                      shape={cake.photoFrameShape}
-                      busy={photoUploading}
-                      attachedUrl={photoUrl}
-                      onUse={(chosen) => void handlePhotoReady(chosen)}
-                      onProblem={(problem) => toast.error(problem)}
-                    />
+                    {photoEditorOpen || photoFile ? (
+                      <PhotoPrintEditor
+                        open={photoEditorOpen}
+                        onOpenChange={setPhotoEditorOpen}
+                        file={photoFile}
+                        onFileChange={setPhotoFile}
+                        draft={photoDraft}
+                        onDraftChange={setPhotoDraft}
+                        shape={cake.photoFrameShape}
+                        busy={photoUploading}
+                        attachedUrl={photoUrl}
+                        onUse={(chosen) => void handlePhotoReady(chosen)}
+                        onProblem={(problem) => toast.error(problem)}
+                      />
+                    ) : null}
                   </div>
                 ) : null}
 
