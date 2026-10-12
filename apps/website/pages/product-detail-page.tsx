@@ -95,6 +95,7 @@ import {
 import { couponDiscountLabel, isLiveCoupon } from "@/features/commerce/lib/coupon-offers";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DetailSection } from "@/components/storefront/detail-section";
+import { ClampedTitle } from "@/components/storefront/clamped-title";
 import { OptionButton, OptionGroup } from "@/components/storefront/option-group";
 
 /**
@@ -1108,7 +1109,7 @@ export function ProductDetailPage({
                   28 and the price at about 40, and that ordering is the point
                   rather than the exact figures.
                 */}
-                <h2 className={storefrontHeading.page}>{cake.name}</h2>
+                <ClampedTitle text={cake.name} className={storefrontHeading.page} />
                 {/*
                   THE RATING AS A BADGE, and a way to the reviews.
 
@@ -1123,22 +1124,25 @@ export function ProductDetailPage({
                 {cake.rating ? (
                   <a
                     href="#reviews"
-                    className="inline-flex flex-wrap items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+                    className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-sm text-foreground hover:bg-secondary"
                     aria-label={
                       reviewCount
                         ? `Rated ${cake.rating.toFixed(1)} out of 5 from ${reviewCount} reviews`
                         : `Rated ${cake.rating.toFixed(1)} out of 5`
                     }
                   >
-                    <span className="inline-flex items-center gap-1 rounded bg-green-700 px-1.5 py-0.5 text-xs font-semibold text-white">
+                    {/* The shop's second reference: one grey pill, "4.1 ★ | 51". */}
+                    <span className="inline-flex items-center gap-1 font-semibold">
                       {cake.rating.toFixed(1)}
-                      <Star aria-hidden="true" className="size-3 fill-white text-white" />
+                      <Star aria-hidden="true" className="size-3.5 fill-green-700 text-green-700" />
                     </span>
                     {reviewCount ? (
-                      <span>
-                        Rating &amp; {groupIndian(reviewCount)}{" "}
-                        {reviewCount === 1 ? "Review" : "Reviews"}
-                      </span>
+                      <>
+                        <span aria-hidden="true" className="text-border">
+                          |
+                        </span>
+                        <span className="text-muted-foreground">{groupIndian(reviewCount)}</span>
+                      </>
                     ) : null}
                   </a>
                 ) : null}
