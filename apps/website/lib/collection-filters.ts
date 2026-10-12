@@ -127,6 +127,29 @@ export interface PriceBand {
 }
 
 /**
+ * A whole number grouped the Indian way — 1,25,000 — without `Intl`.
+ *
+ * This was `toLocaleString("en-IN")`, and the listing filters run in the
+ * browser: the first number a page formats is where the browser loads its
+ * locale data, ~100ms of a phone's main thread during hydration, spent on the
+ * labels of four price bands. The listing's cards are formatted on the server
+ * now, so these labels were the only thing left asking for it.
+ */
+export function groupIndian(value: number): string {
+  const digits = String(Math.round(Math.abs(value)));
+  const sign = value < 0 ? "-" : "";
+  if (digits.length <= 3) return sign + digits;
+  let head = digits.slice(0, -3);
+  const groups = [digits.slice(-3)];
+  while (head.length > 2) {
+    groups.unshift(head.slice(-2));
+    head = head.slice(0, -2);
+  }
+  if (head) groups.unshift(head);
+  return sign + groups.join(",");
+}
+
+/**
  * THE PRICE BANDS THIS SHOP'S OWN CATALOGUE SUPPORTS.
  *
  * The reference storefront offers fixed slices — "499 and below", "500-999",
@@ -170,7 +193,7 @@ export function priceBandsFor(cakes: { price: number }[]): PriceBand[] {
 
   if (cuts.length === 0) return [];
 
-  const money = (value: number) => value.toLocaleString("en-IN");
+  const money = groupIndian;
   const bands: PriceBand[] = [];
   let from = 0;
   for (const cut of cuts) {

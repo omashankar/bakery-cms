@@ -74,7 +74,9 @@ describe("the phrase a listing page is headed with", () => {
       "({ id, name, slug, headline })",
     );
 
-    const page = code("apps/website/pages/collections-page.tsx");
+    // The dedup is shared by the listing's server wrapper and its client
+    // component, so it lives beside them rather than in the page.
+    const page = code("apps/website/lib/collection-listing.ts");
     expect(page, "the pill dedup narrows the row and loses the headline").toMatch(
       /new Map<[\s\S]{0,120}headline\?: string[\s\S]{0,20}>\(\)/,
     );

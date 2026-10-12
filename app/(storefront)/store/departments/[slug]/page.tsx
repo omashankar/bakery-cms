@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { CollectionsPage } from "@/apps/website/pages/collections-page";
+import { CollectionsListing } from "@/apps/website/pages/collections-listing";
 import { getStorefrontProductCards } from "@/features/products/data/products-service";
 import {
   getStorefrontCategories,
@@ -88,7 +88,7 @@ export default async function Page({ params }: PageProps) {
     than a dead end.
   */
   return (
-    <CollectionsPage
+    <CollectionsListing
       catalog={catalog}
       categories={categories}
       department={
