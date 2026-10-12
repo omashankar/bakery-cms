@@ -2,7 +2,8 @@
  * Seed script: creates the RBAC roles and the first admin user.
  *
  * Run:  npm run seed
- * Env:  ADMIN_EMAIL / ADMIN_PASSWORD (optional) override the defaults below.
+ * Env:  ADMIN_EMAIL and ADMIN_PASSWORD — REQUIRED when the owner account does
+ *       not exist yet (see below). Not read at all once it does.
  *
  * Idempotent — re-running updates roles and leaves an existing admin untouched.
  */
@@ -59,13 +60,28 @@ async function main() {
   }
 
   // 2. Admin user — create only if missing.
-  const email = (process.env.ADMIN_EMAIL || "sumanom7014106@gmail.com").toLowerCase();
-  const password = process.env.ADMIN_PASSWORD || "Admin@12345";
+  //
+  // NO DEFAULTS. This fell back to a fixed password ("Admin@12345") and to
+  // one developer's personal email when the env was not set, and only
+  // printed a warning — so a fresh deploy for a new shop came up with an
+  // owner account anyone who had seen this file could sign in to, under
+  // somebody else's address. It now refuses to create the owner without
+  // both, and without a password worth having.
+  const email = (process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
+  const password = process.env.ADMIN_PASSWORD ?? "";
 
-  const existing = await UserModel.findOne({ email });
+  const existing = email ? await UserModel.findOne({ email }) : null;
   if (existing) {
     console.info(`[seed] admin already exists: ${email} (unchanged)`);
   } else {
+    if (!email || !email.includes("@")) {
+      throw new Error("Set ADMIN_EMAIL to the shop owner's email address to create the owner account.");
+    }
+    if (password.length < 10 || password === "Admin@12345") {
+      throw new Error(
+        "Set ADMIN_PASSWORD (at least 10 characters, not the old default) to create the owner account.",
+      );
+    }
     await UserModel.create({
       name: "Store Admin",
       email,
@@ -74,9 +90,6 @@ async function main() {
       status: "active",
     });
     console.info(`[seed] admin created: ${email}`);
-    if (!process.env.ADMIN_PASSWORD) {
-      console.warn(`[seed] default password used: "${password}" — change it after first login`);
-    }
   }
 
   await mongoose.disconnect();
