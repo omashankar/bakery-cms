@@ -1,6 +1,6 @@
 import { OptimizedImage } from "@/components/shared/optimized-image";
 import Link from "next/link";
-import { BadgeCheck, Clock, Heart, Quote, Tag, Truck } from "lucide-react";
+import { BadgeCheck, Clock, Heart, Quote, Star, Tag, Truck } from "lucide-react";
 import { ProductCard } from "@/components/storefront/product-card";
 import { SectionHeader, sectionHeaderDraws } from "@/components/shared/section-header";
 import { RatingStars } from "@/components/shared/rating-stars";
@@ -72,11 +72,16 @@ function heroTrustBarFor(
           ? `On orders over ${formatCurrency(trust.freeDeliveryThreshold)}`
           : "On every order",
     },
-    { icon: "Clock", title: trust.deliveryPromise, subtitle: "" },
+    {
+      icon: "Clock",
+      title: trust.deliveryPromise,
+      // The cutoff the checkout enforces, when the shop has one open today.
+      subtitle: trust.sameDayCutoff ? `Order by ${trust.sameDayCutoff}` : "",
+    },
   ];
 }
 
-const heroTrustIcons = { Truck, Clock, BadgeCheck, Heart } as const;
+const heroTrustIcons = { Truck, Clock, BadgeCheck, Heart, Star } as const;
 
 function HeroSection(props: HomepageSectionRendererProps) {
   const labels = labelsOf(props);
@@ -1202,6 +1207,84 @@ function TileGridSection(props: HomepageSectionRendererProps) {
   );
 }
 
+/**
+ * THE SHOP'S PROMISES — its rating, its free-delivery threshold and how soon
+ * it delivers — as one strip the builder can place anywhere.
+ *
+ * All three are read from the shop's own data, never written here: the
+ * rating from its approved reviews (and absent until there is one), the
+ * threshold and the delivery promise from its commerce settings (see
+ * `heroTrustBarFor`). They used to be strips inside the hero; the shop took
+ * them off the hero and, a month later, asked for them back on the page —
+ * so they are a band of their own now, placed and hidden from the builder.
+ */
+function ShopPromisesSection(props: HomepageSectionRendererProps) {
+  const c = props.section.content;
+  const show = (key: string) => c[key] !== false && c[key] !== "false";
+  const trust = props.trust;
+
+  const items: { icon: keyof typeof heroTrustIcons; title: string; subtitle: string }[] = [];
+  if (show("showRating") && trust?.rating && trust.rating.count > 0) {
+    items.push({
+      icon: "Star",
+      title: `${trust.rating.average.toFixed(1)} rating`,
+      subtitle: `From ${trust.rating.count} ${trust.rating.count === 1 ? "review" : "reviews"}`,
+    });
+  }
+  for (const tile of heroTrustBarFor(trust)) {
+    const key = tile.icon === "Truck" ? "showFreeDelivery" : "showDelivery";
+    if (!show(key) || !tile.title) continue;
+    items.push({
+      icon: (tile.icon as keyof typeof heroTrustIcons) ?? "BadgeCheck",
+      title: tile.title,
+      subtitle: tile.subtitle ?? "",
+    });
+  }
+
+  if (items.length === 0) {
+    if (!props.interactive) return null;
+    return (
+      <SectionShell {...props}>
+        <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+          Nothing to show yet: the rating appears once a review is approved, and the delivery
+          facts come from Settings → Commerce.
+        </p>
+      </SectionShell>
+    );
+  }
+
+  return (
+    <SectionShell {...props}>
+      <ul
+        className={cn(
+          "grid gap-3 rounded-2xl border border-border bg-card p-4 sm:p-5",
+          items.length === 1 ? "grid-cols-1" : items.length === 2 ? "sm:grid-cols-2" : "sm:grid-cols-3",
+        )}
+      >
+        {items.map((item) => {
+          const Icon = heroTrustIcons[item.icon] ?? BadgeCheck;
+          return (
+            <li key={item.title} className="flex items-center gap-3">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
+                <Icon
+                  aria-hidden="true"
+                  className={cn("size-5", item.icon === "Star" && "fill-amber-400 text-amber-500")}
+                />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-foreground">{item.title}</span>
+                {item.subtitle ? (
+                  <span className="block text-xs text-muted-foreground">{item.subtitle}</span>
+                ) : null}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </SectionShell>
+  );
+}
+
 function WhyUsSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
   const hasHeading = sectionHeaderDraws(
@@ -1621,6 +1704,8 @@ export function HomepageSectionRenderer(props: HomepageSectionRendererProps) {
       return <BannerGridSection {...props} />;
     case "banner-strip":
       return <BannerStripSection {...shellPropsOf(props)} />;
+    case "shop-promises":
+      return <ShopPromisesSection {...props} />;
     case "same-day-countdown":
       return <SameDayCountdownSection {...shellPropsOf(props)} trust={props.trust} />;
     case "category-price-cards":

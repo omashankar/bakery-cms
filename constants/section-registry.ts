@@ -1413,6 +1413,27 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     ],
   },
   {
+    type: "shop-promises",
+    label: "Shop promises",
+    icon: "Award",
+    defaultBackground: "white",
+    /*
+      Three switches and no words: every figure in this band is the shop's
+      own — its approved reviews and its commerce settings — so there is
+      nothing here to type, only what to show.
+    */
+    defaultContent: {
+      showRating: true,
+      showFreeDelivery: true,
+      showDelivery: true,
+    },
+    fields: [
+      { key: "showRating", label: "Show the rating (once a review is approved)", type: "boolean" },
+      { key: "showFreeDelivery", label: "Show free delivery", type: "boolean" },
+      { key: "showDelivery", label: "Show how soon you deliver", type: "boolean" },
+    ],
+  },
+  {
     type: "why-us",
     label: "Why Choose Us",
     icon: "Shield",
