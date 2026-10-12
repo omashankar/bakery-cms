@@ -187,6 +187,30 @@ export function ShippingRulesAdminPage() {
                   }
                 />
               </label>
+              {/*
+                WHAT HAPPENS OUTSIDE EVERY ZONE.
+
+                The product page's delivery check said "not delivered here"
+                for an address no zone covered, while checkout took the same
+                order at the fallback fee — a customer was told no and then
+                charged yes. One switch now decides both.
+              */}
+              <label className="flex items-center justify-between gap-4 rounded-xl border border-border p-4">
+                <div>
+                  <p className="font-medium">Deliver outside your zones</p>
+                  <p className="text-sm text-muted-foreground">
+                    {settings.deliverOutsideZones === false
+                      ? "Off — an address no zone covers cannot order, and the product page says so."
+                      : "On — an address no zone covers is charged the fallback fee below."}
+                  </p>
+                </div>
+                <Switch
+                  checked={settings.deliverOutsideZones !== false}
+                  onCheckedChange={(checked) =>
+                    edit((prev) => ({ ...prev, deliverOutsideZones: checked === true }))
+                  }
+                />
+              </label>
               <div className="space-y-2">
                 <Label htmlFor="zone-fallback-fee">Fallback delivery fee (no zone match)</Label>
                 <Input

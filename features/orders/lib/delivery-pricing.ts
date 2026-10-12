@@ -14,6 +14,13 @@ export interface DeliveryQuote {
   minDeliveryDays?: number;
   estimatedDeliveryDays?: number;
   usedZonePricing: boolean;
+  /**
+   * False only when the shop takes orders inside its zones alone
+   * (`deliverOutsideZones: false`) and this address is in none of them.
+   * An address not entered yet is never undeliverable — there is nothing to
+   * refuse until there is somewhere to deliver to.
+   */
+  deliverable: boolean;
 }
 
 export function calculateDeliveryQuote(
@@ -21,6 +28,7 @@ export function calculateDeliveryQuote(
     subtotal: number;
     city?: string;
     pincode?: string;
+    state?: string;
   },
   commerceOverride?: CommerceSettings,
   /**
@@ -39,12 +47,13 @@ export function calculateDeliveryQuote(
     return {
       delivery: input.subtotal >= commerce.freeDeliveryThreshold ? 0 : commerce.deliveryFee,
       usedZonePricing: false,
+      deliverable: true,
     };
   }
 
   const match = zonesOverride
-    ? findDeliveryZone(zonesOverride, { city: input.city, pincode: input.pincode })
-    : resolveDeliveryZoneForAddress({ city: input.city, pincode: input.pincode });
+    ? findDeliveryZone(zonesOverride, { city: input.city, pincode: input.pincode, state: input.state })
+    : resolveDeliveryZoneForAddress({ city: input.city, pincode: input.pincode, state: input.state });
 
   // Free delivery no longer short-circuits the lookup.
   //
@@ -55,6 +64,10 @@ export function calculateDeliveryQuote(
   const free = input.subtotal >= commerce.freeDeliveryThreshold;
 
   if (!match) {
+    const addressGiven = Boolean(input.pincode?.trim() || input.city?.trim());
+    if (addressGiven && commerce.deliverOutsideZones === false) {
+      return { delivery: 0, usedZonePricing: true, deliverable: false };
+    }
     return {
       // `??`, not `||`. A shop that deliberately sets a ZERO fallback — deliver
       // anywhere unmatched at no charge — got the standard fee instead, because
@@ -62,6 +75,7 @@ export function calculateDeliveryQuote(
       // became the other.
       delivery: free ? 0 : (commerce.zoneFallbackDeliveryFee ?? commerce.deliveryFee),
       usedZonePricing: true,
+      deliverable: true,
     };
   }
 
@@ -74,5 +88,6 @@ export function calculateDeliveryQuote(
     minDeliveryDays: match.zone.minDeliveryDays,
     estimatedDeliveryDays: match.zone.estimatedDeliveryDays,
     usedZonePricing: true,
+    deliverable: true,
   };
 }

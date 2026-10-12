@@ -51,6 +51,15 @@ const deliveryZoneSchema = z
     name: z.string().trim().min(1, "Name is required"),
     city: z.string().default(""),
     pincode: z.string().default(""),
+    coverage: z.enum(["country", "states", "cities", "pincodes"]).optional(),
+    states: z.array(z.string().trim().min(1).max(80)).max(40).optional(),
+    cities: z.array(z.string().trim().min(1).max(80)).max(200).optional(),
+    // Digits only, 1–6 of them: an exact PIN or a prefix.
+    pincodes: z.array(z.string().regex(/^\d{1,6}$/, "A PIN code is 1–6 digits")).max(2000).optional(),
+    excludedPincodes: z
+      .array(z.string().regex(/^\d{1,6}$/, "A PIN code is 1–6 digits"))
+      .max(2000)
+      .optional(),
     radiusKm: z.number().min(0),
     deliveryCharge: z.number().min(0),
     minDeliveryDays: z.number().int().min(0),

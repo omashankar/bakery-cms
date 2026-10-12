@@ -36,6 +36,7 @@ import { checkMinimumOrder } from "@/features/checkout/lib/minimum-order";
 import {
   priceCart,
   UndeliverableAtSpeedError,
+  OutsideDeliveryZonesError,
   UnknownProductError,
   UnknownWeightError,
 } from "@/features/checkout/server/pricing.server";
@@ -61,6 +62,7 @@ import {
 import type { PlacedOrder, OrderStatus, PaymentStatus } from "@/features/orders/lib/orders";
 
 import * as repo from "./order.repository";
+import { OUTSIDE_ZONES_MESSAGE } from "@/features/commerce/lib/delivery-zone-utils";
 import type {
   PlaceOrderInput,
   RefundInput,
@@ -169,7 +171,7 @@ async function repriceForPlacement(input: PlaceOrderInput) {
       couponCode,
       giftWrap: Number((input.totals as { giftWrapFee?: unknown } | undefined)?.giftWrapFee) > 0,
       deliveryAddress: input.address
-        ? { city: input.address.city, pincode: input.address.pincode }
+        ? { city: input.address.city, pincode: input.address.pincode, state: input.address.state }
         : undefined,
     });
 
@@ -191,6 +193,9 @@ async function repriceForPlacement(input: PlaceOrderInput) {
         `${error.productName} cannot be delivered by ${error.tierLabel}.`,
         409,
       );
+    }
+    if (error instanceof OutsideDeliveryZonesError) {
+      throw new AppError(OUTSIDE_ZONES_MESSAGE, 409);
     }
     throw error;
   }

@@ -114,6 +114,7 @@ const commerceSchema = new mongoose.Schema(
     platformChargeAmount: { type: Number, default: 0 },
     useZoneBasedDelivery: { type: Boolean, default: false },
     zoneFallbackDeliveryFee: { type: Number, default: 0 },
+    deliverOutsideZones: { type: Boolean, default: true },
     deliveryLeadDays: { type: Number, default: 1 },
     estimatedDeliveryDays: { type: Number, default: 1 },
     deliveryTimeSlots: { type: [String], default: [] },

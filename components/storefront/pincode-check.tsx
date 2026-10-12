@@ -14,6 +14,7 @@ import {
 import { normalizePincode } from "@/features/commerce/lib/delivery-zone-utils";
 import type { DeliveryZone } from "@/types/delivery";
 import { cn } from "@/lib/utils";
+import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
 
 /**
  * CAN IT REACH ME — asked on the page where the customer is deciding.
@@ -81,7 +82,7 @@ export function PincodeCheck({ className }: { className?: string }) {
 
   const check = () => {
     setChecking(true);
-    const found = lookUpDeliveryPincode(zones, entered);
+    const found = lookUpDeliveryPincode(zones, entered, getCommerceSettings());
     setResult(found);
     setChecking(false);
     if (found?.served) {

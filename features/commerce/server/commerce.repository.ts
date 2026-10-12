@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { connectDB } from "@/lib/server/db/mongoose";
 import { hasSeeded, markSeeded } from "@/lib/server/db/cms-store";
 import { CouponModel, type CouponDoc } from "@/lib/server/db/models/coupon.model";
@@ -207,7 +208,30 @@ export async function listZones(): Promise<DeliveryZone[]> {
     }
   }
   const docs = (await DeliveryZoneModel.find().sort({ priority: -1 }).lean()) as unknown as Record<string, unknown>[];
-  return docs.map((d) => toItem<DeliveryZone>(d));
+  return onePerId(docs).map((d) => toItem<DeliveryZone>(d));
+}
+
+/**
+ * ONE ZONE PER ID, the copy that saves reach.
+ *
+ * The live collection held the Kota zone twice: once under an ObjectId _id
+ * and once under the same hex as a STRING, which is what `replaceZones`
+ * upserts by. Both came back, so the admin list showed Kota twice (and React
+ * warned about the duplicate key), and the first edit to Kota would have
+ * updated only the string copy — leaving the ObjectId twin at the old charge,
+ * where a cheaper stale copy wins `findDeliveryZone`'s price tie-break.
+ *
+ * The string copy is kept because every write targets it; the twin is
+ * removed on the next save of the zone list (see `replaceZones`).
+ */
+export function onePerId(docs: Record<string, unknown>[]): Record<string, unknown>[] {
+  const byId = new Map<string, Record<string, unknown>>();
+  for (const doc of docs) {
+    const id = String(doc._id);
+    const held = byId.get(id);
+    if (!held || (typeof doc._id === "string" && typeof held._id !== "string")) byId.set(id, doc);
+  }
+  return docs.filter((doc) => byId.get(String(doc._id)) === doc);
 }
 
 export async function replaceZones(
@@ -247,6 +271,16 @@ export async function replaceZones(
 
   if (removedIds.length > 0) {
     ops.push({ deleteMany: { filter: { _id: { $in: removedIds } } } });
+  }
+
+  // The ObjectId twin of any zone saved here (see `onePerId`), by exact id —
+  // its string copy is the one just written.
+  const twins = fresh
+    .map((z) => z.id)
+    .filter((id) => mongoose.isObjectIdOrHexString(id) && /^[0-9a-f]{24}$/i.test(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+  if (twins.length > 0) {
+    ops.push({ deleteMany: { filter: { _id: { $in: twins } } as never } });
   }
 
   if (ops.length > 0) await DeliveryZoneModel.bulkWrite(ops);

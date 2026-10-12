@@ -65,7 +65,7 @@ export interface QuoteInput {
   giftWrap?: boolean;
   /** WHICH speed, never its price. See `CartTotalsInput.deliveryTierId`. */
   deliveryTierId?: string;
-  deliveryAddress?: { city?: string; pincode?: string };
+  deliveryAddress?: { city?: string; pincode?: string; state?: string };
 }
 
 export interface QuotedLine extends QuoteLineInput {
@@ -121,6 +121,20 @@ export class UndeliverableAtSpeedError extends Error {
   ) {
     super(`${productName} cannot be delivered by ${tierLabel}`);
     this.name = "UndeliverableAtSpeedError";
+  }
+}
+
+/**
+ * The address is outside every delivery zone, and the shop has said it does
+ * not deliver there (`deliverOutsideZones: false`).
+ *
+ * Refused here, where the price is decided, so no path can take the order —
+ * the product page's delivery check says the same thing from the same zones.
+ */
+export class OutsideDeliveryZonesError extends Error {
+  constructor(readonly pincode: string) {
+    super(`No delivery zone covers ${pincode || "this address"}`);
+    this.name = "OutsideDeliveryZonesError";
   }
 }
 
@@ -456,6 +470,10 @@ export async function priceCart(input: QuoteInput): Promise<CartQuote> {
     // for the formatter to read a locale from, so this has to be passed.
     currencyOverride: currency,
   });
+
+  if (totals.deliverable === false) {
+    throw new OutsideDeliveryZonesError(input.deliveryAddress?.pincode ?? "");
+  }
 
   return {
     items,

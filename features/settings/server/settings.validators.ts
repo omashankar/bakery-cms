@@ -199,6 +199,7 @@ export const commerceSchema = z.object({
   platformChargeAmount: nonNegative,
   useZoneBasedDelivery: z.boolean(),
   zoneFallbackDeliveryFee: nonNegative,
+  deliverOutsideZones: z.boolean().default(true),
   deliveryLeadDays: z.number().int().min(0),
   estimatedDeliveryDays: z.number().int().min(0),
   deliveryTimeSlots: z.array(z.string()).default([]),

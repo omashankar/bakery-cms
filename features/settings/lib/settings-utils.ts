@@ -161,6 +161,7 @@ export const defaultCommerceSettings: CommerceSettings = {
   platformChargeAmount: 0,
   useZoneBasedDelivery: false,
   zoneFallbackDeliveryFee: 149,
+  deliverOutsideZones: true,
   deliveryLeadDays: 1,
   estimatedDeliveryDays: 1,
   deliveryTimeSlots: [

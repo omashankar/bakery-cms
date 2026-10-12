@@ -19,6 +19,7 @@ import {
 import { normalizePincode } from "@/features/commerce/lib/delivery-zone-utils";
 import type { DeliveryZone } from "@/types/delivery";
 import { cn } from "@/lib/utils";
+import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
 
 /**
  * WHERE AM I HAVING THIS SENT — in the header, where the reference puts it.
@@ -94,7 +95,7 @@ export function DeliveryLocationButton() {
 
   const check = () => {
     if (zones === null) return;
-    const found = lookUpDeliveryPincode(zones, entered);
+    const found = lookUpDeliveryPincode(zones, entered, getCommerceSettings());
     setResult(found);
     if (found?.served) {
       const pincode = normalizePincode(entered);

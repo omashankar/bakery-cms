@@ -43,6 +43,8 @@ export interface CartTotalsInput {
   deliveryAddress?: {
     city?: string;
     pincode?: string;
+    /** Read only when there is no PIN code to work the state out from. */
+    state?: string;
   };
   commerceOverride?: import("@/types/settings").CommerceSettings;
   /** Delivery zones from the caller — the server passes its own; see below. */
@@ -91,6 +93,11 @@ export interface CartTotals {
    * `deliveryLeadDays` and nothing anywhere consulted the zone.
    */
   deliveryMinDays?: number;
+  /**
+   * False when the shop takes orders only inside its zones and this address
+   * is in none of them — see `DeliveryQuote.deliverable`. Absent means yes.
+   */
+  deliverable?: boolean;
 }
 
 function getCommerceConfig() {
@@ -156,12 +163,13 @@ export function calculateCartTotals({
     giftWrap && commerce.giftWrapEnabled && items.length > 0 ? commerce.giftWrapFee : 0;
   const deliveryQuote =
     items.length === 0
-      ? { delivery: 0, usedZonePricing: false }
+      ? { delivery: 0, usedZonePricing: false, deliverable: true }
       : calculateDeliveryQuote(
           {
             subtotal,
             city: deliveryAddress?.city,
             pincode: deliveryAddress?.pincode,
+            state: deliveryAddress?.state,
           },
           commerce,
           zonesOverride
@@ -211,5 +219,6 @@ export function calculateCartTotals({
     deliveryZoneName: deliveryQuote.zoneName,
     estimatedDeliveryDays: deliveryQuote.estimatedDeliveryDays,
     deliveryMinDays: deliveryQuote.minDeliveryDays,
+    deliverable: deliveryQuote.deliverable,
   };
 }

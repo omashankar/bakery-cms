@@ -338,6 +338,7 @@ export function getActiveDeliveryZones(): DeliveryZone[] {
 export function resolveDeliveryZoneForAddress(address: {
   city?: string;
   pincode?: string;
+  state?: string;
 }): ReturnType<typeof findDeliveryZone> {
   return findDeliveryZone(loadDeliveryZones(), address);
 }

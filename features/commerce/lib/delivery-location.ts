@@ -1,5 +1,6 @@
 import { safeRemoveItem, safeSetItem } from "@/lib/safe-storage";
 import type { DeliveryZone } from "@/types/delivery";
+import type { CommerceSettings } from "@/types/settings";
 import { findDeliveryZone, normalizePincode } from "./delivery-zone-utils";
 
 /**
@@ -100,12 +101,37 @@ export interface DeliveryLookup {
 export function lookUpDeliveryPincode(
   zones: DeliveryZone[],
   entered: string,
+  /**
+   * The shop's delivery rules, so this answers what CHECKOUT will do. Without
+   * them it judged by the zones alone and said "not covered" to an address
+   * checkout then charged the fallback fee — or to any address at all on a
+   * shop with zone pricing switched off.
+   */
+  rules?: Pick<
+    CommerceSettings,
+    "useZoneBasedDelivery" | "deliverOutsideZones" | "zoneFallbackDeliveryFee" | "deliveryFee"
+  >,
 ): DeliveryLookup | null {
   const pincode = normalizePincode(entered);
   if (!pincode) return null;
 
+  // Zones off: every address is delivered at the shop's flat fee.
+  if (rules && !rules.useZoneBasedDelivery) {
+    return { served: true, zoneName: "", minDeliveryDays: null, charge: rules.deliveryFee };
+  }
+
   const match = findDeliveryZone(zones, { pincode });
-  if (!match) return { served: false, zoneName: "", minDeliveryDays: null, charge: null };
+  if (!match) {
+    if (rules && rules.deliverOutsideZones !== false) {
+      return {
+        served: true,
+        zoneName: "",
+        minDeliveryDays: null,
+        charge: rules.zoneFallbackDeliveryFee ?? rules.deliveryFee,
+      };
+    }
+    return { served: false, zoneName: "", minDeliveryDays: null, charge: null };
+  }
 
   const { zone } = match;
   return {

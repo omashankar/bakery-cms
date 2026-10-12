@@ -8,6 +8,7 @@ import { getMaintenanceState } from "@/features/settings/server/maintenance.serv
 import {
   priceCart,
   UndeliverableAtSpeedError,
+  OutsideDeliveryZonesError,
   UnknownProductError,
   UnknownWeightError,
 } from "./pricing.server";
@@ -30,6 +31,7 @@ async function shopNow(): Promise<Date> {
 }
 import { checkMinimumOrder } from "@/features/checkout/lib/minimum-order";
 import { formatCurrency } from "@/utils/format";
+import { OUTSIDE_ZONES_MESSAGE } from "@/features/commerce/lib/delivery-zone-utils";
 
 /**
  * Prices a cart and holds the result as a draft.
@@ -86,7 +88,7 @@ export const quoteCartController = withErrorHandler(async (request: Request) => 
   // the zone. `deliveryAddress` only stands alone before the customer has
   // entered one, which is the running-total case it exists for.
   const pricingAddress = input.address
-    ? { city: input.address.city, pincode: input.address.pincode }
+    ? { city: input.address.city, pincode: input.address.pincode, state: input.address.state }
     : input.deliveryAddress;
 
   try {
@@ -233,6 +235,11 @@ export const quoteCartController = withErrorHandler(async (request: Request) => 
         409,
         [{ field: "deliveryTierId", message: error.message }],
       );
+    }
+    if (error instanceof OutsideDeliveryZonesError) {
+      throw new AppError(OUTSIDE_ZONES_MESSAGE, 409, [
+        { field: "pincode", message: error.message },
+      ]);
     }
     throw error;
   }

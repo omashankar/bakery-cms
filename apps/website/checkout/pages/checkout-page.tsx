@@ -41,6 +41,7 @@ import { CheckoutProgress } from "@/apps/website/checkout/components/checkout-pr
 import { CouponInput } from "@/apps/website/checkout/components/coupon-input";
 import { OrderSummaryPanel } from "@/apps/website/checkout/components/order-summary-panel";
 import { calculateCartTotals, type CartTotals } from "@/features/orders/lib/cart-totals";
+import { OUTSIDE_ZONES_MESSAGE } from "@/features/commerce/lib/delivery-zone-utils";
 import {
   clearCheckoutDraft,
   EMPTY_CHECKOUT_ADDRESS,
@@ -690,6 +691,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
 
   const watchedCity = watch("city");
   const watchedPincode = watch("pincode");
+  const watchedState = watch("state");
   // The 3-up control is not an <input>, so its value is watched rather than
   // registered; `setValue` is what writes the choice back into the form.
   const watchedAddressLabel = watch("addressLabel");
@@ -809,10 +811,11 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
         deliveryAddress: {
           city: watchedCity,
           pincode: watchedPincode,
+          state: watchedState,
         },
         commerceOverride: commerce,
       }),
-    [items, validCoupon, giftWrap, deliveryTierId, watchedCity, watchedPincode, commerce]
+    [items, validCoupon, giftWrap, deliveryTierId, watchedCity, watchedPincode, watchedState, commerce]
   );
 
   const totals = serverTotals ?? localTotals;
@@ -1682,6 +1685,17 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                             {formState.errors.pincode.message}
                           </p>
                         ) : null}
+                        {/*
+                          SAID HERE, under the PIN, as soon as it is typed — not
+                          as a failed payment. The shop delivers only inside its
+                          zones and this address is in none of them; the server
+                          refuses the order for the same reason.
+                        */}
+                        {totals.deliverable === false ? (
+                          <p role="alert" className="text-xs text-destructive">
+                            {OUTSIDE_ZONES_MESSAGE}
+                          </p>
+                        ) : null}
                         {commerce.useZoneBasedDelivery && totals.deliveryZoneName ? (
                           <p className="text-xs text-bakery-700">
                             Delivery zone: {totals.deliveryZoneName}
@@ -2396,6 +2410,9 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                     disabled={
                       placing ||
                       cartBlocked ||
+                      // Outside every zone, on a shop that delivers only
+                      // inside them — the reason is under the PIN code.
+                      totals.deliverable === false ||
                       (commerce.minOrderValue > 0 && totals.subtotal < commerce.minOrderValue)
                     }
                   >

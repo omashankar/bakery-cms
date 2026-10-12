@@ -33,7 +33,11 @@ export const quoteSchema = z.object({
   // surcharge; the shop's settings are the only place a fee comes from.
   deliveryTierId: z.string().trim().max(60).optional(),
   deliveryAddress: z
-    .object({ city: z.string().trim().optional(), pincode: z.string().trim().optional() })
+    .object({
+      city: z.string().trim().optional(),
+      pincode: z.string().trim().optional(),
+      state: z.string().trim().optional(),
+    })
     .optional(),
 
   /**
