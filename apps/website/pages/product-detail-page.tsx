@@ -9,6 +9,7 @@ import {
   ImageUp,
   Percent,
   ShoppingBag,
+  Star,
   ThumbsUp,
   Truck,
 } from "lucide-react";
@@ -82,7 +83,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
-import { formatCurrency, formatRelativeTime } from "@/utils/format";
+import { formatCurrency, formatRelativeTime, groupIndian } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/lazy-toast";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
@@ -1108,11 +1109,38 @@ export function ProductDetailPage({
                   rather than the exact figures.
                 */}
                 <h2 className={storefrontHeading.page}>{cake.name}</h2>
+                {/*
+                  THE RATING AS A BADGE, and a way to the reviews.
+
+                  The shop pointed at its reference: a filled green chip with
+                  the score and a star, then "Rating & N Reviews" beside it —
+                  read at a glance where a row of five small stars has to be
+                  counted. The count is `reviewCount`, which the server sends,
+                  so it is in the HTML; it was the fetched list's length, which
+                  printed nothing until the reviews had loaded. The whole line
+                  links to the Reviews section further down.
+                */}
                 {cake.rating ? (
-                  <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                    <StarRating rating={cake.rating} size="md" showValue />
-                    {reviews.length ? <span>({reviews.length} reviews)</span> : null}
-                  </div>
+                  <a
+                    href="#reviews"
+                    className="inline-flex flex-wrap items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+                    aria-label={
+                      reviewCount
+                        ? `Rated ${cake.rating.toFixed(1)} out of 5 from ${reviewCount} reviews`
+                        : `Rated ${cake.rating.toFixed(1)} out of 5`
+                    }
+                  >
+                    <span className="inline-flex items-center gap-1 rounded bg-green-700 px-1.5 py-0.5 text-xs font-semibold text-white">
+                      {cake.rating.toFixed(1)}
+                      <Star aria-hidden="true" className="size-3 fill-white text-white" />
+                    </span>
+                    {reviewCount ? (
+                      <span>
+                        Rating &amp; {groupIndian(reviewCount)}{" "}
+                        {reviewCount === 1 ? "Review" : "Reviews"}
+                      </span>
+                    ) : null}
+                  </a>
                 ) : null}
                 {/*
                   The description moved into Product Description, below.
