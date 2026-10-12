@@ -1,4 +1,7 @@
+import { redirect } from "next/navigation";
 import { StorefrontLayoutShell } from "@/layouts/storefront-layout";
+import { routes } from "@/constants/routes";
+import { getCustomerAccount } from "@/lib/server/auth/customer-dal";
 import { AppearanceStyleTag } from "@/components/shared/appearance-style-tag";
 import { getStorefrontScripts } from "@/features/settings/server/storefront-scripts.server";
 import { getSeoStoreServer } from "@/features/seo/server/seo-store.server";
@@ -22,11 +25,12 @@ export default async function AccountLayout({
   // late -- a 52px bar arriving above the header and shoving the whole page
   // down. getPublicContent returns the live ones only, so the schedule is
   // already settled and the client never has to re-check the clock.
-  const [chrome, scripts, seo, bannerStrip] = await Promise.all([
+  const [chrome, scripts, seo, bannerStrip, account] = await Promise.all([
     getStorefrontChrome(),
     getStorefrontScripts(),
     getSeoStoreServer(),
     getPublicContent("banners") as Promise<Banner[]>,
+    getCustomerAccount(),
   ]);
 
   if (maintenance.isClosed) {
@@ -40,6 +44,15 @@ export default async function AccountLayout({
       </div>
     );
   }
+
+  // Every page in here is for a signed-in customer, and a guest used to be
+  // sent away only by the BROWSER: an empty account page painted, the bundle
+  // loaded, `useCustomerAuth` asked /api/customer-auth/me, and then the router
+  // replaced it with the homepage — 5.3s to the first real content on a
+  // throttled phone. The server already knows: the same cookie, the same
+  // check `/api/customer-auth/me` makes. The hook still guards sign-outs
+  // that happen while the page is open.
+  if (!account) redirect(`${routes.store.home}?login=1`);
 
   return (
     <StorefrontLayoutShell

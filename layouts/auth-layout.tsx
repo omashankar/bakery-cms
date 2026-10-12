@@ -1,6 +1,3 @@
-"use client";
-
-import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { optimizedImageUrl } from "@/lib/image-url";
 
@@ -25,7 +22,17 @@ interface AuthLayoutShellProps {
   className?: string;
 }
 
-const ease = [0.22, 1, 0.36, 1] as const;
+/**
+ * The entrance, in CSS — it runs from the first paint.
+ *
+ * These were framer-motion `initial={{ opacity: 0 }}` blocks. The server
+ * rendered them at opacity 0, and they only became visible once the motion
+ * library had downloaded and hydrated: the whole sign-in screen was blank for
+ * 3.6s on a throttled phone, with the HTML already there. `motion-safe`: a
+ * visitor who asked for reduced motion gets no entrance at all.
+ */
+const enter =
+  "motion-safe:animate-in motion-safe:fade-in motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)]";
 
 /**
  * Business-neutral on purpose.
@@ -108,11 +115,11 @@ export function AuthLayoutShell({
         <aside className="relative hidden bg-bakery-900 lg:flex">
           <div className="absolute inset-y-0 right-0 w-px bg-gold-300/40" aria-hidden />
           <div className="flex w-full flex-col justify-center px-10 py-14 xl:px-16">
-            <motion.div
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.45, ease }}
-              className="max-w-md space-y-8"
+            <div
+              className={cn(
+                enter,
+                "max-w-md space-y-8 motion-safe:slide-in-from-bottom-3.5 motion-safe:duration-450",
+              )}
             >
               {/* The wordmark takes the badge's place and the heading's job:
                   it already says the name, and this plane is the widest space
@@ -173,7 +180,7 @@ export function AuthLayoutShell({
                   </li>
                 ))}
               </ul>
-            </motion.div>
+            </div>
           </div>
 
           <div className="absolute inset-x-0 bottom-0 px-10 py-8 xl:px-16">
@@ -186,11 +193,11 @@ export function AuthLayoutShell({
 
         {/* Form column */}
         <main className="relative flex flex-col justify-center px-5 py-12 sm:px-10 lg:px-14 xl:px-20">
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, ease }}
-            className="mb-10 flex items-center gap-3 lg:hidden"
+          <div
+            className={cn(
+              enter,
+              "mb-10 flex items-center gap-3 lg:hidden motion-safe:slide-in-from-bottom-2.5 motion-safe:duration-400",
+            )}
           >
             {/* Same rule, smaller: the wordmark replaces the badge AND the
                 name, and "Staff console" stays either way — it says what the
@@ -220,16 +227,16 @@ export function AuthLayoutShell({
                 </div>
               </>
             )}
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, delay: 0.05, ease }}
-            className="mx-auto w-full max-w-[420px]"
+          <div
+            className={cn(
+              enter,
+              "mx-auto w-full max-w-[420px] motion-safe:slide-in-from-bottom-3 motion-safe:duration-450",
+            )}
           >
             {children}
-          </motion.div>
+          </div>
         </main>
       </div>
     </div>

@@ -26,6 +26,10 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
   display: "swap",
+  // Not preloaded: only a few admin fields use `font-mono`, and the preload
+  // made every storefront page download it alongside — and so ahead of — the
+  // render-blocking stylesheet, on a phone's shared 4G bandwidth.
+  preload: false,
 });
 
 /**

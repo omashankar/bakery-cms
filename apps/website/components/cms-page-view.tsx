@@ -170,6 +170,11 @@ function AboutTemplate({ page, preview }: { page: CmsPage; preview: boolean }) {
                       fill
                       className="object-cover"
                       sizes="(max-width: 1024px) 100vw, 45vw"
+                      // The first thing under the page title, so on a phone it
+                      // is the largest paint — lazy, it was not even requested
+                      // until layout, and the page's LCP waited 3s for it.
+                      loading="eager"
+                      fetchPriority="high"
                     />
                   </div>
                 </div>

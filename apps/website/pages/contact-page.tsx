@@ -1,6 +1,7 @@
 import { Clock, Mail, MapPin, Phone } from "lucide-react";
 import { ContactForm } from "@/components/shared/contact-form";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
+import { NearViewport } from "@/components/shared/near-viewport";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import {
   getStorefrontBusinessHours,
@@ -184,7 +185,7 @@ export function ContactPage({
               counted in that screen's "N/4 sections on" line, and read by
               nothing — the only map on the site gated on the URL alone. */}
           {showMap && contactInfo.mapEmbedUrl ? (
-            <ScrollReveal className="mt-8 h-[280px] overflow-hidden rounded-2xl border border-border bg-cream-100 sm:h-[360px]">
+            <NearViewport className="mt-8 h-[280px] overflow-hidden rounded-2xl border border-border bg-cream-100 sm:h-[360px]">
               <iframe
                 title="Shop location"
                 src={contactInfo.mapEmbedUrl}
@@ -201,7 +202,7 @@ export function ContactPage({
                 sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms"
                 allowFullScreen
               />
-            </ScrollReveal>
+            </NearViewport>
           ) : null}
         </div>
       </section>
