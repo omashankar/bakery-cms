@@ -279,9 +279,13 @@ export async function replaceZones(
     .map((z) => z.id)
     .filter((id) => mongoose.isObjectIdOrHexString(id) && /^[0-9a-f]{24}$/i.test(id))
     .map((id) => new mongoose.Types.ObjectId(id));
-  if (twins.length > 0) {
-    ops.push({ deleteMany: { filter: { _id: { $in: twins } } as never } });
-  }
-
   if (ops.length > 0) await DeliveryZoneModel.bulkWrite(ops);
+
+  // On the NATIVE collection, after the string copy is written. Through the
+  // model, Mongoose casts the filter to the schema's String _id — the
+  // ObjectId became the hex string, and the delete removed the copy just
+  // saved instead of its twin. That happened to the live Kota zone.
+  if (twins.length > 0) {
+    await DeliveryZoneModel.collection.deleteMany({ _id: { $in: twins } } as never);
+  }
 }
