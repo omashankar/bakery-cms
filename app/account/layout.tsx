@@ -10,6 +10,8 @@ import { getStorefrontChrome } from "@/apps/website/lib/storefront-chrome.server
 import { getMaintenanceState } from "@/features/settings/server/maintenance.server";
 import { getPublicContent } from "@/features/content/server/content.service";
 import type { Banner } from "@/types/media";
+import { StorefrontCacheSeed } from "@/apps/website/components/storefront-cache-seed";
+import { getStorefrontCacheSeed } from "@/apps/website/lib/storefront-cache-seed.server";
 
 export default async function AccountLayout({
   children,
@@ -25,12 +27,14 @@ export default async function AccountLayout({
   // late -- a 52px bar arriving above the header and shoving the whole page
   // down. getPublicContent returns the live ones only, so the schedule is
   // already settled and the client never has to re-check the clock.
-  const [chrome, scripts, seo, bannerStrip, account] = await Promise.all([
+  const [chrome, scripts, seo, bannerStrip, account, cacheSeed] = await Promise.all([
     getStorefrontChrome(),
     getStorefrontScripts(),
     getSeoStoreServer(),
     getPublicContent("banners") as Promise<Banner[]>,
     getCustomerAccount(),
+    // Reads the banners again rather than waiting for the read above.
+    getStorefrontCacheSeed(),
   ]);
 
   if (maintenance.isClosed) {
@@ -62,6 +66,7 @@ export default async function AccountLayout({
       organizationSchema={seo.global.organizationSchemaJson}
       maintenance={maintenance}
     >
+      {cacheSeed ? <StorefrontCacheSeed data={cacheSeed} /> : null}
       {children}
     </StorefrontLayoutShell>
   );

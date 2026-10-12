@@ -22,7 +22,15 @@ export default async function Page() {
 
   return (
     <Suspense fallback={<div className="min-h-[40vh]" />}>
-      <CheckoutPage catalog={catalog} siteName={chrome.siteName} />
+      <CheckoutPage
+        catalog={catalog.map(({ slug, inStock, categoryIds, occasions }) => ({
+          slug,
+          inStock,
+          categoryIds,
+          occasions,
+        }))}
+        siteName={chrome.siteName}
+      />
     </Suspense>
   );
 }

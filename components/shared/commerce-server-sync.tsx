@@ -10,6 +10,7 @@ import {
 } from "@/features/commerce/lib/commerce-api";
 import { persistServerCoupons } from "@/features/commerce/lib/coupons-repository";
 import { persistServerZones } from "@/features/commerce/lib/delivery-zones-repository";
+import { isStorefrontSeeded } from "@/lib/storefront-seed-flag";
 
 /**
  * Hydrates coupons + delivery zones from the server once on mount, so the
@@ -19,6 +20,8 @@ import { persistServerZones } from "@/features/commerce/lib/delivery-zones-repos
  */
 export function CommerceServerSync() {
   useEffect(() => {
+    // Filled with the page by StorefrontCacheSeed — the same answer, already here.
+    if (isStorefrontSeeded()) return;
     let cancelled = false;
 
     (async () => {

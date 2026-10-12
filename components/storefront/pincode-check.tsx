@@ -5,6 +5,8 @@ import { MapPin, X } from "lucide-react";
 
 import { DeliveryAnswer } from "@/components/storefront/delivery-answer";
 import { fetchZones } from "@/features/commerce/lib/commerce-api";
+import { loadDeliveryZones } from "@/features/commerce/lib/delivery-zones-repository";
+import { isStorefrontSeeded } from "@/lib/storefront-seed-flag";
 import {
   lookUpDeliveryPincode,
   readDeliveryLocation,
@@ -49,7 +51,9 @@ export function PincodeCheck({ className }: { className?: string }) {
 
   useEffect(() => {
     let alive = true;
-    void fetchZones()
+    // The zones the page brought with it (StorefrontCacheSeed), or a request.
+    const read = isStorefrontSeeded() ? Promise.resolve(loadDeliveryZones()) : fetchZones();
+    void read
       // An empty list on failure rather than a retry loop — the control then
       // simply does not mount, which is the same as a shop with no zones and
       // is the quiet failure rather than a loud wrong claim.

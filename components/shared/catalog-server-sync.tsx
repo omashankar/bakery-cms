@@ -13,6 +13,7 @@ import {
   saveCatalogStore,
 } from "@/features/catalog/lib/catalog-repository";
 import type { CatalogStore } from "@/types/catalog";
+import { isStorefrontSeeded } from "@/lib/storefront-seed-flag";
 
 /**
  * Hydrates the local catalog from the server once on mount, so the taxonomy
@@ -25,6 +26,8 @@ import type { CatalogStore } from "@/types/catalog";
  */
 export function CatalogServerSync() {
   useEffect(() => {
+    // Filled with the page by StorefrontCacheSeed — the same answer, already here.
+    if (isStorefrontSeeded()) return;
     let cancelled = false;
 
     (async () => {

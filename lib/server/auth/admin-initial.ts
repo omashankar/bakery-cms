@@ -1,4 +1,5 @@
 import "server-only";
+import { unstable_rethrow } from "next/navigation";
 
 import { getSession } from "@/lib/server/auth/dal";
 
@@ -21,7 +22,10 @@ export async function whenAdmin<T>(read: () => Promise<T>): Promise<T | null> {
     const session = await getSession();
     if (!session || !ADMIN_ROLES.includes(session.role)) return null;
     return await read();
-  } catch {
+  } catch (error) {
+    // Next's own interrupts (a request-time API read while prerendering, a
+    // redirect, notFound) are not a failed read and must reach Next.
+    unstable_rethrow(error);
     return null;
   }
 }

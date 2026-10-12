@@ -13,6 +13,7 @@ import { toast } from "@/lib/lazy-toast";
 import {
   getCustomerSession,
   syncCustomerSession,
+  hasCustomerSessionSettled,
 } from "@/apps/website/account/lib/customer-session";
 import {
   createSavedAddress,
@@ -197,8 +198,11 @@ function hasDeliverableAddress(address?: Partial<CheckoutAddress>): boolean {
 }
 
 interface CheckoutPageProps {
-  /** Live published catalogue, fetched on the server. */
-  catalog: LandingProduct[];
+  /**
+   * Live published catalogue, fetched on the server — only the four fields
+   * this page reads (see `CheckoutCatalogEntry`).
+   */
+  catalog: CheckoutCatalogEntry[];
   /**
    * The shop's name, read on the SERVER.
    *
@@ -211,6 +215,18 @@ interface CheckoutPageProps {
    */
   siteName: string;
 }
+
+/**
+ * What checkout needs to know about a product: whether it is still sold and
+ * in stock, the categories a scoped coupon is checked against, and its
+ * occasions for the occasion picker. The route used to send every product's
+ * whole record — descriptions, images, variants — 120 KB of HTML to parse on
+ * a phone for four fields.
+ */
+export type CheckoutCatalogEntry = Pick<
+  LandingProduct,
+  "slug" | "inStock" | "categoryIds" | "occasions"
+>;
 
 export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   const labels = useBusinessLabels();
@@ -484,7 +500,11 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
      * cookie was perfectly valid. The cache is a render hint; only the server
      * knows.
      */
-    const signedIn = await syncCustomerSession();
+    // The layout already asked the server with this page (StorefrontCacheSeed);
+    // that answer is as authoritative as a second request would be.
+    const signedIn = hasCustomerSessionSettled()
+      ? getCustomerSession()
+      : await syncCustomerSession();
     if (cancelled) return;
 
     // Being bounced back to the cart with no explanation reads as a broken

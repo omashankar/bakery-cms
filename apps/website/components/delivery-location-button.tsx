@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DeliveryAnswer } from "@/components/storefront/delivery-answer";
 import { fetchZones } from "@/features/commerce/lib/commerce-api";
+import { loadDeliveryZones } from "@/features/commerce/lib/delivery-zones-repository";
+import { isStorefrontSeeded } from "@/lib/storefront-seed-flag";
 import {
   DELIVERY_LOCATION_UPDATED_EVENT,
   deliveryLocationLabel,
@@ -68,7 +70,9 @@ export function DeliveryLocationButton() {
     setOpen(true);
     if (zones !== null || loading) return;
     setLoading(true);
-    void fetchZones()
+    // The zones the page brought with it (StorefrontCacheSeed), or a request.
+    const read = isStorefrontSeeded() ? Promise.resolve(loadDeliveryZones()) : fetchZones();
+    void read
       .then((rows) => setZones(rows ?? []))
       // An empty list on failure, not a retry loop: the panel then says it
       // found no covering zone, which is what it knows, instead of claiming

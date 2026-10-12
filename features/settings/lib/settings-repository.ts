@@ -188,6 +188,16 @@ export function applyServerSettings(full: Partial<AppSettings> & { sectionVersio
   settingsHydration.markSettled();
 }
 
+/**
+ * The PUBLIC settings the storefront layout read with the page, applied the
+ * way `hydrateSettingsFromServer` applies a visitor's read: merged into the
+ * cache, and the gate left shut — a public read never vouches for a save.
+ */
+export function applyPublicSettings(server: Partial<AppSettings>): void {
+  if (typeof window === "undefined") return;
+  mergeServerSettings(server);
+}
+
 function mergeServerSettings(server: Partial<AppSettings>): void {
   const current = loadSettings();
   const merged = mergeAppSettings({

@@ -29,6 +29,7 @@ import {
   getCustomerSession,
   hasCustomerSession,
   syncCustomerSession,
+  hasCustomerSessionSettled,
 } from "@/apps/website/account/lib/customer-session";
 import type { StorefrontChrome } from "@/apps/website/lib/storefront-chrome.server";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
@@ -400,7 +401,8 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
      * `syncCustomerSession` dispatches the session event, which the listener
      * below picks up, so there is nothing to set from here.
      */
-    void syncCustomerSession();
+    // Unless the page already brought the answer (StorefrontCacheSeed).
+    if (!hasCustomerSessionSettled()) void syncCustomerSession();
   }, []);
 
   useEffect(() => {

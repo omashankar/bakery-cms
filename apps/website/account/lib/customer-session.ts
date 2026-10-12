@@ -84,31 +84,42 @@ export async function syncCustomerSession(): Promise<CustomerSession | null> {
     const body = (await res.json()) as {
       data?: { email: string; name: string; phone?: string } | null;
     };
-    settled = true;
-
-    if (!body.data) {
-      // The server says nobody. A cache that disagrees is a stale copy, and
-      // leaving it would keep an account menu on screen for a signed-out
-      // browser — and, on a shared device, someone else's name.
-      if (readCache()) clearLocalCustomerData();
-      return null;
-    }
-
-    const current = readCache();
-    const session: CustomerSession = {
-      email: body.data.email,
-      name: body.data.name,
-      phone: body.data.phone,
-      // Kept from the cached copy where we have one; this is display trivia,
-      // not authority.
-      signedInAt: current?.signedInAt ?? new Date().toISOString(),
-    };
-    writeCache(session);
-    return session;
+    return applyServerCustomer(body.data ?? null);
   } catch {
     // Offline: keep showing what we had rather than pretending they signed out.
     return readCache();
   }
+}
+
+/**
+ * The server's answer to "who is signed in", however it arrived — fetched
+ * above, or read by the storefront layout with the page (`StorefrontCacheSeed`).
+ */
+export function applyServerCustomer(
+  data: { email: string; name: string; phone?: string } | null,
+): CustomerSession | null {
+  if (typeof window === "undefined") return null;
+  settled = true;
+
+  if (!data) {
+    // The server says nobody. A cache that disagrees is a stale copy, and
+    // leaving it would keep an account menu on screen for a signed-out
+    // browser — and, on a shared device, someone else's name.
+    if (readCache()) clearLocalCustomerData();
+    return null;
+  }
+
+  const current = readCache();
+  const session: CustomerSession = {
+    email: data.email,
+    name: data.name,
+    phone: data.phone,
+    // Kept from the cached copy where we have one; this is display trivia,
+    // not authority.
+    signedInAt: current?.signedInAt ?? new Date().toISOString(),
+  };
+  writeCache(session);
+  return session;
 }
 
 /** Adopt an identity the server has just confirmed (the sign-in modal). */
