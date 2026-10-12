@@ -11,6 +11,7 @@ import {
   Percent,
   ShoppingBag,
   Star,
+  ThumbsDown,
   ThumbsUp,
   Truck,
 } from "lucide-react";
@@ -41,8 +42,16 @@ import { ProductQuestionForm } from "@/apps/website/components/product-question-
 import { fetchProductQuestions } from "@/features/inquiries/lib/inquiries-api";
 import type { Inquiry } from "@/types/inquiry";
 import { REVIEWS_UPDATED_EVENT } from "@/features/reviews/lib/reviews-repository";
-import { markReviewHelpfulRequest } from "@/features/reviews/lib/reviews-api";
-import { getHelpfulMarks, rememberHelpfulMark } from "@/features/reviews/lib/helpful-marks";
+import {
+  markReviewHelpfulRequest,
+  markReviewUnhelpfulRequest,
+} from "@/features/reviews/lib/reviews-api";
+import {
+  getHelpfulMarks,
+  getUnhelpfulMarks,
+  rememberHelpfulMark,
+  rememberUnhelpfulMark,
+} from "@/features/reviews/lib/helpful-marks";
 import {
   getProductGalleryImages,
   getProductReviews,
@@ -290,6 +299,9 @@ export function ProductDetailPage({
   /** Answered questions only — see `listAnsweredForProduct`. */
   const [questions, setQuestions] = useState<Inquiry[]>([]);
   const [helpfulCounts, setHelpfulCounts] = useState<Record<string, number>>({});
+  /** The other thumb, held apart for the same reason. */
+  const [unhelpfulMarks, setUnhelpfulMarks] = useState<string[]>([]);
+  const [unhelpfulCounts, setUnhelpfulCounts] = useState<Record<string, number>>({});
   // The count the SERVER knows, so the heading and the empty state do not
   // contradict the star rating beside them before the fetch lands.
   const reviewCount = reviews.length || cake.reviewCount || 0;
@@ -668,6 +680,7 @@ export function ProductDetailPage({
   useEffect(() => {
     setWishlisted(isInWishlist(cake.slug));
     setHelpfulMarks(getHelpfulMarks());
+    setUnhelpfulMarks(getUnhelpfulMarks());
     /*
       Fetched, not server-rendered: this is one more round trip on a page
       whose first paint matters, and a question nobody has answered yet is
@@ -951,6 +964,15 @@ export function ProductDetailPage({
   };
 
   /**
+   * Whether this browser has already voted on a review, either way. One vote
+   * per review: a reader who pressed 👍 does not also get to press 👎.
+   *
+   * Read from the STORES, not from state — see `handleHelpful`.
+   */
+  const votedOn = (id: string) =>
+    getHelpfulMarks().includes(id) || getUnhelpfulMarks().includes(id);
+
+  /**
    * Counted optimistically, then corrected by the server's own number.
    *
    * The mark is remembered whatever the request does. A reader who pressed it
@@ -967,7 +989,7 @@ export function ProductDetailPage({
      * applied yet either. `rememberHelpfulMark` writes synchronously, so the
      * store is the only thing that already knows about the first press.
      */
-    if (getHelpfulMarks().includes(review.id)) return;
+    if (votedOn(review.id)) return;
     rememberHelpfulMark(review.id);
     setHelpfulMarks((current) => [...current, review.id]);
     setHelpfulCounts((current) => ({
@@ -978,6 +1000,22 @@ export function ProductDetailPage({
     const settled = await markReviewHelpfulRequest(review.id);
     if (settled !== null) {
       setHelpfulCounts((current) => ({ ...current, [review.id]: settled }));
+    }
+  };
+
+  /** 👎 — the same rules as 👍, and one vote per review between the two. */
+  const handleUnhelpful = async (review: ProductReview) => {
+    if (votedOn(review.id)) return;
+    rememberUnhelpfulMark(review.id);
+    setUnhelpfulMarks((current) => [...current, review.id]);
+    setUnhelpfulCounts((current) => ({
+      ...current,
+      [review.id]: (current[review.id] ?? review.unhelpfulCount ?? 0) + 1,
+    }));
+
+    const settled = await markReviewUnhelpfulRequest(review.id);
+    if (settled !== null) {
+      setUnhelpfulCounts((current) => ({ ...current, [review.id]: settled }));
     }
   };
 
@@ -2052,7 +2090,10 @@ export function ProductDetailPage({
                       <div className="divide-y divide-border border-t border-border">
                         {reviews.map((review) => {
                           const helpful = helpfulCounts[review.id] ?? review.helpfulCount ?? 0;
-                          const marked = helpfulMarks.includes(review.id);
+                          const unhelpful =
+                            unhelpfulCounts[review.id] ?? review.unhelpfulCount ?? 0;
+                          const votedUp = helpfulMarks.includes(review.id);
+                          const votedDown = unhelpfulMarks.includes(review.id);
                           return (
                             <article key={review.id} className="py-4">
                               <div className="flex flex-wrap items-center gap-2">
@@ -2134,33 +2175,54 @@ export function ProductDetailPage({
                                   <span>{formatRelativeTime(review.date)}</span>
                                 </p>
                                 {/*
-                                  One direction only. There is no way to say a
-                                  review was UNhelpful: a button that buries what
-                                  somebody wrote is a moderation tool wearing a
-                                  reader’s face, and this shop moderates on its
-                                  own screen.
+                                  👍 and 👎 with their counts, as the shop's
+                                  reference shows them. One vote per review per
+                                  browser, and the one pressed stays lit.
 
-                                  The number is shown only once somebody has
-                                  pressed it. “Helpful (0)” reads as a verdict on
-                                  the review.
+                                  A count appears only once somebody has pressed
+                                  it: "👎 0" reads as a verdict on the review.
+                                  And neither number moves a review up or down
+                                  the list — burying what somebody wrote is
+                                  moderation, done on the admin screen.
                                 */}
-                                <span className="flex items-center gap-2">
-                                  {helpful > 0 ? (
-                                    <span>
-                                      {helpful} {helpful === 1 ? "person" : "people"} found this
-                                      helpful
-                                    </span>
-                                  ) : null}
+                                <span className="flex items-center gap-1">
                                   <Button
                                     type="button"
                                     variant="ghost"
                                     size="sm"
-                                    className="h-7 px-2 text-xs"
-                                    disabled={marked}
+                                    className={cn(
+                                      "h-7 gap-1 px-2 text-xs",
+                                      votedUp && "text-green-700 disabled:opacity-100",
+                                    )}
+                                    aria-label={votedUp ? "Marked helpful" : "Helpful"}
+                                    aria-pressed={votedUp}
+                                    disabled={votedUp || votedDown}
                                     onClick={() => void handleHelpful(review)}
                                   >
-                                    <ThumbsUp className="size-3.5" />
-                                    {marked ? "Marked helpful" : "Helpful"}
+                                    <ThumbsUp
+                                      aria-hidden="true"
+                                      className={cn("size-3.5", votedUp && "fill-current")}
+                                    />
+                                    {helpful > 0 ? groupIndian(helpful) : null}
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className={cn(
+                                      "h-7 gap-1 px-2 text-xs",
+                                      votedDown && "text-red-600 disabled:opacity-100",
+                                    )}
+                                    aria-label={votedDown ? "Marked not helpful" : "Not helpful"}
+                                    aria-pressed={votedDown}
+                                    disabled={votedUp || votedDown}
+                                    onClick={() => void handleUnhelpful(review)}
+                                  >
+                                    <ThumbsDown
+                                      aria-hidden="true"
+                                      className={cn("size-3.5", votedDown && "fill-current")}
+                                    />
+                                    {unhelpful > 0 ? groupIndian(unhelpful) : null}
                                   </Button>
                                 </span>
                               </div>

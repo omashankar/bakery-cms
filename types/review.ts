@@ -40,14 +40,17 @@ export interface ProductReview {
    * loaded by every visitor.
    */
   photoUrls?: string[];
-  /**
-   * How many readers said this review helped them.
-   *
-   * A count, not a score: there is no way to say a review was UNhelpful,
-   * because a button that buries what somebody wrote is a moderation tool
-   * dressed as feedback and this shop already has a moderation screen.
-   */
+  /** How many readers said this review helped them. */
   helpfulCount?: number;
+  /**
+   * How many readers said it did NOT — the shop asked for both thumbs, as its
+   * reference storefront shows them (2026-10-12).
+   *
+   * A count to read, never a lever: nothing sorts, hides or demotes a review
+   * by it. Burying what somebody wrote is moderation, and this shop moderates
+   * on its own screen.
+   */
+  unhelpfulCount?: number;
   createdAt: string;
   updatedAt: string;
 }

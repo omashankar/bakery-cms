@@ -35,6 +35,7 @@ const reviewSchema = new mongoose.Schema(
     // review look like one that had its photos removed.
     photoUrls: { type: [String], default: undefined },
     helpfulCount: { type: Number, default: 0 },
+    unhelpfulCount: { type: Number, default: 0 },
     createdAt: { type: String },
     updatedAt: { type: String },
   },

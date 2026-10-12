@@ -129,6 +129,23 @@ export async function markReviewHelpfulRequest(id: string): Promise<number | nul
   }
 }
 
+/** Public: say an approved review did NOT help. Returns the new count, or null. */
+export async function markReviewUnhelpfulRequest(id: string): Promise<number | null> {
+  try {
+    const res = await fetch(`/api/reviews/${encodeURIComponent(id)}/unhelpful`, {
+      method: "POST",
+    });
+    if (!res.ok) {
+      noteAuthStatus(res.status);
+      return null;
+    }
+    const json = (await res.json()) as Envelope<{ unhelpfulCount: number }>;
+    return json.success ? (json.data?.unhelpfulCount ?? null) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Admin: fetch all reviews (401 → null for non-admins). */
 export async function fetchReviews(): Promise<ProductReview[] | null> {
   try {

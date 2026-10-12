@@ -77,6 +77,22 @@ export const markReviewHelpfulController = withErrorHandler(
   },
 );
 
+/**
+ * The other thumb. The SAME rate-limit bucket as the first, so splitting votes
+ * across the two buttons buys a script no extra presses.
+ */
+export const markReviewUnhelpfulController = withErrorHandler(
+  async (request: Request, ctx: IdContext) => {
+    const { id } = await ctx.params;
+    const requestCtx = requestContext(request);
+    if (requestCtx.ip) {
+      rateLimit(`review:helpful:${requestCtx.ip}`, { limit: 30, windowMs: 60_000 });
+    }
+    const result = await service.markReviewUnhelpful(id);
+    return ok(result, "Thanks for the feedback");
+  },
+);
+
 export const updateReviewController = withErrorHandler(async (request: Request, ctx: IdContext) => {
   const session = await requireRole(...REVIEW_ROLES);
   const { id } = await ctx.params;

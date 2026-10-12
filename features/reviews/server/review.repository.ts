@@ -83,6 +83,7 @@ const PUBLIC_REVIEW_FIELDS = {
   // Public by design: the button that produces it is on the storefront, and
   // a count nobody can see is not worth collecting.
   helpfulCount: 1,
+  unhelpfulCount: 1,
   // The city, and NOT the order number it came from: one is a fact about
   // this review, the other is a handle on somebody else's order.
   deliveredCity: 1,
@@ -115,15 +116,27 @@ export async function listApprovedByProduct(productSlug: string): Promise<Produc
  *
  * Returns the new count, or null when there is no such approved review.
  */
-export async function incrementHelpful(id: string): Promise<number | null> {
+export function incrementHelpful(id: string): Promise<number | null> {
+  return incrementVote(id, "helpfulCount");
+}
+
+/** One more reader found it NOT useful — the same rules as `incrementHelpful`. */
+export function incrementUnhelpful(id: string): Promise<number | null> {
+  return incrementVote(id, "unhelpfulCount");
+}
+
+async function incrementVote(
+  id: string,
+  field: "helpfulCount" | "unhelpfulCount",
+): Promise<number | null> {
   await connectDB();
   const doc = await ReviewModel.findOneAndUpdate(
     { _id: id, status: "approved" },
-    { $inc: { helpfulCount: 1 } },
-    { new: true, projection: { helpfulCount: 1 } },
+    { $inc: { [field]: 1 } },
+    { new: true, projection: { [field]: 1 } },
   ).lean();
   if (!doc) return null;
-  return (doc as { helpfulCount?: number }).helpfulCount ?? 0;
+  return (doc as Partial<Record<typeof field, number>>)[field] ?? 0;
 }
 
 /**
