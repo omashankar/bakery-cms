@@ -42,6 +42,12 @@ export function formatCurrency(
   const digits = fractionDigits(resolved);
   const tag = locale ?? localeForCurrency(resolved);
 
+  // Whole rupees in en-IN, written out without `Intl` — see `formatInrWhole`.
+  if (resolved === "INR" && digits === 0 && tag === "en-IN") {
+    const written = formatInrWhole(amount);
+    if (written !== null) return written;
+  }
+
   // One formatter per locale and currency, not one per price: a listing
   // formats dozens, and each `new Intl.NumberFormat` is a measurable slice of
   // a phone's main thread.
@@ -57,6 +63,44 @@ export function formatCurrency(
     currencyFormatters.set(key, formatter);
   }
   return formatter.format(amount);
+}
+
+/**
+ * A whole number grouped the Indian way — 1,25,000 — without `Intl`.
+ */
+export function groupIndian(value: number): string {
+  const digits = String(Math.round(Math.abs(value)));
+  const sign = value < 0 ? "-" : "";
+  if (digits.length <= 3) return sign + digits;
+  let head = digits.slice(0, -3);
+  const groups = [digits.slice(-3)];
+  while (head.length > 2) {
+    groups.unshift(head.slice(-2));
+    head = head.slice(0, -2);
+  }
+  if (head) groups.unshift(head);
+  return sign + groups.join(",");
+}
+
+/**
+ * "₹1,25,000" — exactly what `Intl.NumberFormat("en-IN", { style: "currency",
+ * currency: "INR", maximumFractionDigits: 0 })` writes, without constructing
+ * one.
+ *
+ * The first `Intl` formatter a page builds in the browser is where it loads
+ * the locale data: ~100ms of a phone's main thread, measured in CPU profiles
+ * of the product page, the cart and checkout, all of it spent during
+ * hydration to print a price. Rupees are this shop's currency and the case
+ * almost every page hits, so they skip it. The rules are Intl's own, checked
+ * value by value in a test: half away from zero, a minus on any negative
+ * input (−0.4 is "-₹0"), Indian grouping. Anything it would get wrong — not
+ * finite, or past exact integers — answers null and goes through `Intl`.
+ */
+export function formatInrWhole(amount: number): string | null {
+  if (!Number.isFinite(amount) || Math.abs(amount) >= 1e15) return null;
+  const negative = amount < 0 || Object.is(amount, -0);
+  const rupees = Math.floor(Math.abs(amount) + 0.5);
+  return `${negative ? "-" : ""}₹${groupIndian(rupees)}`;
 }
 
 const currencyFormatters = new Map<string, Intl.NumberFormat>();

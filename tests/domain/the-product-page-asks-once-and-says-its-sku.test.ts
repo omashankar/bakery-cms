@@ -2,6 +2,8 @@ import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 
@@ -36,6 +38,7 @@ vi.mock("@/features/reviews/lib/reviews-api", () => ({
 }));
 
 const { ProductDetailPage } = await import("@/apps/website/pages/product-detail-page");
+const { ProductCard } = await import("@/components/storefront/product-card");
 
 const PRODUCT = {
   id: "p-1",
@@ -82,6 +85,7 @@ function render(props: Record<string, unknown> = {}) {
         cake: PRODUCT,
         modules: defaultModuleSettings,
         related: [],
+        relatedCards: [],
         catalog: [],
         ...props,
       } as never),
@@ -125,17 +129,26 @@ describe("the rail built from what the server sent", () => {
      * effect, so a rail gated behind it looks present either way — which is
      * exactly how the gate survived unnoticed in the first place.
      */
+    // The cards are drawn by the route on the server and placed by the page;
+    // drawn here the same way the route draws them.
     const html = renderToStaticMarkup(
       createElement(ProductDetailPage, {
         cake: PRODUCT,
         modules: defaultModuleSettings,
         related: RELATED,
+        relatedCards: RELATED.map((item) => createElement(ProductCard, { key: item.id, cake: item as never })),
         catalog: [],
       } as never),
     );
 
     expect(html).toContain("You May Also Like");
     expect(html).toContain("Linen Shirt");
+  });
+
+  it("is drawn by the route, from the same products it hands the page", () => {
+    const route = readFileSync(join(process.cwd(), "app/(storefront)/store/p/[slug]/page.tsx"), "utf8");
+    expect(route).toContain("related={related}");
+    expect(route).toContain("relatedCards={related.map((item) => <ProductCard key={item.id} cake={item} />)}");
   });
 
   it("is absent when the shop has nothing to put in it", () => {

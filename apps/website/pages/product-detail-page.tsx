@@ -12,7 +12,6 @@ import {
   ThumbsUp,
   Truck,
 } from "lucide-react";
-import { ProductCard } from "@/components/storefront/product-card";
 import { ScrollReveal, StaggerReveal } from "@/components/shared/scroll-reveal";
 import type { ProductVariantGroup, ProductVariantOption } from "@/types/product";
 import { OptimizedImage } from "@/components/shared/optimized-image";
@@ -75,7 +74,6 @@ import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils"
 import { isInWishlist, toggleWishlist } from "@/apps/website/lib/wishlist";
 import { getRecommendedProducts } from "@/apps/website/lib/recommended-products";
 import { recordRecentlyViewedProduct } from "@/features/products/lib/recently-viewed";
-import { ProductRailSection } from "@/apps/website/components/product-rail-section";
 import type { LandingProduct } from "@/constants/landing-data";
 import { storefrontHeading } from "@/constants/typography";
 import { Badge } from "@/components/ui/badge";
@@ -107,6 +105,16 @@ import { OptionButton, OptionGroup } from "@/components/storefront/option-group"
  * visitors never open. Its state (the file and the draft) lives in this page,
  * so mounting it only while it is in use loses nothing.
  */
+/**
+ * "Recommended for you" is built from what this browser has looked at, so it
+ * only ever draws after mount — and its cards are the only ones this page
+ * draws itself. Loaded then, rather than with the page.
+ */
+const ProductRailSection = dynamic(
+  () => import("@/apps/website/components/product-rail-section").then((m) => m.ProductRailSection),
+  { ssr: false },
+);
+
 const PhotoPrintEditor = dynamic(
   () => import("@/components/storefront/photo-print-editor").then((m) => m.PhotoPrintEditor),
   { ssr: false },
@@ -156,6 +164,12 @@ interface ProductDetailPageProps {
    * until a change made it live. A required prop cannot rot that way.
    */
   related: LandingProduct[];
+  /**
+   * The "You may also like" cards, drawn on the SERVER from `related`. The
+   * page only places them; drawing them here put the card's code and its
+   * price formatting into this page's hydration.
+   */
+  relatedCards: React.ReactNode;
   catalog: LandingProduct[];
   /**
    * This product's category, as a crumb — its name and its real address.
@@ -187,6 +201,7 @@ export function ProductDetailPage({
   modules: modulesFromServer,
   editLineId,
   related: relatedFromServer,
+  relatedCards,
   catalog,
   categoryCrumb,
   departmentCrumb,
@@ -2137,9 +2152,7 @@ export function ProductDetailPage({
                   and four cards became four full-width rows — four and a
                   half extra screens at the foot of a phone. */}
               <StaggerReveal className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4">
-                {related.map((item) => (
-                  <ProductCard key={item.id} cake={item} />
-                ))}
+                {relatedCards}
               </StaggerReveal>
             </div>
           ) : null}
