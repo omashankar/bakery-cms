@@ -1237,11 +1237,11 @@ describe("the two forms that used to stand open", () => {
   it("does the same for the review form", () => {
     const view = render(CAKE);
     try {
-      expect(view.html).toContain("Write a review");
+      expect(view.html).toContain("Rate Product");
       expect(view.html).not.toContain("Your review");
 
       const write = [...view.container.querySelectorAll("button")].find(
-        (node) => node.textContent?.trim() === "Write a review",
+        (node) => node.textContent?.trim() === "Rate Product",
       );
       act(() => {
         write?.dispatchEvent(new MouseEvent("click", { bubbles: true }));

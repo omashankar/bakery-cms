@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
+  BadgeCheck,
   Check,
   Heart,
   ImageUp,
@@ -25,8 +26,7 @@ import {
   type PhotoPrintDraft,
 } from "@/lib/images/photo-print-layout";
 import { PriceDisplay } from "@/components/storefront/price-display";
-import { StarRating } from "@/components/shared/star-rating";
-import { RatingSummary } from "@/components/storefront/rating-summary";
+import { RatingSummary, ratingTone } from "@/components/storefront/rating-summary";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import {
   addToCart,
@@ -1989,28 +1989,28 @@ export function ProductDetailPage({
                   </div>
                 </DetailSection>
 
+                {/*
+                  RATINGS & REVIEWS, laid out the way the shop's reference
+                  (Flipkart) lays it out: "Rate Product" beside the heading, the
+                  summary, then each review as a row — a coloured rating chip
+                  and its title first, the words, and who wrote it last.
+                */}
                 <DetailSection
                   id="reviews"
-                  title={`Reviews${reviewCount ? ` (${reviewCount})` : ""}`}
+                  title={`Ratings & Reviews${reviewCount ? ` (${reviewCount})` : ""}`}
+                  action={
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      aria-expanded={reviewOpen}
+                      onClick={() => setReviewOpen((open) => !open)}
+                    >
+                      Rate Product
+                    </Button>
+                  }
                 >
                   <div className="space-y-4">
-                    {/*
-                      Counted from the rows rendered below it, so the summary
-                      and the list cannot disagree. Renders nothing when there
-                      is nothing to summarise.
-                    */}
-                    <RatingSummary reviews={reviews} />
-                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-cream-50 px-4 py-3">
-                      <p className="text-sm font-medium">Ordered this before?</p>
-                      <Button
-                        type="button"
-                        variant="bakery"
-                        size="sm"
-                        onClick={() => setReviewOpen((open) => !open)}
-                      >
-                        Write a review
-                      </Button>
-                    </div>
                     {reviewOpen ? (
                       <ProductReviewForm
                         productSlug={cake.slug}
@@ -2027,6 +2027,12 @@ export function ProductDetailPage({
                         }}
                       />
                     ) : null}
+                    {/*
+                      Counted from the rows rendered below it, so the summary
+                      and the list cannot disagree. Renders nothing when there
+                      is nothing to summarise.
+                    */}
+                    <RatingSummary reviews={reviews} />
                     {reviews.length === 0 ? (
                       <p className="text-sm text-muted-foreground">
                         {/*
@@ -2043,112 +2049,125 @@ export function ProductDetailPage({
                           : "No published reviews yet. Be the first to share your experience."}
                       </p>
                     ) : (
-                      reviews.map((review) => (
-                        <article
-                          key={review.id}
-                          className="rounded-xl border border-border bg-card p-4"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="text-sm font-medium">{review.author}</p>
-                              {review.isFeatured ? <Badge variant="gold">Featured</Badge> : null}
-                              {/*
-                                Shown only where the SERVER could match this
-                                reviewer's signed-in account to an order of this
-                                product that actually reached Delivered. It is a
-                                statement that somebody in that city bought this
-                                and received it, so nothing a browser can type
-                                may reach it — and for most reviews it is simply
-                                absent, which is the honest answer.
-                              */}
-                              {review.deliveredCity ? (
-                                <span className="text-xs text-muted-foreground">
-                                  Delivered in {review.deliveredCity}
-                                </span>
-                              ) : null}
-                            </div>
-                            <span className="text-xs text-muted-foreground">
-                              {formatRelativeTime(review.date)}
-                            </span>
-                          </div>
-                          {review.title ? (
-                            <p className="mt-1 text-sm font-medium">{review.title}</p>
-                          ) : null}
-                          <StarRating rating={review.rating} className="mt-2" />
-                          <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">
-                            {review.text}
-                          </p>
-                          {/*
-                            The reviewer's own photos of what arrived.
-
-                            Only URLs this shop stored itself reach here: the
-                            submit endpoint is public, and an off-site image on
-                            a product page loads for every visitor and can be
-                            swapped for something else after a moderator has
-                            approved it.
-                          */}
-                          {review.photoUrls?.length ? (
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {review.photoUrls.map((url) => (
-                                <a
-                                  key={url}
-                                  href={url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="size-20 overflow-hidden rounded-lg border border-border bg-cream-100"
+                      <div className="divide-y divide-border border-t border-border">
+                        {reviews.map((review) => {
+                          const helpful = helpfulCounts[review.id] ?? review.helpfulCount ?? 0;
+                          const marked = helpfulMarks.includes(review.id);
+                          return (
+                            <article key={review.id} className="py-4">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span
+                                  className={cn(
+                                    "inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-xs font-semibold text-white",
+                                    ratingTone(Math.round(review.rating)),
+                                  )}
+                                  aria-label={`Rated ${review.rating} out of 5`}
                                 >
-                                  <OptimizedImage
-                                    src={url}
-                                    alt=""
-                                    width={80}
-                                    height={80}
-                                    className="size-full object-cover"
-                                  />
-                                </a>
-                              ))}
-                            </div>
-                          ) : null}
-                          {review.adminReply ? (
-                            <div className="mt-3 rounded-lg border border-border bg-cream-50 px-3 py-2 text-sm">
-                              <p className="font-medium text-bakery-700">Response from the shop</p>
-                              <p className="mt-1 whitespace-pre-line text-muted-foreground">
-                                {review.adminReply}
+                                  {review.rating} ★
+                                </span>
+                                {review.title ? (
+                                  <p className="text-sm font-semibold">{review.title}</p>
+                                ) : null}
+                                {review.isFeatured ? <Badge variant="gold">Featured</Badge> : null}
+                              </div>
+                              <p className="mt-2 whitespace-pre-line text-sm text-foreground/90">
+                                {review.text}
                               </p>
-                            </div>
-                          ) : null}
-                          {/*
-                            One direction only. There is no way to say a review
-                            was UNhelpful: a button that buries what somebody
-                            wrote is a moderation tool wearing a reader’s face,
-                            and this shop moderates on its own screen.
+                              {/*
+                                The reviewer's own photos of what arrived.
 
-                            The number is shown only once somebody has pressed
-                            it. “Helpful (0)” reads as a verdict on the review.
-                          */}
-                          <div className="mt-3 flex items-center gap-2">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              disabled={helpfulMarks.includes(review.id)}
-                              onClick={() => void handleHelpful(review)}
-                            >
-                              <ThumbsUp className="size-4" />
-                              {helpfulMarks.includes(review.id) ? "Marked helpful" : "Helpful"}
-                            </Button>
-                            {(helpfulCounts[review.id] ?? review.helpfulCount ?? 0) > 0 ? (
-                              <span className="text-xs text-muted-foreground">
-                                {helpfulCounts[review.id] ?? review.helpfulCount}
-                                {" "}
-                                {(helpfulCounts[review.id] ?? review.helpfulCount) === 1
-                                  ? "person"
-                                  : "people"}{" "}
-                                found this helpful
-                              </span>
-                            ) : null}
-                          </div>
-                        </article>
-                      ))
+                                Only URLs this shop stored itself reach here: the
+                                submit endpoint is public, and an off-site image on
+                                a product page loads for every visitor and can be
+                                swapped for something else after a moderator has
+                                approved it.
+                              */}
+                              {review.photoUrls?.length ? (
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  {review.photoUrls.map((url) => (
+                                    <a
+                                      key={url}
+                                      href={url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="size-16 overflow-hidden rounded-md border border-border bg-muted"
+                                    >
+                                      <OptimizedImage
+                                        src={url}
+                                        alt=""
+                                        width={64}
+                                        height={64}
+                                        className="size-full object-cover"
+                                      />
+                                    </a>
+                                  ))}
+                                </div>
+                              ) : null}
+                              {review.adminReply ? (
+                                <div className="mt-3 rounded-md bg-muted px-3 py-2 text-sm">
+                                  <p className="font-medium">Response from the shop</p>
+                                  <p className="mt-1 whitespace-pre-line text-muted-foreground">
+                                    {review.adminReply}
+                                  </p>
+                                </div>
+                              ) : null}
+                              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                                <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                  <span className="font-medium text-foreground/80">{review.author}</span>
+                                  {/*
+                                    Shown only where the SERVER could match this
+                                    reviewer's signed-in account to an order of
+                                    this product that actually reached Delivered.
+                                    It is a statement that somebody in that city
+                                    bought this and received it — which is what
+                                    "Certified Buyer" claims — so nothing a
+                                    browser can type may reach it, and for most
+                                    reviews it is simply absent, which is the
+                                    honest answer.
+                                  */}
+                                  {review.deliveredCity ? (
+                                    <span className="inline-flex items-center gap-1">
+                                      <BadgeCheck aria-hidden="true" className="size-3.5 text-green-700" />
+                                      Certified Buyer, {review.deliveredCity}
+                                    </span>
+                                  ) : null}
+                                  <span>{formatRelativeTime(review.date)}</span>
+                                </p>
+                                {/*
+                                  One direction only. There is no way to say a
+                                  review was UNhelpful: a button that buries what
+                                  somebody wrote is a moderation tool wearing a
+                                  reader’s face, and this shop moderates on its
+                                  own screen.
+
+                                  The number is shown only once somebody has
+                                  pressed it. “Helpful (0)” reads as a verdict on
+                                  the review.
+                                */}
+                                <span className="flex items-center gap-2">
+                                  {helpful > 0 ? (
+                                    <span>
+                                      {helpful} {helpful === 1 ? "person" : "people"} found this
+                                      helpful
+                                    </span>
+                                  ) : null}
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs"
+                                    disabled={marked}
+                                    onClick={() => void handleHelpful(review)}
+                                  >
+                                    <ThumbsUp className="size-3.5" />
+                                    {marked ? "Marked helpful" : "Helpful"}
+                                  </Button>
+                                </span>
+                              </div>
+                            </article>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
                 </DetailSection>

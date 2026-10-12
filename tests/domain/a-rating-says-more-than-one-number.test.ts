@@ -89,17 +89,16 @@ async function render() {
 }
 
 /**
- * The summary block, found by what only it contains.
+ * The summary block, found by the name it gives itself.
  *
- * `.bg-cream-50` matches the price panel further up the page, and a width
- * selector matches every progress-ish element in the document. Both of those
- * made an assertion pass, or fail, for reasons that had nothing to do with the
+ * A class selector (`.bg-cream-50`) matched the price panel further up the
+ * page, and a width selector matches every progress-ish element in the
+ * document; each review's rating chip also reads "5 ★" now. All of those made
+ * an assertion pass, or fail, for reasons that had nothing to do with the
  * histogram.
  */
 function summary() {
-  return [...(container?.querySelectorAll("div") ?? [])].find(
-    (node) => node.className.includes("bg-cream-50") && (node.textContent ?? "").includes("5 ★"),
-  );
+  return container?.querySelector<HTMLElement>('[role="group"][aria-label="Ratings summary"]');
 }
 
 function press(text: string) {
@@ -136,7 +135,7 @@ describe("the shape of the ratings, not just their average", () => {
     // Four reviews: three fives and a one. 4.0, not the 4.2 stored on the
     // product — the bars and the number beside them come from the same rows.
     expect(summary).toContain("4");
-    expect(summary).toContain("4 reviews");
+    expect(summary).toContain("4 Ratings & 4 Reviews");
     expect(summary).toContain("5 ★");
     expect(summary).toContain("1 ★");
   });

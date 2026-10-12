@@ -14,15 +14,25 @@ import { storefrontHeading } from "@/constants/typography";
 export function DetailSection({
   title,
   id,
+  action,
   children,
 }: {
   title: string;
   id?: string;
+  /** Beside the heading, at the far end — "Rate Product" on the reviews. */
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <section id={id} className="border-t border-border pt-6">
-      <h2 className={storefrontHeading.card}>{title}</h2>
+      {action ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className={storefrontHeading.card}>{title}</h2>
+          {action}
+        </div>
+      ) : (
+        <h2 className={storefrontHeading.card}>{title}</h2>
+      )}
       <div className="mt-3">{children}</div>
     </section>
   );

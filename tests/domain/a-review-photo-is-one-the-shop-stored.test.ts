@@ -210,7 +210,7 @@ describe("where a review photo is seen", () => {
       );
       expect(photo, "the reviewer's photo never reached the page").toBeTruthy();
       // …and the delivery line beside it, which comes from the same payload.
-      expect(container.textContent).toContain("Delivered in Mumbai");
+      expect(container.textContent).toContain("Certified Buyer, Mumbai");
     } finally {
       act(() => {
         root.unmount();
