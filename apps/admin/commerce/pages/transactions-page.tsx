@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Download, IndianRupee, Loader2, Receipt, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
@@ -43,10 +43,17 @@ const EMPTY_TRANSACTIONS_OVERVIEW: TransactionsOverviewResponse = {
   totalRecords: 0,
 };
 
-export function TransactionsPage() {
-  const [paginated, setPaginated] = useState<TransactionView[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
+export function TransactionsPage({
+  initial = null,
+}: {
+  /** The default view's first page, read on the server; null fetches as before. */
+  initial?: { items: TransactionView[]; total: number; overview: TransactionsOverviewResponse } | null;
+} = {}) {
+  // The server answered the default view; its first request would repeat it.
+  const listFromServer = useRef(Boolean(initial));
+  const [paginated, setPaginated] = useState<TransactionView[]>(initial?.items ?? []);
+  const [total, setTotal] = useState(initial?.total ?? 0);
+  const [loading, setLoading] = useState(!initial);
   const [failed, setFailed] = useState(false);
 
   /**
@@ -59,7 +66,7 @@ export function TransactionsPage() {
    * simply never reached the cards. Same wiring as the dashboard and reports.
    */
   const statFigures: FiguresState = loading ? "loading" : failed ? "unavailable" : "ready";
-  const [overview, setOverview] = useState<TransactionsOverviewResponse>(EMPTY_TRANSACTIONS_OVERVIEW);
+  const [overview, setOverview] = useState<TransactionsOverviewResponse>(initial?.overview ?? EMPTY_TRANSACTIONS_OVERVIEW);
   const [filters, setFilters] = useState<TransactionFilters>(defaultTransactionFilters);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<PlacedOrder | null>(null);
@@ -86,6 +93,10 @@ export function TransactionsPage() {
     page: number;
   };
   useEffect(() => {
+    if (listFromServer.current) {
+      listFromServer.current = false;
+      return;
+    }
     let cancelled = false;
     async function load() {
       // Re-armed on EVERY request, not just the first: without this a refilter

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -35,6 +35,7 @@ import {
   getInventoryOverview,
   getInventorySettings,
   INVENTORY_UPDATED_EVENT,
+  isServerCopyUpdate,
   loadStockHistory,
   saveInventorySettings,
   setUnlimitedStock,
@@ -56,7 +57,8 @@ import { SettingsFormGate, SettingsHydrationNotice } from "@/apps/admin/settings
 import { routes } from "@/constants/routes";
 import { formatRelativeTime } from "@/utils/format";
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
-import { useProductCacheSync } from "@/features/products/data/use-product-cache-sync";
+import { applyServerProducts, useProductCacheSync } from "@/features/products/data/use-product-cache-sync";
+import type { Product } from "@/types/product";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 const PAGE_SIZE = 10;
@@ -71,7 +73,18 @@ const EMPTY_OVERVIEW: InventoryOverview = {
   totalUnits: 0,
 };
 
-export function InventoryAdminPage() {
+export function InventoryAdminPage({
+  initial = null,
+}: {
+  /** The catalogue and overview, read on the server for this page. */
+  initial?: { products: Product[]; overview: InventoryOverview } | null;
+} = {}) {
+  // Before this screen's passive effects, so the item list is the server's
+  // stock from its first refresh rather than this browser's old copy.
+  useLayoutEffect(() => {
+    if (initial) applyServerProducts(initial.products);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
+  }, []);
   const labels = useBusinessLabels();
   /**
    * This screen's own data, asked for NOW.
@@ -126,7 +139,9 @@ export function InventoryAdminPage() {
    * The local computation stays as the fallback for a failed read, which is
    * approximately right rather than absent.
    */
-  const [serverOverview, setServerOverview] = useState<InventoryOverview | null>(null);
+  const [serverOverview, setServerOverview] = useState<InventoryOverview | null>(
+    initial?.overview ?? null,
+  );
 
   const overview = useMemo(
     () => serverOverview ?? (mounted ? getInventoryOverview() : EMPTY_OVERVIEW),
@@ -156,12 +171,15 @@ export function InventoryAdminPage() {
       if (!cancelled && next) setServerOverview(next);
     }
 
-    function onInventoryUpdated() {
+    function onInventoryUpdated(event: Event) {
       setRefreshKey((value) => value + 1);
-      void refreshOverview();
+      // The admin's sync copying the server's history and settings into this
+      // browser changes nothing the server's overview counts.
+      if (!isServerCopyUpdate(event)) void refreshOverview();
     }
 
-    void refreshOverview();
+    // The server sent the overview with the page; later changes still re-read.
+    if (!initial) void refreshOverview();
     window.addEventListener(INVENTORY_UPDATED_EVENT, onInventoryUpdated);
     // The product cache arrives from the server AFTER this screen has read it.
     // Without this the item list showed whatever localStorage held at mount for
@@ -172,6 +190,7 @@ export function InventoryAdminPage() {
       window.removeEventListener(INVENTORY_UPDATED_EVENT, onInventoryUpdated);
       window.removeEventListener(PRODUCTS_UPDATED_EVENT, onInventoryUpdated);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
   }, []);
 
   function updateFilters(patch: Partial<InventoryListFilters>) {

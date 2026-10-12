@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+
 import {
   Banknote,
   CheckCircle2,
@@ -196,16 +197,23 @@ function RefundCaseDetail({
   );
 }
 
-export function RefundCenterAdminPage() {
-  const [orders, setOrders] = useState<PlacedOrder[]>([]);
+export function RefundCenterAdminPage({
+  initial = null,
+}: {
+  /** The default view's first page, read on the server; null fetches as before. */
+  initial?: { items: PlacedOrder[]; total: number; overview: RefundOverview } | null;
+} = {}) {
+  // The server answered the default view; its first request would repeat it.
+  const listFromServer = useRef(Boolean(initial));
+  const [orders, setOrders] = useState<PlacedOrder[]>(initial?.items ?? []);
   const [filters, setFilters] = useState<RefundListFilters>(defaultRefundFilters);
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [refundTarget, setRefundTarget] = useState<PlacedOrder | null>(null);
-  const [total, setTotal] = useState(0);
-  const [overview, setOverview] = useState<RefundOverview>(EMPTY_REFUND_OVERVIEW);
+  const [total, setTotal] = useState(initial?.total ?? 0);
+  const [overview, setOverview] = useState<RefundOverview>(initial?.overview ?? EMPTY_REFUND_OVERVIEW);
   const [reloadKey, setReloadKey] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initial);
   const [failed, setFailed] = useState(false);
 
   /**
@@ -240,6 +248,10 @@ export function RefundCenterAdminPage() {
     page: number;
   };
   useEffect(() => {
+    if (listFromServer.current) {
+      listFromServer.current = false;
+      return;
+    }
     let cancelled = false;
     async function load() {
       // Re-armed on EVERY request, not just the first: without this a refilter

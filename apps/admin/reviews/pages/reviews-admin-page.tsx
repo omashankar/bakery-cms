@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import {
   Check,
   Flag,
@@ -46,7 +46,7 @@ import {
   toggleReviewFeatured,
   updateReview,
 } from "@/features/reviews/lib/reviews-repository";
-import { useReviewsServerSync } from "@/features/reviews/lib/use-reviews-server-sync";
+import { applyServerReviews, useReviewsServerSync } from "@/features/reviews/lib/use-reviews-server-sync";
 import {
   defaultReviewFilters,
   filterReviews,
@@ -72,7 +72,18 @@ const EMPTY_OVERVIEW: ProductReviewOverview = {
   averageRating: 0,
 };
 
-export function ReviewsAdminPage() {
+export function ReviewsAdminPage({
+  initial = null,
+}: {
+  /** Every review, read on the server for this page; null fetches as before. */
+  initial?: ProductReview[] | null;
+} = {}) {
+  // Before this screen's passive effects (the sync and the first refresh), so
+  // they find the server's reviews already in the cache.
+  useLayoutEffect(() => {
+    if (initial) applyServerReviews(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
+  }, []);
   const labels = useBusinessLabels();
   const [mounted, setMounted] = useState(false);
   const [reviews, setReviews] = useState<ProductReview[]>([]);

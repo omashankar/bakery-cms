@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Download,
   Loader2,
@@ -64,12 +64,19 @@ const EXPORT_LIMIT = 500;
 
 type InvoiceTab = "invoices" | "design";
 
-export function InvoicesAdminPage() {
+export function InvoicesAdminPage({
+  initial = null,
+}: {
+  /** The default view's first page, read on the server; null fetches as before. */
+  initial?: { items: PlacedOrder[]; total: number; overview: InvoiceOverview } | null;
+} = {}) {
+  // The server answered the default view; its first request would repeat it.
+  const listFromServer = useRef(Boolean(initial));
   const router = useRouter();
   const [tab, setTab] = useState<InvoiceTab>("invoices");
-  const [orders, setOrders] = useState<PlacedOrder[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [orders, setOrders] = useState<PlacedOrder[]>(initial?.items ?? []);
+  const [total, setTotal] = useState(initial?.total ?? 0);
+  const [loading, setLoading] = useState(!initial);
   const [exporting, setExporting] = useState(false);
   const [failed, setFailed] = useState(false);
 
@@ -83,7 +90,7 @@ export function InvoicesAdminPage() {
    * simply never reached the cards. Same wiring as the dashboard and reports.
    */
   const statFigures: FiguresState = loading ? "loading" : failed ? "unavailable" : "ready";
-  const [overview, setOverview] = useState<InvoiceOverview>(EMPTY_INVOICE_OVERVIEW);
+  const [overview, setOverview] = useState<InvoiceOverview>(initial?.overview ?? EMPTY_INVOICE_OVERVIEW);
   const [filters, setFilters] = useState<InvoiceListFilters>(defaultInvoiceListFilters);
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -161,6 +168,10 @@ export function InvoicesAdminPage() {
     page: number;
   };
   useEffect(() => {
+    if (listFromServer.current) {
+      listFromServer.current = false;
+      return;
+    }
     let cancelled = false;
     async function load() {
       // Re-armed on EVERY request, not just the first: without this a refilter
