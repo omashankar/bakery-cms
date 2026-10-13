@@ -411,6 +411,16 @@ html.dark {
     @apply font-heading tracking-[-0.01em] text-foreground;
   }
 
+  /*
+    FIGURES THAT LINE UP. Amounts, counts and dates in a table sit in
+    columns; with proportional digits a "1" is narrower than an "8" and the
+    column of totals zig-zags.
+  */
+  td,
+  th {
+    font-variant-numeric: tabular-nums;
+  }
+
   ::selection {
     background: color-mix(in oklch, var(--gold-300) 35%, transparent);
     color: var(--foreground);

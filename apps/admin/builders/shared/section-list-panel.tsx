@@ -203,7 +203,7 @@ function SortableSectionRow<T extends BuilderSectionListItem>({
             {entry?.label ?? section.type}
           </span>
           {!section.isVisible ? (
-            <span className="shrink-0 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+            <span className="shrink-0 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
               Hidden
             </span>
           ) : null}

@@ -440,7 +440,7 @@ export function InquiriesListPage({
                           </td>
                           {!fixedType ? (
                             <td className="px-4 py-3">
-                              <Badge variant="outline" className="text-[10px]">
+                              <Badge variant="outline" className="text-[11px]">
                                 {formatInquiryType(inquiry.type)}
                               </Badge>
                             </td>

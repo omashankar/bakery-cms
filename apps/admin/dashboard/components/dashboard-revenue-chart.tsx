@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { type FiguresState } from "@/components/shared/panel-loading";
 import { routes } from "@/constants/routes";
 import { formatCurrency } from "@/utils/format";
+import { cn } from "@/lib/utils";
 import { type DashboardCommerceAnalytics } from "../lib/dashboard-analytics";
 
 interface DashboardRevenueChartProps {
@@ -111,7 +112,14 @@ export function DashboardRevenueChart({ analytics, figures = "ready" }: Dashboar
                         and only one bar in six carries one, so the neighbours'
                         empty space is there for it to use.
                       */
-                      <span className="whitespace-nowrap text-[10px] tabular-nums text-muted-foreground sm:text-[11px]">
+                      <span
+  className={cn(
+    "whitespace-nowrap text-[11px] tabular-nums text-muted-foreground",
+    // The end labels hug their edge, or the first was cut off at the left.
+    index === 0 && "self-start",
+    index === trend.length - 1 && "self-end",
+  )}
+>
                         {item.label}
                       </span>
                     ) : (

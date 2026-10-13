@@ -156,7 +156,7 @@ function ResultButton({
             <Badge
               variant="outline"
               className={cn(
-                "shrink-0 text-[10px]",
+                "shrink-0 text-[11px]",
                 active && "border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground"
               )}
             >
@@ -362,7 +362,7 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
               </p>
               {grouped.map((section) => (
                 <div key={section.group} className="mb-2 last:mb-0">
-                  <p className="px-3 py-1.5 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                  <p className="px-3 py-1.5 text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
                     {section.label}
                   </p>
                   <div className="space-y-0.5">
@@ -387,7 +387,7 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
               {recentResults.length > 0 ? (
                 <div className="mb-3">
                   <div className="flex items-center justify-between px-3 py-1.5">
-                    <p className="flex items-center gap-1.5 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                    <p className="flex items-center gap-1.5 text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
                       <Clock3 className="size-3.5" />
                       Recent
                     </p>
@@ -419,7 +419,7 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
               ) : null}
 
               <div className="mb-2">
-                <p className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                <p className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
                   <Sparkles className="size-3.5" />
                   Quick access
                 </p>
@@ -446,7 +446,7 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
                     <button
                       key={hint.prefix}
                       type="button"
-                      className="rounded-full border border-border bg-card px-2 py-0.5 font-mono text-[10px] hover:text-foreground"
+                      className="rounded-full border border-border bg-card px-2 py-0.5 font-mono text-[11px] hover:text-foreground"
                       onClick={() => setQuery(hint.prefix)}
                     >
                       {hint.prefix}
@@ -461,16 +461,16 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border bg-muted/40 px-4 py-2 text-[11px] text-muted-foreground">
           <div className="flex flex-wrap items-center gap-2">
             <span>
-              <kbd className="rounded border border-border bg-card px-1.5 py-0.5 font-mono text-[10px]">
+              <kbd className="rounded border border-border bg-card px-1.5 py-0.5 font-mono text-[11px]">
                 ↑
               </kbd>{" "}
-              <kbd className="rounded border border-border bg-card px-1.5 py-0.5 font-mono text-[10px]">
+              <kbd className="rounded border border-border bg-card px-1.5 py-0.5 font-mono text-[11px]">
                 ↓
               </kbd>{" "}
               navigate
             </span>
             <span>
-              <kbd className="rounded border border-border bg-card px-1.5 py-0.5 font-mono text-[10px]">
+              <kbd className="rounded border border-border bg-card px-1.5 py-0.5 font-mono text-[11px]">
                 Enter
               </kbd>{" "}
               open

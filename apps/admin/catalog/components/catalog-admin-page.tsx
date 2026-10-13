@@ -495,7 +495,7 @@ export function CatalogAdminPage({
                 <Badge
                   variant={active ? "secondary" : "outline"}
                   className={cn(
-                    "h-5 min-w-5 justify-center px-1.5 text-[10px]",
+                    "h-5 min-w-5 justify-center px-1.5 text-[11px]",
                     active && "border-transparent bg-primary-foreground/20 text-primary-foreground"
                   )}
                 >

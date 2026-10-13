@@ -52,7 +52,7 @@ export function NotificationTypeBadge({
   className?: string;
 }) {
   return (
-    <Badge variant={variantMap[type]} className={cn("text-[10px]", className)}>
+    <Badge variant={variantMap[type]} className={cn("text-[11px]", className)}>
       {formatNotificationType(type)}
     </Badge>
   );

@@ -276,7 +276,7 @@ export function ReviewsAdminPage({
             >
               <Plus className="size-4" />
               <span className="sm:hidden">Add</span>
-              <span className="hidden sm:inline">Add review</span>
+              <span className="hidden sm:inline">Add Review</span>
             </Button>
           </div>
         }
@@ -467,7 +467,7 @@ export function ReviewsAdminPage({
                         <p className="font-medium text-foreground">{review.authorName}</p>
                         <ReviewStatusBadge status={review.status} />
                         {review.isFeatured ? (
-                          <Badge variant="gold" className="text-[10px]">
+                          <Badge variant="gold" className="text-[11px]">
                             Featured
                           </Badge>
                         ) : null}

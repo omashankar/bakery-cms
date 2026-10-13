@@ -313,7 +313,7 @@ export function AdminProfilePage({
             <CardContent className="space-y-5">
               <div className="grid gap-5 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="fullName">Full Name</Label>
+                  <Label htmlFor="fullName">Full name</Label>
                   <Input
                     id="fullName"
                     value={form.fullName}
@@ -322,7 +322,7 @@ export function AdminProfilePage({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
+                  <Label htmlFor="email">Email address</Label>
                   <div className="relative">
                     <Mail className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
@@ -336,7 +336,7 @@ export function AdminProfilePage({
                   <p className="text-xs text-muted-foreground">Email cannot be changed.</p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="mobile">Mobile Number</Label>
+                  <Label htmlFor="mobile">Mobile number</Label>
                   <Input
                     id="mobile"
                     type="tel"
@@ -385,9 +385,9 @@ export function AdminProfilePage({
             <CardContent className="divide-y divide-border text-sm">
               {[
                 { label: "Role", value: profile.role },
-                { label: "Account Status", value: profile.status },
-                { label: "Last Login", value: formatDate(profile.lastLogin) },
-                { label: "Account Created", value: formatDate(profile.createdAt) },
+                { label: "Account status", value: profile.status },
+                { label: "Last login", value: formatDate(profile.lastLogin) },
+                { label: "Account created", value: formatDate(profile.createdAt) },
               ].map((row) => (
                 <div key={row.label} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
                   <span className="text-muted-foreground">{row.label}</span>

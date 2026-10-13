@@ -606,17 +606,17 @@ export function ProductsListPage({
                           <p className="truncate font-medium text-foreground">{cake.name}</p>
                           <div className="mt-0.5 flex flex-wrap gap-1">
                             {cake.isFeatured ? (
-                              <Badge variant="gold" className="text-[10px]">
+                              <Badge variant="gold" className="text-[11px]">
                                 Featured
                               </Badge>
                             ) : null}
                             {cake.isTrending ? (
-                              <Badge variant="outline" className="text-[10px]">
+                              <Badge variant="outline" className="text-[11px]">
                                 Trending
                               </Badge>
                             ) : null}
                             {cake.isBestSeller ? (
-                              <Badge variant="bakery" className="text-[10px]">
+                              <Badge variant="bakery" className="text-[11px]">
                                 Best Seller
                               </Badge>
                             ) : null}

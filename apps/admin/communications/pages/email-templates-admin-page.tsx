@@ -425,7 +425,7 @@ export function EmailTemplatesAdminPage({
             <Button variant="bakery" className="w-full sm:w-auto" onClick={() => void handleCreate()} disabled={hydration !== "ready"}>
               <Plus className="size-4" />
               <span className="sm:hidden">New</span>
-              <span className="hidden sm:inline">New template</span>
+              <span className="hidden sm:inline">New Template</span>
             </Button>
           </div>
         }

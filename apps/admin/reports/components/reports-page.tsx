@@ -400,7 +400,14 @@ export function ReportsPage({
                             />
                           </div>
                           {showLabel ? (
-                            <span className="whitespace-nowrap text-[10px] tabular-nums text-muted-foreground sm:text-[11px]">
+                            <span
+  className={cn(
+    "whitespace-nowrap text-[11px] tabular-nums text-muted-foreground",
+    // The end labels hug their edge, or the first was cut off at the left.
+    index === 0 && "self-start",
+    index === trend.length - 1 && "self-end",
+  )}
+>
                               {item.label}
                             </span>
                           ) : (

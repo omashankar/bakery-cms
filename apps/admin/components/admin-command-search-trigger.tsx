@@ -37,7 +37,7 @@ export function AdminCommandSearchTrigger({ onOpen, className }: AdminCommandSea
     >
       <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
       <span className="truncate">Search admin…</span>
-      <kbd className="ml-auto hidden rounded border border-border bg-card px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground lg:inline">
+      <kbd className="ml-auto hidden rounded border border-border bg-card px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground lg:inline">
         {shortcut}
       </kbd>
     </button>

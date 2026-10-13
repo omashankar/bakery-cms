@@ -280,7 +280,7 @@ export function BannersAdminPage({
             >
               <Plus className="size-4" />
               <span className="sm:hidden">Add</span>
-              <span className="hidden sm:inline">Add banner</span>
+              <span className="hidden sm:inline">Add Banner</span>
             </Button>
           </div>
         }

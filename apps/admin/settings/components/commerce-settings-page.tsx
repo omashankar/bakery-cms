@@ -14,6 +14,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { calculateCartTotals } from "@/features/orders/lib/cart-totals";
 import type { CommerceSettings } from "@/types/settings";
+import Link from "next/link";
+import { routes } from "@/constants/routes";
 import { formatCurrency } from "@/utils/format";
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import {
@@ -152,7 +154,7 @@ export function CommerceSettingsPage() {
         hydration === "ready"
           ? `${
               saved.freeDeliveryThreshold > 0
-                ? `Delivery ${formatCurrency(saved.deliveryFee)} · free above ${formatCurrency(saved.freeDeliveryThreshold)}`
+                ? `${saved.useZoneBasedDelivery ? "Delivery by zone" : `Delivery ${formatCurrency(saved.deliveryFee)}`} · free above ${formatCurrency(saved.freeDeliveryThreshold)}`
                 : "Delivery free on every order"
             } · ${livePaymentMethodsOn} payment method${livePaymentMethodsOn === 1 ? "" : "s"}`
           : undefined
@@ -202,6 +204,22 @@ export function CommerceSettingsPage() {
                     }))
                   }
                 />
+                {/*
+                  WHICH FEE IS ACTUALLY CHARGED. With zone pricing on this box
+                  is not used — the zones set the fee — and the preview beside
+                  it showed the zone fallback (₹149) under "Standard ₹99".
+                */}
+                {settings.useZoneBasedDelivery ? (
+                  <p className="text-xs text-pretty text-muted-foreground">
+                    Not used while zone pricing is on: each zone sets its own fee, and an
+                    address outside your zones is charged{" "}
+                    {formatCurrency(settings.zoneFallbackDeliveryFee)}. Change these in{" "}
+                    <Link href={routes.admin.commerce.shippingRules} className="underline underline-offset-2">
+                      Shipping Rules
+                    </Link>
+                    .
+                  </p>
+                ) : null}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="freeDeliveryThreshold">Free delivery above</Label>

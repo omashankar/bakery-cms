@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 
 export function CustomerSegmentBadge({ segment }: { segment: CustomerSegment }) {
   return (
-    <Badge variant={getCustomerSegmentVariant(segment)} className="text-[10px]">
+    <Badge variant={getCustomerSegmentVariant(segment)} className="text-[11px]">
       {formatCustomerSegmentLabel(segment)}
     </Badge>
   );

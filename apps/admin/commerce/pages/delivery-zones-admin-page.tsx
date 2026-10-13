@@ -258,7 +258,7 @@ export function DeliveryZonesAdminPage({
             <Button variant="bakery" className="w-full sm:w-auto" onClick={openCreate}>
               <Plus className="size-4" />
               <span className="sm:hidden">Add</span>
-              <span className="hidden sm:inline">Add zone</span>
+              <span className="hidden sm:inline">Add Zone</span>
             </Button>
           </div>
         }

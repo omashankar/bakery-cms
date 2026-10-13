@@ -250,18 +250,18 @@ function NavRowCard({
               the database still holds it.
             */}
             {item.badge?.trim() ? (
-              <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {item.badge}
               </span>
             ) : null}
             {item.icon ? (
-              <span className="shrink-0 text-[10px] text-muted-foreground">{item.icon}</span>
+              <span className="shrink-0 text-[11px] text-muted-foreground">{item.icon}</span>
             ) : null}
             {item.highlight ? (
-              <span className="shrink-0 text-[10px] text-muted-foreground">Highlighted</span>
+              <span className="shrink-0 text-[11px] text-muted-foreground">Highlighted</span>
             ) : null}
             {item.dividerBefore ? (
-              <span className="shrink-0 text-[10px] text-muted-foreground">Divider</span>
+              <span className="shrink-0 text-[11px] text-muted-foreground">Divider</span>
             ) : null}
           </span>
             <Button

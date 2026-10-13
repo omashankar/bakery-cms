@@ -212,7 +212,7 @@ export function GatewayConfigPage({ gatewayId }: GatewayConfigPageProps) {
               value={
                 <div className="flex flex-wrap justify-end gap-1">
                   {config.supportedCurrencies.map((c) => (
-                    <Badge key={c} variant="outline" className="text-[10px]">{c}</Badge>
+                    <Badge key={c} variant="outline" className="text-[11px]">{c}</Badge>
                   ))}
                 </div>
               }

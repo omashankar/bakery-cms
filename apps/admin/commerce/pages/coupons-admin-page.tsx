@@ -160,7 +160,7 @@ export function CouponsAdminPage({
             >
               <Plus className="size-4" />
               <span className="sm:hidden">Add</span>
-              <span className="hidden sm:inline">Add coupon</span>
+              <span className="hidden sm:inline">Add Coupon</span>
             </Button>
           </div>
         }

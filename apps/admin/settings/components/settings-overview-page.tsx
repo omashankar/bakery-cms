@@ -436,7 +436,7 @@ export function SettingsOverviewPage() {
                             <div className="flex flex-wrap items-center gap-2">
                               <p className="text-sm font-medium">{item.title}</p>
                               {item.future ? (
-                                <Badge variant="outline" className="text-[10px]">
+                                <Badge variant="outline" className="text-[11px]">
                                   Coming soon
                                 </Badge>
                               ) : null}

@@ -62,11 +62,11 @@ export function TemplatePreviewPanel({
         </div>
       ) : (
         <div className="max-w-sm rounded-2xl rounded-tl-md border border-border bg-emerald-50 p-4 shadow-sm dark:bg-emerald-950/40">
-          <p className="mb-2 text-[10px] font-semibold tracking-wide text-emerald-900/70 uppercase dark:text-emerald-200/80">
+          <p className="mb-2 text-[11px] font-semibold tracking-wide text-emerald-900/70 uppercase dark:text-emerald-200/80">
             WhatsApp preview
           </p>
           <div className="whitespace-pre-wrap text-sm text-foreground">{renderedBody}</div>
-          <p className="mt-2 text-right text-[10px] text-muted-foreground">12:45 PM</p>
+          <p className="mt-2 text-right text-[11px] text-muted-foreground">12:45 PM</p>
         </div>
       )}
 

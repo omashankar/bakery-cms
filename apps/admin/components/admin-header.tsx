@@ -203,7 +203,7 @@ export function AdminHeader({
                 <Avatar className="size-7 ring-1 ring-sidebar-border">
                   {/* The uploaded photo, which had no way to reach this header before. */}
                   {photoUrl ? <AvatarImage src={photoUrl} alt="" /> : null}
-                  <AvatarFallback className="bg-primary/15 text-[10px] font-semibold text-primary">
+                  <AvatarFallback className="bg-primary/15 text-[11px] font-semibold text-primary">
                     {initials}
                   </AvatarFallback>
                 </Avatar>

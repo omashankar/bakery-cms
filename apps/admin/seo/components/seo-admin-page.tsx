@@ -712,7 +712,7 @@ export function SeoAdminPage({
                   <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                     {entry.metaDescription}
                   </p>
-                  <p className="mt-2 text-[10px] text-muted-foreground">
+                  <p className="mt-2 text-[11px] text-muted-foreground">
                     {formatRelativeTime(entry.updatedAt)}
                   </p>
                 </li>
