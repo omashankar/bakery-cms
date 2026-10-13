@@ -137,6 +137,7 @@ export const productFormSchema = z
     // Optional for the same reason as `photoFrameShape` below: a required
     // field would 400 every import and API client written before it existed.
     cancellationClass: z.enum(["standard", "made_to_order", "non_cancellable"]).optional(),
+    codAllowed: z.boolean().optional(),
     /**
      * Optional, unlike the three booleans around it.
      *

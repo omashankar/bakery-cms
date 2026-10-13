@@ -272,6 +272,12 @@ export interface Product extends BaseEntity {
    */
   cancellationClass?: "standard" | "made_to_order" | "non_cancellable";
   /**
+   * Cash on delivery for this product. Absent means "follow the class":
+   * allowed for standard items, not for made-to-order or personalised ones
+   * (see `productAllowsCod`).
+   */
+  codAllowed?: boolean;
+  /**
    * Which shape the customer's photograph is printed in.
    *
    * A print area is GEOMETRY — the browser has to clip to it — so unlike a

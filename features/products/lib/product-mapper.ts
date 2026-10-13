@@ -124,6 +124,7 @@ export function mapAdminProductToStorefront(
     allowsMessage: cake.allowsMessage,
     allowsPhotoUpload: cake.allowsPhotoUpload,
     cancellationClass: cake.cancellationClass,
+    codAllowed: cake.codAllowed,
     photoFrameShape: cake.photoFrameShape,
     weights: cake.weights,
     weightLabel: cake.weightLabel,

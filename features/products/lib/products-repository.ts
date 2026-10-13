@@ -337,6 +337,7 @@ export function normalizeCommerceFields(cake: Product): Product {
     allowsMessage: cake.allowsMessage ?? true,
     allowsPhotoUpload: cake.allowsPhotoUpload ?? false,
     cancellationClass: cake.cancellationClass,
+    codAllowed: cake.codAllowed,
 
     variantGroups,
     /**

@@ -7,6 +7,7 @@ import {
   policyVersion,
   preparationStage,
   preparationStartedAt,
+  productAllowsCod,
   refundState,
   strictestClass,
   type CancellationClass,
@@ -166,5 +167,17 @@ describe("the policy copy on an order", () => {
     expect(policyVersion("No refunds once baked.", [{ productSlug: "cake", policyClass: "made_to_order" }])).toBe(base);
     expect(policyVersion("No refunds once baked!", [{ productSlug: "cake", policyClass: "made_to_order" }])).not.toBe(base);
     expect(policyVersion("No refunds once baked.", [{ productSlug: "cake", policyClass: "standard" }])).not.toBe(base);
+  });
+});
+
+describe("cash on delivery, per product", () => {
+  it("follows the class unless the shop has said otherwise", () => {
+    expect(productAllowsCod({})).toBe(true);
+    expect(productAllowsCod({ cancellationClass: "standard" })).toBe(true);
+    expect(productAllowsCod({ cancellationClass: "made_to_order" })).toBe(false);
+    expect(productAllowsCod({ cancellationClass: "non_cancellable" })).toBe(false);
+    // The shop's tick wins, both ways.
+    expect(productAllowsCod({ cancellationClass: "made_to_order", codAllowed: true })).toBe(true);
+    expect(productAllowsCod({ cancellationClass: "standard", codAllowed: false })).toBe(false);
   });
 });

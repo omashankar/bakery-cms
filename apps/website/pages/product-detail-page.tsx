@@ -33,6 +33,7 @@ import { RatingSummary, ratingTone, ratingWord } from "@/components/storefront/r
 import {
   CANCELLATION_CLASS_CUSTOMER_TEXT,
   DEFAULT_CANCELLATION_CLASS,
+  productAllowsCod,
 } from "@/features/orders/lib/cancellation-policy";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import {
@@ -1956,6 +1957,8 @@ export function ProductDetailPage({
                   <span className="font-medium text-foreground">Cancellation</span>
                   <span className="text-xs text-muted-foreground">
                     {CANCELLATION_CLASS_CUSTOMER_TEXT[cake.cancellationClass ?? DEFAULT_CANCELLATION_CLASS]}
+                    {/* Said before the cart, not discovered at the payment step. */}
+                    {productAllowsCod(cake) ? null : " Paid online — no Cash on Delivery."}
                   </span>
                 </li>
                 {(commerce.productTrustCards ?? [])

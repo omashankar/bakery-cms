@@ -438,3 +438,24 @@ export function policyVersion(text: string, itemClasses: readonly { productSlug:
   }
   return `p${hash.toString(36)}`;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Cash on delivery                                                           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Whether a product may be paid for in cash at the door.
+ *
+ * The shop's explicit tick wins. Without one, it follows the product's class:
+ * a ready-made item can go back on the shelf if the door is not answered, so
+ * cash is fine; a made-to-order or personalised one cannot, so it is paid
+ * online — a cake baked for a customer who then refuses it at the door is a
+ * cake and its price both lost.
+ */
+export function productAllowsCod(product: {
+  codAllowed?: boolean;
+  cancellationClass?: CancellationClass;
+}): boolean {
+  if (typeof product.codAllowed === "boolean") return product.codAllowed;
+  return (product.cancellationClass ?? DEFAULT_CANCELLATION_CLASS) === "standard";
+}

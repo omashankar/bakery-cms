@@ -67,6 +67,8 @@ const productSchema = new mongoose.Schema(
       enum: ["standard", "made_to_order", "non_cancellable"],
       default: "standard",
     },
+    // No default: absent means "follow the class" (productAllowsCod).
+    codAllowed: { type: Boolean },
     // No `enum` and no default: an unknown value resolves to round at read
     // time (`frameShape`), and a validation error here would refuse a whole
     // product save over a picture's outline.

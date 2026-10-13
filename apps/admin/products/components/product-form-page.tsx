@@ -70,6 +70,7 @@ import {
   CANCELLATION_CLASS_CUSTOMER_TEXT,
   CANCELLATION_CLASS_LABELS,
   DEFAULT_CANCELLATION_CLASS,
+  productAllowsCod,
   type CancellationClass,
 } from "@/features/orders/lib/cancellation-policy";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
@@ -1628,6 +1629,29 @@ export function ProductFormPage({
                   <p className="text-xs text-muted-foreground">
                     Customers see this on the {productLower} page and at checkout:
                     &ldquo;{CANCELLATION_CLASS_CUSTOMER_TEXT[form.cancellationClass ?? DEFAULT_CANCELLATION_CLASS]}&rdquo;
+                  </p>
+                </div>
+                {/*
+                  CASH ON DELIVERY, per product. Unticked by default for made
+                  to order and personalised — a cake refused at the door is the
+                  cake and its price both lost — and ticked for ready-made
+                  items. Ticking or unticking it here overrides that default.
+                  One item in a cart that takes no cash takes cash off the
+                  whole order, at checkout and on the server.
+                */}
+                <div className="space-y-1">
+                  <label className="flex items-start gap-2 text-sm">
+                    <Checkbox
+                      className="mt-0.5"
+                      checked={productAllowsCod(form)}
+                      onCheckedChange={(checked) => patchForm({ codAllowed: checked === true })}
+                    />
+                    Allow Cash on Delivery
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    {typeof form.codAllowed === "boolean"
+                      ? "Set by you for this product."
+                      : "Following the cancellation setting: on for standard items, off for made-to-order and personalised ones."}
                   </p>
                 </div>
 

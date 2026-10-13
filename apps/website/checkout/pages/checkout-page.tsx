@@ -60,6 +60,7 @@ import {
 import {
   CANCELLATION_CLASS_CUSTOMER_TEXT,
   DEFAULT_CANCELLATION_CLASS,
+  productAllowsCod,
 } from "@/features/orders/lib/cancellation-policy";
 import {
   getDeliveryTimeSlots,
@@ -230,7 +231,7 @@ interface CheckoutPageProps {
  */
 export type CheckoutCatalogEntry = Pick<
   LandingProduct,
-  "slug" | "inStock" | "categoryIds" | "occasions" | "cancellationClass"
+  "slug" | "inStock" | "categoryIds" | "occasions" | "cancellationClass" | "codAllowed"
 >;
 
 export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
@@ -332,14 +333,31 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   // Null while unknown — do not hide a method on a guess.
   const [onlinePaymentReady, setOnlinePaymentReady] = useState<boolean | null>(null);
 
+  /**
+   * The cart lines that take no cash — made to order, personalised, or
+   * switched off by the shop (`productAllowsCod`). One of them takes Cash on
+   * Delivery off the whole order; the server refuses it too, so this only
+   * keeps the customer from choosing something that would be refused.
+   */
+  const codBlockedBy = useMemo(() => {
+    const bySlug = new Map(catalog.map((product) => [product.slug, product]));
+    return items
+      .filter((item) => {
+        const product = bySlug.get(item.productSlug);
+        return product ? !productAllowsCod(product) : false;
+      })
+      .map((item) => item.name);
+  }, [items, catalog]);
+
   const availablePaymentOptions = useMemo(
     () =>
       paymentOptions.filter(
         (option) =>
           commerce.paymentMethods[option.value] &&
-          (option.value !== "razorpay" || onlinePaymentReady !== false)
+          (option.value !== "razorpay" || onlinePaymentReady !== false) &&
+          (option.value !== "cod" || codBlockedBy.length === 0)
       ),
-    [commerce.paymentMethods, onlinePaymentReady]
+    [commerce.paymentMethods, onlinePaymentReady, codBlockedBy]
   );
 
   // Offering "Pay Online" when the gateway has no keys means the customer
@@ -399,10 +417,12 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
           // this line runs. Reading the cache here made the list a snapshot of
           // an arbitrary moment, and nothing re-took it.
           getEnabledCheckoutMethods(commerce.paymentMethods).filter(
-            (method) => method.id !== "razorpay" || onlinePaymentReady !== false
+            (method) =>
+              (method.id !== "razorpay" || onlinePaymentReady !== false) &&
+              (method.id !== "cod" || codBlockedBy.length === 0)
           )
         : [],
-    [ready, commerce.paymentMethods, onlinePaymentReady]
+    [ready, commerce.paymentMethods, onlinePaymentReady, codBlockedBy]
   );
 
   /**
@@ -2195,8 +2215,23 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                   <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
                     <h2 className={storefrontHeading.card}>Payment method</h2>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Pay securely online, or choose Cash on Delivery.
+                      {codBlockedBy.length > 0
+                        ? "Pay securely online."
+                        : "Pay securely online, or choose Cash on Delivery."}
                     </p>
+                    {/*
+                      WHY THERE IS NO CASH OPTION, rather than a method that
+                      silently vanished. Only said on a shop that offers cash.
+                    */}
+                    {codBlockedBy.length > 0 && commerce.paymentMethods.cod ? (
+                      <p className="mt-2 rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+                        Cash on Delivery isn&apos;t available for{" "}
+                        <span className="font-medium text-foreground">
+                          {[...new Set(codBlockedBy)].join(", ")}
+                        </span>{" "}
+                        — it is made to order for you, so it is paid online.
+                      </p>
+                    ) : null}
 
                     <div className="mt-5">
                       <PaymentMethodList

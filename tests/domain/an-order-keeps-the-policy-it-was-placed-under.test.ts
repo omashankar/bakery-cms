@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * AN ORDER KEEPS THE CANCELLATION POLICY IT WAS PLACED UNDER.
@@ -128,6 +128,15 @@ type Policy = {
 };
 
 describe("placing an order copies its cancellation policy", () => {
+  // These place a cash order for the cake; cash for it is tested on its own
+  // below, so here the shop has ticked it.
+  beforeEach(() => {
+    CATALOGUE["black-forest"].codAllowed = true;
+  });
+  afterEach(() => {
+    delete CATALOGUE["black-forest"].codAllowed;
+  });
+
   it("records each line's class from the shop's product, and judges by the strictest", async () => {
     setCommerce({ cancellationPolicyText: "Cakes are baked to order." });
     await order({ termsAcceptedAt: "2026-10-13T09:00:00.000Z" });
@@ -158,5 +167,43 @@ describe("placing an order copies its cancellation policy", () => {
     expect((state.inserted?.cancellationPolicy as Policy).text).toBe(
       defaultCommerceSettings.cancellationPolicyText,
     );
+  });
+});
+
+/**
+ * CASH ON DELIVERY IS REFUSED FOR A PRODUCT THAT TAKES NONE — on the server,
+ * whatever the checkout page offered. One such line takes cash off the order.
+ */
+describe("cash on delivery at placement", () => {
+  function cod(lines: Array<{ productSlug: string; name: string; price: number; quantity: number }>) {
+    return placeOrder(
+      { items: lines, totals: { subtotal: 0, total: 0, tax: 0, itemCount: 1 }, address, paymentMethod: "cod" } as never,
+      {} as never,
+    );
+  }
+  const cake = { productSlug: "black-forest", name: "Black Forest", price: 500, quantity: 1 };
+  const candle = { productSlug: "candle", name: "Candle", price: 50, quantity: 1 };
+
+  it("refuses a made-to-order cake, naming it, and stores nothing", async () => {
+    setCommerce();
+    await expect(cod([candle, cake])).rejects.toThrow(/not available for Black Forest/);
+    expect(state.inserted).toBeNull();
+  });
+
+  it("takes cash for ready-made items", async () => {
+    setCommerce();
+    await cod([candle]);
+    expect(state.inserted).not.toBeNull();
+  });
+
+  it("takes cash for a cake the shop has ticked for it", async () => {
+    setCommerce();
+    CATALOGUE["black-forest"].codAllowed = true;
+    try {
+      await cod([cake]);
+      expect(state.inserted).not.toBeNull();
+    } finally {
+      delete CATALOGUE["black-forest"].codAllowed;
+    }
   });
 });

@@ -69,6 +69,7 @@ import {
   isCancellationClass,
   policyVersion,
   preparationStage,
+  productAllowsCod,
   strictestClass,
   type OrderCancellationPolicy,
 } from "@/features/orders/lib/cancellation-policy";
@@ -567,6 +568,31 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
       "That payment method is not available at this shop. Please choose another.",
       409,
     );
+  }
+
+  /*
+    CASH ON DELIVERY, PER PRODUCT — enforced here, whatever the checkout page
+    offered. A made-to-order cake refused at the door is the cake and its
+    price both lost, so a product that takes no cash (`productAllowsCod`)
+    takes cash off the whole order. Read from the SHOP's products, never from
+    anything the browser sent about them.
+  */
+  if (input.paymentMethod === "cod") {
+    const slugs = [...new Set(input.items.map((item) => item.productSlug).filter(Boolean))];
+    const refusing = (
+      await Promise.all(
+        slugs.map(async (slug) => {
+          const product = await productRepo.findBySlug(slug).catch(() => null);
+          return product && !productAllowsCod(product) ? product.name || slug : null;
+        }),
+      )
+    ).filter((name): name is string => Boolean(name));
+    if (refusing.length > 0) {
+      throw new AppError(
+        `Cash on delivery is not available for ${refusing.join(", ")}. Please pay online.`,
+        409,
+      );
+    }
   }
 
   // An online payment must be against a cart the shop priced. Without this a
