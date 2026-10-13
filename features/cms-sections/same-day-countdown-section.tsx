@@ -132,45 +132,36 @@ export function SameDayCountdownSection(props: HomepageSectionRendererProps) {
     <SectionShell
       {...props}
       /*
-        A WASH OVER THE TONE, not instead of it.
+        A SOFT LIGHT AT THE CENTRE, over the tone and not instead of it.
 
-        One flat fill is what the first cut of this looked like beside the
-        reference: a rectangle of paint. The reference is lighter where the
-        clock sits and deeper at the far end, and that GRADIENT is the part
-        worth taking — its greens and blues are not.
+        The first wash ran cream to tan from corner to corner and read as a
+        stain on the strip. This one only lifts the middle, where the content
+        now sits, and fades to the shop's own tone at both ends.
 
-        Every stop is either `transparent` or one of the shop's own tokens,
-        and `background-image` sits over the tone's `background-color`
-        rather than replacing it. So whichever of the six backgrounds the
-        shop picks in the dropdown is still the colour underneath, and this
-        only shapes the light on it. `--background` is the shop's palest
-        surface and `--primary` its brand colour; at 8% the second is a
-        suggestion of weight at the end of the strip, not a second fill.
-
-        Angled from the top-left because that is where the eye starts and
-        where the digits are. A ring rather than a border: `ring` draws
-        inside the rounded corner, so it cannot leave the 1px notch a
-        `border` leaves on a `rounded-2xl` box at some zoom levels.
+        Every stop is `transparent` or a shop token, and `background-image`
+        sits over the tone's `background-color` rather than replacing it, so
+        the Background dropdown still decides the colour underneath. A ring
+        rather than a border: `ring` draws inside the rounded corner, so it
+        cannot leave the 1px notch a `border` leaves on a `rounded-2xl` box.
       */
-      panelClassName="bg-[radial-gradient(120%_150%_at_6%_-10%,var(--background)_0%,transparent_66%),linear-gradient(105deg,transparent_30%,color-mix(in_oklab,var(--primary)_13%,transparent)_100%)] px-4 py-3 ring-1 ring-border sm:px-5 sm:py-3"
+      panelClassName="bg-[radial-gradient(55%_160%_at_50%_0%,var(--background)_0%,transparent_75%)] px-4 py-4 ring-1 ring-border sm:px-6"
     >
       {/*
         NO `bg-*` HERE, and that is the point: SectionShell applies the
         Background setting BEFORE this className, so a colour passed here
-        outranks it and the dropdown goes inert — three sections in this file
-        did exactly that, and one showed "White" in the builder while
-        rendering cream.
+        outranks it and the dropdown goes inert.
 
         `relative` is load-bearing rather than styling: Tailwind's `sr-only`
-        is `position: absolute`, and with no positioned ancestor it lays out
-        at its static position in the initial containing block and escapes
+        is `position: absolute`, and with no positioned ancestor it escapes
         every `overflow: hidden` on the way up.
 
-        A SLIM STRIP, the shape the shop picked (2026-10-13): one line from
-        `md` — the sentence, then the clock and the button at the far end. On a
-        phone, two: the sentence, then the clock and the button side by side.
+        ONE GROUP, IN THE MIDDLE. The words, the clock and the button were
+        pinned to opposite ends of a 1,350px strip with nothing between them,
+        so they read as three things rather than one sentence with a clock in
+        it. They are a single centred group now: the words, a hairline, the
+        clock, the button — one row from `md`, two centred rows on a phone.
       */}
-      <div className="relative grid gap-3 md:flex md:items-center md:gap-5">
+      <div className="relative flex flex-col items-center gap-3 text-center md:flex-row md:justify-center md:gap-6 md:text-left">
         {/*
           THE FACT, ONCE, AND NOT TICKING.
 
@@ -189,36 +180,38 @@ export function SameDayCountdownSection(props: HomepageSectionRendererProps) {
         <p className="sr-only">
           Same-day orders close at {cutoff} today — {parts.spoken}.
         </p>
-        <p className="flex min-w-0 items-center gap-2.5 md:flex-1">
-          <span
-            aria-hidden="true"
-            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground"
-          >
-            <Truck className="size-[1.125rem]" />
-          </span>
-          <span className="min-w-0 font-heading text-base leading-snug font-bold sm:text-lg">
-            {headline}
-            {/*
-              WHAT CLOSES, AND WHEN — "Same-day orders close at" is the
-              Settings -> Commerce label this figure is read from, and the
-              figure is `cutoff` as the shop typed it. From `lg` only, where
-              the line has room for it; the screen reader has it in the one
-              sentence above at every width.
-            */}
-            <span
-              aria-hidden="true"
-              className="ml-2 hidden align-middle text-xs font-medium text-muted-foreground lg:inline"
-            >
-              · Same-day orders close at {cutoff}
-            </span>
-          </span>
-        </p>
-        <div className="flex items-center justify-between gap-3 md:justify-end md:gap-4">
+
+        <div className="min-w-0">
           {/*
-            02 : 31 : 53 with HRS MIN SEC under the digits — plain figures on
-            the strip, no box behind them (the shop asked for the backgrounds
-            off). The digits are the strip's largest type after nothing: the
-            same size as the headline, so the clock reads as part of the line.
+            WHAT CLOSES, AND WHEN, over the sentence and at every width.
+            "Same-day orders close at" is the Settings -> Commerce label the
+            figure is read from, and the figure is `cutoff` as the shop typed
+            it. Hidden from the screen reader, which has both in the one
+            sentence above.
+          */}
+          <p
+            aria-hidden="true"
+            className="inline-flex items-center gap-1.5 text-[0.6875rem] leading-none font-semibold tracking-[0.08em] text-muted-foreground uppercase"
+          >
+            <Truck className="size-3.5 text-primary" />
+            Same-day orders close at {cutoff}
+          </p>
+          {/*
+            THE SENTENCE IS THE BAND: the only thing in it that says what is
+            closing, in the shop's own words.
+          */}
+          <p className="mt-1.5 font-heading text-lg leading-snug font-bold text-balance sm:text-xl lg:text-2xl">
+            {headline}
+          </p>
+        </div>
+
+        {/* A hairline between the words and the clock, where they share a row. */}
+        <span aria-hidden="true" className="hidden h-10 w-px shrink-0 bg-border md:block" />
+
+        <div className="flex items-center gap-5">
+          {/*
+            02 : 26 : 49 with HRS MIN SEC under the digits — plain figures, no
+            box behind each (the shop asked for those off).
 
             `tabular-nums`, and each unit a column as wide as its label, keep
             the clock still as its digits change, so the button beside it
@@ -229,20 +222,20 @@ export function SameDayCountdownSection(props: HomepageSectionRendererProps) {
             colour and weight at 5 hours and at 5 seconds. A band that gets
             louder as it empties is a pressure tactic wearing a fact's clothes.
 
-            `text-foreground` rather than the shop's primary: `--foreground`
-            is fixed in globals.css, so the digits hold their contrast on a
-            pale brand colour too.
+            Digits in `text-foreground`, which globals.css fixes, so they hold
+            their contrast on a pale brand colour; the colons take the brand
+            colour, where contrast matters less.
           */}
           <span aria-hidden="true" className="inline-flex items-start gap-2">
             {cells.map(([label, value], index) => (
               <Fragment key={label}>
                 {index > 0 ? (
-                  <span className="font-heading text-2xl leading-none font-bold text-muted-foreground">
+                  <span className="font-heading text-2xl leading-none font-bold text-primary lg:text-3xl">
                     :
                   </span>
                 ) : null}
                 <span className="flex flex-col items-center">
-                  <span className="font-heading text-2xl leading-none font-bold text-foreground tabular-nums">
+                  <span className="font-heading text-2xl leading-none font-bold text-foreground tabular-nums lg:text-3xl">
                     {value}
                   </span>
                   <span className="mt-1 text-[0.625rem] leading-none font-semibold tracking-[0.1em] text-muted-foreground uppercase">
@@ -256,11 +249,12 @@ export function SameDayCountdownSection(props: HomepageSectionRendererProps) {
             A BUTTON, NOT THE ROW PILL: there are no cards beneath this band,
             so the control at the end is the only thing to press. Not
             `<Button>`: its default variant carries `hover:bg-primary/90`, and
-            no hover is a standing rule on this shop.
+            no hover is a standing rule on this shop. `bg-primary` with
+            `text-primary-foreground`, which is `readableInkOn(primaryColor)`
+            — contrast-checked per shop.
 
-            `min-h-10` with the strip's own padding still clears a 44px touch
-            row; `outline-foreground` for the focus ring because `--ring` is
-            the shop's accent, about 1.9:1 on the sand band.
+            `outline-foreground` for the focus ring because `--ring` is the
+            shop's accent, about 1.9:1 on the sand band.
 
             NOTHING WITHOUT BOTH HALVES: a label with no destination is a
             button that does not work, and a destination with no label is a
@@ -269,7 +263,7 @@ export function SameDayCountdownSection(props: HomepageSectionRendererProps) {
           {contentString(c, "ctaHref") && contentString(c, "ctaLabel") ? (
             <Link
               href={contentString(c, "ctaHref")}
-              className="flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+              className="flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
             >
               {contentString(c, "ctaLabel")}
               <ArrowRight aria-hidden="true" className="size-4" />
@@ -289,7 +283,7 @@ export function SameDayCountdownSection(props: HomepageSectionRendererProps) {
           Only you can see this line. Same-day orders close at {cutoff}, so this
           band draws nothing on the live page from then until midnight. The clock
           drops the hours in the last hour and the minutes in the last minute — so
-          the first tile is never a “00”.
+          the first figure is never a “00”.
         </p>
       ) : null}
     </SectionShell>
