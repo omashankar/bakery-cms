@@ -20,6 +20,7 @@ import {
   deliveryPartnerSchema,
   notesSchema,
   refundNotesSchema,
+  declineRefundSchema,
   refundRequestSchema,
   orderQuerySchema,
   orderAnalyticsQuerySchema,
@@ -404,6 +405,18 @@ export const requestRefundController = withErrorHandler(async (request: Request,
     actorEmail: session.email,
   });
   return ok(order, "Refund requested");
+});
+
+export const declineRefundController = withErrorHandler(async (request: Request, ctx: IdContext) => {
+  const session = await requireRole(...ORDER_ROLES);
+  const { id } = await ctx.params;
+  const { reason } = validate(declineRefundSchema, await readJson(request));
+  const order = await service.declineRefund(id, reason, {
+    ...requestContext(request),
+    actorId: session.sub,
+    actorEmail: session.email,
+  });
+  return ok(order, "Refund declined");
 });
 
 /**

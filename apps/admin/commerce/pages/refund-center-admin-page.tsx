@@ -40,7 +40,7 @@ import {
   type PlacedOrder,
   type RefundOrderInput,
 } from "@/features/orders/lib/orders";
-import { fetchRefundCasesPage } from "@/features/orders/lib/orders-api";
+import { declineRefundRequest, fetchRefundCasesPage } from "@/features/orders/lib/orders-api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -73,10 +73,17 @@ const caseTabs: Array<{
 function RefundCaseDetail({
   order,
   onIssueRefund,
+  onDeclineRefund,
 }: {
   order: PlacedOrder;
   onIssueRefund: () => void;
+  onDeclineRefund: () => void;
 }) {
+  // A request nothing has been paid against — the only case the shop can
+  // still say no to. See `declineRefund` on the server.
+  const declinable =
+    order.refundRecord?.status === "requested" &&
+    (order.refundRecord.gatewayRefunds?.length ?? 0) === 0;
   return (
     <div className="space-y-4">
       <Card className="shadow-sm">
@@ -180,6 +187,17 @@ function RefundCaseDetail({
           {order.status !== "refunded" ? (
             <Button variant="bakery" className="w-full" onClick={onIssueRefund}>
               Issue refund
+            </Button>
+          ) : null}
+          {/*
+            THE OTHER ANSWER. A cancelled paid order opens a refund request on
+            its own, and whether to pay it is the shop's decision — a cake that
+            was already baked may not be. Issue refund can still pay a partial
+            amount; this is for paying nothing.
+          */}
+          {declinable ? (
+            <Button variant="outline" className="w-full" onClick={onDeclineRefund}>
+              Decline refund
             </Button>
           ) : null}
         </CardContent>
@@ -314,6 +332,29 @@ export function RefundCenterAdminPage({
     if (caseType === "refunded") return overview.refundedCount;
     if (caseType === "requested") return overview.requestedCount;
     return overview.processingCount;
+  }
+
+  /**
+   * Say no to a requested refund. The reason is optional and goes on the
+   * refund's timeline; Cancel on the prompt changes nothing.
+   */
+  async function handleDecline(order: PlacedOrder) {
+    const reason = window.prompt(
+      `Decline the refund for ${order.orderNumber}? Why (optional — kept on the timeline):`,
+      "",
+    );
+    if (reason === null) return;
+    const done = await declineRefundRequest(order.id, reason);
+    if (!done) {
+      if (!reportedAsSignedOut()) {
+        toast.error("Could not decline the refund", {
+          description: "It may have changed since this page loaded — reload and try again.",
+        });
+      }
+      return;
+    }
+    toast.success(`Refund declined · ${order.orderNumber}`);
+    setReloadKey((key) => key + 1);
   }
 
   async function handleRefundConfirm(input: RefundOrderInput) {
@@ -628,6 +669,7 @@ export function RefundCenterAdminPage({
             <RefundCaseDetail
               order={selected}
               onIssueRefund={() => setRefundTarget(selected)}
+              onDeclineRefund={() => void handleDecline(selected)}
             />
           ) : (
             <Card className="shadow-sm">
@@ -653,6 +695,7 @@ export function RefundCenterAdminPage({
             <RefundCaseDetail
               order={selected}
               onIssueRefund={() => setRefundTarget(selected)}
+              onDeclineRefund={() => void handleDecline(selected)}
             />
           </div>
         ) : null}

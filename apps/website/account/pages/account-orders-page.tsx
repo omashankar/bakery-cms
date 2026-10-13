@@ -67,6 +67,9 @@ function paymentText(order: PlacedOrder): string {
   if (order.refundRecord?.status === "requested" || order.refundRecord?.status === "processing") {
     return "Refund in progress";
   }
+  // The shop said no — for instance the cake was already baked. Said plainly,
+  // so the customer knows to ask the shop rather than wait.
+  if (order.refundRecord?.status === "rejected") return "Paid online · refund declined";
   // Cancelled after paying, from before cancelling opened a refund request:
   // the shop owes this money, and "Paid online" alone would hide that.
   if (order.status === "cancelled" && order.paymentStatus === "paid" && !order.refundRecord) {

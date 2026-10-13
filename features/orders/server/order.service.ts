@@ -1911,6 +1911,48 @@ export async function updateRefundNotes(id: string, notes: RefundNotesInput["not
   return updated;
 }
 
+/**
+ * The shop says no to a requested refund.
+ *
+ * Cancelling a paid order opens a refund REQUEST, and whether to pay it is the
+ * shop's call — the cake may already be baked. There was no way to make that
+ * call in the other direction: a request the shop would not pay sat in the
+ * Refund Center and rang the admin bell for ever.
+ *
+ * Only a request nothing has been paid against. Once money has gone back to
+ * the gateway the case is a refund, not a request, and "declined" would be a
+ * lie about it. Not final either way: Issue refund still works afterwards, if
+ * the shop changes its mind.
+ *
+ * Through the version check, like every other refund write: a gateway
+ * webhook settling between the read and this write must not be erased.
+ */
+export async function declineRefund(id: string, reason: string | undefined, ctx: RequestCtx) {
+  const order = await requireOrder(id);
+  const existing = order.refundRecord;
+  if (!existing || existing.status !== "requested" || (existing.gatewayRefunds?.length ?? 0) > 0) {
+    throw new AppError("Only a refund that has been requested and not yet paid can be declined.", 409);
+  }
+
+  const now = new Date().toISOString();
+  const priorVersion = Number(existing.version) || 0;
+  const note = reason?.trim() ? `Declined: ${reason.trim()}` : "Declined";
+  const updated = await repo.compareAndSetRefund(id, priorVersion, {
+    refundRecord: {
+      ...existing,
+      version: priorVersion + 1,
+      status: "rejected",
+      history: [...(existing.history ?? []), { status: "rejected", at: now, note }],
+    },
+  });
+  if (!updated) {
+    throw new AppError("This refund changed while you were looking at it. Reload and try again.", 409);
+  }
+
+  await audit(ctx, "order.refund.decline", id, { reason: reason?.trim() || undefined });
+  return updated;
+}
+
 export async function requestRefund(id: string, input: RefundRequestInput, ctx: RequestCtx) {
   const order = await requireOrder(id);
 

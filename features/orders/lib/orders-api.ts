@@ -392,6 +392,11 @@ export function refundNotesRequest(orderId: string, notes: string): Promise<bool
   return send(`/api/orders/${orderId}/refund-notes`, "PATCH", { notes });
 }
 
+/** Admin: say no to a requested refund that nothing has been paid against. */
+export function declineRefundRequest(orderId: string, reason: string): Promise<boolean> {
+  return send(`/api/orders/${orderId}/refund-decline`, "POST", { reason });
+}
+
 export function requestRefundRequest(
   orderId: string,
   input: RefundOrderInput,

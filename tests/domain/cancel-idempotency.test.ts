@@ -60,6 +60,14 @@ vi.mock("@/features/orders/server/order.repository", () => ({
     return true;
   },
 
+  // `{ refundRecord.version: expected }` — a stale write matches nothing.
+  compareAndSetRefund: async (_id: string, expected: number, fields: Record<string, unknown>) => {
+    const current = Number((state.order?.refundRecord as { version?: number } | undefined)?.version) || 0;
+    if (current !== expected) return null;
+    state.order = { ...state.order, ...fields };
+    return { ...state.order };
+  },
+
   restoreStock: async (reductions: unknown[]) => {
     state.restoredStock.push(reductions);
   },
@@ -225,6 +233,39 @@ describe("cancelling a paid order", () => {
 
     const history = (h.order?.refundRecord as { history?: unknown[] } | undefined)?.history;
     expect(history).toHaveLength(1);
+  });
+
+  it("lets the shop say no — the cake may already be baked", async () => {
+    const h = harness({ paymentMethod: "razorpay", paymentStatus: "paid" });
+    await service.cancel("order-1", "changed mind", CTX);
+
+    await service.declineRefund("order-1", "Cake was already baked", CTX);
+
+    const record = h.order?.refundRecord as {
+      status: string;
+      history: Array<{ status: string; note?: string }>;
+    };
+    expect(record.status).toBe("rejected");
+    expect(record.history.at(-1)).toMatchObject({
+      status: "rejected",
+      note: "Declined: Cake was already baked",
+    });
+    // Declining moves no money and marks nothing refunded.
+    expect(h.order?.paymentStatus).toBe("paid");
+  });
+
+  it("will not decline what is not an open request", async () => {
+    harness({ paymentMethod: "cod", paymentStatus: "cod" });
+    await service.cancel("order-1", undefined, CTX);
+    // No request was opened for a cash order, so there is nothing to decline.
+    await expect(service.declineRefund("order-1", undefined, CTX)).rejects.toThrow(/requested/);
+
+    const h = harness({ paymentMethod: "razorpay", paymentStatus: "paid" });
+    await service.cancel("order-1", undefined, CTX);
+    await service.declineRefund("order-1", undefined, CTX);
+    // Declining twice: the second finds a declined case, not a request.
+    await expect(service.declineRefund("order-1", undefined, CTX)).rejects.toThrow(/requested/);
+    expect((h.order?.refundRecord as { history: unknown[] }).history).toHaveLength(2);
   });
 
   it("asks for nothing when no money was taken", async () => {
