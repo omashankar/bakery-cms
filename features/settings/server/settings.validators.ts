@@ -217,6 +217,8 @@ export const commerceSchema = z.object({
     .default([]),
   orderNumberPrefix: z.string().trim().min(1).max(8),
   checkoutTerms: z.string().default(""),
+  cancellationPolicyText: z.string().max(4000).optional(),
+  customerCancellationRequests: z.boolean().optional(),
   giftWrapEnabled: z.boolean(),
   giftWrapFee: nonNegative,
   giftWrapLabel: z.string().default(""),

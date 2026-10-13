@@ -187,6 +187,13 @@ export interface CommerceSettings {
   deliveryTiers: DeliveryTier[];
   orderNumberPrefix: string;
   checkoutTerms: string;
+  /**
+   * The cancellation policy in the shop's words, shown at checkout beside each
+   * cart line's own rule and copied onto every order placed under it.
+   */
+  cancellationPolicyText: string;
+  /** Whether customers may ask to cancel from My Orders. */
+  customerCancellationRequests: boolean;
   giftWrapEnabled: boolean;
   giftWrapFee: number;
   giftWrapLabel: string;

@@ -151,6 +151,8 @@ const commerceSchema = new mongoose.Schema(
     deliveryInformation: { type: String, default: "" },
     productTrustCards: { type: [mongoose.Schema.Types.Mixed], default: [] },
     checkoutTerms: { type: String, default: "" },
+    cancellationPolicyText: { type: String },
+    customerCancellationRequests: { type: Boolean, default: true },
     giftWrapEnabled: { type: Boolean, default: false },
     giftWrapFee: { type: Number, default: 0 },
     giftWrapLabel: { type: String, default: "" },

@@ -417,6 +417,45 @@ export function CommerceSettingsPage() {
                   }
                 />
               </div>
+              {/*
+                THE CANCELLATION POLICY. Each product's own rule (Products →
+                Cancellation) is shown beside the cart line; this is the
+                wording around them, shown at checkout and COPIED onto every
+                order — so changing it here changes it for new orders only.
+              */}
+              <div className="space-y-2">
+                <Label htmlFor="cancellationPolicyText">Cancellation policy</Label>
+                <textarea
+                  id="cancellationPolicyText"
+                  className={adminTextareaClassName}
+                  rows={5}
+                  value={settings.cancellationPolicyText ?? ""}
+                  onChange={(e) =>
+                    edit((prev) => ({ ...prev, cancellationPolicyText: e.target.value }))
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Shown at checkout and saved with each order. Orders already placed
+                  keep the wording they were placed under. It cannot take away a
+                  customer&apos;s right to a refund when the order is wrong, damaged
+                  or not delivered — those are always reviewed.
+                </p>
+              </div>
+              <label className="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium">Customers can ask to cancel</p>
+                  <p className="text-xs text-muted-foreground">
+                    Adds &ldquo;Request cancellation&rdquo; to My Orders. You decide
+                    every request; nothing is refunded until you do.
+                  </p>
+                </div>
+                <Switch
+                  checked={settings.customerCancellationRequests ?? true}
+                  onCheckedChange={(checked) =>
+                    edit((prev) => ({ ...prev, customerCancellationRequests: checked }))
+                  }
+                />
+              </label>
             </CardContent>
           </Card>
         </div>

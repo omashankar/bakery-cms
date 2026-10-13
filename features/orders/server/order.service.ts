@@ -62,6 +62,14 @@ import {
 import type { PlacedOrder, OrderStatus, PaymentStatus } from "@/features/orders/lib/orders";
 
 import * as repo from "./order.repository";
+import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
+import {
+  DEFAULT_CANCELLATION_CLASS,
+  isCancellationClass,
+  policyVersion,
+  strictestClass,
+  type OrderCancellationPolicy,
+} from "@/features/orders/lib/cancellation-policy";
 import { OUTSIDE_ZONES_MESSAGE } from "@/features/commerce/lib/delivery-zone-utils";
 import type {
   PlaceOrderInput,
@@ -239,6 +247,50 @@ export function formatOrderItemsForEmail(
 
 /** Fresh order numbers to try when the client's collided with another customer's. */
 const ORDER_NUMBER_ATTEMPTS = 5;
+
+/**
+ * THE POLICY AN ORDER IS PLACED UNDER, as a copy kept on the order.
+ *
+ * Each line's class is read from the product as it is NOW, at placement, and
+ * the wording from the shop's settings — so a product reclassified next week,
+ * or a policy reworded, does not change what this customer agreed to.
+ *
+ * Never allowed to stop an order: a product that cannot be read is classed
+ * by the default, and a failure here leaves the order without a copy (the
+ * request flow then judges it by the products as they are) rather than
+ * refusing a customer's payment over a policy lookup.
+ */
+async function cancellationPolicyFor(
+  items: PlacedOrder["items"],
+  commerce: CommerceSettings,
+  acceptedAt: string | undefined,
+): Promise<OrderCancellationPolicy | undefined> {
+  try {
+    const slugs = [...new Set(items.map((item) => item.productSlug).filter(Boolean))];
+    const itemClasses = await Promise.all(
+      slugs.map(async (productSlug) => {
+        const product = await productRepo.findBySlug(productSlug).catch(() => null);
+        const cls = product?.cancellationClass;
+        return {
+          productSlug,
+          policyClass: isCancellationClass(cls) ? cls : DEFAULT_CANCELLATION_CLASS,
+        };
+      }),
+    );
+    const text =
+      commerce.cancellationPolicyText?.trim() || defaultCommerceSettings.cancellationPolicyText;
+    return {
+      version: policyVersion(text, itemClasses),
+      text,
+      policyClass: strictestClass(itemClasses.map((item) => item.policyClass)),
+      itemClasses,
+      ...(acceptedAt ? { acceptedAt } : {}),
+    };
+  } catch (error) {
+    console.error("[orders] Could not copy the cancellation policy onto a new order", error);
+    return undefined;
+  }
+}
 
 export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promise<PlacedOrder> {
   // ONE PAYMENT, ONE ORDER — checked before anything is built.
@@ -612,6 +664,16 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
       (priced.totals ?? null) as unknown as Record<string, unknown> | null,
     ),
   };
+
+  // The cancellation policy this order is placed under, copied — see
+  // `cancellationPolicyFor`. Built from the SHOP's products and settings,
+  // never from anything the browser sent, except the moment the customer
+  // ticked the checkout agreement.
+  order.cancellationPolicy = await cancellationPolicyFor(
+    order.items,
+    commerce,
+    (input.personalisation as { termsAcceptedAt?: string } | undefined)?.termsAcceptedAt,
+  );
 
   // Atomic: create the order AND reduce stock for each line together.
   //

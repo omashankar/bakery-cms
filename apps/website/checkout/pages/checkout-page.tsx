@@ -58,6 +58,10 @@ import {
   type PaymentMethod,
 } from "@/features/orders/lib/checkout-draft";
 import {
+  CANCELLATION_CLASS_CUSTOMER_TEXT,
+  DEFAULT_CANCELLATION_CLASS,
+} from "@/features/orders/lib/cancellation-policy";
+import {
   getDeliveryTimeSlots,
   getMinDeliveryDate,
 } from "@/apps/website/lib/product-details";
@@ -226,7 +230,7 @@ interface CheckoutPageProps {
  */
 export type CheckoutCatalogEntry = Pick<
   LandingProduct,
-  "slug" | "inStock" | "categoryIds" | "occasions"
+  "slug" | "inStock" | "categoryIds" | "occasions" | "cancellationClass"
 >;
 
 export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
@@ -811,6 +815,20 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
       price: item.price,
       quantity: item.quantity,
     }));
+  }, [items, catalog]);
+  /**
+   * Each kind of cancellation rule in this cart, strictest first — the lines
+   * the policy box above the consent tick reads. From the server-sent
+   * catalogue, the same one the order's own copy is built from.
+   */
+  const cartPolicyClasses = useMemo(() => {
+    const bySlug = new Map(catalog.map((product) => [product.slug, product.cancellationClass]));
+    const present = new Set(
+      items.map((item) => bySlug.get(item.productSlug) ?? DEFAULT_CANCELLATION_CLASS),
+    );
+    return (["non_cancellable", "made_to_order", "standard"] as const).filter((cls) =>
+      present.has(cls),
+    );
   }, [items, catalog]);
   const couponCheck = useMemo(
     () => (coupon ? applyCouponCode(coupon.code, couponLines) : null),
@@ -2356,6 +2374,34 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       the order stores the moment it was ticked rather than the
                       fact that a page once contained the words.
                     */}
+                    {/*
+                      THE CANCELLATION POLICY, BEFORE PAYMENT — each kind of
+                      item in this cart once, in the words its product page
+                      used, and the shop's own policy wording under a
+                      disclosure. Ticking the box below agrees to it, and the
+                      order keeps a copy of exactly this.
+                    */}
+                    <div className="mb-3 rounded-lg bg-muted/60 px-3 py-2.5 text-xs">
+                      <p className="font-medium text-foreground">Cancellation policy</p>
+                      <ul className="mt-1 list-disc space-y-0.5 pl-4 text-muted-foreground">
+                        {cartPolicyClasses.map((cls) => (
+                          <li key={cls}>{CANCELLATION_CLASS_CUSTOMER_TEXT[cls]}</li>
+                        ))}
+                      </ul>
+                      {commerce.cancellationPolicyText?.trim() ? (
+                        <details className="mt-1.5">
+                          <summary className="cursor-pointer text-bakery-700">
+                            Read the full policy
+                          </summary>
+                          <p className="mt-1 whitespace-pre-line text-muted-foreground">
+                            {commerce.cancellationPolicyText}
+                          </p>
+                        </details>
+                      ) : null}
+                      <p className="mt-1.5 text-muted-foreground">
+                        Ticking the box below also agrees to this policy.
+                      </p>
+                    </div>
                     <label className="flex cursor-pointer items-start justify-center gap-3 text-xs text-muted-foreground">
                       {/*
                         An id, because the visible label is the shop's own
