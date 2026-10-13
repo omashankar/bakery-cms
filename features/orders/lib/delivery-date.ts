@@ -418,15 +418,17 @@ export function countdownParts(
  *
  * A fixed hours/minutes/seconds triple carries a "00" for most of the day: a
  * cell whose entire content is the ABSENCE of a unit, given the same width and
- * the same weight as the ones that mean something. It also puts SECONDS on the
- * page six hours out, where a digit changes 3,600 times before anything a
- * customer can act on has changed at all.
+ * the same weight as the ones that mean something.
  *
- * ONE RULE: drop the leading units that are still zero, then keep at most two.
- * 05:12:09 reads hours and minutes, 00:12:09 reads minutes and seconds, and
- * 00:00:09 reads seconds alone. So the LEADING cell is never "00" — a trailing
- * one still can be, and should: "01 hours 00 minutes" is a reading, where "00
+ * ONE RULE: drop the leading units that are still zero, and keep the rest.
+ * 05:12:09 reads hours, minutes and seconds; 00:12:09 minutes and seconds;
+ * 00:00:09 seconds alone. So the LEADING cell is never "00" — a trailing one
+ * still can be, and should: "01 hours 00 minutes" is a reading, where "00
  * hours" is a unit that is not there.
+ *
+ * SECONDS ALL DAY, at the shop's request (2026-10-13): it wants the clock to
+ * be seen running, as a countdown does. This replaced "keep at most two",
+ * which hid the seconds until the last hour.
  *
  * `timeLeftToday` returns null at or past the cutoff, so `countdownParts` is
  * non-null only while at least one unit is non-zero and `findIndex` cannot
@@ -452,5 +454,5 @@ export function countdownCells(parts: {
     units.findIndex(([, value]) => Number(value) > 0),
     0,
   );
-  return units.slice(lead, lead + 2);
+  return units.slice(lead);
 }
