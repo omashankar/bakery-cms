@@ -65,7 +65,6 @@ export const adminNavSections: AdminNavSection[] = [
     title: "Sales",
     items: [
       { label: "Orders", href: routes.admin.orders.list, icon: "ShoppingBag" },
-      { label: "Cancellations", href: routes.admin.orders.cancellations, icon: "CircleSlash" },
       // Payments had no sidebar entry at all — gateway keys, transactions and
       // refunds were reachable only two levels inside Settings, or by knowing
       // the URL. An admin looking for "where do I put my Razorpay key" had

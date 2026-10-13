@@ -79,7 +79,6 @@ const orderSchema = new mongoose.Schema(
     // Mixed, like the refund record beside it; shaped by the service.
     preparationStartedAt: { type: String },
     cancellationPolicy: { type: mongoose.Schema.Types.Mixed },
-    cancellationRequest: { type: mongoose.Schema.Types.Mixed },
     createdAt: { type: String },
     updatedAt: { type: String },
   },

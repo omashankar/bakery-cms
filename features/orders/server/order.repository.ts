@@ -622,59 +622,6 @@ export async function patchIfStatus(
   return doc ? toOrder(doc) : null;
 }
 
-/**
- * Open a cancellation request — once.
- *
- * The filter IS the duplicate guard: no request on the order yet, and the
- * order not closed. Two taps of "Request cancellation", or a customer and a
- * staff member at the same moment, find one winner; the other gets null.
- */
-export async function openCancellationRequest(
-  id: string,
-  request: NonNullable<PlacedOrder["cancellationRequest"]>,
-): Promise<PlacedOrder | null> {
-  await connectDB();
-  const doc = (await OrderModel.findOneAndUpdate(
-    {
-      _id: id,
-      cancellationRequest: { $exists: false },
-      status: { $nin: ["cancelled", "refunded"] },
-    },
-    { $set: { cancellationRequest: request, updatedAt: new Date().toISOString() } },
-    { new: true },
-  ).lean()) as unknown as Raw | null;
-  return doc ? toOrder(doc) : null;
-}
-
-/**
- * Write a cancellation request only if nobody else has since — keyed on its
- * `version`, the same protocol the refund record uses. Two admins deciding
- * one request at once: the second write matches nothing.
- */
-export async function compareAndSetCancellation(
-  id: string,
-  expectedVersion: number,
-  request: NonNullable<PlacedOrder["cancellationRequest"]>,
-): Promise<PlacedOrder | null> {
-  await connectDB();
-  const doc = (await OrderModel.findOneAndUpdate(
-    { _id: id, "cancellationRequest.version": expectedVersion },
-    { $set: { cancellationRequest: request, updatedAt: new Date().toISOString() } },
-    { new: true },
-  ).lean()) as unknown as Raw | null;
-  return doc ? toOrder(doc) : null;
-}
-
-/** Every order with a cancellation request, newest request first. */
-export async function listCancellationCases(limit = 500): Promise<PlacedOrder[]> {
-  await connectDB();
-  const docs = (await OrderModel.find({ cancellationRequest: { $exists: true } })
-    .sort({ "cancellationRequest.requestedAt": -1 })
-    .limit(limit)
-    .lean()) as unknown as Raw[];
-  return docs.map(toOrder);
-}
-
 export async function cancelIfActive(
   id: string,
   fields: Partial<PlacedOrder>,

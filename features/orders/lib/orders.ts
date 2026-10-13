@@ -4,7 +4,7 @@ import { getCommerceSettings } from "@/features/settings/lib/settings-repository
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import type { RefundReasonCode, RefundRecord } from "@/types/refund";
 import type { AppliedCoupon } from "./coupons";
-import type { CancellationRequest, OrderCancellationPolicy } from "./cancellation-policy";
+import type { OrderCancellationPolicy } from "./cancellation-policy";
 import type {
   CheckoutAddress,
   DeliverySlot,
@@ -112,8 +112,6 @@ export interface PlacedOrder {
   preparationStartedAt?: string;
   /** The cancellation policy the customer agreed to, copied at placement. */
   cancellationPolicy?: OrderCancellationPolicy;
-  /** The customer's (or staff's) request to cancel, and the shop's decision. */
-  cancellationRequest?: CancellationRequest;
 }
 
 export interface RefundOrderInput {

@@ -192,8 +192,6 @@ export interface CommerceSettings {
    * cart line's own rule and copied onto every order placed under it.
    */
   cancellationPolicyText: string;
-  /** Whether customers may ask to cancel from My Orders. */
-  customerCancellationRequests: boolean;
   giftWrapEnabled: boolean;
   giftWrapFee: number;
   giftWrapLabel: string;

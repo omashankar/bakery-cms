@@ -1,11 +1,5 @@
 import { z } from "zod";
 import { DEFAULT_TIME_ZONE, isValidTimeZone } from "@/features/orders/lib/viewer-time";
-import {
-  CANCELLATION_REASONS,
-  CANCELLATION_RESOLUTIONS,
-  type CancellationReason,
-  type CancellationResolution,
-} from "@/features/orders/lib/cancellation-policy";
 
 /**
  * Zod contracts for order operations. Nested value objects (items, totals,
@@ -255,25 +249,6 @@ export const deliveryPartnerSchema = z.object({
 });
 
 export const refundNotesSchema = z.object({ notes: z.string() });
-
-/**
- * The shop's actions on a cancellation case. One endpoint, three verbs:
- * open a case itself, pick a request up for review, or decide it.
- */
-export const cancellationActionSchema = z.discriminatedUnion("action", [
-  z.object({
-    action: z.literal("open"),
-    reason: z.enum(CANCELLATION_REASONS as [CancellationReason, ...CancellationReason[]]),
-    detail: z.string().trim().max(1000).optional(),
-  }),
-  z.object({ action: z.literal("review") }),
-  z.object({
-    action: z.literal("decide"),
-    resolution: z.enum(CANCELLATION_RESOLUTIONS as [CancellationResolution, ...CancellationResolution[]]),
-    reason: z.string().trim().min(1, "Write down why — it is kept with the decision.").max(1000),
-    refundAmount: z.number().positive().optional(),
-  }),
-]);
 
 /** Saying no to a requested refund — why, for the record and the timeline. */
 export const declineRefundSchema = z.object({

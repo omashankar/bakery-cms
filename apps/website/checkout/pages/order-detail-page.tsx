@@ -27,12 +27,9 @@ import { settledRefundAmount } from "@/features/orders/lib/order-overviews";
 import { formatAddress } from "@/features/orders/lib/address-format";
 import {
   CANCELLATION_CLASS_CUSTOMER_TEXT,
-  CANCELLATION_REASON_LABELS,
-  CANCELLATION_REQUEST_STATUS_LABELS,
-  CANCELLATION_RESOLUTION_LABELS,
   DEFAULT_CANCELLATION_CLASS,
   REFUND_STATE_LABELS,
-  preparationStage,
+  customerCancellation,
   refundState,
 } from "@/features/orders/lib/cancellation-policy";
 
@@ -304,9 +301,9 @@ export function OrderDetailPage() {
 
               {/*
                 CANCELLATION AND REFUND, kept apart: the policy this order was
-                placed under (the copy, not today's wording), the request and
-                the shop's decision, and the refund's own state — "Processed"
-                only once the payment provider has said so.
+                placed under (the copy, not today's wording) and the refund's
+                own state — "Processed" only once the payment provider has said
+                so.
               */}
               <div className="rounded-xl border border-border bg-card p-6 text-sm shadow-sm">
                 <h2 className={storefrontHeading.card}>Cancellation &amp; refund</h2>
@@ -324,23 +321,6 @@ export function OrderDetailPage() {
                       ) : null}
                     </dd>
                   </div>
-                  {order.cancellationRequest ? (
-                    <div>
-                      <dt className="text-xs text-muted-foreground">Your request</dt>
-                      <dd className="text-foreground">
-                        {CANCELLATION_REQUEST_STATUS_LABELS[order.cancellationRequest.status]} ·{" "}
-                        {CANCELLATION_REASON_LABELS[order.cancellationRequest.reason]}
-                        {order.cancellationRequest.decision ? (
-                          <span className="block text-xs text-muted-foreground">
-                            {CANCELLATION_RESOLUTION_LABELS[order.cancellationRequest.decision.resolution]}
-                            {order.cancellationRequest.decision.reason
-                              ? ` — ${order.cancellationRequest.decision.reason}`
-                              : ""}
-                          </span>
-                        ) : null}
-                      </dd>
-                    </div>
-                  ) : null}
                   {refundState(order) !== "not_applicable" ? (
                     <div>
                       <dt className="text-xs text-muted-foreground">Refund</dt>
@@ -355,9 +335,12 @@ export function OrderDetailPage() {
                     </div>
                   ) : null}
                 </dl>
-                {!order.cancellationRequest && preparationStage(order.status) !== null ? (
+                {customerCancellation({
+                  ...order,
+                  policyClass: order.cancellationPolicy?.policyClass ?? DEFAULT_CANCELLATION_CLASS,
+                }).allowed ? (
                   <p className="mt-4 text-xs text-muted-foreground">
-                    Need to cancel or report a problem?{" "}
+                    Need to cancel?{" "}
                     <Link href={routes.account.orders} className="text-bakery-700 hover:underline">
                       Go to My Orders
                     </Link>{" "}

@@ -184,7 +184,6 @@ export const defaultCommerceSettings: CommerceSettings = {
     "By placing this order you agree to our delivery terms. Orders are prepared to order — cancellations within 2 hours of placement may be accepted.",
   cancellationPolicyText:
     "Ready-made items can be cancelled for a full refund until they are dispatched. Made-to-order items, such as cakes, can be cancelled for a full refund until we start preparing them; after that, a change of mind is not refundable. Personalised items cannot be cancelled for a change of mind. If anything is wrong with your order — wrong, damaged, late or never delivered — we will always look into it with you.",
-  customerCancellationRequests: true,
   giftWrapEnabled: true,
   giftWrapFee: 49,
   giftWrapLabel: "Gift wrap",

@@ -9,7 +9,6 @@ import {
   ServerCrash,
   ShoppingBag,
   XCircle,
-  CircleSlash,
 } from "lucide-react";
 import type { NotificationType } from "@/types/notification";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +20,6 @@ const iconMap = {
   payment_received: CreditCard,
   payment_failed: XCircle,
   refund_request: RotateCcw,
-  cancellation_request: CircleSlash,
   gateway_error: ServerCrash,
   cod_confirmation: Banknote,
   low_stock: AlertTriangle,
@@ -38,7 +36,6 @@ const variantMap: Record<
   payment_received: "secondary",
   payment_failed: "destructive",
   refund_request: "outline",
-  cancellation_request: "destructive",
   gateway_error: "destructive",
   cod_confirmation: "secondary",
   low_stock: "outline",

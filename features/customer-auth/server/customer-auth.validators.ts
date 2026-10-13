@@ -1,8 +1,4 @@
 import { z } from "zod";
-import {
-  CUSTOMER_CANCELLATION_REASONS,
-  type CancellationReason,
-} from "@/features/orders/lib/cancellation-policy";
 
 /**
  * What the storefront's sign-in endpoints accept.
@@ -73,13 +69,9 @@ export const savedAddressesSchema = z.object({
 
 export type SavedAddressRecord = z.infer<typeof savedAddressSchema>;
 
-/** A customer asking to cancel: a reason from the list, and their own words. */
+/** A customer cancelling: an optional line saying why. */
 export const customerCancellationSchema = z.object({
-  reason: z.enum(
-    CUSTOMER_CANCELLATION_REASONS as [CancellationReason, ...CancellationReason[]],
-    "Please choose a reason from the list.",
-  ),
-  detail: z.string().trim().max(1000).optional(),
+  reason: z.string().trim().max(300).optional(),
 });
 
 export type RequestCodeInput = z.infer<typeof requestCodeSchema>;

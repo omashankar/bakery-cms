@@ -71,7 +71,6 @@ const typeOptions = [
   "payment_received",
   "payment_failed",
   "refund_request",
-  "cancellation_request",
   "cod_confirmation",
   "gateway_error",
   "low_stock",

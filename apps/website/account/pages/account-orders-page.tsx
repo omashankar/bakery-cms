@@ -21,22 +21,31 @@ import { routes } from "@/constants/routes";
 import { formatCalendarDate, formatCurrency, formatDate } from "@/utils/format";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import dynamic from "next/dynamic";
-import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
 import {
-  CANCELLATION_REASON_LABELS,
-  CANCELLATION_REQUEST_STATUS_LABELS,
-  CANCELLATION_RESOLUTION_LABELS,
-  preparationStage,
+  DEFAULT_CANCELLATION_CLASS,
+  customerCancellation,
 } from "@/features/orders/lib/cancellation-policy";
 
-// Loaded on the press that opens it: most visits to My Orders never ask.
-const CancellationRequestDialog = dynamic(
+// Loaded on the press that opens it: most visits to My Orders never cancel.
+const CancelOrderDialog = dynamic(
   () =>
-    import("@/apps/website/account/components/cancellation-request-dialog").then(
-      (module) => module.CancellationRequestDialog,
+    import("@/apps/website/account/components/cancel-order-dialog").then(
+      (module) => module.CancelOrderDialog,
     ),
   { ssr: false },
 );
+
+/**
+ * Whether this order offers "Cancel order": its products' "Order cancel"
+ * toggle allows it and the shop has not started preparing it. The server
+ * checks the same rule again.
+ */
+function canCancel(order: PlacedOrder): boolean {
+  return customerCancellation({
+    ...order,
+    policyClass: order.cancellationPolicy?.policyClass ?? DEFAULT_CANCELLATION_CLASS,
+  }).allowed;
+}
 
 const PAGE_SIZE = 10;
 
@@ -113,8 +122,6 @@ export function AccountOrdersPage() {
   const [page, setPage] = useState(1);
   const [orders, setOrders] = useState<PlacedOrder[] | null>(null);
   const [cancelling, setCancelling] = useState<PlacedOrder | null>(null);
-  // The shop can take requests by phone instead; the server enforces it too.
-  const cancellationsOpen = getCommerceSettings().customerCancellationRequests !== false;
   const [loadError, setLoadError] = useState(false);
 
   /**
@@ -375,38 +382,6 @@ export function AccountOrdersPage() {
                     </div>
                   </dl>
 
-                  {/*
-                    THE CANCELLATION REQUEST, AS IT STANDS — its status and,
-                    once the shop has decided, the decision and its reason in
-                    the shop's own words. Kept apart from Payment above: a
-                    request approved is not money refunded, and that line
-                    already says where the refund is.
-                  */}
-                  {order.cancellationRequest ? (
-                    <div className="rounded-xl border border-border px-4 py-3 text-xs">
-                      <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span className="font-medium text-foreground">
-                          Cancellation{" "}
-                          {CANCELLATION_REQUEST_STATUS_LABELS[order.cancellationRequest.status].toLowerCase()}
-                        </span>
-                        <span className="text-muted-foreground">
-                          · {CANCELLATION_REASON_LABELS[order.cancellationRequest.reason]}
-                        </span>
-                      </p>
-                      {order.cancellationRequest.decision ? (
-                        <p className="mt-1 text-muted-foreground">
-                          {CANCELLATION_RESOLUTION_LABELS[order.cancellationRequest.decision.resolution]}
-                          {order.cancellationRequest.decision.reason
-                            ? ` — ${order.cancellationRequest.decision.reason}`
-                            : ""}
-                        </p>
-                      ) : (
-                        <p className="mt-1 text-muted-foreground">
-                          The shop will reply soon. Nothing is cancelled or refunded until it does.
-                        </p>
-                      )}
-                    </div>
-                  ) : null}
                 </div>
 
                 <div className="flex shrink-0 flex-col items-start gap-3 lg:items-end">
@@ -435,20 +410,10 @@ export function AccountOrdersPage() {
                     >
                       Reorder
                     </Button>
-                    {/*
-                      ONE REQUEST PER ORDER, offered while there is something
-                      to ask about. Once it has left the shop the question is
-                      no longer "cancel" but "something is wrong", so the
-                      button says that.
-                    */}
-                    {cancellationsOpen &&
-                    !order.cancellationRequest &&
-                    preparationStage(order.status) !== null ? (
+                    {/* Only while the order can still be cancelled. */}
+                    {canCancel(order) ? (
                       <Button variant="ghost" size="sm" onClick={() => setCancelling(order)}>
-                        {preparationStage(order.status) === "dispatched" ||
-                        preparationStage(order.status) === "delivered"
-                          ? "Report a problem"
-                          : "Request cancellation"}
+                        Cancel order
                       </Button>
                     ) : null}
                   </div>
@@ -466,19 +431,22 @@ export function AccountOrdersPage() {
         </div>
       )}
       {cancelling ? (
-        <CancellationRequestDialog
+        <CancelOrderDialog
           order={cancelling}
           open
           onOpenChange={(open) => {
             if (!open) setCancelling(null);
           }}
-          onSubmitted={(updated) => {
+          onCancelled={(updated) => {
             setCancelling(null);
             setOrders((current) =>
               (current ?? []).map((entry) => (entry.orderNumber === updated.orderNumber ? updated : entry)),
             );
-            toast.success("Request sent", {
-              description: "The shop will reply by email. Nothing is cancelled until it does.",
+            toast.success("Order cancelled", {
+              description:
+                updated.paymentStatus === "paid"
+                  ? "Your refund is on its way to the way you paid."
+                  : "We have emailed you a confirmation.",
             });
           }}
         />

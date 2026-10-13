@@ -441,21 +441,6 @@ export function CommerceSettingsPage() {
                   or not delivered — those are always reviewed.
                 </p>
               </div>
-              <label className="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium">Customers can ask to cancel</p>
-                  <p className="text-xs text-muted-foreground">
-                    Adds &ldquo;Request cancellation&rdquo; to My Orders. You decide
-                    every request; nothing is refunded until you do.
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.customerCancellationRequests ?? true}
-                  onCheckedChange={(checked) =>
-                    edit((prev) => ({ ...prev, customerCancellationRequests: checked }))
-                  }
-                />
-              </label>
             </CardContent>
           </Card>
         </div>

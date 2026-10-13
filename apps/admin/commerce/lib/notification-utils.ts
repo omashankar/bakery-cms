@@ -26,7 +26,6 @@ export function formatNotificationType(type: NotificationType): string {
     payment_received: "Payment received",
     payment_failed: "Payment failed",
     refund_request: "Refund request",
-    cancellation_request: "Cancellation request",
     gateway_error: "Gateway error",
     cod_confirmation: "COD confirmation",
     low_stock: "Low stock",

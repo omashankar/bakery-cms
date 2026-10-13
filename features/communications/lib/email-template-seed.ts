@@ -212,41 +212,6 @@ export function seedEmailTemplates(): EmailTemplateRecord[] {
       ...base,
     },
     {
-      id: "email-cancellation-requested",
-      slug: "cancellation_requested",
-      name: "Cancellation request received",
-      description: "Sent when a customer asks to cancel an order.",
-      category: "transactional",
-      subject: "We received your cancellation request for {{order_number}}",
-      previewText: "The shop will review your request.",
-      body: "Hi {{customer_name}},\n\nWe have received your request to cancel order {{order_number}}.\n\nYour reason: {{cancellation_reason}}\n\n{{cancellation_outcome}}\n\nWe will email you as soon as the shop has decided. Nothing has been refunded yet.\n\n— {{store_name}}",
-      variables: ["customer_name", "order_number", "cancellation_reason", "cancellation_outcome", "store_name"],
-      ...base,
-    },
-    {
-      id: "email-cancellation-decided",
-      slug: "cancellation_decided",
-      name: "Cancellation decision",
-      description: "Sent when the shop approves or rejects a cancellation request.",
-      category: "transactional",
-      subject: "Your cancellation request for {{order_number}}",
-      previewText: "The shop has decided on your request.",
-      // `refund_note` says only what has happened: a refund STARTED, never one
-      // that has arrived — the gateway confirms that, and `refund_processed`
-      // is sent when it does.
-      body: "Hi {{customer_name}},\n\nThe shop has looked at your cancellation request for order {{order_number}}.\n\nDecision: {{cancellation_decision}}\n{{decision_reason}}\n\n{{refund_note}}\n\nQuestions? Email {{store_email}}\n\n— {{store_name}}",
-      variables: [
-        "customer_name",
-        "order_number",
-        "cancellation_decision",
-        "decision_reason",
-        "refund_note",
-        "store_email",
-        "store_name",
-      ],
-      ...base,
-    },
-    {
       id: "email-refund-failed",
       slug: "refund_failed",
       name: "Refund failed",

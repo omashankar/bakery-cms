@@ -14,27 +14,10 @@ import type { PlacedOrder } from "@/features/orders/lib/orders";
  */
 export function withoutStaffOnlyFields<T extends PlacedOrder | null>(order: T): T {
   if (!order) return order;
-  const { adminNotes: _adminNotes, refundRecord, cancellationRequest, ...rest } = order;
+  const { adminNotes: _adminNotes, refundRecord, ...rest } = order;
 
   return {
     ...rest,
-    // The customer sees their request and the shop's decision and reason —
-    // those are written to them. Not WHICH staff member decided: an email
-    // address of the shop's staff is not the customer's to have.
-    ...(cancellationRequest
-      ? {
-          cancellationRequest: {
-            ...cancellationRequest,
-            decision: cancellationRequest.decision
-              ? { ...cancellationRequest.decision, actorEmail: undefined }
-              : undefined,
-            history: cancellationRequest.history.map((event) => ({
-              ...event,
-              actor: event.actor === "customer" ? "customer" : undefined,
-            })),
-          },
-        }
-      : {}),
     ...(refundRecord
       ? {
           refundRecord: {

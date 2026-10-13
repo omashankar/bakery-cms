@@ -75,7 +75,6 @@ const SEGMENT_LABELS: Record<string, string> = {
   refunds: "Refunds",
   // Each of these read as its URL ("Sms", "Seo Files", "Custom Code") under a
   // page titled something else; they now say what the page heading says.
-  cancellations: "Cancellations",
   sms: "SMS Notifications",
   "seo-files": "Robots.txt & Sitemap",
   "custom-code": "Custom Code",
@@ -102,7 +101,6 @@ function isDynamicSegment(segment: string, prev?: string): boolean {
   if (prev === "pages" && segment !== "add" && segment !== "edit") {
     return true;
   }
-  if (prev === "orders" && segment === "cancellations") return false;
   if (prev === "orders" || prev === "customers") {
     return true;
   }
