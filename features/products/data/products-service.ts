@@ -320,6 +320,11 @@ function toCard(product: LandingProduct, modules: ModuleSettings): LandingProduc
     occasions: product.occasions,
     flavours: product.flavours,
     weights: product.weights?.map((tier) => ({ label: tier.label, price: 0 })),
+    // The two per-product toggles, for checkout. Dropped here, every product
+    // looked COD-able and cancellable there: Cash on Delivery was offered on
+    // cakes the server then refused at Place order.
+    cancellationClass: product.cancellationClass,
+    codAllowed: product.codAllowed,
   };
 }
 

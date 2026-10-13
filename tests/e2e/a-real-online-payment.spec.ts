@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { PROBE_ADDRESS } from "./shop-state";
 
 import { probeEmail, signInAsCustomer } from "./sign-in";
 
@@ -58,14 +59,15 @@ test.describe("paying for real, on a test key", () => {
     await page.getByRole("button", { name: /proceed to checkout/i }).click();
 
     await page.getByLabel(/full name/i).fill("E2E Pay Probe");
-    await page.getByLabel(/email/i).fill(customerEmail);
+    // Signed in, so the address step says "Ordering as" instead of asking.
+    await expect(page.getByText(customerEmail, { exact: true })).toBeVisible();
     // EXACT. The address step also carries "Alternate phone (optional)", so
     // a loose /phone/i matches two boxes and the fill refuses to guess.
     await page.getByLabel("Phone", { exact: true }).fill("9000000002");
     await page.getByLabel(/address line 1|address/i).first().fill("2 Probe Lane");
-    await page.getByLabel(/city/i).fill("Mumbai");
-    await page.getByLabel(/state/i).fill("MH");
-    await page.getByLabel(/PIN code/i).fill("400001");
+    await page.getByLabel(/city/i).fill(PROBE_ADDRESS.city);
+    await page.getByLabel(/state/i).fill(PROBE_ADDRESS.state);
+    await page.getByLabel(/PIN code/i).fill(PROBE_ADDRESS.pincode);
 
     await page.getByRole("button", { name: /continue|next/i }).first().click();
 

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { connect } from "./shop-state";
+import { connect, PROBE_ADDRESS } from "./shop-state";
 import { probeEmail, removeCustomer, signInAsCustomer } from "./sign-in";
 
 /**
@@ -39,16 +39,21 @@ test.describe("a customer placing an order", () => {
     customerEmail = await probeEmail("order");
     await signInAsCustomer(page, customerEmail);
 
-    // ---- find a cake that can actually be bought ----
-    await page.goto("/store");
-    await expect(page).toHaveTitle(/./);
+    // ---- find a cake that can actually be bought, with cash ----
+    // Cash on Delivery is a per-product toggle now, and checkout hides it when
+    // any line has it off. The first card on /store may well be one of those.
+    const db = await connect();
+    const codProduct = await db.collection("products").findOne({
+      status: "published",
+      stockStatus: { $ne: "out_of_stock" },
+      codAllowed: { $ne: false },
+    });
+    test.skip(
+      !codProduct,
+      "no product takes Cash on Delivery — a-real-online-payment covers placing an order",
+    );
 
-    const firstProduct = page.locator('a[href^="/store/p/"]').first();
-    await expect(firstProduct).toBeVisible();
-    const href = await firstProduct.getAttribute("href");
-    expect(href, "the storefront lists no product to open").toBeTruthy();
-
-    await page.goto(href!);
+    await page.goto(`/store/p/${codProduct!.slug}`);
 
     // ---- add it to the cart ----
     const addToCart = page.getByRole("button", { name: /add to cart/i }).first();
@@ -69,14 +74,15 @@ test.describe("a customer placing an order", () => {
 
     // ---- the address step ----
     await page.getByLabel(/full name/i).fill("E2E Probe");
-    await page.getByLabel(/email/i).fill(customerEmail);
+    // Signed in, so the address step says "Ordering as" instead of asking.
+    await expect(page.getByText(customerEmail, { exact: true })).toBeVisible();
     // EXACT. The address step also carries "Alternate phone (optional)", so
     // a loose /phone/i matches two boxes and the fill refuses to guess.
     await page.getByLabel("Phone", { exact: true }).fill("9000000001");
     await page.getByLabel(/address line 1|address/i).first().fill("1 Probe Lane");
-    await page.getByLabel(/city/i).fill("Mumbai");
-    await page.getByLabel(/state/i).fill("MH");
-    await page.getByLabel(/PIN code/i).fill("400001");
+    await page.getByLabel(/city/i).fill(PROBE_ADDRESS.city);
+    await page.getByLabel(/state/i).fill(PROBE_ADDRESS.state);
+    await page.getByLabel(/PIN code/i).fill(PROBE_ADDRESS.pincode);
 
     await page.getByRole("button", { name: /continue|next/i }).first().click();
 
@@ -217,7 +223,6 @@ test.describe("a customer placing an order", () => {
     ).toEqual([]);
 
     // ---- and it really did ----
-    const db = await connect();
     const placed = await db
       .collection("orders")
       .findOne({ "address.email": customerEmail });

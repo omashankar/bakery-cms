@@ -62,6 +62,48 @@ async function client(): Promise<Razorpay | null> {
 
 /** Paise are the gateway's unit. Rounding here rather than at each call site so a
  *  float like 149.99999999 cannot become 14998. */
+/**
+ * Why Razorpay refused, when the reason is the account's balance.
+ *
+ * Refunds come out of the Razorpay balance (or refund credits), and the balance
+ * is swept to the bank on every settlement — so a shop's first full refund
+ * often asks for more than is there, if only by the fee Razorpay kept. Razorpay
+ * answers that with a bare "invalid request sent". Asked only after a refusal,
+ * so a refund that works costs no extra call. Null when the balance is not the
+ * reason, or cannot be read.
+ */
+async function balanceShortfall(paise: number): Promise<string | null> {
+  const credentials = await getRazorpayCredentials();
+  if (!credentials) return null;
+  try {
+    const response = await fetch("https://api.razorpay.com/v1/balance", {
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${credentials.keyId}:${credentials.keySecret}`).toString("base64")}`,
+      },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) return null;
+    const body = (await response.json()) as {
+      balance?: number;
+      refund_credits?: number;
+      currency?: string;
+    };
+    const available = Number(body.balance ?? 0) + Number(body.refund_credits ?? 0);
+    if (!Number.isFinite(available) || available >= paise) return null;
+    const money = new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: body.currency || "INR",
+    });
+    return (
+      `Your Razorpay balance (${money.format(available / 100)}) is less than this refund ` +
+      `(${money.format(paise / 100)}). Add refund credits in the Razorpay Dashboard, ` +
+      `or try again after more payments come in.`
+    );
+  } catch {
+    return null;
+  }
+}
+
 function toPaise(amount: number): number {
   return Math.round(amount * 100);
 }
@@ -184,7 +226,14 @@ export async function createRazorpayRefund(args: {
       (error instanceof Error ? error.message : "Razorpay refund failed");
 
     if (typeof status === "number" && status >= 400 && status < 500) {
-      return { ok: false, refundId: null, status: null, amount: null, refused: described };
+      const short = await balanceShortfall(paise);
+      return {
+        ok: false,
+        refundId: null,
+        status: null,
+        amount: null,
+        refused: short ?? described,
+      };
     }
     return { ok: false, refundId: null, status: null, amount: null, unavailable: described };
   }

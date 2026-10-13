@@ -312,6 +312,27 @@ describe("collection filters use the product's real data", () => {
     expect(fn).toContain('description: ""');
   });
 
+  it("the card projection carries every field checkout picks from it", () => {
+    // Checkout's catalog is these cards, narrowed. `codAllowed` and
+    // `cancellationClass` were picked there and never put on a card, so every
+    // cake looked COD-able at checkout and the server refused it at Place order.
+    const source = stripComments(read("features/products/data/products-service.ts"));
+    const start = source.indexOf("function toCard(");
+    const fn = source.slice(start, source.indexOf("\n}", start));
+
+    const checkout = read("apps/website/checkout/pages/checkout-page.tsx");
+    const pick = /CheckoutCatalogEntry = Pick<\s*LandingProduct,([^>]*)>/.exec(checkout);
+    expect(pick, "checkout no longer declares its catalog as a Pick").toBeTruthy();
+    const fields = [...pick![1].matchAll(/"(\w+)"/g)].map((match) => match[1]);
+    expect(fields).toContain("codAllowed");
+
+    for (const field of fields) {
+      expect(fn, `checkout reads ${field}, and toCard never sets it`).toMatch(
+        new RegExp(`\\b${field}: product\\.${field}\\b`),
+      );
+    }
+  });
+
   it("offers the sizes the products on the page are actually sold in", () => {
     /**
      * Three answers, in order. It was the hard-coded list, so a shop that

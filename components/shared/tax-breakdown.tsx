@@ -104,9 +104,12 @@ export function TaxBreakdown({
       <Row
         label="Delivery"
         value={
-          showFreeDelivery && values.delivery === 0
-            ? "Free"
-            : formatCurrency(values.delivery)
+          // Not "Free": the fee is 0 only because nothing can be delivered.
+          values.deliverable === false
+            ? "Not available here"
+            : showFreeDelivery && values.delivery === 0
+              ? "Free"
+              : formatCurrency(values.delivery)
         }
         tone="muted"
       />
@@ -166,6 +169,7 @@ export function taxBreakdownFromCartTotals(
     discount: totals.discount,
     discountLabel: options?.discountLabel,
     delivery: totals.delivery,
+    deliverable: totals.deliverable,
     tax: totals.tax,
     // The rate this order was CHARGED at, not the one the shop charges now.
     // Reading the live label relabelled every invoice already issued whenever

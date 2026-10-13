@@ -167,7 +167,10 @@ export function OrderSummaryPanel({
         </div>
       ) : null}
 
-      {!placed && totals.subtotal > 0 && totals.subtotal < freeDeliveryThreshold ? (
+      {!placed &&
+      totals.deliverable !== false &&
+      totals.subtotal > 0 &&
+      totals.subtotal < freeDeliveryThreshold ? (
         <p className="mt-3 text-xs text-muted-foreground">
           Add {formatCurrency(freeDeliveryThreshold - totals.subtotal)} more for free delivery.
         </p>

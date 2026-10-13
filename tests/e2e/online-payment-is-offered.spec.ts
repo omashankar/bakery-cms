@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { PROBE_ADDRESS } from "./shop-state";
 
 import { probeEmail, signInAsCustomer } from "./sign-in";
 
@@ -50,14 +51,15 @@ test.describe("paying online", () => {
 
     // ---- the address step, exactly as place-an-order does it ----
     await page.getByLabel(/full name/i).fill("E2E Pay Probe");
-    await page.getByLabel(/email/i).fill(customerEmail);
+    // Signed in, so the address step says "Ordering as" instead of asking.
+    await expect(page.getByText(customerEmail, { exact: true })).toBeVisible();
     // EXACT. The address step also carries "Alternate phone (optional)", so
     // a loose /phone/i matches two boxes and the fill refuses to guess.
     await page.getByLabel("Phone", { exact: true }).fill("9000000002");
     await page.getByLabel(/address line 1|address/i).first().fill("2 Probe Lane");
-    await page.getByLabel(/city/i).fill("Mumbai");
-    await page.getByLabel(/state/i).fill("MH");
-    await page.getByLabel(/PIN code/i).fill("400001");
+    await page.getByLabel(/city/i).fill(PROBE_ADDRESS.city);
+    await page.getByLabel(/state/i).fill(PROBE_ADDRESS.state);
+    await page.getByLabel(/PIN code/i).fill(PROBE_ADDRESS.pincode);
 
     await page.getByRole("button", { name: /continue|next/i }).first().click();
 
@@ -113,9 +115,17 @@ test.describe("paying online", () => {
     // Cash has to survive too. An earlier shape of this gate hid every method
     // it could not confirm, which would have left a checkout with no way to pay
     // at all.
+    //
+    // Cash is a per-product toggle as well, so a cart of cakes with it off
+    // shows WHY there is no cash option instead. Either is an answer; a cash
+    // method that silently vanished is not. Matched exactly, because the note
+    // contains the words "Cash on Delivery" too.
     await expect(
-      page.getByText(/cash on delivery/i).first(),
-      "cash on delivery disappeared alongside it",
+      page
+        .getByText("Cash on Delivery", { exact: true })
+        .or(page.getByText(/Cash on Delivery isn.t available for/))
+        .first(),
+      "cash on delivery disappeared alongside it, with nothing saying why",
     ).toBeVisible();
 
     await online.click();
