@@ -189,6 +189,54 @@ describe("cancelling twice", () => {
 });
 
 /**
+ * A PAID order cancelled is a refund the shop owes — and nothing asked for it.
+ *
+ * The customer was emailed "a refund is on its way" while the only trace on
+ * the shop's side was a console line: a paid order cancelled on 2 September
+ * 2026 had no refund request six weeks later. Cancelling opens the request
+ * now; paying it out stays the shop's own click (its choice, 2026-10-13).
+ */
+describe("cancelling a paid order", () => {
+  it("opens a full refund request for the shop to approve", async () => {
+    const h = harness({ paymentMethod: "razorpay", paymentStatus: "paid" });
+
+    const result = await service.cancel("order-1", "time issue", CTX);
+
+    const record = h.order?.refundRecord as Record<string, unknown> | undefined;
+    expect(record, "no refund was asked for").toBeDefined();
+    expect(record?.status).toBe("requested");
+    expect(record?.amount).toBe(300);
+    expect(record?.reason).toBe("order_cancelled");
+    expect(record?.reasonDetail).toBe("time issue");
+    // The caller is handed the order as it now stands, request and all.
+    expect((result as { refundRecord?: unknown } | null)?.refundRecord).toBeDefined();
+    // And no money moved: the payment still reads as taken.
+    expect(h.order?.paymentStatus).toBe("paid");
+  });
+
+  it("asks once, however many times Cancel is pressed", async () => {
+    const h = harness({ paymentMethod: "razorpay", paymentStatus: "paid" });
+
+    await Promise.all([
+      service.cancel("order-1", undefined, CTX),
+      service.cancel("order-1", undefined, CTX),
+    ]);
+    await service.cancel("order-1", undefined, CTX);
+
+    const history = (h.order?.refundRecord as { history?: unknown[] } | undefined)?.history;
+    expect(history).toHaveLength(1);
+  });
+
+  it("asks for nothing when no money was taken", async () => {
+    const h = harness({ paymentMethod: "cod", paymentStatus: "cod" });
+
+    await service.cancel("order-1", undefined, CTX);
+
+    expect(h.order?.refundRecord).toBeUndefined();
+  });
+});
+
+/**
  * The repository is MOCKED above, so the mock proves the service uses the
  * guards and proves nothing about the queries that implement them.
  *

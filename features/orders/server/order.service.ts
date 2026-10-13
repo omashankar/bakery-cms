@@ -1245,13 +1245,42 @@ export async function cancel(id: string, cancellationReason: string | undefined,
   await restoreStock(stockFor(order));
 
   // Cancelling does not move money. A paid order cancelled here still has the
-  // customer's payment sitting in the gateway account, and this is the state
-  // `requestRefund` expects — so say so rather than leaving it to be noticed.
+  // customer's payment sitting in the gateway account.
   const holdsPayment = order.paymentStatus === "paid";
-  if (holdsPayment) {
-    console.info(
-      `[orders] Cancelled ${order.orderNumber} still holds a captured payment — it needs a refund.`,
-    );
+
+  /*
+    SO THE REFUND IS ASKED FOR, NOT JUST MENTIONED.
+
+    This logged a line to the server console and nothing else. The customer
+    was emailed "a refund is on its way" (below), and nothing anywhere asked
+    for one: a paid order cancelled by its customer on 2 September 2026 sat in
+    the Refund Center six weeks later with no request on it, because no one
+    had been told to look.
+
+    Now a paid cancellation opens a full refund REQUEST — the record the
+    Refund Center works from and the admin bell announces ("Refund requested
+    · BK-…"). No money moves here: the shop chose (2026-10-13) to approve each
+    refund itself, so paying it out stays one deliberate click.
+
+    Never allowed to fail the cancellation, for the reason the email below
+    gives: the order IS cancelled. A refund that could not be opened is
+    logged loudly; the Refund Center still lists the order as cancelled.
+  */
+  let result = updated;
+  if (holdsPayment && !order.refundRecord) {
+    try {
+      result =
+        (await requestRefund(
+          id,
+          { reason: "order_cancelled", reasonDetail: cancellationReason?.trim() || undefined },
+          ctx,
+        )) ?? updated;
+    } catch (error) {
+      console.error(
+        `[orders] Cancelled ${order.orderNumber} holds a captured payment and its refund request could not be opened`,
+        error,
+      );
+    }
   }
 
   // TELL THE CUSTOMER.
@@ -1269,7 +1298,7 @@ export async function cancel(id: string, cancellationReason: string | undefined,
   await releaseCoupon(order);
 
   await audit(ctx, "order.cancel", id, { reason: cancellationReason });
-  return updated;
+  return result;
 }
 
 export async function updatePayment(
