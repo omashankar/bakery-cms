@@ -22,7 +22,7 @@ export interface AdminBreadcrumb {
  * saying "Dashboard > Cakes > Add Cake". They are built per call now, from the
  * labels the caller passes.
  *
- * Only /admin/cakes/* reaches `add` and `edit` — /admin/pages/* is handled
+ * Only /admin/products/* reaches `add` and `edit` — /admin/pages/* is handled
  * ahead of this map, and no other admin route has those segments.
  */
 const SEGMENT_LABELS: Record<string, string> = {
@@ -95,7 +95,9 @@ const NON_ROUTABLE_SEGMENTS = new Set(["commerce", "builders"]);
 
 function isDynamicSegment(segment: string, prev?: string): boolean {
   if (!prev) return false;
-  if (prev === "cakes" && !["add", "edit", "preview"].includes(segment)) {
+  // Products live at /admin/products (/admin/cakes until 2026-10-13, which
+  // still redirects there).
+  if ((prev === "products" || prev === "cakes") && !["add", "edit", "preview"].includes(segment)) {
     return true;
   }
   if (prev === "pages" && segment !== "add" && segment !== "edit") {
@@ -121,6 +123,7 @@ export function getAdminBreadcrumbs(
   const segmentLabels: Record<string, string> = {
     ...SEGMENT_LABELS,
     cakes: capitalised(labels.productWordPlural),
+    products: capitalised(labels.productWordPlural),
     add: `Add ${capitalised(labels.productWord)}`,
     edit: `Edit ${capitalised(labels.productWord)}`,
   };
@@ -194,7 +197,7 @@ export function getAdminBreadcrumbs(
             ? "Wedding"
             : part === "contact" && prev === "settings"
               ? "Contact Information"
-              : part === "commerce" && prev === "settings"
+              : (part === "commerce" || part === "orders") && prev === "settings"
                 ? "Order Settings"
                 : segmentLabels[part] ??
               part.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());

@@ -500,8 +500,8 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
     return adminNavSections.map((section) => ({
       ...section,
       items: section.items
-        // The route and component stay named "cakes"; only the visible label
-        // changes. Shared with the command palette, which used to disagree.
+        // The route is /admin/products for every shop; the visible label is
+        // the shop's own word. Shared with the command palette, which used to disagree.
         .map((item) => ({ ...item, label: navItemLabel(item, labels) })),
     }));
   }, [labels]);

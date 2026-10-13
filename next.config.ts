@@ -159,6 +159,14 @@ const nextConfig: NextConfig = {
       { source: "/", destination: "/store", permanent: false },
       { source: "/landing", destination: "/platform", permanent: true },
       /*
+        ADMIN ADDRESSES THAT NOW SAY WHAT THE PAGE IS. Products lived at
+        /admin/cakes and Order Settings at /admin/settings/commerce; a
+        bookmark or an old link still lands on the right page.
+      */
+      { source: "/admin/cakes", destination: "/admin/products", permanent: true },
+      { source: "/admin/cakes/:path*", destination: "/admin/products/:path*", permanent: true },
+      { source: "/admin/settings/commerce", destination: "/admin/settings/orders", permanent: true },
+      /*
         THE SEARCH PAGE IS GONE; THE RESULTS ARE ON THE COLLECTIONS PAGE.
 
         It was a page whose whole content was a second search box, a row of

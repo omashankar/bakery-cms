@@ -52,7 +52,7 @@ vi.mock("@/features/products/lib/products-repository", async (importOriginal) =>
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: () => undefined, replace: () => undefined, refresh: () => undefined }),
-  usePathname: () => "/admin/cakes",
+  usePathname: () => "/admin/products",
 }));
 
 const { filterProducts } = await import(

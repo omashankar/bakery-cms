@@ -135,10 +135,12 @@ export const routes = {
     changePassword: "/admin/profile/password",
 
     cakes: {
-      list: "/admin/cakes",
-      add: "/admin/cakes/add",
-      edit: (id: string) => `/admin/cakes/${id}/edit`,
-      preview: (id: string) => `/admin/cakes/${id}/preview`,
+      // "/admin/cakes" until 2026-10-13: the page is Products for every kind
+      // of shop. The old addresses redirect (next.config.ts).
+      list: "/admin/products",
+      add: "/admin/products/add",
+      edit: (id: string) => `/admin/products/${id}/edit`,
+      preview: (id: string) => `/admin/products/${id}/preview`,
     },
 
     catalog: "/admin/catalog",
@@ -183,7 +185,8 @@ export const routes = {
       maintenance: "/admin/settings/maintenance",
       backup: "/admin/settings/backup",
       activity: "/admin/settings/activity",
-      commerce: "/admin/settings/commerce",
+      // The page is "Order Settings"; it was /settings/commerce (redirects).
+      commerce: "/admin/settings/orders",
       permissions: "/admin/settings/permissions",
       customCode: "/admin/settings/custom-code",
       navigation: "/admin/settings/navigation",
