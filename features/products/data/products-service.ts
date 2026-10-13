@@ -411,6 +411,14 @@ export async function updateProduct(
     ...data,
     ...(await stockForEdit(existing, data, options.stockQuantityLoaded)),
     id,
+    /*
+      THE FORM'S OWN ANSWER, absent included. The form sends no compare-at
+      price when the box is cleared, and the spread above then kept the OLD
+      one — so a compare-at could never be removed, and a product whose
+      compare-at had fallen below its price could not be saved at all while
+      the error told the admin to "Clear it".
+    */
+    compareAtPrice: data.compareAtPrice,
     // `rating` and `reviewCount` are owned by the reviews aggregate, which
     // writes them directly. Letting an edit form carry its stale copy back would
     // undo a moderation decision made since this form was opened.
