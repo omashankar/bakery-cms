@@ -4,6 +4,7 @@ import { getCommerceSettings } from "@/features/settings/lib/settings-repository
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import type { RefundReasonCode, RefundRecord } from "@/types/refund";
 import type { AppliedCoupon } from "./coupons";
+import type { CancellationRequest, OrderCancellationPolicy } from "./cancellation-policy";
 import type {
   CheckoutAddress,
   DeliverySlot,
@@ -103,6 +104,16 @@ export interface PlacedOrder {
   couponReleased?: boolean;
   refundReference?: string;
   refundRecord?: RefundRecord;
+  /**
+   * When staff first moved the order into a kitchen step (preparing, or
+   * straight past it). Set by `updateStatus`; never by placing or paying.
+   * Older orders read it off `statusHistory` — see `preparationStartedAt`.
+   */
+  preparationStartedAt?: string;
+  /** The cancellation policy the customer agreed to, copied at placement. */
+  cancellationPolicy?: OrderCancellationPolicy;
+  /** The customer's (or staff's) request to cancel, and the shop's decision. */
+  cancellationRequest?: CancellationRequest;
 }
 
 export interface RefundOrderInput {
