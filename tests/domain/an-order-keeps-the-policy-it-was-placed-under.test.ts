@@ -184,10 +184,15 @@ describe("cash on delivery at placement", () => {
   const cake = { productSlug: "black-forest", name: "Black Forest", price: 500, quantity: 1 };
   const candle = { productSlug: "candle", name: "Candle", price: 50, quantity: 1 };
 
-  it("refuses a made-to-order cake, naming it, and stores nothing", async () => {
+  it("refuses a product the shop unticked, naming it, and stores nothing", async () => {
     setCommerce();
-    await expect(cod([candle, cake])).rejects.toThrow(/not available for Black Forest/);
-    expect(state.inserted).toBeNull();
+    CATALOGUE["black-forest"].codAllowed = false;
+    try {
+      await expect(cod([candle, cake])).rejects.toThrow(/not available for Black Forest/);
+      expect(state.inserted).toBeNull();
+    } finally {
+      delete CATALOGUE["black-forest"].codAllowed;
+    }
   });
 
   it("takes cash for ready-made items", async () => {
@@ -196,14 +201,9 @@ describe("cash on delivery at placement", () => {
     expect(state.inserted).not.toBeNull();
   });
 
-  it("takes cash for a cake the shop has ticked for it", async () => {
+  it("takes cash for a product never unticked", async () => {
     setCommerce();
-    CATALOGUE["black-forest"].codAllowed = true;
-    try {
-      await cod([cake]);
-      expect(state.inserted).not.toBeNull();
-    } finally {
-      delete CATALOGUE["black-forest"].codAllowed;
-    }
+    await cod([cake]);
+    expect(state.inserted).not.toBeNull();
   });
 });

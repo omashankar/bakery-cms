@@ -8,6 +8,8 @@ import {
   preparationStage,
   preparationStartedAt,
   productAllowsCod,
+  classForCancellableTick,
+  isCancellableClass,
   refundState,
   strictestClass,
   type CancellationClass,
@@ -170,14 +172,23 @@ describe("the policy copy on an order", () => {
   });
 });
 
-describe("cash on delivery, per product", () => {
-  it("follows the class unless the shop has said otherwise", () => {
+describe("the admin's two ticks", () => {
+  it("cash on delivery is on until the shop unticks it", () => {
     expect(productAllowsCod({})).toBe(true);
-    expect(productAllowsCod({ cancellationClass: "standard" })).toBe(true);
-    expect(productAllowsCod({ cancellationClass: "made_to_order" })).toBe(false);
-    expect(productAllowsCod({ cancellationClass: "non_cancellable" })).toBe(false);
-    // The shop's tick wins, both ways.
-    expect(productAllowsCod({ cancellationClass: "made_to_order", codAllowed: true })).toBe(true);
-    expect(productAllowsCod({ cancellationClass: "standard", codAllowed: false })).toBe(false);
+    expect(productAllowsCod({ codAllowed: true })).toBe(true);
+    expect(productAllowsCod({ codAllowed: false })).toBe(false);
+  });
+
+  it("'customers can cancel' maps onto the rules, and an untouched product reads as ticked", () => {
+    expect(isCancellableClass(undefined)).toBe(true);
+    expect(isCancellableClass("standard")).toBe(true);
+    expect(isCancellableClass(classForCancellableTick(true))).toBe(true);
+    expect(isCancellableClass(classForCancellableTick(false))).toBe(false);
+    // Ticked: cancellable until preparation starts.
+    expect(judge(classForCancellableTick(true), "not_started", "changed_mind")).toBe("eligible");
+    expect(judge(classForCancellableTick(true), "in_progress", "changed_mind")).toBe("non_refundable");
+    // Unticked: not for a change of mind — but a problem is still reviewed.
+    expect(judge(classForCancellableTick(false), "not_started", "changed_mind")).toBe("non_refundable");
+    expect(judge(classForCancellableTick(false), "not_started", "wrong_item")).toBe("exception_review");
   });
 });

@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -66,12 +67,9 @@ import { loadSeoStore, SEO_UPDATED_EVENT } from "@/features/seo/lib/seo-reposito
 import { getActiveLocale } from "@/features/settings/lib/active-locale";
 import type { ModuleSettings } from "@/types/settings";
 import {
-  CANCELLATION_CLASSES,
-  CANCELLATION_CLASS_CUSTOMER_TEXT,
-  CANCELLATION_CLASS_LABELS,
-  DEFAULT_CANCELLATION_CLASS,
+  classForCancellableTick,
+  isCancellableClass,
   productAllowsCod,
-  type CancellationClass,
 } from "@/features/orders/lib/cancellation-policy";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import {
@@ -1315,14 +1313,12 @@ export function ProductFormPage({
                   product, which is what the rest of this tab is about.
                 */}
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm sm:col-span-2">
-                    <Checkbox
+                  <label className="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-3 text-sm sm:col-span-2">
+                    <span className="font-medium">Unlimited stock</span>
+                    <Switch
                       checked={form.unlimitedStock ?? false}
-                      onCheckedChange={(checked) =>
-                        patchForm({ unlimitedStock: checked === true })
-                      }
+                      onCheckedChange={(checked) => patchForm({ unlimitedStock: checked })}
                     />
-                    Unlimited stock
                   </label>
 
                   <div className="space-y-2">
@@ -1565,94 +1561,68 @@ export function ProductFormPage({
                   rather than a mechanism used wrongly — dropped, not translated.
                 */}
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <label className="flex items-start gap-2 text-sm">
-                      <Checkbox
-                        className="mt-0.5"
-                        checked={form.allowsMessage}
-                        onCheckedChange={(checked) =>
-                          patchForm({ allowsMessage: checked === true })
-                        }
-                      />
-                      Ask for a message
-                    </label>
-                    <p className="text-xs text-muted-foreground">
-                      Puts a &ldquo;Message on this order&rdquo; box on the page. For
-                      something written on or sent with the {productLower}.
-                    </p>
-                  </div>
+                  <label className="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-3">
+                    <span>
+                      <span className="block text-sm font-medium">Ask for a message</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Puts a &ldquo;Message on this order&rdquo; box on the page. For
+                        something written on or sent with the {productLower}.
+                      </span>
+                    </span>
+                    <Switch
+                      checked={form.allowsMessage}
+                      onCheckedChange={(checked) => patchForm({ allowsMessage: checked })}
+                    />
+                  </label>
                   {modules.photoCake ? (
-                    <div className="space-y-1">
-                      <label className="flex items-start gap-2 text-sm">
-                        <Checkbox
-                          className="mt-0.5"
-                          checked={form.allowsPhotoUpload}
-                          onCheckedChange={(checked) =>
-                            patchForm({ allowsPhotoUpload: checked === true })
-                          }
-                        />
-                        Ask for a photo
-                      </label>
-                      <p className="text-xs text-muted-foreground">
-                        The customer uploads a picture and you receive it cut to the
-                        outline below. The printing is part of the price.
-                      </p>
-                    </div>
+                    <label className="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-3">
+                      <span>
+                        <span className="block text-sm font-medium">Ask for a photo</span>
+                        <span className="block text-xs text-muted-foreground">
+                          The customer uploads a picture and you receive it cut to the
+                          outline below. The printing is part of the price.
+                        </span>
+                      </span>
+                      <Switch
+                        checked={form.allowsPhotoUpload}
+                        onCheckedChange={(checked) => patchForm({ allowsPhotoUpload: checked })}
+                      />
+                    </label>
                   ) : null}
                 </div>
 
                 {/*
-                  HOW A CHANGE OF MIND IS TREATED. A shop that sells cakes and
-                  candles cannot have one rule: a candle can be cancelled until
-                  it leaves, a cake cannot once it is in the oven, and a photo
-                  cake cannot be sold to anyone else at all. A genuine problem
-                  (wrong, damaged, never delivered) is reviewed whatever this
-                  says — it only decides the change-of-mind case.
+                  TWO TOGGLES, as the shop asked — allow it or not, nothing more.
+                  Neither touches a genuine problem: a wrong, damaged or
+                  undelivered order can always be reported and is reviewed.
                 */}
-                <div className="space-y-1">
-                  <Label htmlFor="cancellationClass">Cancellation</Label>
-                  <AdminSelect
-                    id="cancellationClass"
-                    value={form.cancellationClass ?? DEFAULT_CANCELLATION_CLASS}
-                    onChange={(event) =>
-                      patchForm({
-                        cancellationClass: event.target.value as CancellationClass,
-                      })
-                    }
-                  >
-                    {CANCELLATION_CLASSES.map((cls) => (
-                      <option key={cls} value={cls}>
-                        {CANCELLATION_CLASS_LABELS[cls]}
-                      </option>
-                    ))}
-                  </AdminSelect>
-                  <p className="text-xs text-muted-foreground">
-                    Customers see this on the {productLower} page and at checkout:
-                    &ldquo;{CANCELLATION_CLASS_CUSTOMER_TEXT[form.cancellationClass ?? DEFAULT_CANCELLATION_CLASS]}&rdquo;
-                  </p>
-                </div>
-                {/*
-                  CASH ON DELIVERY, per product. Unticked by default for made
-                  to order and personalised — a cake refused at the door is the
-                  cake and its price both lost — and ticked for ready-made
-                  items. Ticking or unticking it here overrides that default.
-                  One item in a cart that takes no cash takes cash off the
-                  whole order, at checkout and on the server.
-                */}
-                <div className="space-y-1">
-                  <label className="flex items-start gap-2 text-sm">
-                    <Checkbox
-                      className="mt-0.5"
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-3">
+                    <span>
+                      <span className="block text-sm font-medium">Cash on Delivery</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Off: this {productLower} is paid online only.
+                      </span>
+                    </span>
+                    <Switch
                       checked={productAllowsCod(form)}
-                      onCheckedChange={(checked) => patchForm({ codAllowed: checked === true })}
+                      onCheckedChange={(checked) => patchForm({ codAllowed: checked })}
                     />
-                    Allow Cash on Delivery
                   </label>
-                  <p className="text-xs text-muted-foreground">
-                    {typeof form.codAllowed === "boolean"
-                      ? "Set by you for this product."
-                      : "Following the cancellation setting: on for standard items, off for made-to-order and personalised ones."}
-                  </p>
+                  <label className="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-3">
+                    <span>
+                      <span className="block text-sm font-medium">Order cancel</span>
+                      <span className="block text-xs text-muted-foreground">
+                        On: customers can cancel until you start preparing it.
+                      </span>
+                    </span>
+                    <Switch
+                      checked={isCancellableClass(form.cancellationClass)}
+                      onCheckedChange={(checked) =>
+                        patchForm({ cancellationClass: classForCancellableTick(checked) })
+                      }
+                    />
+                  </label>
                 </div>
 
                 {/*
@@ -1923,32 +1893,26 @@ export function ProductFormPage({
                 </p>
               </div>
               <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm">
-                  <Checkbox
+                <label className="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-2.5 text-sm">
+                  <span className="font-medium">Featured on homepage</span>
+                  <Switch
                     checked={form.isFeatured}
-                    onCheckedChange={(checked) =>
-                      patchForm({ isFeatured: checked === true })
-                    }
+                    onCheckedChange={(checked) => patchForm({ isFeatured: checked })}
                   />
-                  Featured on homepage
                 </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <Checkbox
+                <label className="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-2.5 text-sm">
+                  <span className="font-medium">Trending</span>
+                  <Switch
                     checked={form.isTrending}
-                    onCheckedChange={(checked) =>
-                      patchForm({ isTrending: checked === true })
-                    }
+                    onCheckedChange={(checked) => patchForm({ isTrending: checked })}
                   />
-                  Trending
                 </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <Checkbox
+                <label className="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-2.5 text-sm">
+                  <span className="font-medium">Best seller</span>
+                  <Switch
                     checked={form.isBestSeller}
-                    onCheckedChange={(checked) =>
-                      patchForm({ isBestSeller: checked === true })
-                    }
+                    onCheckedChange={(checked) => patchForm({ isBestSeller: checked })}
                   />
-                  Best seller
                 </label>
               </div>
             </CardContent>

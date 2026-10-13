@@ -2228,8 +2228,8 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                         Cash on Delivery isn&apos;t available for{" "}
                         <span className="font-medium text-foreground">
                           {[...new Set(codBlockedBy)].join(", ")}
-                        </span>{" "}
-                        — it is made to order for you, so it is paid online.
+                        </span>
+                        . Please pay online.
                       </p>
                     ) : null}
 

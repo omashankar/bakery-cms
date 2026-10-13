@@ -49,10 +49,25 @@ export const CANCELLATION_CLASS_LABELS: Record<CancellationClass, string> = {
 export const CANCELLATION_CLASS_CUSTOMER_TEXT: Record<CancellationClass, string> = {
   standard: "Can be cancelled for a full refund until it is dispatched.",
   made_to_order:
-    "Made to order: can be cancelled for a full refund until we start preparing it. After that, a change of mind is not refundable.",
+    "Can be cancelled for a full refund until we start preparing it. After that, it cannot be cancelled.",
   non_cancellable:
-    "Personalised for you: cannot be cancelled for a change of mind once ordered.",
+    "Cannot be cancelled once ordered. If anything is wrong with it, we will always help.",
 };
+
+/**
+ * THE ADMIN'S ONE TICK — "Customers can cancel this product" — and the class
+ * it stands for. The shop asked for one checkbox, like Cash on Delivery, not a
+ * choice of three: ticked, a customer may cancel until preparation starts;
+ * unticked, not at all for a change of mind. A product never ticked either way
+ * keeps "standard" (until dispatch), which reads as ticked.
+ */
+export function isCancellableClass(cls: CancellationClass | undefined): boolean {
+  return (cls ?? DEFAULT_CANCELLATION_CLASS) !== "non_cancellable";
+}
+
+export function classForCancellableTick(cancellable: boolean): CancellationClass {
+  return cancellable ? "made_to_order" : "non_cancellable";
+}
 
 const STRICTNESS: Record<CancellationClass, number> = {
   standard: 0,
@@ -250,7 +265,7 @@ export function evaluateCancellation(input: {
     return {
       eligibility: "non_refundable",
       explanation:
-        "This order is personalised for you, so a change of mind is not refundable. You can still send the request and the shop will reply.",
+        "This item cannot be cancelled once ordered, so a change of mind is not refundable. You can still send the request and the shop will reply.",
     };
   }
 
@@ -444,18 +459,11 @@ export function policyVersion(text: string, itemClasses: readonly { productSlug:
 /* -------------------------------------------------------------------------- */
 
 /**
- * Whether a product may be paid for in cash at the door.
- *
- * The shop's explicit tick wins. Without one, it follows the product's class:
- * a ready-made item can go back on the shelf if the door is not answered, so
- * cash is fine; a made-to-order or personalised one cannot, so it is paid
- * online — a cake baked for a customer who then refuses it at the door is a
- * cake and its price both lost.
+ * Whether a product may be paid for in cash at the door — the shop's own tick,
+ * on unless the shop has unticked it. A cake refused at the door is the cake
+ * and its price both lost, so a shop unticks it for cakes; that is the shop's
+ * decision per product, kept as one plain checkbox at its request.
  */
-export function productAllowsCod(product: {
-  codAllowed?: boolean;
-  cancellationClass?: CancellationClass;
-}): boolean {
-  if (typeof product.codAllowed === "boolean") return product.codAllowed;
-  return (product.cancellationClass ?? DEFAULT_CANCELLATION_CLASS) === "standard";
+export function productAllowsCod(product: { codAllowed?: boolean }): boolean {
+  return product.codAllowed !== false;
 }
