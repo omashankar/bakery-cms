@@ -42,6 +42,11 @@ import { routes } from "@/constants/routes";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { reportedAsSignedOut, reportedAsSignedOutOnRead } from "@/apps/admin/lib/report-write";
 import { addressLines } from "@/features/orders/lib/address-format";
+import {
+  CANCELLATION_REASON_LABELS,
+  CANCELLATION_REQUEST_STATUS_LABELS,
+  preparationStartedAt,
+} from "@/features/orders/lib/cancellation-policy";
 
 interface OrderDetailPageProps {
   orderId: string;
@@ -606,6 +611,33 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
                 </option>
               ))}
             </AdminSelect>
+
+            {/*
+              WHAT THE CANCELLATION POLICY TURNS ON: when the kitchen started
+              (stamped by the first move to Preparing), and any request open
+              against this order.
+            */}
+            <div className="mt-3 space-y-1 text-xs text-muted-foreground">
+              <p>
+                Preparation:{" "}
+                {preparationStartedAt(order)
+                  ? `started ${formatDate(preparationStartedAt(order)!, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}`
+                  : "not started"}
+              </p>
+              <p>Customer can cancel: {order.cancellationPolicy?.policyClass === "non_cancellable" ? "no" : "yes, until preparation starts"}</p>
+              {order.cancellationRequest ? (
+                <p>
+                  Cancellation request:{" "}
+                  <Link
+                    href={routes.admin.orders.cancellations}
+                    className="font-medium text-foreground underline-offset-2 hover:underline"
+                  >
+                    {CANCELLATION_REQUEST_STATUS_LABELS[order.cancellationRequest.status]} ·{" "}
+                    {CANCELLATION_REASON_LABELS[order.cancellationRequest.reason]}
+                  </Link>
+                </p>
+              ) : null}
+            </div>
 
             <div className="mt-4 space-y-2">
               <Button
