@@ -67,6 +67,7 @@ import {
   DEFAULT_CANCELLATION_CLASS,
   isCancellationClass,
   policyVersion,
+  preparationStage,
   strictestClass,
   type OrderCancellationPolicy,
 } from "@/features/orders/lib/cancellation-policy";
@@ -1100,14 +1101,28 @@ export async function updateStatus(id: string, status: OrderStatus, ctx: Request
   // a refund landing between the read and this write used to be overwritten —
   // status back to "delivered", the cancel erased from the history — after its
   // stock had already gone back on the shelf.
+  /*
+    WHEN THE KITCHEN STARTED, stamped once, by the staff member who said so.
+    The cancellation policy turns on it — a made-to-order cake cancelled
+    before this moment is refunded, after it is not — so it is recorded at the
+    first move into a kitchen step (or past one: a shop that marks a cake
+    Ready without marking it Preparing still started it). Never on placing or
+    paying, and never moved once set.
+  */
+  const startsKitchen =
+    !order.preparationStartedAt && preparationStage(status) !== "not_started" && preparationStage(status) !== null;
   const updated = await repo.patchIfStatus(id, order.status, {
     status,
     statusHistory: [...order.statusHistory, { status, at: now }],
+    ...(startsKitchen ? { preparationStartedAt: now } : {}),
   });
   if (!updated) {
     throw new AppError("This order was changed by someone else just now. Reload it and try again.", 409);
   }
-  await audit(ctx, "order.status", id, { status });
+  await audit(ctx, "order.status", id, {
+    status,
+    ...(startsKitchen ? { preparationStartedAt: now } : {}),
+  });
 
   // Tell the customer their cake has left the bakery.
   //
