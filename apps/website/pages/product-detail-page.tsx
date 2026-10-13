@@ -10,6 +10,7 @@ import {
   Heart,
   ImageUp,
   Percent,
+  RotateCcw,
   ShoppingBag,
   Star,
   ThumbsDown,
@@ -29,6 +30,10 @@ import {
 } from "@/lib/images/photo-print-layout";
 import { PriceDisplay } from "@/components/storefront/price-display";
 import { RatingSummary, ratingTone, ratingWord } from "@/components/storefront/rating-summary";
+import {
+  CANCELLATION_CLASS_CUSTOMER_TEXT,
+  DEFAULT_CANCELLATION_CLASS,
+} from "@/features/orders/lib/cancellation-policy";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import {
   addToCart,
@@ -1940,6 +1945,19 @@ export function ProductDetailPage({
                     <span className="text-xs text-muted-foreground">{deliveryPromise}</span>
                   </li>
                 ) : null}
+                {/*
+                  WHAT HAPPENS IF THEY CANCEL, before they buy — the product's
+                  own class, in the words checkout repeats. A cake that cannot
+                  be refunded once baked should say so here, not in an email
+                  after the customer has asked.
+                */}
+                <li className="flex flex-col items-center gap-2 rounded-xl border border-border bg-cream-50 p-4 text-center">
+                  <RotateCcw className="size-6 text-bakery-700" />
+                  <span className="font-medium text-foreground">Cancellation</span>
+                  <span className="text-xs text-muted-foreground">
+                    {CANCELLATION_CLASS_CUSTOMER_TEXT[cake.cancellationClass ?? DEFAULT_CANCELLATION_CLASS]}
+                  </span>
+                </li>
                 {(commerce.productTrustCards ?? [])
                   .filter((card) => card.title.trim().length > 0)
                   .map((card) => {

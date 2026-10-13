@@ -134,6 +134,9 @@ export const productFormSchema = z
     lowStockThreshold: z.number().min(0).optional(),
     allowsMessage: z.boolean(),
     allowsPhotoUpload: z.boolean(),
+    // Optional for the same reason as `photoFrameShape` below: a required
+    // field would 400 every import and API client written before it existed.
+    cancellationClass: z.enum(["standard", "made_to_order", "non_cancellable"]).optional(),
     /**
      * Optional, unlike the three booleans around it.
      *

@@ -265,6 +265,13 @@ export interface Product extends BaseEntity {
   allowsMessage: boolean;
   allowsPhotoUpload: boolean;
   /**
+   * How a change of mind is treated for this product — see
+   * features/orders/lib/cancellation-policy.ts. Absent means "standard":
+   * cancellable until dispatch, which is right for anything ready-made.
+   * Written out rather than imported so `types/` stays free of features.
+   */
+  cancellationClass?: "standard" | "made_to_order" | "non_cancellable";
+  /**
    * Which shape the customer's photograph is printed in.
    *
    * A print area is GEOMETRY — the browser has to clip to it — so unlike a

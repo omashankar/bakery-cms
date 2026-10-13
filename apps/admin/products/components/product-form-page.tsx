@@ -65,6 +65,13 @@ import { MAX_PRODUCT_PHOTOS } from "@/features/products/lib/product-limits";
 import { loadSeoStore, SEO_UPDATED_EVENT } from "@/features/seo/lib/seo-repository";
 import { getActiveLocale } from "@/features/settings/lib/active-locale";
 import type { ModuleSettings } from "@/types/settings";
+import {
+  CANCELLATION_CLASSES,
+  CANCELLATION_CLASS_CUSTOMER_TEXT,
+  CANCELLATION_CLASS_LABELS,
+  DEFAULT_CANCELLATION_CLASS,
+  type CancellationClass,
+} from "@/features/orders/lib/cancellation-policy";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import {
   getModuleSettings,
@@ -1591,6 +1598,37 @@ export function ProductFormPage({
                       </p>
                     </div>
                   ) : null}
+                </div>
+
+                {/*
+                  HOW A CHANGE OF MIND IS TREATED. A shop that sells cakes and
+                  candles cannot have one rule: a candle can be cancelled until
+                  it leaves, a cake cannot once it is in the oven, and a photo
+                  cake cannot be sold to anyone else at all. A genuine problem
+                  (wrong, damaged, never delivered) is reviewed whatever this
+                  says — it only decides the change-of-mind case.
+                */}
+                <div className="space-y-1">
+                  <Label htmlFor="cancellationClass">Cancellation</Label>
+                  <AdminSelect
+                    id="cancellationClass"
+                    value={form.cancellationClass ?? DEFAULT_CANCELLATION_CLASS}
+                    onChange={(event) =>
+                      patchForm({
+                        cancellationClass: event.target.value as CancellationClass,
+                      })
+                    }
+                  >
+                    {CANCELLATION_CLASSES.map((cls) => (
+                      <option key={cls} value={cls}>
+                        {CANCELLATION_CLASS_LABELS[cls]}
+                      </option>
+                    ))}
+                  </AdminSelect>
+                  <p className="text-xs text-muted-foreground">
+                    Customers see this on the {productLower} page and at checkout:
+                    &ldquo;{CANCELLATION_CLASS_CUSTOMER_TEXT[form.cancellationClass ?? DEFAULT_CANCELLATION_CLASS]}&rdquo;
+                  </p>
                 </div>
 
                 {/*

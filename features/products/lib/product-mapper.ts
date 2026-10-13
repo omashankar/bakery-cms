@@ -123,6 +123,7 @@ export function mapAdminProductToStorefront(
     shapes: cake.shapes,
     allowsMessage: cake.allowsMessage,
     allowsPhotoUpload: cake.allowsPhotoUpload,
+    cancellationClass: cake.cancellationClass,
     photoFrameShape: cake.photoFrameShape,
     weights: cake.weights,
     weightLabel: cake.weightLabel,
