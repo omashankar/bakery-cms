@@ -31,6 +31,19 @@ const customerAccountSchema = new mongoose.Schema(
      * `blocked` flag on `customermetas`, which is about orders, not access.
      */
     blocked: { type: Boolean, default: false },
+    /**
+     * The customer's address book — the shape `SavedAddress` describes,
+     * validated at the endpoint (`savedAddressesSchema`). It lived in one
+     * browser's localStorage, so an address saved on a phone was not there on
+     * the laptop, and clearing site data lost the lot.
+     */
+    addresses: { type: [mongoose.Schema.Types.Mixed], default: [] },
+    /**
+     * When the book was last written. Null means it never has been — the one
+     * case where a device's own pre-account copy may be uploaded. An emptied
+     * book has a date, so an old device cannot bring deleted addresses back.
+     */
+    addressesSavedAt: { type: Date, default: null },
   },
   { timestamps: true },
 );

@@ -49,6 +49,30 @@ export async function updateProfile(
   await CustomerAccountModel.updateOne({ _id: id }, { $set: set });
 }
 
+/** The account's address book as stored, and when it was last written (null: never). */
+export async function findAddresses(
+  id: string,
+): Promise<{ addresses: unknown[]; savedAt: Date | null }> {
+  await connectDB();
+  const doc = (await CustomerAccountModel.findById(id, {
+    addresses: 1,
+    addressesSavedAt: 1,
+  }).lean()) as { addresses?: unknown[]; addressesSavedAt?: Date | null } | null;
+  return {
+    addresses: Array.isArray(doc?.addresses) ? doc.addresses : [],
+    savedAt: doc?.addressesSavedAt ?? null,
+  };
+}
+
+/** Replace the whole book in one write — the browser sends the list it shows. */
+export async function replaceAddresses(id: string, addresses: unknown[]): Promise<void> {
+  await connectDB();
+  await CustomerAccountModel.updateOne(
+    { _id: id },
+    { $set: { addresses, addressesSavedAt: new Date() } },
+  );
+}
+
 /**
  * One live code per address.
  *

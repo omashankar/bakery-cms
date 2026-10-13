@@ -19,6 +19,7 @@ import {
   createSavedAddress,
   getDefaultAddress,
   getSavedAddresses,
+  syncSavedAddresses,
   updateSavedAddress,
   type SavedAddress,
 } from "@/apps/website/account/lib/customer-addresses";
@@ -573,6 +574,24 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
       // A typed-but-unsaved address must stay editable on return.
       if (!matching) setShowAddressForm(true);
     }
+
+    /*
+      THE ACCOUNT'S BOOK, which this device may not hold yet — an address
+      saved on the customer's phone, opened at checkout on their laptop.
+      Applied as a pick only where nothing was picked above, so it never
+      replaces an address the customer is in the middle of.
+    */
+    void syncSavedAddresses().then((synced) => {
+      if (!synced) return;
+      setSavedAddresses(synced);
+      if (addresses.length === 0 && !draftHasAddress) {
+        const fresh = getDefaultAddress();
+        if (fresh) {
+          setAddressChoice(fresh.id);
+          reset(toCheckoutAddress(fresh, session?.email ?? ""));
+        }
+      }
+    });
     // "Nothing to choose from: go straight to the form" stood here, and it was
     // the ONLY thing opening the form for a first-time customer — once, at
     // mount, never again. `addressFormOpen` derives that from the book itself,

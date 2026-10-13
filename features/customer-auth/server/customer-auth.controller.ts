@@ -15,6 +15,7 @@ import * as orderService from "@/features/orders/server/order.service";
 import * as service from "./customer-auth.service";
 import {
   requestCodeSchema,
+  savedAddressesSchema,
   updateCustomerProfileSchema,
   verifyCodeSchema,
 } from "./customer-auth.validators";
@@ -90,6 +91,26 @@ export const updateCustomerProfileController = withErrorHandler(async (request: 
 
   await service.updateProfile(customer.id, input);
   return ok({ ...customer, ...input }, "Profile updated");
+});
+
+/**
+ * The signed-in customer's own address book — keyed on the SESSION, never on
+ * anything in the request, so it cannot be pointed at another account's.
+ */
+export const myAddressesController = withErrorHandler(async () => {
+  const customer = await requireCustomer();
+  return ok(await service.getAddresses(customer.id), "Your addresses");
+});
+
+export const saveMyAddressesController = withErrorHandler(async (request: Request) => {
+  const customer = await requireCustomer();
+  const ctx = requestContext(request);
+  // A save per click is the honest rate; this only stops a loop.
+  rateLimit(`customer-addresses:${customer.id}`, { limit: 60, windowMs: 60 * 1000 });
+  if (ctx.ip) rateLimit(`customer-addresses-ip:${ctx.ip}`, { limit: 120, windowMs: 60 * 1000 });
+
+  const input = validate(savedAddressesSchema, await readJson(request));
+  return ok(await service.saveAddresses(customer.id, input.addresses), "Addresses saved");
 });
 
 /**

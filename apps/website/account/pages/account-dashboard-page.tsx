@@ -19,7 +19,11 @@ type ProfileForm = {
   firstName: string;
   lastName: string;
   email: string;
+  phone: string;
 };
+
+/** A 10-digit Indian mobile, with or without +91 / 0 in front; blank is allowed. */
+const MOBILE = /^(?:\+?91[\s-]?|0)?[6-9]\d{9}$/;
 
 const quickLinks = [
   {
@@ -60,17 +64,18 @@ export function AccountDashboardPage() {
   useEffect(() => {
     if (!session) return;
     const { firstName, lastName } = splitName(session.name);
-    reset({ firstName, lastName, email: session.email });
+    reset({ firstName, lastName, email: session.email, phone: session.phone ?? "" });
   }, [session, reset]);
 
   const resetForm = () => {
     if (!session) return;
     const { firstName, lastName } = splitName(session.name);
-    reset({ firstName, lastName, email: session.email });
+    reset({ firstName, lastName, email: session.email, phone: session.phone ?? "" });
   };
 
   const onSubmit = async (data: ProfileForm) => {
     const name = `${data.firstName} ${data.lastName}`.trim();
+    const phone = data.phone.trim();
 
     /**
      * Saved on the SERVER, and only reported when the server says so.
@@ -85,7 +90,7 @@ export function AccountDashboardPage() {
      * toast. Moving to another address now means signing in as that address and
      * proving it, which is the only version of the change that can be true.
      */
-    const updated = await updateCustomerProfile({ name });
+    const updated = await updateCustomerProfile({ name, phone });
     if (!updated) {
       toast.error("Could not update your profile", {
         description: "Please check your connection and try again.",
@@ -140,16 +145,32 @@ export function AccountDashboardPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Mobile Number</Label>
+              {/*
+                EDITABLE. It said "cannot be changed", but this account signs in
+                with an email and a code — the phone is a contact detail, and
+                the profile endpoint has always taken it. A customer who signed
+                up without one could never add it.
+              */}
               <Input
                 id="phone"
                 type="tel"
-                value={session.phone ?? ""}
-                readOnly
-                disabled
-                className="cursor-not-allowed bg-cream-50 text-muted-foreground"
+                inputMode="tel"
+                autoComplete="tel"
+                placeholder="10-digit mobile number"
+                aria-invalid={formState.errors.phone ? true : undefined}
+                {...register("phone", {
+                  validate: (value) =>
+                    !value.trim() || MOBILE.test(value.replace(/\s+/g, "")) ||
+                    "Enter a 10-digit mobile number",
+                })}
               />
-              <p className="text-xs text-muted-foreground">
-                Mobile number cannot be changed
+              <p
+                className={cn(
+                  "text-xs",
+                  formState.errors.phone ? "text-destructive" : "text-muted-foreground",
+                )}
+              >
+                {formState.errors.phone?.message ?? "We call this number if a delivery needs it."}
               </p>
             </div>
           </div>

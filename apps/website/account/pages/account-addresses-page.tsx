@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { MapPin, Pencil, Trash2 } from "lucide-react";
+import { stateForPincode } from "@/features/commerce/lib/india-states";
 import { formatAddress } from "@/features/orders/lib/address-format";
 import {
   EMPTY_CHECKOUT_ADDRESS,
@@ -16,6 +17,7 @@ import {
   deleteSavedAddress,
   getSavedAddresses,
   setDefaultSavedAddress,
+  syncSavedAddresses,
   updateSavedAddress,
   type SavedAddress,
 } from "@/apps/website/account/lib/customer-addresses";
@@ -42,10 +44,28 @@ type AddressForm = CheckoutAddress & {
 
 const emptyForm: AddressForm = {
   ...EMPTY_CHECKOUT_ADDRESS,
+  // The shop delivers in India only, for now.
+  country: "India",
   label: "Home",
   addressLabel: "Home",
   isDefault: false,
 };
+
+/** A 10-digit Indian mobile, with or without +91 / 0 in front. */
+const MOBILE = /^(?:\+?91[\s-]?|0)?[6-9]\d{9}$/;
+
+/**
+ * What is wrong with a box, under it. Every field said only `required: true`,
+ * so a bad save did nothing and said nothing.
+ */
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return (
+    <p role="alert" className="text-xs text-destructive">
+      {message}
+    </p>
+  );
+}
 
 /**
  * A saved record as the form wants it.
@@ -65,7 +85,7 @@ export function AccountAddressesPage() {
   const [addresses, setAddresses] = useState<SavedAddress[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const { register, handleSubmit, reset, setValue, watch, formState } = useForm<AddressForm>({
+  const { register, handleSubmit, reset, setValue, getValues, watch, formState } = useForm<AddressForm>({
     defaultValues: emptyForm,
   });
 
@@ -77,8 +97,23 @@ export function AccountAddressesPage() {
     const refresh = () => setAddresses(getSavedAddresses());
     refresh();
     window.addEventListener("bakery-addresses-updated", refresh);
+    // The account's book, which this device may not hold yet. Lands through
+    // the event above when it differs.
+    void syncSavedAddresses();
     return () => window.removeEventListener("bakery-addresses-updated", refresh);
   }, []);
+
+  /*
+    THE STATE FROM THE PIN, where the box is still empty — the same lookup the
+    delivery zones use. Never over a state the customer typed themselves.
+  */
+  const watchedPincode = watch("pincode");
+  useEffect(() => {
+    const pin = (watchedPincode ?? "").trim();
+    if (!/^\d{6}$/.test(pin) || getValues("state")?.trim()) return;
+    const state = stateForPincode(pin);
+    if (state) setValue("state", state, { shouldValidate: true });
+  }, [watchedPincode, getValues, setValue]);
 
   useEffect(() => {
     if (!session || editingId) return;
@@ -112,9 +147,8 @@ export function AccountAddressesPage() {
     }
   }
 
-  const onSubmit = async (data: AddressForm) => {
-    await new Promise((resolve) => setTimeout(resolve, 400));
-
+  const onSubmit = (data: AddressForm) => {
+    // A 400ms sleep stood here so the button looked busy. Nothing was busy.
     if (editingId) {
       updateSavedAddress(editingId, data);
       toast.success("Address updated");
@@ -186,6 +220,8 @@ export function AccountAddressesPage() {
                       variant="ghost"
                       size="icon-sm"
                       onClick={() => {
+                        // One tap deleted it, with no way back.
+                        if (!window.confirm(`Remove the ${address.label} address?`)) return;
                         deleteSavedAddress(address.id);
                         toast.success("Address removed");
                         setAddresses(getSavedAddresses());
@@ -257,7 +293,13 @@ export function AccountAddressesPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="fullName">Full name</Label>
-              <Input id="fullName" {...register("fullName", { required: true })} />
+              <Input
+                id="fullName"
+                autoComplete="name"
+                aria-invalid={formState.errors.fullName ? true : undefined}
+                {...register("fullName", { required: "Enter the name for delivery" })}
+              />
+              <FieldError message={formState.errors.fullName?.message} />
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
@@ -266,12 +308,31 @@ export function AccountAddressesPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone</Label>
-                <Input id="phone" {...register("phone", { required: true })} />
+                <Input
+                  id="phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  aria-invalid={formState.errors.phone ? true : undefined}
+                  {...register("phone", {
+                    required: "Enter a mobile number",
+                    validate: (value) =>
+                      MOBILE.test(value.replace(/\s+/g, "")) || "Enter a 10-digit mobile number",
+                  })}
+                />
+                <FieldError message={formState.errors.phone?.message} />
               </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="addressLine1">Address line 1</Label>
-              <Input id="addressLine1" {...register("addressLine1", { required: true })} />
+              <Input
+                id="addressLine1"
+                autoComplete="address-line1"
+                placeholder="House no., building, street"
+                aria-invalid={formState.errors.addressLine1 ? true : undefined}
+                {...register("addressLine1", { required: "Enter the house and street" })}
+              />
+              <FieldError message={formState.errors.addressLine1?.message} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="addressLine2">Address line 2</Label>
@@ -295,25 +356,46 @@ export function AccountAddressesPage() {
                 <Input id="country" {...register("country")} />
               </div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="city">City</Label>
-                <Input id="city" {...register("city", { required: true })} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="state">State</Label>
-                <Input id="state" {...register("state", { required: true })} />
-              </div>
-            </div>
+            {/*
+              PIN FIRST: typing it fills in the state (see the effect above),
+              so it comes before the boxes it can answer.
+            */}
             <div className="space-y-2">
               <Label htmlFor="pincode">PIN code</Label>
               <Input
                 id="pincode"
+                inputMode="numeric"
+                autoComplete="postal-code"
+                maxLength={6}
+                aria-invalid={formState.errors.pincode ? true : undefined}
                 {...register("pincode", {
-                  required: true,
-                  pattern: { value: /^\d{6}$/, message: "Enter 6-digit PIN" },
+                  required: "Enter the 6-digit PIN code",
+                  pattern: { value: /^\d{6}$/, message: "Enter the 6-digit PIN code" },
                 })}
               />
+              <FieldError message={formState.errors.pincode?.message} />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="city">City</Label>
+                <Input
+                  id="city"
+                  autoComplete="address-level2"
+                  aria-invalid={formState.errors.city ? true : undefined}
+                  {...register("city", { required: "Enter the city" })}
+                />
+                <FieldError message={formState.errors.city?.message} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="state">State</Label>
+                <Input
+                  id="state"
+                  autoComplete="address-level1"
+                  aria-invalid={formState.errors.state ? true : undefined}
+                  {...register("state", { required: "Enter the state" })}
+                />
+                <FieldError message={formState.errors.state?.message} />
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <Checkbox

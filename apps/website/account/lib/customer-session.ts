@@ -159,6 +159,10 @@ const ORDER_ACCESS_KEY = "bakery-cms-verified-orders";
 
 const CUSTOMER_DEVICE_KEYS = [
   "bakery-cms-customer-addresses",
+  // `ADDRESSES_DIRTY_KEY` in customer-addresses.ts, written out here because
+  // that module imports this one. Left behind, the next person to sign in on
+  // this device would push the previous customer's book into their account.
+  "bakery-cms-customer-addresses-dirty",
   "bakery-cms-cart",
   "bakery-cms-cart-preferences",
   "bakery-cms-saved-for-later",
