@@ -9,6 +9,7 @@ import type {
   NotificationSettings,
 } from "@/types/notification";
 import { formatCurrency } from "@/utils/format";
+import { CANCELLATION_REASON_LABELS } from "@/features/orders/lib/cancellation-policy";
 import {
   pushNotificationState,
   replaceNotificationSettingsRequest,
@@ -398,6 +399,30 @@ function buildGeneratedNotifications(settings: NotificationSettings): AdminNotif
             (completed ? order.refundRecord.completedAt : undefined) ??
             order.refundRecord.requestedAt ??
             order.placedAt,
+        });
+      }
+
+      /*
+        A CANCELLATION REQUEST waiting for the shop — raised while it is open,
+        one alert per state, so moving it to Under review raises it again for
+        whoever picks it up, and a decided request stops ringing.
+      */
+      const cancellation = order.cancellationRequest;
+      if (
+        cancellation &&
+        (cancellation.status === "requested" || cancellation.status === "under_review") &&
+        !dismissed.has(`cancellation:${cancellation.status}:${order.id}`)
+      ) {
+        generated.push({
+          id: `cancellation:${cancellation.status}:${order.id}`,
+          type: "cancellation_request",
+          title: `Cancellation ${cancellation.status === "under_review" ? "to review" : "requested"} · ${order.orderNumber}`,
+          message: `${CANCELLATION_REASON_LABELS[cancellation.reason] ?? cancellation.reason} · ${order.address.fullName}`,
+          href: routes.admin.orders.cancellations,
+          entityId: order.id,
+          entityKind: "order",
+          read: false,
+          createdAt: cancellation.history.at(-1)?.at ?? cancellation.requestedAt,
         });
       }
 

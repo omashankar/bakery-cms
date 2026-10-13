@@ -11,9 +11,11 @@ import { rateLimit } from "@/lib/server/http/rate-limit";
 import { ok } from "@/lib/server/http/response";
 import { readJson, validate } from "@/lib/server/http/validate";
 import * as orderService from "@/features/orders/server/order.service";
+import { requestCancellationAsCustomer } from "@/features/orders/server/cancellation.service";
 
 import * as service from "./customer-auth.service";
 import {
+  customerCancellationSchema,
   requestCodeSchema,
   savedAddressesSchema,
   updateCustomerProfileSchema,
@@ -92,6 +94,31 @@ export const updateCustomerProfileController = withErrorHandler(async (request: 
   await service.updateProfile(customer.id, input);
   return ok({ ...customer, ...input }, "Profile updated");
 });
+
+/**
+ * A customer asks to cancel one of THEIR orders.
+ *
+ * The email that proves ownership comes from the session; the order number
+ * from the URL is only a name, checked against it in the service. Budgeted,
+ * because each request emails the customer.
+ */
+export const requestOrderCancellationController = withErrorHandler(
+  async (request: Request, ctx: { params: Promise<{ orderNumber: string }> }) => {
+    const customer = await requireCustomer();
+    const { orderNumber } = await ctx.params;
+    const requestCtx = requestContext(request);
+    rateLimit(`customer-cancel:${customer.id}`, { limit: 10, windowMs: 15 * 60 * 1000 });
+
+    const input = validate(customerCancellationSchema, await readJson(request));
+    const order = await requestCancellationAsCustomer(
+      decodeURIComponent(orderNumber),
+      customer.email,
+      input,
+      { ...requestCtx, actorEmail: customer.email },
+    );
+    return ok(withoutStaffOnlyFields(order), "Cancellation requested");
+  },
+);
 
 /**
  * The signed-in customer's own address book — keyed on the SESSION, never on

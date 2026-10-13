@@ -150,8 +150,13 @@ describe("the refund's state", () => {
     expect(
       refundState({ refundRecord: { status: "completed", gatewayRefunds: [{ status: "processed" }] } }),
     ).toBe("processed");
-    // A declined request is not a refund at all.
+    // A declined request is not a refund at all…
     expect(refundState({ refundRecord: { status: "rejected" } })).toBe("not_applicable");
+    // …but a refund the bank bounced reads `rejected` on the record too, and
+    // that one FAILED.
+    expect(
+      refundState({ refundRecord: { status: "rejected", gatewayRefunds: [{ status: "failed" }] } }),
+    ).toBe("failed");
   });
 });
 

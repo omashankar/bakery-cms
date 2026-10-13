@@ -33,7 +33,10 @@ export type EmailTemplateSlug =
   | "password_reset"
   | "customer_sign_in"
   | "refund_processed"
-  | "admin_new_order";
+  | "admin_new_order"
+  | "cancellation_requested"
+  | "cancellation_decided"
+  | "refund_failed";
 
 /**
  * Used when the stored template is missing or still a draft.
@@ -94,6 +97,21 @@ const FALLBACKS: Record<EmailTemplateSlug, { subject: string; body: string }> = 
    * template would otherwise mean a cancelled customer hears nothing at all,
    * which is the state this template exists to end.
    */
+  // The cancellation workflow. Each says only what has actually happened:
+  // a request received is not a refund, and a refund started is not money
+  // in the customer's account.
+  cancellation_requested: {
+    subject: "We received your cancellation request for {{order_number}}",
+    body: "Hi {{customer_name}},\n\nWe have received your request to cancel order {{order_number}}.\n\nYour reason: {{cancellation_reason}}\n\n{{cancellation_outcome}}\n\nWe will email you as soon as the shop has decided. Nothing has been refunded yet.\n\n— {{store_name}}",
+  },
+  cancellation_decided: {
+    subject: "Your cancellation request for {{order_number}}",
+    body: "Hi {{customer_name}},\n\nThe shop has looked at your cancellation request for order {{order_number}}.\n\nDecision: {{cancellation_decision}}\n{{decision_reason}}\n\n{{refund_note}}\n\nQuestions? Email {{store_email}}\n\n— {{store_name}}",
+  },
+  refund_failed: {
+    subject: "We could not complete your refund for {{order_number}}",
+    body: "Hi {{customer_name}},\n\nWe tried to refund {{refund_amount}} for order {{order_number}}, but the payment provider could not complete it.\n\nNo money has reached you yet. We are looking into it and will try again or contact you.\n\nQuestions? Email {{store_email}}\n\n— {{store_name}}",
+  },
   order_cancelled: {
     subject: "Your order {{order_number}} has been cancelled",
     body:

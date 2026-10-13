@@ -355,11 +355,15 @@ export function refundState(order: {
   };
 }): RefundState {
   const record = order.refundRecord;
-  if (!record || record.status === "rejected") return "not_applicable";
+  if (!record) return "not_applicable";
   if (record.status === "completed") return "processed";
   const gateway = record.gatewayRefunds ?? [];
   if (gateway.some((refund) => refund.status === "pending")) return "processing";
+  // Checked BEFORE "rejected": a refund the bank bounced leaves the record
+  // reading `rejected` too, and that one is a failure the shop must retry —
+  // not a request it declined.
   if (gateway.length > 0 && gateway.every((refund) => refund.status === "failed")) return "failed";
+  if (record.status === "rejected") return "not_applicable";
   if (record.status === "processing") return "processing";
   return "pending";
 }

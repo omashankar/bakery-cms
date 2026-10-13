@@ -52,6 +52,11 @@ export const defaultTemplateSampleData: Record<string, string> = {
   refund_note: "You paid for this order, so a refund is on its way. It usually takes 5–7 working days to reach your account.",
   refund_amount: "₹1,468",
   refund_eta: "5–7 working days",
+  cancellation_reason: "I ordered by mistake",
+  cancellation_outcome:
+    "This order can be cancelled. Once the shop confirms, anything you paid online is refunded in full to the way you paid.",
+  cancellation_decision: "Cancel and refund in full",
+  decision_reason: "Reason: not started yet.",
   refund_reference: "rfnd_PmXq82Kd10Lb",
   customer_phone: "+91 90000 00000",
   order_items: "  1 x Black Forest (1 kg)\n  2 x Chocolate cupcake",

@@ -49,6 +49,7 @@ import { isNotificationEnabled } from "@/features/payments/server/notification-p
 import { routes } from "@/constants/routes";
 import { formatCurrency } from "@/utils/format";
 import { checkRazorpayPayment } from "@/features/payments/server/razorpay-payment.server";
+import { getRazorpayStatus } from "@/lib/server/payments/razorpay-credentials";
 import {
   consumeDraft,
   findDraft,
@@ -1281,7 +1282,16 @@ function stockFor(order: PlacedOrder) {
   return order.items.map((item) => ({ slug: item.productSlug, quantity: item.quantity }));
 }
 
-export async function cancel(id: string, cancellationReason: string | undefined, ctx: RequestCtx) {
+export async function cancel(
+  id: string,
+  cancellationReason: string | undefined,
+  ctx: RequestCtx,
+  /**
+   * `notifyCustomer: false` when the caller sends its own, truer message — the
+   * cancellation decision, which knows whether a refund is coming at all.
+   */
+  options: { notifyCustomer?: boolean } = {},
+) {
   const order = await requireOrder(id);
   if (order.status === "cancelled" || order.status === "refunded") return order;
 
@@ -1370,7 +1380,7 @@ export async function cancel(id: string, cancellationReason: string | undefined,
   //
   // Awaited but never allowed to fail the cancellation: the order IS cancelled,
   // and reporting that as a failure would have an operator do it twice.
-  await notifyOrderCancelled(updated, holdsPayment);
+  if (options.notifyCustomer !== false) await notifyOrderCancelled(updated, holdsPayment);
 
   await releaseCoupon(order);
 
@@ -1584,6 +1594,7 @@ export async function refund(id: string, input: RefundInput, ctx: RequestCtx) {
       status: outcome.status ?? "pending",
       createdAt: now,
       ...(outcome.status === "processed" ? { processedAt: now } : {}),
+      ...((await getRazorpayStatus().catch(() => null))?.testMode ? { testMode: true } : {}),
     };
   }
 
@@ -1676,7 +1687,16 @@ export async function refund(id: string, input: RefundInput, ctx: RequestCtx) {
   if (restoreNow) await restoreStock(stockFor(order));
   if (releaseCouponNow) await releaseCoupon(order);
 
-  await sendRefundEmail(updated, plan.amount, settled);
+  /*
+    ONLY ONCE IT IS TRUE. The email says "we have refunded"; a gateway refund
+    that has only been ACCEPTED is still `pending` and can yet fail at the
+    bank. So it goes now only for a refund already settled (cash in hand, or
+    the gateway answering processed at once) — otherwise `settleGatewayRefund`
+    sends it when Razorpay confirms.
+  */
+  if (settled) {
+    await sendRefundEmail(updated, plan.amount, settled, Boolean(appended?.testMode));
+  }
   await audit(ctx, "order.refund", id, {
     amount: plan.amount,
     refundId: appended?.id ?? null,
@@ -1702,7 +1722,12 @@ function formatRefundAmount(amount: number): string {
  * storefront's order pages read from that browser's localStorage, so the state
  * change was invisible there too.
  */
-async function sendRefundEmail(order: PlacedOrder, amount: number, settled: boolean) {
+async function sendRefundEmail(
+  order: PlacedOrder,
+  amount: number,
+  settled: boolean,
+  testMode = false,
+) {
   const email = order.address?.email;
   if (!email) return;
 
@@ -1716,7 +1741,11 @@ async function sendRefundEmail(order: PlacedOrder, amount: number, settled: bool
   const mail = await sendTemplatedEmail("refund_processed", email, {
     customer_name: order.address.fullName?.trim() || "there",
     order_number: order.orderNumber,
-    refund_amount: formatCurrency(amount, currency),
+    // A simulated refund says so where the money is named, in every
+    // template wording the shop might have written.
+    refund_amount: testMode
+      ? `${formatCurrency(amount, currency)} (TEST MODE — simulated, no real money moved)`
+      : formatCurrency(amount, currency),
     refund_reference: order.refundRecord?.reference ?? order.orderNumber,
     // Cash handed back is already in their hand; a gateway refund is not.
     refund_eta: order.refundRecord?.offline
@@ -1966,7 +1995,43 @@ export async function settleGatewayRefund(input: {
 
   if (restoreNow) await restoreStock(stockFor(order));
   if (releaseCouponNow) await releaseCoupon(order);
+
+  /*
+    TELL THE CUSTOMER WHAT THE GATEWAY SAID — once. A webhook delivered twice,
+    or a reconcile run after it, finds the refund already in this state and
+    sends nothing more.
+  */
+  const before = known ? priorRefunds[index].status : undefined;
+  const entry = nextRefunds.find((refund) => refund.id === input.refundId);
+  if (before !== input.status) {
+    if (input.status === "processed") {
+      await sendRefundEmail(updated, input.amount, true, Boolean(entry?.testMode));
+    } else {
+      await sendRefundFailedEmail(updated, input.amount);
+    }
+  }
   return true;
+}
+
+/**
+ * The gateway could not complete a refund. The customer is told no money has
+ * reached them — the one thing they must not be left believing otherwise —
+ * and the shop sees it as Failed in the Refund Center, where Issue refund
+ * tries again.
+ */
+async function sendRefundFailedEmail(order: PlacedOrder, amount: number): Promise<void> {
+  const email = order.address?.email;
+  if (!email) return;
+  const settings = await getSettings().catch(() => null);
+  const currency = (settings?.general as GeneralSettings | undefined)?.currency;
+  const mail = await sendTemplatedEmail("refund_failed", email, {
+    customer_name: order.address.fullName?.trim() || "there",
+    order_number: order.orderNumber,
+    refund_amount: formatCurrency(amount, currency),
+  }).catch((error: unknown) => ({ sent: false, error }));
+  if (!mail.sent) {
+    console.error(`[orders] Could not email the failed refund for ${order.orderNumber}`, mail.error);
+  }
 }
 
 export async function updateRefundNotes(id: string, notes: RefundNotesInput["notes"], ctx: RequestCtx) {

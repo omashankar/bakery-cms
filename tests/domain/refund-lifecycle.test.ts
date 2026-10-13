@@ -37,6 +37,8 @@ const PAYMENT_ID = "pay_LIVE1";
 const state = vi.hoisted(() => ({
   db: { order: null as Record<string, unknown> | null },
   restoredStock: [] as unknown[][],
+  emails: [] as Array<{ slug: string; vars: Record<string, string> }>,
+  testMode: false,
   refundCalls: [] as { paymentId: string; amount: number }[],
   gateway: {
     refundable: 1000 as number | null,
@@ -161,8 +163,14 @@ vi.mock("@/lib/server/audit/audit-log", () => ({
   requestContext: () => ({ ip: "", userAgent: "" }),
 }));
 vi.mock("@/features/communications/server/email.service", () => ({
-  sendTemplatedEmail: async () => ({ sent: true }),
+  sendTemplatedEmail: async (slug: string, _to: string, vars: Record<string, string>) => {
+    state.emails.push({ slug, vars });
+    return { sent: true };
+  },
   publicBaseUrl: () => "",
+}));
+vi.mock("@/lib/server/payments/razorpay-credentials", () => ({
+  getRazorpayStatus: async () => ({ testMode: state.testMode }),
 }));
 vi.mock("@/features/settings/server/settings.service", () => ({
   getSettings: async () => ({ general: { currency: "INR" }, commerce: {} }),
@@ -205,6 +213,8 @@ function seedOrder(over: Record<string, unknown> = {}) {
 function harness(initial: Record<string, unknown> = {}) {
   state.db.order = seedOrder(initial);
   state.restoredStock.length = 0;
+  state.emails.length = 0;
+  state.testMode = false;
   state.refundCalls.length = 0;
   state.gateway.refundable = 1000;
   state.gateway.createStatus = "pending";
@@ -220,6 +230,68 @@ function harness(initial: Record<string, unknown> = {}) {
 const CTX = { ip: "1.1.1.1", userAgent: "test" };
 
 
+
+/**
+ * THE CUSTOMER IS TOLD WHAT THE GATEWAY SAID — not what was hoped.
+ *
+ * "We have refunded ₹X" went out the moment Razorpay ACCEPTED a refund, while
+ * it was still pending and could yet fail at the bank. It goes when the
+ * gateway confirms now, a failure gets its own email, and a webhook delivered
+ * twice does not email twice.
+ */
+describe("refund emails follow the gateway", () => {
+  const slugs = () => state.emails.map((mail) => mail.slug);
+
+  it("says nothing about money while the refund is only pending", async () => {
+    const { service } = harness();
+    await service.refund(ORDER_ID, {}, CTX);
+    expect(slugs()).not.toContain("refund_processed");
+  });
+
+  it("emails once when the gateway confirms, and not again on a repeated webhook", async () => {
+    const { service } = harness();
+    await service.refund(ORDER_ID, {}, CTX);
+    const confirm = { refundId: "rfnd_1", paymentId: PAYMENT_ID, amount: 1000, status: "processed" as const };
+
+    await service.settleGatewayRefund(confirm);
+    await service.settleGatewayRefund(confirm);
+
+    expect(slugs().filter((slug) => slug === "refund_processed")).toHaveLength(1);
+  });
+
+  it("emails at once when the gateway settles immediately", async () => {
+    const { h, service } = harness();
+    h.gateway.createStatus = "processed";
+    await service.refund(ORDER_ID, {}, CTX);
+    expect(slugs()).toContain("refund_processed");
+  });
+
+  it("tells the customer when the bank bounced it — once", async () => {
+    const { service } = harness();
+    await service.refund(ORDER_ID, {}, CTX);
+    const bounce = { refundId: "rfnd_1", paymentId: PAYMENT_ID, amount: 1000, status: "failed" as const };
+
+    await service.settleGatewayRefund(bounce);
+    await service.settleGatewayRefund(bounce);
+
+    expect(slugs().filter((slug) => slug === "refund_failed")).toHaveLength(1);
+    expect(slugs()).not.toContain("refund_processed");
+  });
+
+  it("marks a test-mode refund as simulated, on the record and in the email", async () => {
+    const { h, service } = harness();
+    state.testMode = true;
+    await service.refund(ORDER_ID, {}, CTX);
+    const refunds = (h.db.order.refundRecord as { gatewayRefunds: { testMode?: boolean }[] }).gatewayRefunds;
+    expect(refunds[0].testMode).toBe(true);
+
+    // Live keys by the time it settles: the record still says it was a test.
+    state.testMode = false;
+    await service.settleGatewayRefund({ refundId: "rfnd_1", paymentId: PAYMENT_ID, amount: 1000, status: "processed" });
+    const mail = state.emails.find((entry) => entry.slug === "refund_processed");
+    expect(mail?.vars.refund_amount).toMatch(/TEST MODE — simulated/);
+  });
+});
 
 describe("the refund lifecycle", () => {
   it("does not claim the money has landed when the gateway says pending", async () => {

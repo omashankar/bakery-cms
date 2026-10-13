@@ -3,6 +3,7 @@ export type NotificationType =
   | "payment_received"
   | "payment_failed"
   | "refund_request"
+  | "cancellation_request"
   | "gateway_error"
   | "cod_confirmation"
   | "low_stock"

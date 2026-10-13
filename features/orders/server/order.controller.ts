@@ -10,6 +10,7 @@ import { rateLimit } from "@/lib/server/http/rate-limit";
 import { verifyOrderLookup } from "@/features/orders/lib/order-tracking";
 import { OutOfStockError } from "./order.repository";
 import * as service from "./order.service";
+import * as cancellationService from "./cancellation.service";
 import {
   placeOrderSchema,
   type PlaceOrderInput,
@@ -21,6 +22,7 @@ import {
   notesSchema,
   refundNotesSchema,
   declineRefundSchema,
+  cancellationActionSchema,
   refundRequestSchema,
   orderQuerySchema,
   orderAnalyticsQuerySchema,
@@ -405,6 +407,47 @@ export const requestRefundController = withErrorHandler(async (request: Request,
     actorEmail: session.email,
   });
   return ok(order, "Refund requested");
+});
+
+/**
+ * The shop's cancellation actions: open a case, review it, decide it. Roles
+ * are checked here and every rule again in the service — the admin page is a
+ * convenience, not the guard.
+ */
+export const cancellationActionController = withErrorHandler(async (request: Request, ctx: IdContext) => {
+  const session = await requireRole(...ORDER_ROLES);
+  const { id } = await ctx.params;
+  const input = validate(cancellationActionSchema, await readJson(request));
+  const requestCtx = { ...requestContext(request), actorId: session.sub, actorEmail: session.email };
+
+  if (input.action === "open") {
+    const order = await cancellationService.openCancellationAsStaff(
+      id,
+      { reason: input.reason, detail: input.detail },
+      requestCtx,
+    );
+    return ok(order, "Cancellation case opened");
+  }
+  if (input.action === "review") {
+    return ok(await cancellationService.startCancellationReview(id, requestCtx), "Under review");
+  }
+  const result = await cancellationService.decideCancellation(
+    id,
+    { resolution: input.resolution, reason: input.reason, refundAmount: input.refundAmount },
+    requestCtx,
+  );
+  return ok(
+    result,
+    result.refundError
+      ? `Decision saved, but the refund could not be started: ${result.refundError}`
+      : "Decision saved",
+  );
+});
+
+/** Every order with a cancellation request, for the admin's list. */
+export const cancellationCasesController = withErrorHandler(async () => {
+  await requireRole(...ORDER_ROLES);
+  return ok(await cancellationService.listCancellationCases(), "Cancellation cases");
 });
 
 export const declineRefundController = withErrorHandler(async (request: Request, ctx: IdContext) => {

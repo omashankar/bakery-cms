@@ -215,6 +215,7 @@ export const routes = {
     orders: {
       list: "/admin/orders",
       detail: (id: string) => `/admin/orders/${id}`,
+      cancellations: "/admin/orders/cancellations",
     },
 
     customers: {
