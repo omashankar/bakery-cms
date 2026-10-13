@@ -43,6 +43,9 @@ import { type HomepageSectionRendererProps, contentString, SectionShell } from "
  * empty screen cannot tell "waiting" from "broken" — the bargain
  * `RecentlyViewedSection` already strikes.
  */
+/** The unit labels under the digits — short, so the strip stays one line. */
+const SHORT_UNIT: Record<string, string> = { Hours: "Hrs", Minutes: "Min", Seconds: "Sec" };
+
 export function SameDayCountdownSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
   /*
@@ -212,31 +215,38 @@ export function SameDayCountdownSection(props: HomepageSectionRendererProps) {
         </p>
         <div className="flex items-center justify-between gap-3 md:justify-end md:gap-4">
           {/*
-            02h : 40m : 03s — a chip per unit in the shop's colour, colons
-            between. `tabular-nums` keeps every chip the same width as its
-            digits change, so the button beside it does not move once a
-            second; a tick repaints glyphs and reflows nothing.
+            02 : 31 : 53 with HRS MIN SEC under the digits — plain figures on
+            the strip, no box behind them (the shop asked for the backgrounds
+            off). The digits are the strip's largest type after nothing: the
+            same size as the headline, so the clock reads as part of the line.
+
+            `tabular-nums`, and each unit a column as wide as its label, keep
+            the clock still as its digits change, so the button beside it
+            does not move once a second; a tick repaints glyphs and reflows
+            nothing.
 
             NOT A COUNT THAT GROWS OR REDDENS as the time goes: the same
             colour and weight at 5 hours and at 5 seconds. A band that gets
             louder as it empties is a pressure tactic wearing a fact's clothes.
 
-            `bg-primary` + `text-primary-foreground`: `--primary-foreground` is
-            `readableInkOn(primaryColor)`, so the ink is contrast-checked per
-            shop rather than chosen here.
+            `text-foreground` rather than the shop's primary: `--foreground`
+            is fixed in globals.css, so the digits hold their contrast on a
+            pale brand colour too.
           */}
-          <span aria-hidden="true" className="inline-flex items-center gap-1">
+          <span aria-hidden="true" className="inline-flex items-start gap-2">
             {cells.map(([label, value], index) => (
               <Fragment key={label}>
                 {index > 0 ? (
-                  <span className="font-heading text-lg leading-none font-bold text-primary">
+                  <span className="font-heading text-2xl leading-none font-bold text-muted-foreground">
                     :
                   </span>
                 ) : null}
-                <span className="inline-flex items-baseline gap-0.5 rounded-md bg-primary px-2 py-1.5 font-heading text-primary-foreground">
-                  <span className="text-lg leading-none font-bold tabular-nums">{value}</span>
-                  <span className="text-[0.6875rem] leading-none font-semibold text-primary-foreground/80">
-                    {label.charAt(0).toLowerCase()}
+                <span className="flex flex-col items-center">
+                  <span className="font-heading text-2xl leading-none font-bold text-foreground tabular-nums">
+                    {value}
+                  </span>
+                  <span className="mt-1 text-[0.625rem] leading-none font-semibold tracking-[0.1em] text-muted-foreground uppercase">
+                    {SHORT_UNIT[label]}
                   </span>
                 </span>
               </Fragment>
