@@ -24,7 +24,7 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
   return (
     <footer className="border-t border-border surface-cream">
       <div className={cn(layoutSpacing.container, "py-14")}>
-        <div className="grid gap-10 lg:grid-cols-[1.6fr_3fr]">
+        <div className="grid gap-10 lg:grid-cols-[1fr_3fr]">
           <div className="space-y-4">
             {/* The same mark the header renders. This used to be its own copy
                 of the markup, which is how the footer missed logo support
@@ -78,7 +78,7 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
             column, four from `lg`, and a shop that adds a third link column
             starts a second row instead of overflowing the first.
           */}
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-8 lg:grid-cols-4">
 
           {footerSettings.columns.map((column) => (
             <div key={column.id} className="space-y-4">
@@ -86,7 +86,7 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
                   the page's h2s skipped a level — Lighthouse's heading-order on
                   every storefront page. The classes keep the look. */}
               <h2 className="text-sm font-semibold text-foreground">{column.title}</h2>
-              <ul className="space-y-2.5">
+              <ul className="space-y-1">
                 {column.links.map((link) => (
                   <li
                     key={link.id}
@@ -106,7 +106,7 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
                   >
                     <Link
                       href={link.href}
-                      className="text-sm text-muted-foreground transition-colors hover:text-bakery-700"
+                      className="inline-block py-1 text-sm text-muted-foreground transition-colors hover:text-bakery-700"
                     >
                       {link.label}
                     </Link>
@@ -123,7 +123,7 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
           */}
           {footerSettings.showContact &&
           (contactInfo.address || contactInfo.phone || contactInfo.email) ? (
-            <div className="space-y-4">
+            <div className="col-span-2 space-y-4 sm:col-span-1">
               <h2 className="text-sm font-semibold text-foreground">Contact</h2>
               {/*
                 A row per detail the shop actually publishes. These used to
@@ -151,7 +151,7 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
                     <Phone className="size-4 shrink-0 text-bakery-700" />
                     <a
                       href={`tel:${contactInfo.phone.replace(/[^+\d]/g, "")}`}
-                      className="hover:text-foreground"
+                      className="inline-block py-1 hover:text-foreground"
                     >
                       {contactInfo.phone}
                     </a>
@@ -198,7 +198,7 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
                       the @ as well — it gives up the @ only where keeping it
                       would mean overflowing.
                     */}
-                    <a href={`mailto:${contactInfo.email}`} className="wrap-anywhere hover:text-foreground">
+                    <a href={`mailto:${contactInfo.email}`} className="inline-block py-1 wrap-anywhere hover:text-foreground">
                       {contactInfo.email.includes("@") ? (
                         <>
                           {contactInfo.email.slice(0, contactInfo.email.indexOf("@") + 1)}
@@ -221,7 +221,7 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
             be empty — and a heading over nothing is its own claim.
           */}
           {footerSettings.showHours && businessHours.length > 0 ? (
-            <div className="space-y-4">
+            <div className="col-span-2 space-y-4 sm:col-span-1">
               <h2 className="text-sm font-semibold text-foreground">Opening Hours</h2>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {businessHours.map((item, index) => (

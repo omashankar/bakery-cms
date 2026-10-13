@@ -79,7 +79,7 @@ describe("what a shop writes", () => {
      */
     const page = read("apps/website/pages/product-detail-page.tsx");
 
-    expect(page).toContain(".filter((card) => card.title.trim().length > 0)");
+    expect(page).toMatch(/\.filter\(\s*\(card\) => card\.title\.trim\(\)\.length > 0,?\s*\)/);
     expect(page).toContain("{card.subtitle.trim() ? (");
   });
 

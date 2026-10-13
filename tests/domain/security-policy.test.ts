@@ -304,10 +304,19 @@ describe("the regressions the first attempt introduced", () => {
     expect(api).toMatch(/fieldMessage \|\| json\?\.message/);
   });
 
-  it("does not advertise a password rule the server never accepted", () => {
-    const notice = code("features/auth/components/auth-demo-notice.tsx");
-    expect(notice).not.toContain("password 6+ characters");
-    expect(notice).toContain("8+ with letters and numbers");
+  it("does not tell the sign-in screens' visitors that any email will do", () => {
+    // "Demo · any email · password 8+ with letters and numbers" sat under the
+    // staff sign-in long after real accounts arrived: untrue, and it handed
+    // anyone at the door the password rule.
+    for (const page of [
+      "login-form-page",
+      "forgot-password-form-page",
+      "otp-form-page",
+      "reset-password-form-page",
+    ]) {
+      const source = code(`features/auth/pages/${page}.tsx`);
+      expect(source, page).not.toMatch(/AuthDemoNotice|any email|Demo ·/);
+    }
   });
 });
 

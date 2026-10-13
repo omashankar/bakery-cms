@@ -93,7 +93,11 @@ export function StorePageHeader({
                     {item.label}
                   </span>
                 ) : (
-                  <Link href={item.href} className="truncate underline-offset-4 hover:underline">
+                  // py-1: a 16px-tall line was the whole tap target on a phone.
+                  <Link
+                    href={item.href}
+                    className="truncate py-1 underline-offset-4 hover:underline"
+                  >
                     {item.label}
                   </Link>
                 )}

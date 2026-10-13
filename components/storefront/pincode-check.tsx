@@ -171,7 +171,8 @@ export function PincodeCheck({ className }: { className?: string }) {
           inputMode="numeric"
           autoComplete="postal-code"
           aria-label="PIN code"
-          placeholder="Enter PIN code to check delivery"
+          // Short enough to read whole at 390px; it was cut to "check deliv…".
+          placeholder="Enter delivery PIN code"
           /*
             `size={1}`, AND IT IS NOT ABOUT THE RENDERED WIDTH — the CSS below
             sets that. `size` sets an input's INTRINSIC width, and its default

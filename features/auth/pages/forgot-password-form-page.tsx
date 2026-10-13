@@ -7,7 +7,6 @@ import { useForm } from "react-hook-form";
 import { Loader2, MailCheck } from "lucide-react";
 import { toast } from "@/lib/lazy-toast";
 import { AuthCard } from "@/features/auth/components/auth-card";
-import { AuthDemoNotice } from "@/features/auth/components/auth-demo-notice";
 import { startResetFlow } from "@/features/auth/lib/reset-flow";
 import { AuthRequestError, forgotPasswordRequest, isDeliveryFailure } from "@/features/auth/lib/auth-api";
 import { Button } from "@/components/ui/button";
@@ -123,8 +122,6 @@ export function ForgotPasswordFormPage() {
           </p>
         </div>
       ) : null}
-
-      <AuthDemoNotice />
     </AuthCard>
   );
 }

@@ -115,6 +115,16 @@ const nextConfig: NextConfig = {
      * Two copies of this list would drift; one cannot.
      */
     remotePatterns: remoteImagePatterns(cloudinaryCloudName),
+    /**
+     * The default ladder plus 192 and 480, measured on a 412px phone at 2x.
+     *
+     * A two-across product card there needs ~412px of picture and the next
+     * rung was 640 — 2.4x the pixels it shows, on every card of every rail.
+     * Category tiles (~172 needed) and the why-us circles (~136) jumped to
+     * 256 the same way. Both new rungs sit under the smallest device size,
+     * as `imageSizes` must.
+     */
+    imageSizes: [32, 48, 64, 96, 128, 192, 256, 384, 480],
   },
   /**
    * Inlined into the client bundle so the renderer can scope res.cloudinary.com

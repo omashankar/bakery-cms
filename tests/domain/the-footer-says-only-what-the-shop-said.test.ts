@@ -100,7 +100,9 @@ describe("the footer says only what the shop said", () => {
 
     expect(body.includes("lg:grid-cols-12"), "the fixed twelve is back").toBe(false);
     expect(body.includes("lg:col-span-2"), "fixed spans are back").toBe(false);
-    expect(body, "there is no tablet step").toContain("sm:grid-cols-2");
+    // Two across from the smallest phone now, not only from 640: the link
+    // columns pair up and the long contact lines take the full width.
+    expect(body, "there is no two-across step").toMatch(/(?:^|[\s"'])(?:sm:)?grid-cols-2\b/);
     expect(body, "the blocks do not flow into four").toContain("lg:grid-cols-4");
   });
 });

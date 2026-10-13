@@ -5,6 +5,7 @@ import { compareAtSavings, getFreeDeliveryThreshold } from "@/features/orders/li
 import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import { TaxBreakdown, taxBreakdownFromCartTotals } from "@/components/shared/tax-breakdown";
+import { OptimizedImage } from "@/components/shared/optimized-image";
 import { routes } from "@/constants/routes";
 import { formatCurrency } from "@/utils/format";
 import { cn } from "@/lib/utils";
@@ -96,12 +97,18 @@ export function OrderSummaryPanel({
           <li key={item.id} className="flex items-center gap-3 text-sm">
             <span className="size-11 shrink-0 overflow-hidden rounded-lg border border-border bg-card">
               {item.image ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                /*
+                  Through the image optimiser at the box's own size. A raw
+                  <img> fetched the 600px product photo for a 44px square,
+                  once per line, on the page where the customer pays.
+                */
+                <OptimizedImage
                   src={item.image}
                   alt={item.name}
+                  width={44}
+                  height={44}
+                  sizes="44px"
                   className="size-full object-cover"
-                  loading="lazy"
                 />
               ) : null}
             </span>

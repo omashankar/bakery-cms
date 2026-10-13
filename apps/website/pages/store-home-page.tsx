@@ -5,6 +5,7 @@ import {
 } from "@/features/cms-sections/data/homepage-sections.server";
 import { getHomepageRenderData } from "@/apps/website/lib/homepage-render-data.server";
 import { getServerLabels } from "@/features/settings/server/labels.server";
+import { getStorefrontChrome } from "@/apps/website/lib/storefront-chrome.server";
 
 interface StoreHomePageProps {
   /** CMS preview flag comes from the URL: ?cmsPreview=1 */
@@ -30,11 +31,14 @@ interface StoreHomePageProps {
  * equivalent — most visibly, product grids drawn from the shipped demo cakes.
  */
 export async function StoreHomePage({ isPreview = false }: StoreHomePageProps) {
-  const [sections, data, labels] = await Promise.all([
+  const [sections, data, labels, chrome] = await Promise.all([
     isPreview ? getDraftHomepageSections() : getPublishedHomepageSections(),
     getHomepageRenderData(),
     getServerLabels(),
+    // cache()d: the storefront layout has already read it for this request.
+    getStorefrontChrome(),
   ]);
+  const tagline = chrome.brand.tagline.trim();
 
   /*
     A SERVER RENDER, all of it. `StoreHomeContent` and the section renderer
@@ -43,5 +47,16 @@ export async function StoreHomePage({ isPreview = false }: StoreHomePageProps) {
     Only the parts that move (the hero and banner carousels, tabs, the
     countdown, wishlist hearts, recently viewed) are client components now.
   */
-  return <StoreHomeContent sections={sections} {...data} labels={labels} isPreview={isPreview} />;
+  return (
+    <>
+      {/*
+        THE PAGE'S ONE HEADING. Every band below is an h2, and the hero is
+        usually artwork with its words in the pixels, so the homepage had no
+        h1 at all — the first thing search engines and screen readers look
+        for. Not drawn: the logo and the hero already say it on screen.
+      */}
+      <h1 className="sr-only">{tagline ? `${chrome.siteName} — ${tagline}` : chrome.siteName}</h1>
+      <StoreHomeContent sections={sections} {...data} labels={labels} isPreview={isPreview} />
+    </>
+  );
 }

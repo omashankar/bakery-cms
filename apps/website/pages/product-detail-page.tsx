@@ -572,6 +572,19 @@ export function ProductDetailPage({
   const closesAt = sameDayCutoffFor(commerce.sameDayCutoff, commerce.deliveryLeadDays);
   const timeLeft = useSameDayCountdown(closesAt);
 
+  // The cards under the buy box, COUNTED so the grid never leaves one hanging
+  // alone on a row: four in three columns put the fourth under the first.
+  const trustCards = (commerce.productTrustCards ?? []).filter(
+    (card) => card.title.trim().length > 0,
+  );
+  const trustCount = (deliveryPromise ? 1 : 0) + 1 + trustCards.length;
+  const trustGrid =
+    trustCount === 1
+      ? "grid-cols-1"
+      : trustCount % 3 === 0
+        ? "grid-cols-2 sm:grid-cols-3 max-sm:[&>li:last-child:nth-child(odd)]:col-span-2"
+        : "grid-cols-2 [&>li:last-child:nth-child(odd)]:col-span-2";
+
   const [askOpen, setAskOpen] = useState(false);  const [reviewOpen, setReviewOpen] = useState(false);
 
   const weight = weightOptions[selectedWeight] ?? weightOptions[0];
@@ -1938,7 +1951,7 @@ export function ProductDetailPage({
                 typed in Settings → Commerce, and a shop that has typed nothing
                 gets one card rather than a boast made up for it.
               */}
-              <ul className="grid gap-3 text-sm sm:grid-cols-3">
+              <ul className={cn("grid gap-3 text-sm", trustGrid)}>
                 {deliveryPromise ? (
                   <li className="flex flex-col items-center gap-2 rounded-xl border border-border bg-cream-50 p-4 text-center">
                     <Truck className="size-6 text-bakery-700" />
@@ -1961,25 +1974,23 @@ export function ProductDetailPage({
                     {productAllowsCod(cake) ? null : " Paid online — no Cash on Delivery."}
                   </span>
                 </li>
-                {(commerce.productTrustCards ?? [])
-                  .filter((card) => card.title.trim().length > 0)
-                  .map((card) => {
-                    const Icon = productTrustIcon(card.icon);
-                    return (
-                      <li
-                        key={card.id}
-                        className="flex flex-col items-center gap-2 rounded-xl border border-border bg-cream-50 p-4 text-center"
-                      >
-                        <Icon className="size-6 text-bakery-700" />
-                        <span className="font-medium text-foreground">{card.title}</span>
-                        {card.subtitle.trim() ? (
-                          <span className="text-xs text-muted-foreground">
-                            {card.subtitle}
-                          </span>
-                        ) : null}
-                      </li>
-                    );
-                  })}
+                {trustCards.map((card) => {
+                  const Icon = productTrustIcon(card.icon);
+                  return (
+                    <li
+                      key={card.id}
+                      className="flex flex-col items-center gap-2 rounded-xl border border-border bg-cream-50 p-4 text-center"
+                    >
+                      <Icon className="size-6 text-bakery-700" />
+                      <span className="font-medium text-foreground">{card.title}</span>
+                      {card.subtitle.trim() ? (
+                        <span className="text-xs text-muted-foreground">
+                          {card.subtitle}
+                        </span>
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
 
               {/*
@@ -2413,8 +2424,10 @@ export function ProductDetailPage({
             </div>
           </div>
 
+          {/* No rule of its own: the last section above already ends in one,
+              and two lines with nothing between them read as a gap. */}
           {related.length > 0 ? (
-            <div className="mt-16 border-t border-border pt-16">
+            <div className="mt-12 sm:mt-16">
               <ScrollReveal className="mb-8 flex items-end justify-between gap-4">
                 <h2 className={storefrontHeading.row}>You May Also Like</h2>
                 <Button variant="ghost" render={<Link href={routes.store.collections} />}>
@@ -2432,7 +2445,12 @@ export function ProductDetailPage({
           ) : null}
 
           {mounted && recommended.length > 0 ? (
-            <div className="mt-16 border-t border-border pt-16">
+            <div
+              className={cn(
+                "mt-12 sm:mt-16",
+                related.length > 0 && "border-t border-border pt-12 sm:pt-16",
+              )}
+            >
               <ProductRailSection
                 title="Recommended for you"
                 description="Based on your browsing and popular picks."

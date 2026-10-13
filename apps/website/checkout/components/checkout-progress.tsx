@@ -53,7 +53,7 @@ export function CheckoutProgress({
   className,
 }: CheckoutProgressProps) {
   return (
-    <ol className={cn("flex items-center gap-2 sm:gap-4", className)}>
+    <ol className={cn("flex items-start", className)}>
       {steps.map((step, index) => {
         const isComplete = step.id < currentStep;
         const isActive = step.id === currentStep;
@@ -95,7 +95,13 @@ export function CheckoutProgress({
           "group flex min-w-0 flex-1 cursor-pointer flex-col items-center gap-1.5 rounded-lg focus-visible:ring-2 focus-visible:ring-bakery-700 focus-visible:outline-none";
 
         return (
-          <li key={step.id} className="flex flex-1 items-center gap-2">
+          /*
+            EQUAL COLUMNS, with the line drawn BETWEEN them rather than taking
+            a share of the row. The line used to be a flex item beside every
+            marker but the last, so the last step owned a column of its own and
+            sat further from the third than the others sat from each other.
+          */
+          <li key={step.id} className="relative flex flex-1 justify-center">
             {canNavigate && step.id === 0 ? (
               /*
                 A LINK, not a button. Going back to the cart is a navigation,
@@ -125,10 +131,12 @@ export function CheckoutProgress({
             )}
             {index < steps.length - 1 ? (
               <div
+                aria-hidden
                 className={cn(
                   // Visible on mobile too: disconnected circles do not read as
-                  // a sequence.
-                  "mb-5 h-px flex-1",
+                  // a sequence. From just past this marker to just before the
+                  // next one.
+                  "absolute top-4 right-[calc(-50%+1.5rem)] left-[calc(50%+1.5rem)] h-px",
                   step.id < currentStep ? "bg-bakery-700" : "bg-border"
                 )}
               />

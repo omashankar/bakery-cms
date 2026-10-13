@@ -142,7 +142,9 @@ export function AuthLayoutShell({
               )}
 
               <div className="space-y-4">
-                <p className="text-[11px] font-semibold tracking-[0.2em] text-gold-300 uppercase">
+                {/* gold-200: gold-300 on this brown was 4.41:1, under the 4.5
+                    small text needs. */}
+                <p className="text-[11px] font-semibold tracking-[0.2em] text-gold-200 uppercase">
                   Staff console
                 </p>
                 {/*

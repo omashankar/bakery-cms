@@ -18,6 +18,7 @@ import {
   readDeliveryLocation,
 } from "@/features/commerce/lib/delivery-location";
 import { EmptyState } from "@/components/shared/empty-state";
+import { OptimizedImage } from "@/components/shared/optimized-image";
 import { QuantityStepper } from "@/components/shared/quantity-stepper";
 import { FrameThumbnail } from "@/components/storefront/frame-thumbnail";
 import { Button } from "@/components/ui/button";
@@ -442,12 +443,15 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                             className="size-20 shrink-0 overflow-hidden rounded-lg border border-border bg-cream-100"
                           >
                             {item.image ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
+                              // At the box's size: a raw <img> fetched the
+                              // 600px product photo for an 80px square.
+                              <OptimizedImage
                                 src={item.image}
                                 alt={item.name}
+                                width={80}
+                                height={80}
+                                sizes="80px"
                                 className="size-full object-cover"
-                                loading="lazy"
                               />
                             ) : null}
                           </Link>
