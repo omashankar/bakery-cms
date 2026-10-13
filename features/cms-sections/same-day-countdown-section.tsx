@@ -2,7 +2,6 @@
 
 import { ArrowRight, Truck } from "lucide-react";
 import Link from "next/link";
-import { Fragment } from "react";
 import { countdownCells, countdownParts } from "@/features/orders/lib/delivery-date";
 import { useSameDayCountdown } from "@/hooks/use-same-day-countdown";
 import { type HomepageSectionRendererProps, contentString, SectionShell } from "./section-parts";
@@ -43,9 +42,6 @@ import { type HomepageSectionRendererProps, contentString, SectionShell } from "
  * empty screen cannot tell "waiting" from "broken" — the bargain
  * `RecentlyViewedSection` already strikes.
  */
-/** The unit labels under the digits — short, so the strip stays one line. */
-const SHORT_UNIT: Record<string, string> = { Hours: "Hrs", Minutes: "Min", Seconds: "Sec" };
-
 export function SameDayCountdownSection(props: HomepageSectionRendererProps) {
   const c = props.section.content;
   /*
@@ -132,19 +128,21 @@ export function SameDayCountdownSection(props: HomepageSectionRendererProps) {
     <SectionShell
       {...props}
       /*
-        A SOFT LIGHT AT THE CENTRE, over the tone and not instead of it.
+        A PASTEL WASH ACROSS THE STRIP, the shop's reference (2026-10-13):
+        sand, mint and sky running into each other.
 
-        The first wash ran cream to tan from corner to corner and read as a
-        stain on the strip. This one only lifts the middle, where the content
-        now sits, and fades to the shop's own tone at both ends.
+        Every stop is one of the shop's own `--band-*-strong` tokens — the
+        same pastels its section backgrounds use, with dark-mode values in
+        globals.css — mixed TOWARDS TRANSPARENT, so the tone the Background
+        dropdown picks still shows through underneath rather than being
+        painted over. `background-image` sits over the tone's
+        `background-color`; it does not replace it.
 
-        Every stop is `transparent` or a shop token, and `background-image`
-        sits over the tone's `background-color` rather than replacing it, so
-        the Background dropdown still decides the colour underneath. A ring
-        rather than a border: `ring` draws inside the rounded corner, so it
-        cannot leave the 1px notch a `border` leaves on a `rounded-2xl` box.
+        A ring rather than a border: `ring` draws inside the rounded corner,
+        so it cannot leave the 1px notch a `border` leaves on a `rounded-2xl`
+        box at some zoom levels.
       */
-      panelClassName="bg-[radial-gradient(55%_160%_at_50%_0%,var(--background)_0%,transparent_75%)] px-4 py-4 ring-1 ring-border sm:px-6"
+      panelClassName="bg-[linear-gradient(100deg,color-mix(in_oklab,var(--band-sand-strong)_70%,transparent)_0%,color-mix(in_oklab,var(--band-mint-strong)_70%,transparent)_30%,color-mix(in_oklab,var(--band-sky-strong)_75%,transparent)_55%,color-mix(in_oklab,var(--band-mint-strong)_70%,transparent)_80%,color-mix(in_oklab,var(--band-sand-strong)_70%,transparent)_100%)] px-4 py-5 ring-1 ring-border sm:px-6 lg:px-14"
     >
       {/*
         NO `bg-*` HERE, and that is the point: SectionShell applies the
@@ -155,13 +153,11 @@ export function SameDayCountdownSection(props: HomepageSectionRendererProps) {
         is `position: absolute`, and with no positioned ancestor it escapes
         every `overflow: hidden` on the way up.
 
-        ONE GROUP, IN THE MIDDLE. The words, the clock and the button were
-        pinned to opposite ends of a 1,350px strip with nothing between them,
-        so they read as three things rather than one sentence with a clock in
-        it. They are a single centred group now: the words, a hairline, the
-        clock, the button — one row from `md`, two centred rows on a phone.
+        CLOCK | SENTENCE | BUTTON, as the reference lays it out: the clock at
+        the start, the sentence centred in what is left, the button at the
+        end — from `md`. Stacked and centred on a phone.
       */}
-      <div className="relative flex flex-col items-center gap-3 text-center md:flex-row md:justify-center md:gap-6 md:text-left">
+      <div className="relative grid items-center justify-items-center gap-4 text-center md:grid-cols-[auto_minmax(0,1fr)_auto] md:gap-8">
         {/*
           THE FACT, ONCE, AND NOT TICKING.
 
@@ -181,95 +177,83 @@ export function SameDayCountdownSection(props: HomepageSectionRendererProps) {
           Same-day orders close at {cutoff} today — {parts.spoken}.
         </p>
 
+        {/*
+          A DARK TILE PER UNIT, its name spelled out underneath — the
+          reference's clock.
+
+          `bg-foreground` + `text-background`: both fixed in globals.css, not
+          written by the shop's palette, so the digits keep their contrast
+          whatever brand colour the shop picks — and in dark mode the pair
+          inverts, which is still a strong tile on a dark page.
+
+          `tabular-nums` and a fixed tile width keep the clock still as its
+          digits change, so the sentence beside it never shuffles; a tick
+          repaints glyphs and reflows nothing.
+
+          NOT A COUNT THAT GROWS OR REDDENS as the time goes: the same colour
+          and weight at 5 hours and at 5 seconds. A band that gets louder as it
+          empties is a pressure tactic wearing a fact's clothes.
+        */}
+        <div aria-hidden="true" className="flex items-start gap-3 sm:gap-4">
+          {cells.map(([label, value]) => (
+            <span key={label} className="flex flex-col items-center gap-2">
+              <span className="flex h-14 w-16 items-center justify-center rounded-lg bg-foreground font-heading text-3xl leading-none font-medium text-background tabular-nums shadow-sm lg:h-16 lg:w-[4.5rem] lg:text-4xl">
+                {value}
+              </span>
+              <span className="text-[0.625rem] leading-none font-semibold tracking-[0.25em] text-foreground uppercase">
+                {label}
+              </span>
+            </span>
+          ))}
+        </div>
+
         <div className="min-w-0">
           {/*
-            WHAT CLOSES, AND WHEN, over the sentence and at every width.
-            "Same-day orders close at" is the Settings -> Commerce label the
-            figure is read from, and the figure is `cutoff` as the shop typed
-            it. Hidden from the screen reader, which has both in the one
-            sentence above.
+            THE SENTENCE IS THE BAND: the only thing in it that says what is
+            closing, in the shop's own words, and the largest type on it.
+          */}
+          <p className="font-heading text-2xl leading-tight font-bold text-balance sm:text-3xl md:text-2xl lg:text-3xl xl:text-4xl">
+            {headline}
+          </p>
+          {/*
+            WHEN IT CLOSES, which the clock alone does not say: "Same-day
+            orders close at" is the Settings -> Commerce label the figure is
+            read from, and the figure is `cutoff` as the shop typed it. Hidden
+            from the screen reader, which has it in the one sentence above.
           */}
           <p
             aria-hidden="true"
-            className="inline-flex items-center gap-1.5 text-[0.6875rem] leading-none font-semibold tracking-[0.08em] text-muted-foreground uppercase"
+            className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
           >
-            <Truck className="size-3.5 text-primary" />
+            <Truck className="size-3.5" />
             Same-day orders close at {cutoff}
           </p>
-          {/*
-            THE SENTENCE IS THE BAND: the only thing in it that says what is
-            closing, in the shop's own words.
-          */}
-          <p className="mt-1.5 font-heading text-lg leading-snug font-bold text-balance sm:text-xl lg:text-2xl">
-            {headline}
-          </p>
         </div>
 
-        {/* A hairline between the words and the clock, where they share a row. */}
-        <span aria-hidden="true" className="hidden h-10 w-px shrink-0 bg-border md:block" />
+        {/*
+          A BUTTON, NOT THE ROW PILL: there are no cards beneath this band, so
+          the control at the end is the only thing to press. Not `<Button>`:
+          its default variant carries `hover:bg-primary/90`, and no hover is a
+          standing rule on this shop. `bg-primary` with
+          `text-primary-foreground`, which is `readableInkOn(primaryColor)` —
+          contrast-checked per shop.
 
-        <div className="flex items-center gap-5">
-          {/*
-            02 : 26 : 49 with HRS MIN SEC under the digits — plain figures, no
-            box behind each (the shop asked for those off).
+          `min-h-12`: past the 44px touch target. `outline-foreground` for the
+          focus ring because `--ring` is the shop's accent, about 1.9:1 on a
+          pale band.
 
-            `tabular-nums`, and each unit a column as wide as its label, keep
-            the clock still as its digits change, so the button beside it
-            does not move once a second; a tick repaints glyphs and reflows
-            nothing.
-
-            NOT A COUNT THAT GROWS OR REDDENS as the time goes: the same
-            colour and weight at 5 hours and at 5 seconds. A band that gets
-            louder as it empties is a pressure tactic wearing a fact's clothes.
-
-            Digits in `text-foreground`, which globals.css fixes, so they hold
-            their contrast on a pale brand colour; the colons take the brand
-            colour, where contrast matters less.
-          */}
-          <span aria-hidden="true" className="inline-flex items-start gap-2">
-            {cells.map(([label, value], index) => (
-              <Fragment key={label}>
-                {index > 0 ? (
-                  <span className="font-heading text-2xl leading-none font-bold text-primary lg:text-3xl">
-                    :
-                  </span>
-                ) : null}
-                <span className="flex flex-col items-center">
-                  <span className="font-heading text-2xl leading-none font-bold text-foreground tabular-nums lg:text-3xl">
-                    {value}
-                  </span>
-                  <span className="mt-1 text-[0.625rem] leading-none font-semibold tracking-[0.1em] text-muted-foreground uppercase">
-                    {SHORT_UNIT[label]}
-                  </span>
-                </span>
-              </Fragment>
-            ))}
-          </span>
-          {/*
-            A BUTTON, NOT THE ROW PILL: there are no cards beneath this band,
-            so the control at the end is the only thing to press. Not
-            `<Button>`: its default variant carries `hover:bg-primary/90`, and
-            no hover is a standing rule on this shop. `bg-primary` with
-            `text-primary-foreground`, which is `readableInkOn(primaryColor)`
-            — contrast-checked per shop.
-
-            `outline-foreground` for the focus ring because `--ring` is the
-            shop's accent, about 1.9:1 on the sand band.
-
-            NOTHING WITHOUT BOTH HALVES: a label with no destination is a
-            button that does not work, and a destination with no label is a
-            blank box.
-          */}
-          {contentString(c, "ctaHref") && contentString(c, "ctaLabel") ? (
-            <Link
-              href={contentString(c, "ctaHref")}
-              className="flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
-            >
-              {contentString(c, "ctaLabel")}
-              <ArrowRight aria-hidden="true" className="size-4" />
-            </Link>
-          ) : null}
-        </div>
+          NOTHING WITHOUT BOTH HALVES: a label with no destination is a button
+          that does not work, and a destination with no label is a blank box.
+        */}
+        {contentString(c, "ctaHref") && contentString(c, "ctaLabel") ? (
+          <Link
+            href={contentString(c, "ctaHref")}
+            className="flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-md bg-primary px-7 text-base font-bold tracking-wide text-primary-foreground uppercase shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+          >
+            {contentString(c, "ctaLabel")}
+            <ArrowRight aria-hidden="true" className="size-4" />
+          </Link>
+        ) : null}
       </div>
 
       {/*
@@ -283,7 +267,7 @@ export function SameDayCountdownSection(props: HomepageSectionRendererProps) {
           Only you can see this line. Same-day orders close at {cutoff}, so this
           band draws nothing on the live page from then until midnight. The clock
           drops the hours in the last hour and the minutes in the last minute — so
-          the first figure is never a “00”.
+          the first tile is never a “00”.
         </p>
       ) : null}
     </SectionShell>
