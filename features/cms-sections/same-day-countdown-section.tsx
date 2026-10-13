@@ -1,10 +1,9 @@
 "use client";
 
-import { ArrowRight, Clock, Truck } from "lucide-react";
+import { ArrowRight, Truck } from "lucide-react";
 import Link from "next/link";
 import { Fragment } from "react";
 import { countdownCells, countdownParts } from "@/features/orders/lib/delivery-date";
-import { cn } from "@/lib/utils";
 import { useSameDayCountdown } from "@/hooks/use-same-day-countdown";
 import { type HomepageSectionRendererProps, contentString, SectionShell } from "./section-parts";
 
@@ -150,7 +149,7 @@ export function SameDayCountdownSection(props: HomepageSectionRendererProps) {
         inside the rounded corner, so it cannot leave the 1px notch a
         `border` leaves on a `rounded-2xl` box at some zoom levels.
       */
-      panelClassName="bg-[radial-gradient(120%_150%_at_6%_-10%,var(--background)_0%,transparent_66%),linear-gradient(105deg,transparent_30%,color-mix(in_oklab,var(--primary)_13%,transparent)_100%)] ring-1 ring-border"
+      panelClassName="bg-[radial-gradient(120%_150%_at_6%_-10%,var(--background)_0%,transparent_66%),linear-gradient(105deg,transparent_30%,color-mix(in_oklab,var(--primary)_13%,transparent)_100%)] px-4 py-3 ring-1 ring-border sm:px-5 sm:py-3"
     >
       {/*
         NO `bg-*` HERE, and that is the point: SectionShell applies the
@@ -164,12 +163,11 @@ export function SameDayCountdownSection(props: HomepageSectionRendererProps) {
         at its static position in the initial containing block and escapes
         every `overflow: hidden` on the way up.
 
-        CLOCK | WORDS | BUTTON from `md`, stacked and centred below it. The
-        middle column takes what is left (`minmax(0,1fr)`), so the sentence —
-        the only thing here that says WHAT is closing — is the part that
-        wraps, never the clock or the button.
+        A SLIM STRIP, the shape the shop picked (2026-10-13): one line from
+        `md` — the sentence, then the clock and the button at the far end. On a
+        phone, two: the sentence, then the clock and the button side by side.
       */}
-      <div className="relative grid items-center justify-items-center gap-5 text-center md:grid-cols-[auto_minmax(0,1fr)_auto] md:justify-items-start md:gap-8 md:text-left">
+      <div className="relative grid gap-3 md:flex md:items-center md:gap-5">
         {/*
           THE FACT, ONCE, AND NOT TICKING.
 
@@ -188,131 +186,86 @@ export function SameDayCountdownSection(props: HomepageSectionRendererProps) {
         <p className="sr-only">
           Same-day orders close at {cutoff} today — {parts.spoken}.
         </p>
-        {/*
-          A TILE PER UNIT, the way a countdown is drawn, with a colon between —
-          the shop asked for the clock to be seen running, seconds included.
-
-          `tabular-nums` and a minimum width on every tile are what keep this
-          the one thing on the homepage that does not move: a "1" is narrower
-          than a "0", and without them the tiles breathe once a second and the
-          sentence beside them shuffles. A tick repaints glyphs and reflows
-          nothing, which is why `prefers-reduced-motion` has nothing here to
-          suppress. The minimum is sized for the widest label, SECONDS.
-
-          NOT A COUNT THAT GROWS OR REDDENS as the time goes: the same colour
-          and weight at 5 hours and at 5 seconds. A band that gets louder as it
-          empties is a pressure tactic wearing a fact's clothes.
-
-          `bg-primary` + `text-primary-foreground`: appearance-tokens.ts sets
-          `--primary` to the shop's own colour and `--primary-foreground` to
-          `readableInkOn(primaryColor)`, so the ink is contrast-checked per shop
-          rather than chosen here; the labels are that ink at 80%, which held
-          AA on all four primaries it was measured on (5.48–12.11:1).
-
-          The column count is written out per case so Tailwind can see each
-          class: in the last hour there are two tiles, in the last minute one.
-        */}
-        <div
-          aria-hidden="true"
-          className={cn(
-            "inline-grid items-center gap-1.5",
-            cells.length === 1
-              ? "grid-cols-1"
-              : cells.length === 2
-                ? "grid-cols-[auto_auto_auto]"
-                : "grid-cols-[auto_auto_auto_auto_auto]",
-          )}
-        >
-          {cells.map(([label, value], index) => (
-            <Fragment key={label}>
-              {index > 0 ? (
-                <span className="font-heading text-2xl leading-none font-bold text-primary lg:text-3xl">
-                  :
-                </span>
-              ) : null}
-              <span className="flex min-w-[4.5rem] flex-col items-center gap-1.5 rounded-xl bg-primary px-2 py-3 text-primary-foreground shadow-sm">
-                <span className="font-heading text-3xl leading-none font-bold tabular-nums lg:text-4xl">
-                  {value}
-                </span>
-                <span className="text-[0.625rem] leading-none font-semibold tracking-[0.12em] uppercase text-primary-foreground/80">
-                  {label}
-                </span>
-              </span>
-            </Fragment>
-          ))}
-        </div>
-
-        <div className="min-w-0">
-          {/*
-            WHAT KIND OF DEADLINE THIS IS, as a label over the sentence. True
-            whenever the band is drawn at all: it renders only while the shop
-            has a same-day window open.
-          */}
-          <p
+        <p className="flex min-w-0 items-center gap-2.5 md:flex-1">
+          <span
             aria-hidden="true"
-            className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-[0.6875rem] font-semibold tracking-[0.08em] text-foreground uppercase"
+            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground"
           >
-            <Truck className="size-3.5 text-primary" />
-            Same-day delivery
-          </p>
-          {/*
-            THE SENTENCE IS THE BAND. It is the only thing here that says what
-            is closing, so it is the largest type in it.
-          */}
-          <p className="mt-2 font-heading text-xl leading-snug font-bold text-balance sm:text-2xl lg:text-3xl">
+            <Truck className="size-[1.125rem]" />
+          </span>
+          <span className="min-w-0 font-heading text-base leading-snug font-bold sm:text-lg">
             {headline}
-          </p>
+            {/*
+              WHAT CLOSES, AND WHEN — "Same-day orders close at" is the
+              Settings -> Commerce label this figure is read from, and the
+              figure is `cutoff` as the shop typed it. From `lg` only, where
+              the line has room for it; the screen reader has it in the one
+              sentence above at every width.
+            */}
+            <span
+              aria-hidden="true"
+              className="ml-2 hidden align-middle text-xs font-medium text-muted-foreground lg:inline"
+            >
+              · Same-day orders close at {cutoff}
+            </span>
+          </span>
+        </p>
+        <div className="flex items-center justify-between gap-3 md:justify-end md:gap-4">
           {/*
-            WHAT CLOSES, AND WHEN, in the label's own words: "Same-day orders
-            close at" is the Settings -> Commerce field this figure is read
-            from, and the figure is `cutoff` as the shop typed it. Hidden from
-            the screen reader, which already has both in the one sentence above.
+            02h : 40m : 03s — a chip per unit in the shop's colour, colons
+            between. `tabular-nums` keeps every chip the same width as its
+            digits change, so the button beside it does not move once a
+            second; a tick repaints glyphs and reflows nothing.
 
-            `text-muted-foreground` is fixed in globals.css rather than written
-            by appearance-tokens, so this pairing holds whatever palette a shop
-            picks, and in dark mode.
+            NOT A COUNT THAT GROWS OR REDDENS as the time goes: the same
+            colour and weight at 5 hours and at 5 seconds. A band that gets
+            louder as it empties is a pressure tactic wearing a fact's clothes.
+
+            `bg-primary` + `text-primary-foreground`: `--primary-foreground` is
+            `readableInkOn(primaryColor)`, so the ink is contrast-checked per
+            shop rather than chosen here.
           */}
-          <p
-            aria-hidden="true"
-            className="mt-2 inline-flex items-center gap-1.5 text-sm text-muted-foreground"
-          >
-            <Clock className="size-4 shrink-0" />
-            Same-day orders close at{" "}
-            <span className="font-semibold text-foreground">{cutoff}</span>
-          </p>
+          <span aria-hidden="true" className="inline-flex items-center gap-1">
+            {cells.map(([label, value], index) => (
+              <Fragment key={label}>
+                {index > 0 ? (
+                  <span className="font-heading text-lg leading-none font-bold text-primary">
+                    :
+                  </span>
+                ) : null}
+                <span className="inline-flex items-baseline gap-0.5 rounded-md bg-primary px-2 py-1.5 font-heading text-primary-foreground">
+                  <span className="text-lg leading-none font-bold tabular-nums">{value}</span>
+                  <span className="text-[0.6875rem] leading-none font-semibold text-primary-foreground/80">
+                    {label.charAt(0).toLowerCase()}
+                  </span>
+                </span>
+              </Fragment>
+            ))}
+          </span>
+          {/*
+            A BUTTON, NOT THE ROW PILL: there are no cards beneath this band,
+            so the control at the end is the only thing to press. Not
+            `<Button>`: its default variant carries `hover:bg-primary/90`, and
+            no hover is a standing rule on this shop.
+
+            `min-h-10` with the strip's own padding still clears a 44px touch
+            row; `outline-foreground` for the focus ring because `--ring` is
+            the shop's accent, about 1.9:1 on the sand band.
+
+            NOTHING WITHOUT BOTH HALVES: a label with no destination is a
+            button that does not work, and a destination with no label is a
+            blank box.
+          */}
+          {contentString(c, "ctaHref") && contentString(c, "ctaLabel") ? (
+            <Link
+              href={contentString(c, "ctaHref")}
+              className="flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+            >
+              {contentString(c, "ctaLabel")}
+              <ArrowRight aria-hidden="true" className="size-4" />
+            </Link>
+          ) : null}
         </div>
-        {/*
-          A BUTTON, NOT THE ROW PILL. `ViewAllLink` is quiet on purpose: at the
-          end of a heading it labels the row beneath it. There are no cards
-          beneath this one; the control at the end is the only thing to press.
-
-          `bg-primary` joins the tiles rather than introducing a third colour,
-          and `--primary-foreground` is contrast-checked per shop. Not
-          `<Button>`: its default variant carries `hover:bg-primary/90`, and no
-          hover is a standing rule on this shop.
-
-          NOTHING WITHOUT BOTH HALVES: a label with no destination is a button
-          that does not work, and a destination with no label is a blank box.
-        */}
-        {contentString(c, "ctaHref") && contentString(c, "ctaLabel") ? (
-          <Link
-            href={contentString(c, "ctaHref")}
-            /*
-              `min-h-11`: 44px, the touch-target size, which padding alone did
-              not reach at 13px type.
-
-              `outline-foreground` for the focus ring rather than `--ring`,
-              which is the shop's ACCENT and about 1.9:1 on the sand band — no
-              ring at all on exactly the pale palettes that need one.
-              `--foreground` is fixed in globals.css, so this is a visible 2px
-              on every background, in both themes.
-            */
-            className="flex min-h-11 max-w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-6 text-center text-sm font-bold tracking-wider text-primary-foreground uppercase shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
-          >
-            {contentString(c, "ctaLabel")}
-            <ArrowRight aria-hidden="true" className="size-4" />
-          </Link>
-        ) : null}
       </div>
 
       {/*
