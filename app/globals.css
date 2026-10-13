@@ -402,7 +402,13 @@ html.dark {
   h4,
   h5,
   h6 {
-    @apply font-heading tracking-tight text-foreground;
+    /*
+      A HAIR TIGHT, NOT TIGHT. The heading face sets a narrow space, and at
+      -0.025em the gap between words nearly closed on small headings
+      ("Delivery Zones", "Personal Information"). Large display headings
+      still ask for tracking-tight themselves.
+    */
+    @apply font-heading tracking-[-0.01em] text-foreground;
   }
 
   ::selection {

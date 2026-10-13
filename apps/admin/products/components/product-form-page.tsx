@@ -1970,7 +1970,7 @@ export function ProductFormPage({
                   form.description ||
                   "Meta description preview will appear here."}
               </p>
-              <Badge variant="outline">{form.status}</Badge>
+              <Badge variant="outline">{formatStatusLabel(form.status)}</Badge>
             </CardContent>
           </Card>
 

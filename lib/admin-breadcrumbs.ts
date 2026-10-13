@@ -49,13 +49,13 @@ const SEGMENT_LABELS: Record<string, string> = {
   settings: "Settings",
   general: "General",
   modules: "Modules",
-  social: "Social",
-  security: "Security",
+  social: "Social Media",
+  security: "Login Security",
   smtp: "SMTP",
   analytics: "Analytics",
-  maintenance: "Maintenance",
-  backup: "Backup",
-  activity: "Activity",
+  maintenance: "Maintenance Mode",
+  backup: "Backup & Restore",
+  activity: "Activity Log",
   permissions: "Permissions",
   commerce: "Commerce",
   orders: "Orders",
@@ -73,7 +73,23 @@ const SEGMENT_LABELS: Record<string, string> = {
   whatsapp: "WhatsApp Templates",
   notifications: "Notifications",
   refunds: "Refunds",
+  // Each of these read as its URL ("Sms", "Seo Files", "Custom Code") under a
+  // page titled something else; they now say what the page heading says.
+  cancellations: "Cancellations",
+  sms: "SMS Notifications",
+  "seo-files": "Robots.txt & Sitemap",
+  "custom-code": "Custom Code",
+  navigation: "Navigation Menus",
+  gateways: "Payment Gateways",
+  transactions: "Transactions",
+  reviews: "Reviews",
 };
+
+/** A menu word, capitalised whatever case the shop typed it in. */
+function capitalised(word: string): string {
+  const trimmed = word.trim();
+  return trimmed ? trimmed.charAt(0).toUpperCase() + trimmed.slice(1) : trimmed;
+}
 
 /** Segments that are path groups only — no real index page */
 const NON_ROUTABLE_SEGMENTS = new Set(["commerce", "builders"]);
@@ -86,6 +102,7 @@ function isDynamicSegment(segment: string, prev?: string): boolean {
   if (prev === "pages" && segment !== "add" && segment !== "edit") {
     return true;
   }
+  if (prev === "orders" && segment === "cancellations") return false;
   if (prev === "orders" || prev === "customers") {
     return true;
   }
@@ -105,9 +122,9 @@ export function getAdminBreadcrumbs(
 ): AdminBreadcrumb[] {
   const segmentLabels: Record<string, string> = {
     ...SEGMENT_LABELS,
-    cakes: labels.productWordPlural,
-    add: `Add ${labels.productWord}`,
-    edit: `Edit ${labels.productWord}`,
+    cakes: capitalised(labels.productWordPlural),
+    add: `Add ${capitalised(labels.productWord)}`,
+    edit: `Edit ${capitalised(labels.productWord)}`,
   };
   const parts = pathname.split("/").filter(Boolean);
 
@@ -146,7 +163,7 @@ export function getAdminBreadcrumbs(
     if (isDynamicSegment(part, prev)) {
       if (next === "edit") {
         crumbs.push({
-          label: prev === "pages" ? "Edit Page" : `Edit ${labels.productWord}`,
+          label: prev === "pages" ? "Edit Page" : `Edit ${capitalised(labels.productWord)}`,
           href: `${href}/edit`,
         });
         i += 1;
@@ -165,7 +182,7 @@ export function getAdminBreadcrumbs(
               ? "Order Details"
               : prev === "customers"
                 ? "Customer Details"
-                : `${labels.productWord} Details`,
+                : `${capitalised(labels.productWord)} Details`,
       });
       continue;
     }
@@ -177,7 +194,11 @@ export function getAdminBreadcrumbs(
           ? "Wedding Builder"
           : part === "wedding" && prev === "inquiries"
             ? "Wedding"
-            : segmentLabels[part] ??
+            : part === "contact" && prev === "settings"
+              ? "Contact Information"
+              : part === "commerce" && prev === "settings"
+                ? "Order Settings"
+                : segmentLabels[part] ??
               part.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
     const isLast = i === parts.length - 1;
     const routable = !NON_ROUTABLE_SEGMENTS.has(part);

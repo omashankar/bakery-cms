@@ -68,7 +68,8 @@ const EMPTY_STATS = {
 const statusTabs: Array<{ value: OrderListFilters["status"]; label: string; short: string }> = [
   { value: "all", label: "All", short: "All" },
   { value: "pending", label: "Pending", short: "Pending" },
-  { value: "confirmed", label: "Confirmed", short: "Confirm" },
+  // The word every row's badge uses for this status (order-status-meta).
+  { value: "confirmed", label: "Accepted", short: "Accepted" },
   { value: "preparing", label: "Preparing", short: "Prep" },
   { value: "ready", label: "Ready", short: "Ready" },
   { value: "out_for_delivery", label: "Out for delivery", short: "Delivery" },

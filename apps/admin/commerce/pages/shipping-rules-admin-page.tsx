@@ -113,7 +113,7 @@ export function ShippingRulesAdminPage() {
           hydration !== "ready"
             ? "How delivery is charged at checkout."
             : liveZonePricing
-              ? `Zone pricing on · ${stats.active} active zones`
+              ? `Zone pricing on · ${stats.active} active zone${stats.active === 1 ? "" : "s"}`
               : "Flat-fee shipping · zone pricing off"
         }
         className="gap-3"
@@ -339,6 +339,15 @@ export function ShippingRulesAdminPage() {
                   ? ` · Est. ${previewTotals.estimatedDeliveryDays} day(s)`
                   : ""}
                 {previewTotals.delivery === 0 ? " · free at this cart value" : ""}
+              </p>
+            ) : previewTotals.deliverable === false ? (
+              // The address is outside every zone and the shop has switched
+              // off delivering outside them. The fee reads 0 because there is
+              // no delivery at all — it said "the fallback fee is set to zero"
+              // beside a fallback of ₹149.
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                No active zone covers this address, and delivering outside your zones is
+                off — checkout will not take this order.
               </p>
             ) : !settings.useZoneBasedDelivery ? (
               <p className="text-xs text-muted-foreground">

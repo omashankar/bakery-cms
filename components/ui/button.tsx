@@ -8,7 +8,11 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        // A disabled filled button keeps readable ink: at 50% opacity the
+        // white label on a pale brand fill could not be read ("Save changes"
+        // on every settings page before anything is edited).
+        default:
+          "bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100",
         outline:
           "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
         secondary:
@@ -21,7 +25,7 @@ const buttonVariants = cva(
         accent:
           "border border-gold-300 bg-background text-foreground hover:bg-muted dark:border-gold-400/50",
         bakery:
-          "bg-bakery-700 text-white hover:bg-bakery-800 dark:bg-bakery-600 dark:hover:bg-bakery-500",
+          "bg-bakery-700 text-white hover:bg-bakery-800 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 dark:bg-bakery-600 dark:hover:bg-bakery-500",
         cream:
           "border border-border bg-muted text-foreground hover:bg-secondary",
         gold:

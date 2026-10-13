@@ -143,6 +143,24 @@ function isChildLinkActive(
   return pathname.startsWith(`${childHref}/`);
 }
 
+/**
+ * Whether a top-level entry owns this path — itself, or something under it
+ * that no MORE SPECIFIC entry claims. "/admin/orders/cancellations" lit both
+ * Orders and Cancellations, because each tested only its own prefix.
+ */
+function ownsPath(itemHref: string, pathname: string): boolean {
+  if (pathname === itemHref) return true;
+  if (!pathname.startsWith(`${itemHref}/`)) return false;
+  return !adminNavSections.some((section) =>
+    section.items.some(
+      (other) =>
+        other.href !== itemHref &&
+        other.href.startsWith(`${itemHref}/`) &&
+        (pathname === other.href || pathname.startsWith(`${other.href}/`)),
+    ),
+  );
+}
+
 function findOpenMenuHref(pathname: string): string | null {
   for (const section of adminNavSections) {
     for (const item of section.items) {
@@ -176,8 +194,7 @@ function useNavActiveState(item: AdminNavItem) {
     const settingsActive =
       item.href === routes.admin.settings.overview && isSettingsOwnedPath(pathname);
     const parentActive =
-      pathname === item.href ||
-      pathname.startsWith(`${item.href}/`) ||
+      ownsPath(item.href, pathname) ||
       Boolean(childActive) ||
       settingsActive;
 

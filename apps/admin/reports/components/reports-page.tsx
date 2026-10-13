@@ -400,7 +400,7 @@ export function ReportsPage({
                             />
                           </div>
                           {showLabel ? (
-                            <span className="max-w-full truncate text-[9px] text-muted-foreground sm:text-[10px]">
+                            <span className="whitespace-nowrap text-[10px] tabular-nums text-muted-foreground sm:text-[11px]">
                               {item.label}
                             </span>
                           ) : (

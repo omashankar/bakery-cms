@@ -238,7 +238,7 @@ export function WhatsAppConnectionCard({
         <SettingsFormGate hydration={hydration}>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="wa-phone-number-id">Phone number id</Label>
+              <Label htmlFor="wa-phone-number-id">Phone number ID</Label>
               <Input
                 id="wa-phone-number-id"
                 value={form.phoneNumberId}
@@ -250,7 +250,7 @@ export function WhatsAppConnectionCard({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="wa-business-account-id">WhatsApp Business Account id</Label>
+              <Label htmlFor="wa-business-account-id">WhatsApp Business Account ID</Label>
               <Input
                 id="wa-business-account-id"
                 value={form.businessAccountId}

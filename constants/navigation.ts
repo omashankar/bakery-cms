@@ -22,7 +22,12 @@ export function navItemLabel(
   item: NavItem,
   labels: Pick<ResolvedLabels, "productWordPlural">,
 ): string {
-  return item.href === routes.admin.cakes.list ? labels.productWordPlural : item.label;
+  if (item.href !== routes.admin.cakes.list) return item.label;
+  // A MENU ENTRY, capitalised like every other one — the shop's word is
+  // whatever case it was typed in ("products" sat lowercase between
+  // "Inventory" and "Catalog").
+  const word = labels.productWordPlural.trim();
+  return word ? word.charAt(0).toUpperCase() + word.slice(1) : item.label;
 }
 
 /** Public storefront navigation */

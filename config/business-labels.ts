@@ -147,23 +147,35 @@ export interface ResolvedLabels {
  * do is change its whole storefront's wording from a dropdown that showed no
  * sign of having done so.
  */
+/**
+ * A WORD, as a word: first letter capitalised, whatever case it was typed in.
+ *
+ * These are used as names — "Add Product", a menu entry, a column heading —
+ * and every place that needs one mid-sentence lowercases it itself
+ * (`productLower`). A shop that typed "products" got a sidebar entry, a page
+ * title and a table heading in lowercase beside capitalised neighbours.
+ */
+function asWord(value: string | undefined, fallback: string): string {
+  const word = value?.trim() || fallback;
+  return word.charAt(0).toUpperCase() + word.slice(1);
+}
+
 export function resolveLabels(overrides: LabelOverrides = {}): ResolvedLabels {
   const base = DEFAULT_LABELS;
-  const productWord = overrides.productWord?.trim() || base.productWord;
   return {
     collectionsTitle: overrides.collectionsTitle?.trim() || base.collectionsTitle,
     collectionsSubtitle: overrides.collectionsSubtitle?.trim() || base.collectionsSubtitle,
-    productWord,
-    productWordPlural: overrides.productWordPlural?.trim() || base.productWordPlural,
+    productWord: asWord(overrides.productWord, base.productWord),
+    productWordPlural: asWord(overrides.productWordPlural, base.productWordPlural),
     descriptionHeading: overrides.descriptionHeading?.trim() || base.descriptionHeading,
-    categoryWord: overrides.categoryWord?.trim() || base.categoryWord,
-    categoryWordPlural: overrides.categoryWordPlural?.trim() || base.categoryWordPlural,
-    occasionWord: overrides.occasionWord?.trim() || base.occasionWord,
-    occasionWordPlural: overrides.occasionWordPlural?.trim() || base.occasionWordPlural,
-    collectionWord: overrides.collectionWord?.trim() || base.collectionWord,
-    collectionWordPlural: overrides.collectionWordPlural?.trim() || base.collectionWordPlural,
-    departmentWord: overrides.departmentWord?.trim() || base.departmentWord,
-    departmentWordPlural: overrides.departmentWordPlural?.trim() || base.departmentWordPlural,
+    categoryWord: asWord(overrides.categoryWord, base.categoryWord),
+    categoryWordPlural: asWord(overrides.categoryWordPlural, base.categoryWordPlural),
+    occasionWord: asWord(overrides.occasionWord, base.occasionWord),
+    occasionWordPlural: asWord(overrides.occasionWordPlural, base.occasionWordPlural),
+    collectionWord: asWord(overrides.collectionWord, base.collectionWord),
+    collectionWordPlural: asWord(overrides.collectionWordPlural, base.collectionWordPlural),
+    departmentWord: asWord(overrides.departmentWord, base.departmentWord),
+    departmentWordPlural: asWord(overrides.departmentWordPlural, base.departmentWordPlural),
   };
 }
 

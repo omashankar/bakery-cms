@@ -42,6 +42,20 @@ function scopeOf(coupon: StoredCoupon): string {
   return ids.map((id) => names.get(id) ?? "a deleted category").join(", ");
 }
 
+/**
+ * Whether the label states a different discount from the one checkout takes.
+ * Only a number the label actually names is compared — "Festive offer" says
+ * nothing to disagree with.
+ */
+function labelDisagrees(coupon: { label?: string; percentOff?: number; flatOff?: number }): boolean {
+  const label = coupon.label ?? "";
+  const percent = /(\d+(?:\.\d+)?)\s*%/.exec(label);
+  if (percent && coupon.percentOff) return Number(percent[1]) !== coupon.percentOff;
+  const flat = /(?:₹|rs\.?\s*)\s*(\d[\d,]*)/i.exec(label);
+  if (flat && coupon.flatOff) return Number(flat[1].replace(/,/g, "")) !== coupon.flatOff;
+  return false;
+}
+
 export function CouponsAdminPage({
   initial = null,
 }: {
@@ -212,6 +226,15 @@ export function CouponsAdminPage({
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-mono text-sm font-semibold">{coupon.code}</p>
                         <Badge variant="secondary">{coupon.label}</Badge>
+                        {/*
+                          THE LABEL IS THE SHOP'S WORDS, the discount is the
+                          number checkout uses — and customers are shown the
+                          label. "20%" on a coupon that takes 10% off sat here
+                          with nothing pointing it out.
+                        */}
+                        {labelDisagrees(coupon) ? (
+                          <Badge variant="destructive">Label doesn&apos;t match the discount</Badge>
+                        ) : null}
                         {!coupon.isActive ? <Badge variant="outline">Inactive</Badge> : null}
                         {/* An expired coupon used to render with a green Active
                             switch and nothing else — expiresAt was captured by

@@ -27,6 +27,19 @@ interface GatewayConfigPageProps {
   gatewayId: string;
 }
 
+/**
+ * How a payment method is written. `capitalize` made "upi" into "Upi" and
+ * "emi" into "Emi" — acronyms a customer knows in capitals.
+ */
+const METHOD_NAMES: Record<string, string> = {
+  upi: "UPI",
+  emi: "EMI",
+  card: "Card",
+  netbanking: "Net banking",
+  wallet: "Wallet",
+  cod: "Cash on delivery",
+};
+
 export function GatewayConfigPage({ gatewayId }: GatewayConfigPageProps) {
   const config = getGatewayConfig(gatewayId);
   const [enabled, setEnabled] = useState(false);
@@ -210,7 +223,7 @@ export function GatewayConfigPage({ gatewayId }: GatewayConfigPageProps) {
               value={
                 <div className="flex flex-wrap justify-end gap-1">
                   {config.supportedMethodIds.map((m) => (
-                    <Badge key={m} variant="outline" className="text-[10px] capitalize">{m}</Badge>
+                    <Badge key={m} variant="outline" className="text-[11px]">{METHOD_NAMES[m] ?? m}</Badge>
                   ))}
                 </div>
               }

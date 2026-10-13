@@ -105,7 +105,13 @@ export function DashboardRevenueChart({ analytics, figures = "ready" }: Dashboar
                       />
                     </div>
                     {showLabel ? (
-                      <span className="max-w-full truncate text-[9px] text-muted-foreground sm:text-[10px]">
+                      /*
+                        Whole, not truncated to its bar. A month of bars is ~22px
+                        a column, so "13 Sep" was cut to "1…" on every label —
+                        and only one bar in six carries one, so the neighbours'
+                        empty space is there for it to use.
+                      */
+                      <span className="whitespace-nowrap text-[10px] tabular-nums text-muted-foreground sm:text-[11px]">
                         {item.label}
                       </span>
                     ) : (
