@@ -26,7 +26,7 @@ const codeOf = (source: string) =>
 /** The picture's own block: the box that holds the image, badge and heart. */
 function pictureBlock(): string {
   const src = codeOf(read(CARD));
-  const at = src.indexOf("relative overflow-hidden rounded-xl bg-cream-100");
+  const at = src.indexOf("\"relative overflow-hidden bg-cream-100\"");
   expect(at, "the card's picture box is gone").toBeGreaterThan(-1);
   return src.slice(at, src.indexOf("</div>", at));
 }

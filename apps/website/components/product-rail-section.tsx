@@ -47,7 +47,7 @@ export function ProductRailSection({
           for one stacked column and costs each of two cards 6px at 360. */}
       <StaggerReveal className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
         {cakes.map((cake) => (
-          <ProductCard key={cake.id} cake={cake} />
+          <ProductCard key={cake.id} cake={cake} framed />
         ))}
       </StaggerReveal>
     </section>

@@ -118,6 +118,7 @@ export function RecentlyViewedSection(props: HomepageSectionRendererProps) {
             cake={cake}
             className="h-auto w-[calc((100%-1rem)/1.6)] shrink-0 snap-start sm:w-[calc((100%-1.25rem)/2)] lg:w-[calc((100%-3.75rem)/4)]"
             showWishlist={false}
+            framed
           />
         ))}
         </ScrollStrip>

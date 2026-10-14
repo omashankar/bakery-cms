@@ -55,6 +55,13 @@ interface ProductCardProps {
    * heart and not the button.
    */
   showWishlist?: boolean;
+  /**
+   * A white card with a hairline, for the homepage rows. The reference draws
+   * its rows' cards boxed — they sit on a tinted band, where words straight on
+   * the tint read as loose — and keeps them to name, price and rating. The
+   * listing's cards stay unboxed on the page's own ground.
+   */
+  framed?: boolean;
 }
 
 export function ProductCard({
@@ -63,6 +70,7 @@ export function ProductCard({
   variant = "default",
   className,
   showWishlist = true,
+  framed = false,
 }: ProductCardProps) {
   /**
    * The price the SHOP will charge, not the base price on the record.
@@ -102,19 +110,24 @@ export function ProductCard({
           sheet of rectangles.
         */
         "group flex h-full flex-col",
+        framed &&
+          "overflow-hidden rounded-xl border border-border/70 bg-card transition-shadow hover:shadow-md",
         /*
           A PANEL ON HOVER, and only then: the reference lifts the card it is
           pointing at onto white with a shadow. The negative margin gives that
           panel room to reach past the picture without moving the picture or
           breaking the grid's alignment at rest.
         */
-        "-m-1.5 rounded-2xl p-1.5 transition-shadow hover:bg-card hover:shadow-lg",
+        !framed && "-m-1.5 rounded-2xl p-1.5 transition-shadow hover:bg-card hover:shadow-lg",
         className
       )}
     >
       <div
         className={cn(
-          "relative overflow-hidden rounded-xl bg-cream-100",
+          // Framed, the card clips the corners; a radius here would round
+          // the picture's bottom edge against a straight seam.
+          "relative overflow-hidden bg-cream-100",
+          !framed && "rounded-xl",
           variant === "tall" ? "aspect-[3/4]" : "aspect-square"
         )}
       >
@@ -153,7 +166,7 @@ export function ProductCard({
         a name and a from-price, no product behind them — while its product
         cards, the ones with a name, a price and a rating, are ranged left.
       */}
-      <div className="flex flex-1 flex-col gap-1.5 px-0.5 pt-2.5">
+      <div className={cn("flex flex-1 flex-col gap-1.5", framed ? "px-2.5 pt-2 pb-2.5" : "px-0.5 pt-2.5")}>
         {/*
           NO CATEGORY OVER THE NAME, and NO BUY BUTTON: the card is the link,
           and every choice that makes a cake — size, flavour, a message — is
@@ -184,6 +197,9 @@ export function ProductCard({
           ) : null}
         </div>
 
+        {framed ? (
+          outOfStock ? <p className="text-xs font-medium text-muted-foreground">Out of stock</p> : null
+        ) : (
         <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
           {outOfStock ? (
             /*
@@ -201,6 +217,7 @@ export function ProductCard({
             </span>
           ) : null}
         </div>
+        )}
       </div>
     </article>
   );

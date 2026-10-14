@@ -500,6 +500,7 @@ function ProductGridSection(
               cake={cake}
               className="h-auto w-[calc((100%-1rem)/1.6)] shrink-0 snap-start sm:w-[calc((100%-1.25rem)/2)] lg:w-[calc((100%-3.75rem)/4)]"
               showWishlist={false}
+              framed
             />
           ))}
         </ScrollStrip>
@@ -579,6 +580,7 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
               cake={cake}
               className="h-auto w-[calc((100%-1rem)/1.6)] shrink-0 snap-start sm:w-[calc((100%-1.25rem)/2)] lg:w-[calc((100%-3.75rem)/4)]"
               showWishlist={false}
+              framed
             />
           ))}
         </ScrollStrip>
@@ -1257,26 +1259,39 @@ function ShopPromisesSection(props: HomepageSectionRendererProps) {
 
   return (
     <SectionShell {...props}>
+      {/*
+        A TINTED STRIP WITH RINGED ICONS, as the reference draws its promises:
+        it reads as one band of reassurance rather than a form-like box. On a
+        phone the facts sit side by side, icon over words — stacked, three of
+        them took ~180px of the first screen.
+      */}
       <ul
         className={cn(
-          "grid gap-3 rounded-2xl border border-border bg-card p-4 sm:p-5",
-          items.length === 1 ? "grid-cols-1" : items.length === 2 ? "sm:grid-cols-2" : "sm:grid-cols-3",
+          "grid gap-3 rounded-2xl bg-cream-100 px-3 py-5 sm:gap-6 sm:px-8 sm:py-6",
+          items.length === 1 ? "grid-cols-1" : items.length === 2 ? "grid-cols-2" : "grid-cols-3",
         )}
       >
         {items.map((item) => {
           const Icon = heroTrustIcons[item.icon] ?? BadgeCheck;
           return (
-            <li key={item.title} className="flex items-center gap-3">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
+            <li
+              key={item.title}
+              className="flex flex-col items-center gap-2 text-center sm:flex-row sm:justify-center sm:gap-3 sm:text-left"
+            >
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-card text-bakery-700 shadow-sm ring-2 ring-bakery-200 sm:size-14">
                 <Icon
                   aria-hidden="true"
-                  className={cn("size-5", item.icon === "Star" && "fill-amber-400 text-amber-500")}
+                  className={cn("size-5 sm:size-6", item.icon === "Star" && "fill-amber-400 text-amber-500")}
                 />
               </span>
               <span className="min-w-0">
-                <span className="block text-sm font-semibold text-foreground">{item.title}</span>
+                <span className="block text-xs font-semibold leading-snug text-foreground sm:text-base">
+                  {item.title}
+                </span>
                 {item.subtitle ? (
-                  <span className="block text-xs text-muted-foreground">{item.subtitle}</span>
+                  <span className="block text-[11px] leading-snug text-muted-foreground sm:text-sm">
+                    {item.subtitle}
+                  </span>
                 ) : null}
               </span>
             </li>
