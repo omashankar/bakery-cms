@@ -105,7 +105,7 @@ describe("which offers a basket is shown", () => {
     shopOffers({ code: "BIG500", flatOff: 500, minSubtotal: 1500 });
     addToCart(cartLineToAddInput(LINE));
 
-    expect(render().textContent).toContain("add ₹500 more");
+    expect(render().textContent).toMatch(/add ₹500 more/i);
   });
 
   it("says nothing about a shortfall the basket has already cleared", () => {

@@ -19,6 +19,8 @@ import {
 } from "@/features/commerce/lib/delivery-location";
 import { EmptyState } from "@/components/shared/empty-state";
 import { OptimizedImage } from "@/components/shared/optimized-image";
+import { EarliestDelivery } from "@/components/storefront/earliest-delivery";
+import { PincodeCheck } from "@/components/storefront/pincode-check";
 import { QuantityStepper } from "@/components/shared/quantity-stepper";
 import { FrameThumbnail } from "@/components/storefront/frame-thumbnail";
 import { Button } from "@/components/ui/button";
@@ -430,6 +432,16 @@ export function CartPage({ catalog = [] }: CartPageProps) {
 
               <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
               <div className="order-1 space-y-6 lg:order-none lg:col-start-1">
+                {/*
+                  WHERE IT IS GOING, before anything else — the reference's
+                  "Deliver to 324001 / Change pincode" bar. The same check as
+                  the product page, so a customer outside every zone finds
+                  out here and not at the address step.
+                */}
+                <PincodeCheck
+                  title="Check delivery to your PIN code"
+                  className="rounded-xl border border-border bg-card p-4"
+                />
                 <div className="space-y-4">
                   {items.map((item) => (
                     <div
@@ -462,6 +474,10 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                           >
                             {item.name}
                           </Link>
+                          {/* The reference's "Estimated Delivery: Today", per line. */}
+                          <p className="text-xs text-muted-foreground">
+                            <EarliestDelivery />
+                          </p>
                           {/*
                             One list, so this cannot drift from the invoice
                             again — laid out as a grid rather than joined
@@ -630,24 +646,73 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                   every install until an owner switches one on.
                 */}
                 {offers.length > 0 ? (
-                  <div className="rounded-xl border border-dashed border-bakery-300 bg-card p-4">
+                  <div className="rounded-xl border border-border bg-card p-4">
                     <p className="flex items-center gap-2 text-sm font-semibold text-bakery-700">
                       <Tag className="size-4" />
-                      Offers you can use
+                      Coupons for this order
                     </p>
-                    <ul className="mt-2 space-y-1.5 text-sm text-muted-foreground">
-                      {offers.map((offer) => (
-                        <li key={offer.code} className="flex gap-2">
-                          <span aria-hidden className="text-bakery-700">•</span>
-                          <span>
-                            <span className="font-medium text-foreground">{offer.code}</span>{" "}
-                            — {offer.label}
-                            {offer.shortfall > 0
-                              ? ` · add ${formatCurrency(offer.shortfall)} more to use it`
-                              : ""}
-                          </span>
-                        </li>
-                      ))}
+                    {/*
+                      A CARD PER CODE, priced against THIS basket and applied
+                      in one press — the reference's coupon list. The saving
+                      is what the same rule checkout runs would take off, not
+                      the label's headline: "20% OFF" is a different number on
+                      every cart.
+                    */}
+                    <ul className="mt-3 grid gap-3 sm:grid-cols-2">
+                      {offers.map((offer) => {
+                        const check =
+                          offer.shortfall > 0 ? null : applyCouponCode(offer.code, couponLines);
+                        const saving = check?.ok ? check.coupon.discountAmount : 0;
+                        return (
+                          <li
+                            key={offer.code}
+                            className="flex flex-col gap-2 rounded-lg border border-dashed border-bakery-300 bg-cream-50 p-3"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold text-foreground">
+                                  {saving > 0 ? `Save ${formatCurrency(saving)}` : offer.label}
+                                </p>
+                                {saving > 0 ? (
+                                  <p className="text-xs text-muted-foreground">{offer.label}</p>
+                                ) : null}
+                              </div>
+                              {check?.ok ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="shrink-0"
+                                  onClick={() => {
+                                    applyCoupon(check.coupon);
+                                    toast.success(
+                                      `${check.coupon.code} applied — you save ${formatCurrency(saving)}`,
+                                    );
+                                  }}
+                                >
+                                  Apply
+                                </Button>
+                              ) : null}
+                            </div>
+                            <span className="w-fit rounded border border-dashed border-border bg-card px-2 py-0.5 font-mono text-xs font-semibold tracking-wide">
+                              {offer.code}
+                            </span>
+                            <p
+                              className={cn(
+                                "text-xs",
+                                check?.ok ? "font-medium text-green-700" : "text-muted-foreground",
+                              )}
+                            >
+                              {check?.ok
+                                ? `You will save ${formatCurrency(saving)} with this code`
+                                : offer.shortfall > 0
+                                  ? `Add ${formatCurrency(offer.shortfall)} more to use it`
+                                  : check && !check.ok
+                                    ? check.message
+                                    : ""}
+                            </p>
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
                 ) : null}
@@ -721,6 +786,7 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                   items={items}
                   totals={totals}
                   showEditLink={false}
+                  discountLabel={validCoupon ? `Coupon (${validCoupon.code})` : undefined}
                   giftWrapLabel={commerce.giftWrapLabel}
                 />
                 {/*
@@ -729,9 +795,9 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                   the past that nobody made — the same rule that had an invented
                   MRP taken out of the repository.
                 */}
-                {savings > 0 ? (
+                {savings + (totals.discount ?? 0) > 0 ? (
                   <p className="text-center text-sm font-medium text-bakery-700">
-                    You save {formatCurrency(savings)} on this order
+                    You save {formatCurrency(savings + (totals.discount ?? 0))} on this order
                   </p>
                 ) : null}
                 {/*

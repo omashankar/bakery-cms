@@ -43,7 +43,18 @@ import { getCommerceSettings } from "@/features/settings/lib/settings-repository
  * still there at checkout — and the answer is rendered by the same
  * `DeliveryAnswer`, so the two screens cannot come to word it differently.
  */
-export function PincodeCheck({ className }: { className?: string }) {
+export function PincodeCheck({
+  className,
+  title,
+}: {
+  className?: string;
+  /**
+   * A heading drawn INSIDE, so it goes away with the control — a shop with no
+   * zones renders nothing here, and a caller's own heading would be left
+   * over an empty box.
+   */
+  title?: string;
+}) {
   const [zones, setZones] = useState<DeliveryZone[] | null>(null);
   const [entered, setEntered] = useState("");
   const [result, setResult] = useState<DeliveryLookup | null>(null);
@@ -126,6 +137,7 @@ export function PincodeCheck({ className }: { className?: string }) {
       others leaves nothing to its right to put an answer in.
     */
     <div className={cn("flex w-full min-w-0 flex-col gap-2", className)}>
+      {title ? <p className="text-sm font-medium text-foreground">{title}</p> : null}
       {/*
         ONE CONTROL, NOT TWO BOXES WITH A GAP.
 
