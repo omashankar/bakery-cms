@@ -254,6 +254,7 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
       <SectionHeader
         overline={contentString(c, "overline")}
         title={contentString(c, "title")}
+        description={contentString(c, "subtitle")}
         align={align}
       />
       <div
@@ -400,6 +401,7 @@ function ProductGridSection(
   const hasHeading = sectionHeaderDraws(
     contentString(c, "overline"),
     contentString(c, "title"),
+    contentString(c, "subtitle"),
   );
   const align = sectionAlignOf(c, "left");
   const labels = labelsOf(props);
@@ -423,6 +425,7 @@ function ProductGridSection(
         <SectionHeader
           overline={contentString(c, "overline")}
           title={contentString(c, "title")}
+          description={contentString(c, "subtitle")}
           align={align}
         />
         {/*
@@ -478,6 +481,7 @@ function ProductGridSection(
           align={align}
           overline={contentString(c, "overline")}
           title={contentString(c, "title")}
+          description={contentString(c, "subtitle")}
           className="items-center"
           trailing={
             props.showCta ? (
@@ -650,6 +654,7 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
             align={align}
             overline={contentString(c, "overline")}
             title={contentString(c, "title")}
+            description={contentString(c, "subtitle")}
             className="mb-4"
           />
         )}
@@ -680,6 +685,7 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
               <SectionHeader
                 overline={contentString(c, "overline")}
                 title={contentString(c, "title")}
+                description={contentString(c, "subtitle")}
                 className="mb-0 shrink-0 pb-0 sm:pb-2.5"
                 align="left"
               />
@@ -723,6 +729,7 @@ function BlogCardsSection(props: HomepageSectionRendererProps) {
         align={align}
         overline={contentString(c, "overline")}
         title={contentString(c, "title")}
+        description={contentString(c, "subtitle")}
         className="items-end"
         trailingClassName="hidden sm:flex"
         trailing={<ViewAllLink href={ctaHref} label={ctaLabel} on={props.section.background} />}
@@ -849,6 +856,7 @@ function BannerGridSection(props: HomepageSectionRendererProps) {
       <SectionHeader
         overline={contentString(c, "overline")}
         title={contentString(c, "title")}
+        description={contentString(c, "subtitle")}
         align={align}
       />
       <div
@@ -975,7 +983,9 @@ function CategoryPriceCardsSection(props: HomepageSectionRendererProps) {
     row with a heading had a 32px header box and the one without had none.
   */
   const hasHeading = Boolean(
-    contentString(c, "overline").trim() || contentString(c, "title").trim(),
+    contentString(c, "overline").trim() ||
+      contentString(c, "title").trim() ||
+      contentString(c, "subtitle").trim(),
   );
 
   return (
@@ -998,6 +1008,7 @@ function CategoryPriceCardsSection(props: HomepageSectionRendererProps) {
         <SectionHeader
           overline={contentString(c, "overline")}
           title={contentString(c, "title")}
+          description={contentString(c, "subtitle")}
           className="mb-0"
           align={align}
         />
@@ -1104,6 +1115,7 @@ function TileGridSection(props: HomepageSectionRendererProps) {
   const hasHeading = sectionHeaderDraws(
     contentString(c, "overline"),
     contentString(c, "title"),
+    contentString(c, "subtitle"),
   );
   const align = sectionAlignOf(c, "center");
   const tiles = renderableRows(parseListField(c, "tiles"));
@@ -1140,6 +1152,7 @@ function TileGridSection(props: HomepageSectionRendererProps) {
       <SectionHeader
         overline={contentString(c, "overline")}
         title={contentString(c, "title")}
+        description={contentString(c, "subtitle")}
         align={align}
       />
       <div className={cn(hasHeading && "mt-6", "grid gap-4 sm:gap-5", columnClass)}>
@@ -1307,6 +1320,7 @@ function WhyUsSection(props: HomepageSectionRendererProps) {
   const hasHeading = sectionHeaderDraws(
     contentString(c, "overline"),
     contentString(c, "title"),
+    contentString(c, "subtitle"),
   );
   const align = sectionAlignOf(c, "center");
   /**
@@ -1334,6 +1348,7 @@ function WhyUsSection(props: HomepageSectionRendererProps) {
       <SectionHeader
         overline={contentString(c, "overline")}
         title={contentString(c, "title")}
+        description={contentString(c, "subtitle")}
         align={align}
       />
       <div
@@ -1462,6 +1477,7 @@ function TestimonialsSection(props: HomepageSectionRendererProps) {
   const hasHeading = sectionHeaderDraws(
     contentString(c, "overline"),
     contentString(c, "title"),
+    contentString(c, "subtitle"),
   );
   const align = sectionAlignOf(c, "center");
   const items = props.testimonials
@@ -1485,6 +1501,7 @@ function TestimonialsSection(props: HomepageSectionRendererProps) {
       <SectionHeader
         overline={contentString(c, "overline")}
         title={contentString(c, "title")}
+        description={contentString(c, "subtitle")}
         align={align}
       />
       <div className={cn(hasHeading && "mt-6", "grid gap-4 sm:gap-5 md:grid-cols-3")}>
@@ -1519,6 +1536,7 @@ function FaqSection(props: HomepageSectionRendererProps) {
   const hasHeading = sectionHeaderDraws(
     contentString(c, "overline"),
     contentString(c, "title"),
+    contentString(c, "subtitle"),
   );
   const align = sectionAlignOf(c, "center");
   const maxItems = contentNumber(c, "maxItems", 6);
@@ -1533,6 +1551,7 @@ function FaqSection(props: HomepageSectionRendererProps) {
           <SectionHeader
             overline={contentString(c, "overline")}
             title={contentString(c, "title")}
+            description={contentString(c, "subtitle")}
             align={align}
           />
         </ScrollReveal>
@@ -1557,6 +1576,7 @@ function OffersSection(props: HomepageSectionRendererProps) {
   const hasHeading = sectionHeaderDraws(
     contentString(c, "overline"),
     contentString(c, "title"),
+    contentString(c, "subtitle"),
   );
   const align = sectionAlignOf(c, "center");
   const maxCount = contentNumber(c, "maxCount", 3);
@@ -1576,6 +1596,7 @@ function OffersSection(props: HomepageSectionRendererProps) {
         <SectionHeader
           overline={contentString(c, "overline")}
           title={contentString(c, "title")}
+          description={contentString(c, "subtitle")}
           align={align}
         />
         <p className={cn(hasHeading && "mt-8", "rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground")}>
@@ -1591,6 +1612,7 @@ function OffersSection(props: HomepageSectionRendererProps) {
       <SectionHeader
         overline={contentString(c, "overline")}
         title={contentString(c, "title")}
+        description={contentString(c, "subtitle")}
         align={align}
       />
       <div className={cn(hasHeading && "mt-6", "grid gap-4 sm:gap-5 md:grid-cols-3")}>

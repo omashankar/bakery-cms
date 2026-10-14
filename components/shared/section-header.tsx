@@ -116,7 +116,7 @@ export function SectionHeader({
         </h2>
       )}
       {hasDescription && (
-        <p className="text-sm leading-relaxed text-muted-foreground">
+        <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
           {description}
         </p>
       )}

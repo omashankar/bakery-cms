@@ -39,6 +39,7 @@ export function RecentlyViewedSection(props: HomepageSectionRendererProps) {
   const hasHeading = sectionHeaderDraws(
     contentString(c, "overline"),
     contentString(c, "title"),
+    contentString(c, "subtitle"),
   );
   const align = sectionAlignOf(c, "left");
   /*
@@ -72,6 +73,7 @@ export function RecentlyViewedSection(props: HomepageSectionRendererProps) {
         <SectionHeader
           overline={contentString(c, "overline")}
           title={contentString(c, "title")}
+          description={contentString(c, "subtitle")}
           align={align}
         />
         <p
@@ -95,6 +97,7 @@ export function RecentlyViewedSection(props: HomepageSectionRendererProps) {
           align={align}
           overline={contentString(c, "overline")}
           title={contentString(c, "title")}
+          description={contentString(c, "subtitle")}
           className="items-center"
           trailing={
             ctaHref && ctaLabel ? (

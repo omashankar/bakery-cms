@@ -144,7 +144,9 @@ export function BannerStripSection(props: HomepageSectionRendererProps) {
     bare band of artwork it has always been.
   */
   const hasHeader =
-    Boolean(contentString(c, "overline").trim() || contentString(c, "title").trim()) ||
+    Boolean(contentString(c, "overline").trim() ||
+      contentString(c, "title").trim() ||
+      contentString(c, "subtitle").trim()) ||
     Boolean(contentString(c, "ctaLabel").trim() && contentString(c, "ctaHref").trim());
 
   return (
@@ -154,6 +156,7 @@ export function BannerStripSection(props: HomepageSectionRendererProps) {
           align={align}
           overline={contentString(c, "overline")}
           title={contentString(c, "title")}
+          description={contentString(c, "subtitle")}
           className="mb-6 items-center"
           trailing={
             <ViewAllLink

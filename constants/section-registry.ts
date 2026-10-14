@@ -394,6 +394,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      { key: "subtitle", label: "Line under the title", type: "text" },
       {
         key: "align",
         label: "Title position",
@@ -483,6 +484,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      { key: "subtitle", label: "Line under the title", type: "text" },
       {
         key: "align",
         label: "Title position",
@@ -575,6 +577,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      { key: "subtitle", label: "Line under the title", type: "text" },
       {
         key: "align",
         label: "Title position",
@@ -642,6 +645,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      { key: "subtitle", label: "Line under the title", type: "text" },
       {
         key: "align",
         label: "Title position",
@@ -704,6 +708,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      { key: "subtitle", label: "Line under the title", type: "text" },
       {
         key: "align",
         label: "Title position",
@@ -795,6 +800,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      { key: "subtitle", label: "Line under the title", type: "text" },
       {
         key: "align",
         label: "Title position",
@@ -892,6 +898,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      { key: "subtitle", label: "Line under the title", type: "text" },
       {
         key: "align",
         label: "Title position",
@@ -1063,6 +1070,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      { key: "subtitle", label: "Line under the title", type: "text" },
       {
         key: "align",
         label: "Title position",
@@ -1105,6 +1113,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      { key: "subtitle", label: "Line under the title", type: "text" },
       {
         key: "align",
         label: "Title position",
@@ -1138,6 +1147,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      { key: "subtitle", label: "Line under the title", type: "text" },
       {
         key: "align",
         label: "Title position",
@@ -1184,6 +1194,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      { key: "subtitle", label: "Line under the title", type: "text" },
       {
         key: "align",
         label: "Title position",
@@ -1219,6 +1230,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      { key: "subtitle", label: "Line under the title", type: "text" },
       {
         key: "align",
         label: "Title position",
@@ -1269,6 +1281,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       },
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      { key: "subtitle", label: "Line under the title", type: "text" },
       {
         key: "align",
         label: "Title position",
@@ -1310,6 +1323,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      { key: "subtitle", label: "Line under the title", type: "text" },
       {
         key: "align",
         label: "Title position",
@@ -1358,6 +1372,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      { key: "subtitle", label: "Line under the title", type: "text" },
       {
         key: "align",
         label: "Title position",
@@ -1396,6 +1411,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      { key: "subtitle", label: "Line under the title", type: "text" },
       {
         key: "align",
         label: "Title position",
@@ -1450,6 +1466,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      { key: "subtitle", label: "Line under the title", type: "text" },
       {
         /*
           TWO SHAPES, and the cards are the one that ships.
@@ -1533,6 +1550,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },
+      { key: "subtitle", label: "Line under the title", type: "text" },
       {
         key: "align",
         label: "Title position",

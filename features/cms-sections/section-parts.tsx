@@ -477,6 +477,7 @@ export function SectionHeadingRow({
   align,
   overline,
   title,
+  description,
   trailing,
   className,
   headerClassName,
@@ -485,6 +486,8 @@ export function SectionHeadingRow({
   align: SectionAlign;
   overline?: string;
   title: string;
+  /** The line under the title. */
+  description?: string;
   trailing?: React.ReactNode;
   className?: string;
   headerClassName?: string;
@@ -497,6 +500,7 @@ export function SectionHeadingRow({
       <SectionHeader
         overline={overline}
         title={title}
+        description={description}
         align={align}
         className={cn("mb-0 min-w-0", !centred && "flex-1", headerClassName)}
       />
