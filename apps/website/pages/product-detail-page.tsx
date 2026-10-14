@@ -1243,7 +1243,7 @@ export function ProductDetailPage({
                 the right answer for most trades.
               */}
               {commerce.productImageNote ? (
-                <p className="mt-3 text-xs text-muted-foreground">
+                <p className={cn("mt-3 text-xs text-muted-foreground", galleryImages.length > 1 && "lg:ml-24")}>
                   <span className="font-medium text-foreground">NOTE:</span>{" "}
                   {commerce.productImageNote}
                 </p>
@@ -1255,7 +1255,12 @@ export function ProductDetailPage({
                 sticky column still fits a 900px window.
               */}
               <ul
-                className="mt-4 hidden gap-3 lg:grid"
+                className={cn(
+                  "mt-4 hidden gap-3 lg:grid",
+                  // Lined up with the photo itself; the thumbnail strip
+                  // (w-20 + gap-4) sits to its left when there is one.
+                  galleryImages.length > 1 && "lg:ml-24",
+                )}
                 style={{ gridTemplateColumns: `repeat(${trustRow.length}, minmax(0, 1fr))` }}
               >
                 {trustRow.map(({ key, Icon, label, detail }, index) => (
@@ -2490,7 +2495,7 @@ export function ProductDetailPage({
           {/* No rule of its own: the last section above already ends in one,
               and two lines with nothing between them read as a gap. */}
           {related.length > 0 ? (
-            <div className="mt-12 sm:mt-16">
+            <div className="mt-12 sm:mt-14">
               <ScrollReveal className="mb-8 flex items-end justify-between gap-4">
                 <h2 className={storefrontHeading.row}>You May Also Like</h2>
                 <Button variant="ghost" render={<Link href={routes.store.collections} />}>
@@ -2509,10 +2514,7 @@ export function ProductDetailPage({
 
           {mounted && recommended.length > 0 ? (
             <div
-              className={cn(
-                "mt-12 sm:mt-16",
-                related.length > 0 && "border-t border-border pt-12 sm:pt-16",
-              )}
+              className="mt-12 sm:mt-14"
             >
               <ProductRailSection
                 title="Recommended for you"
