@@ -1289,7 +1289,7 @@ function ShopPromisesSection(props: HomepageSectionRendererProps) {
                   {item.title}
                 </span>
                 {item.subtitle ? (
-                  <span className="block text-[11px] leading-snug text-muted-foreground sm:text-sm">
+                  <span className="block text-xs leading-snug text-muted-foreground sm:text-sm">
                     {item.subtitle}
                   </span>
                 ) : null}

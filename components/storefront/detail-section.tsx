@@ -33,7 +33,7 @@ export function DetailSection({
 }) {
   return (
     <section id={id} className="border-t border-border">
-      <details className="group">
+      <details className="group" data-detail-section="">
         {/*
           A grid, not a wrapper: a <summary> may hold a heading and phrasing
           content, and nothing else — no <div> around the two lines.

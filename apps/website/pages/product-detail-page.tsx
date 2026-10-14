@@ -777,6 +777,19 @@ export function ProductDetailPage({
 
   // A link to #reviews or #questions — from this page or from outside it —
   // opens the folded section it names instead of landing on a closed heading.
+  // OPEN ON A DESKTOP. The folded sections are the phone's answer to a long
+  // page (the shop's Flipkart reference); on a wide screen the reference it
+  // sent next reads them open, beside a photo that stays in view. Below the
+  // fold there, so opening them moves nothing a customer is looking at.
+  useEffect(() => {
+    // Optional: jsdom and some old browsers have no matchMedia, and a
+    // closed section is the safe default there.
+    if (!window.matchMedia?.("(min-width: 1024px)").matches) return;
+    for (const details of document.querySelectorAll<HTMLDetailsElement>("details[data-detail-section]")) {
+      details.open = true;
+    }
+  }, []);
+
   useEffect(() => {
     const openFromHash = () => openDetailSection(window.location.hash.slice(1));
     openFromHash();
@@ -1235,6 +1248,38 @@ export function ProductDetailPage({
                   {commerce.productImageNote}
                 </p>
               ) : null}
+              {/*
+                THE THREE FACTS AS TILES UNDER THE PHOTO, on a desktop — where
+                the reference puts them, and where this column otherwise ends
+                in empty page while the buying column runs on. Compact, so the
+                sticky column still fits a 900px window.
+              */}
+              <ul
+                className="mt-4 hidden gap-3 lg:grid"
+                style={{ gridTemplateColumns: `repeat(${trustRow.length}, minmax(0, 1fr))` }}
+              >
+                {trustRow.map(({ key, Icon, label, detail }, index) => (
+                  <li
+                    key={key}
+                    title={detail}
+                    className={cn(
+                      "flex flex-col items-center gap-1.5 rounded-xl px-3 py-3 text-center",
+                      ["bg-sky-50", "bg-emerald-50", "bg-rose-50"][index % 3],
+                    )}
+                  >
+                    <span className="flex size-10 items-center justify-center rounded-full bg-card shadow-sm">
+                      <Icon className="size-5 text-bakery-700" aria-hidden />
+                    </span>
+                    <span className="text-sm font-semibold leading-snug text-foreground">{label}</span>
+                    {/*
+                      The sentence for screen readers and on hover only: with
+                      it drawn the column outgrew a 1280x800 window and, being
+                      sticky, cut its own last 40px off.
+                    */}
+                    {detail !== label ? <span className="sr-only">{detail}</span> : null}
+                  </li>
+                ))}
+              </ul>
             </div>
 
             <div className="space-y-6">
@@ -1989,8 +2034,9 @@ export function ProductDetailPage({
                 each, half a phone screen pushing the description out of sight.
                 The full sentence is kept for screen readers and on hover.
               */}
+              {/* Below lg only: from lg the same three sit under the photo. */}
               <ul
-                className="grid border-t border-border pt-4"
+                className="grid border-t border-border pt-4 lg:hidden"
                 style={{ gridTemplateColumns: `repeat(${trustRow.length}, minmax(0, 1fr))` }}
               >
                 {trustRow.map(({ key, Icon, label, detail }) => (

@@ -148,7 +148,10 @@ describe("the rail built from what the server sent", () => {
   it("is drawn by the route, from the same products it hands the page", () => {
     const route = readFileSync(join(process.cwd(), "app/(storefront)/store/p/[slug]/page.tsx"), "utf8");
     expect(route).toContain("related={related}");
-    expect(route).toContain("relatedCards={related.map((item) => <ProductCard key={item.id} cake={item} />)}");
+    // `framed`: boxed like the reference's rows, not the listing's open cards.
+    expect(route).toContain(
+      "relatedCards={related.map((item) => <ProductCard key={item.id} cake={item} framed />)}",
+    );
   });
 
   it("is absent when the shop has nothing to put in it", () => {

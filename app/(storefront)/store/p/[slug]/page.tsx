@@ -218,7 +218,7 @@ export default async function Page(props: PageProps) {
       related={related}
       // Drawn here, on the server — the page is a client component and only
       // places them. One element per card, so its grid wraps each.
-      relatedCards={related.map((item) => <ProductCard key={item.id} cake={item} />)}
+      relatedCards={related.map((item) => <ProductCard key={item.id} cake={item} framed />)}
       catalog={catalog}
       categoryCrumb={
         row ? { label: row.name, href: routes.store.collection(row.slug) } : undefined
