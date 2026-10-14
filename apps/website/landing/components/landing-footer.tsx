@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Clock, Mail, MapPin, Phone } from "lucide-react";
+import { Clock, Gift, Mail, MapPin, Phone, ShieldCheck, Truck } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { BrandMark } from "@/components/shared/brand-mark";
 import { SocialMark } from "@/components/shared/social-mark";
@@ -20,9 +20,40 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
   const businessHours = chrome.businessHours;
   const socialLinks = chrome.socialLinks;
   const footerSettings = chrome.footer;
+  const promises = chrome.footerPromises ?? [];
+  const PROMISE_ICONS = { truck: Truck, gift: Gift, shield: ShieldCheck } as const;
 
   return (
     <footer className="border-t border-border surface-cream">
+      {/*
+        THE SHOP'S PROMISES ACROSS THE TOP, on every page — the reference's
+        band above its footer. Only what the settings make true; see
+        `StorefrontChrome.footerPromises`. No band when there is nothing.
+      */}
+      {promises.length > 0 ? (
+        <div className="border-b border-border bg-muted/60">
+          <ul
+            className={cn(
+              layoutSpacing.container,
+              "grid gap-4 py-5 sm:gap-6",
+              promises.length === 1 ? "grid-cols-1" : promises.length === 2 ? "grid-cols-2" : "grid-cols-1 sm:grid-cols-3",
+            )}
+          >
+            {promises.map((promise) => {
+              const Icon = PROMISE_ICONS[promise.icon];
+              return (
+                <li key={promise.title} className="flex items-center gap-3 sm:justify-center">
+                  <Icon aria-hidden className="size-8 shrink-0 text-bakery-700" strokeWidth={1.5} />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-foreground sm:text-base">{promise.title}</span>
+                    <span className="block text-xs text-muted-foreground sm:text-sm">{promise.subtitle}</span>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
       <div className={cn(layoutSpacing.container, "py-14")}>
         <div className="grid gap-10 lg:grid-cols-[1fr_3fr]">
           <div className="space-y-4">
