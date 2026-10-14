@@ -572,18 +572,12 @@ export function ProductDetailPage({
   const closesAt = sameDayCutoffFor(commerce.sameDayCutoff, commerce.deliveryLeadDays);
   const timeLeft = useSameDayCountdown(closesAt);
 
-  // The cards under the buy box, COUNTED so the grid never leaves one hanging
-  // alone on a row: four in three columns put the fourth under the first.
+  // The short lines under the buy box: the shop's own, then counted so a
+  // single line does not get a two-column box to itself.
   const trustCards = (commerce.productTrustCards ?? []).filter(
     (card) => card.title.trim().length > 0,
   );
   const trustCount = (deliveryPromise ? 1 : 0) + 1 + trustCards.length;
-  const trustGrid =
-    trustCount === 1
-      ? "grid-cols-1"
-      : trustCount % 3 === 0
-        ? "grid-cols-2 sm:grid-cols-3 max-sm:[&>li:last-child:nth-child(odd)]:col-span-2"
-        : "grid-cols-2 [&>li:last-child:nth-child(odd)]:col-span-2";
 
   const [askOpen, setAskOpen] = useState(false);  const [reviewOpen, setReviewOpen] = useState(false);
 
@@ -1951,12 +1945,24 @@ export function ProductDetailPage({
                 typed in Settings → Commerce, and a shop that has typed nothing
                 gets one card rather than a boast made up for it.
               */}
-              <ul className={cn("grid gap-3 text-sm", trustGrid)}>
+              {/*
+                ONE QUIET BOX OF SHORT LINES, not a card per point. They were
+                four centred tiles ~125px tall each — half a phone screen of
+                reassurance pushing the description out of sight.
+              */}
+              <ul
+                className={cn(
+                  "grid gap-x-6 gap-y-3 rounded-xl border border-border bg-cream-50 p-4 text-sm",
+                  trustCount > 1 && "sm:grid-cols-2",
+                )}
+              >
                 {deliveryPromise ? (
-                  <li className="flex flex-col items-center gap-2 rounded-xl border border-border bg-cream-50 p-4 text-center">
-                    <Truck className="size-6 text-bakery-700" />
-                    <span className="font-medium text-foreground">Timely Delivery</span>
-                    <span className="text-xs text-muted-foreground">{deliveryPromise}</span>
+                  <li className="flex items-start gap-2.5">
+                    <Truck className="mt-0.5 size-5 shrink-0 text-bakery-700" />
+                    <span className="min-w-0">
+                      <span className="block font-medium leading-snug text-foreground">Timely Delivery</span>
+                      <span className="block text-xs leading-snug text-muted-foreground">{deliveryPromise}</span>
+                    </span>
                   </li>
                 ) : null}
                 {/*
@@ -1965,29 +1971,30 @@ export function ProductDetailPage({
                   be refunded once baked should say so here, not in an email
                   after the customer has asked.
                 */}
-                <li className="flex flex-col items-center gap-2 rounded-xl border border-border bg-cream-50 p-4 text-center">
-                  <RotateCcw className="size-6 text-bakery-700" />
-                  <span className="font-medium text-foreground">Cancellation</span>
-                  <span className="text-xs text-muted-foreground">
-                    {CANCELLATION_CLASS_CUSTOMER_TEXT[cake.cancellationClass ?? DEFAULT_CANCELLATION_CLASS]}
-                    {/* Said before the cart, not discovered at the payment step. */}
-                    {productAllowsCod(cake) ? null : " Paid online — no Cash on Delivery."}
+                <li className="flex items-start gap-2.5">
+                  <RotateCcw className="mt-0.5 size-5 shrink-0 text-bakery-700" />
+                  <span className="min-w-0">
+                    <span className="block font-medium leading-snug text-foreground">Cancellation</span>
+                    <span className="block text-xs leading-snug text-muted-foreground">
+                      {CANCELLATION_CLASS_CUSTOMER_TEXT[cake.cancellationClass ?? DEFAULT_CANCELLATION_CLASS]}
+                      {/* Said before the cart, not discovered at the payment step. */}
+                      {productAllowsCod(cake) ? null : " Paid online — no Cash on Delivery."}
+                    </span>
                   </span>
                 </li>
                 {trustCards.map((card) => {
                   const Icon = productTrustIcon(card.icon);
                   return (
-                    <li
-                      key={card.id}
-                      className="flex flex-col items-center gap-2 rounded-xl border border-border bg-cream-50 p-4 text-center"
-                    >
-                      <Icon className="size-6 text-bakery-700" />
-                      <span className="font-medium text-foreground">{card.title}</span>
-                      {card.subtitle.trim() ? (
-                        <span className="text-xs text-muted-foreground">
-                          {card.subtitle}
-                        </span>
-                      ) : null}
+                    <li key={card.id} className="flex items-start gap-2.5">
+                      <Icon className="mt-0.5 size-5 shrink-0 text-bakery-700" />
+                      <span className="min-w-0">
+                        <span className="block font-medium leading-snug text-foreground">{card.title}</span>
+                        {card.subtitle.trim() ? (
+                          <span className="block text-xs leading-snug text-muted-foreground">
+                            {card.subtitle}
+                          </span>
+                        ) : null}
+                      </span>
                     </li>
                   );
                 })}
