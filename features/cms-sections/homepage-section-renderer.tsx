@@ -332,7 +332,7 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
               with no padding, the picture reaches the card's own corners,
               and without it the square would square them off.
             */
-            className="group flex w-[5.5rem] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-border/70 bg-cream-100 shadow-xs sm:w-auto"
+            className="group flex w-[5.5rem] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-border/70 bg-cream-100 bg-gradient-to-b from-card to-bakery-100 shadow-xs transition-shadow hover:shadow-md sm:w-auto"
           >
             {/*
               A SQUARE, not a circle.
@@ -352,7 +352,7 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
                   src={category.image}
                   alt={category.name}
                   fill
-                  className="object-cover"
+                  className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
                   /*
                     120px was only ever right in the eight-across case. At a
                     1023px viewport the four-column grid paints these at about
@@ -369,7 +369,9 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
               `px-1 pt-2.5 pb-1` and leaned on the card's 8/12px for the rest
               — with that gone the name would have touched three edges.
             */}
-            <p className="line-clamp-2 px-2 pt-2.5 pb-3 text-center text-[13px] font-semibold text-foreground sm:text-sm">
+            {/* Bold and a size up, as the reference sets it: the name is the tile's
+                only words, so it can carry weight without competing. */}
+            <p className="line-clamp-2 px-2 pt-2.5 pb-3 text-center text-[13px] font-bold text-foreground sm:text-base">
               {category.name}
             </p>
           </Link>

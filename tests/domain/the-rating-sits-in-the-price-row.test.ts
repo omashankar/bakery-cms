@@ -26,52 +26,44 @@ const codeOf = (source: string) =>
 /** The picture's own block: the box that holds the image, badge and heart. */
 function pictureBlock(): string {
   const src = codeOf(read(CARD));
-  const at = src.indexOf("relative overflow-hidden bg-cream-100");
+  const at = src.indexOf("relative overflow-hidden rounded-xl bg-cream-100");
   expect(at, "the card's picture box is gone").toBeGreaterThan(-1);
-  const end = src.indexOf("</div>", at);
-  return src.slice(at, end);
+  return src.slice(at, src.indexOf("</div>", at));
+}
+
+function priceRow(): string {
+  const src = codeOf(read(CARD));
+  const at = src.indexOf("<PriceDisplay");
+  expect(at, "the price display is gone").toBeGreaterThan(-1);
+  return src.slice(at, src.indexOf("</div>", at));
 }
 
 describe("the rating on a product card", () => {
-  it("sits on the picture, not in the price row", () => {
-    const picture = pictureBlock();
+  /*
+    MOVED BACK TO THE PRICE ROW, on the owner's second marketplace reference
+    (2026-10-14): a green pill at the end of the price line, the review count
+    under it beside the delivery day. It had sat low-left on the picture on
+    an earlier reference.
+  */
+  it("ends the price row as a green pill", () => {
+    const row = priceRow();
 
-    expect(picture, "the rating is not on the picture").toMatch(/cake\.rating/);
-    expect(picture, "the rating is not pinned to the picture's corner").toMatch(
-      /absolute bottom-[\d.]+ left-/,
-    );
+    expect(row, "the rating is not in the price row").toContain("{cake.rating ? (");
+    expect(row, "the rating is not the green pill").toContain("bg-green-700");
   });
 
-  it("leaves the price line to the price", () => {
-    /*
-      That line already carries a price, a struck-through price and a
-      discount. A fourth thing on it is a scrum — which is the reason the
-      rating moved, as much as where the shop wanted it.
-    */
-    const src = codeOf(read(CARD));
-    const at = src.indexOf("<PriceDisplay");
-    expect(at, "the price display is gone").toBeGreaterThan(-1);
-
-    const row = src.slice(Math.max(0, at - 200), at + 200);
-    expect(row, "the rating is back beside the price").not.toMatch(/cake\.rating/);
+  it("is not also drawn on the picture", () => {
+    expect(pictureBlock(), "the rating is on the picture as well").not.toContain("cake.rating");
   });
 
   it("says how many reviews only when there are some", () => {
     /*
       A rating with no reviews behind it is a number the shop has not earned,
-      and `(0)` beside it reads worse than nothing at all. Guarded because a
-      count rendered unconditionally is the obvious way to write this.
+      and "0 Reviews" reads worse than nothing at all.
     */
-    const picture = pictureBlock();
-
-    expect(picture, "the review count is drawn whether or not there is one").toMatch(
-      /\{cake\.reviewCount \? \(/,
-    );
-    // And the aria-label's own ternary is NOT what this is asking about:
-    // the first draft matched it and survived the mutation it was written
-    // for, because a label saying "from N reviews" is not the count on screen.
-    expect(picture, "the count on screen is not guarded").toMatch(
-      /\{cake\.reviewCount \? \([\s\S]{0,220}toLocaleString/,
+    const src = codeOf(read(CARD));
+    expect(src, "the review count is drawn whether or not there is one").toMatch(
+      /\{cake\.rating && cake\.reviewCount \? \([\s\S]{0,260}toLocaleString/,
     );
   });
 });

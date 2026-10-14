@@ -42,7 +42,7 @@ export function ProductCardWishlist({ slug }: { slug: string }) {
         padding: padding would make the button itself 44px and the card
         would gain a visibly larger blob.
       */
-      className="absolute top-2.5 right-2.5 border border-border bg-card/95 shadow-sm after:absolute after:-inset-2 after:content-['']"
+      className="absolute right-2.5 bottom-2.5 rounded-full border border-border bg-card/95 shadow-sm after:absolute after:-inset-2 after:content-['']"
       onClick={handleWishlist}
       aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
     >

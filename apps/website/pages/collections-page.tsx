@@ -25,7 +25,6 @@ import {
   type CollectionFilters,
 } from "@/apps/website/lib/collection-filters";
 import { routes } from "@/constants/routes";
-import { storefrontHeading } from "@/constants/typography";
 import { Button } from "@/components/ui/button";
 import {
   Pagination,
@@ -553,7 +552,15 @@ export function CollectionsPage({
               */}
               <div className="mb-5 flex flex-col gap-0 bg-muted sm:flex-row sm:items-stretch sm:justify-between">
                 <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1 px-4 py-3">
-                  <h1 className={heading ? storefrontHeading.page : "sr-only"}>{pageTitle}</h1>
+                  {/* A bar title, not a page headline: the bar is the heading here, and a
+                      32px word beside two 14px controls outweighed the filters. */}
+                  <h1
+                    className={
+                      heading ? "font-heading text-xl font-bold tracking-tight sm:text-2xl" : "sr-only"
+                    }
+                  >
+                    {pageTitle}
+                  </h1>
                   <p className="text-sm text-muted-foreground">{countLine}</p>
                   {filters.search.trim() ? (
                     /*
@@ -598,13 +605,13 @@ export function CollectionsPage({
                 */}
                 <div className="grid grid-cols-2 divide-x divide-border border-t border-border sm:flex sm:shrink-0 sm:border-t-0 sm:border-l">
                   {priceBands.length > 0 ? (
-                    <label className="relative flex min-w-0 flex-1 items-center gap-2 px-3 py-2 sm:flex-none sm:px-4">
+                    <label className="relative flex min-w-0 flex-1 items-center gap-2 px-3 py-2 sm:min-w-52 sm:flex-none sm:px-4">
                       <IndianRupee
                         aria-hidden="true"
                         className="size-4 shrink-0 text-muted-foreground"
                       />
                       <span className="flex min-w-0 flex-col">
-                        <span className="text-[11px] leading-tight font-medium text-muted-foreground">
+                        <span className="text-xs leading-tight font-semibold text-foreground">
                           Filter by price
                         </span>
                         {/*
@@ -653,13 +660,13 @@ export function CollectionsPage({
                     </label>
                   ) : null}
 
-                  <label className="relative flex min-w-0 flex-1 items-center gap-2 px-3 py-2 sm:flex-none sm:px-4">
+                  <label className="relative flex min-w-0 flex-1 items-center gap-2 px-3 py-2 sm:min-w-52 sm:flex-none sm:px-4">
                     <ArrowDownUp
                       aria-hidden="true"
                       className="size-4 shrink-0 text-muted-foreground"
                     />
                     <span className="flex min-w-0 flex-col">
-                      <span className="text-[11px] leading-tight font-medium text-muted-foreground">
+                      <span className="text-xs leading-tight font-semibold text-foreground">
                         Sort by
                       </span>
                       <span className="truncate text-sm font-semibold text-bakery-700">

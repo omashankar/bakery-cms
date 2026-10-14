@@ -67,7 +67,7 @@ describe("a card does not sell, it links", () => {
     const tail = card.slice(card.indexOf('<div className="mt-auto'));
 
     expect(tail, "the price block moved").not.toBe("");
-    expect(tail).toContain("Out of stock</p>");
+    expect(tail).toContain(">Out of stock</span>");
   });
 
   it("and the product page is where the selling happens", () => {

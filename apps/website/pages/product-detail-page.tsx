@@ -1272,25 +1272,23 @@ export function ProductDetailPage({
                     // The section is folded; a link to it that landed on a
                     // closed heading would look like it had done nothing.
                     onClick={() => openDetailSection("reviews")}
-                    className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-sm text-foreground hover:bg-secondary"
+                    className="group/rating inline-flex items-center gap-2 text-sm text-muted-foreground"
                     aria-label={
                       reviewCount
                         ? `Rated ${cake.rating.toFixed(1)} out of 5 from ${reviewCount} reviews`
                         : `Rated ${cake.rating.toFixed(1)} out of 5`
                     }
                   >
-                    {/* The shop's second reference: one grey pill, "4.1 ★ | 51". */}
-                    <span className="inline-flex items-center gap-1 font-semibold">
+                    {/* The same green pill the product cards carry, so the
+                        score reads the same on the grid and on the page. */}
+                    <span className="inline-flex items-center gap-0.5 rounded bg-green-700 px-1.5 py-0.5 text-xs font-semibold text-white">
                       {cake.rating.toFixed(1)}
-                      <Star aria-hidden="true" className="size-3.5 fill-green-700 text-green-700" />
+                      <Star aria-hidden="true" className="size-3 fill-white text-white" />
                     </span>
                     {reviewCount ? (
-                      <>
-                        <span aria-hidden="true" className="text-border">
-                          |
-                        </span>
-                        <span className="text-muted-foreground">{groupIndian(reviewCount)}</span>
-                      </>
+                      <span className="group-hover/rating:text-foreground group-hover/rating:underline">
+                        Rating &amp; {groupIndian(reviewCount)} {reviewCount === 1 ? "Review" : "Reviews"}
+                      </span>
                     ) : null}
                   </a>
                 ) : null}

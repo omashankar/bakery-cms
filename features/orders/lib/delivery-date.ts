@@ -456,3 +456,30 @@ export function countdownCells(parts: {
   );
   return units.slice(lead);
 }
+
+/**
+ * The earliest delivery, in the words a product card says it: "Today",
+ * "Tomorrow", or a short date.
+ *
+ * The shop's lead time, pushed a day when a same-day shop is past its cutoff —
+ * the same two rules checkout enforces, so a card never promises a day the
+ * date picker then refuses. `now` is the SHOP's wall clock (`shopClockNow`).
+ */
+export function earliestDeliveryLabel(leadDays: number, cutoff: string | undefined, now: Date): string {
+  const today = todayAsDateString(now);
+  let date = earliestDeliveryDateString(leadDays, now);
+  const closes = sameDayCutoffFor(cutoff, leadDays);
+  if (date === today && closes && isPastSameDayCutoff(today, closes, now)) {
+    date = addDays(today, 1);
+  }
+  if (date === today) return "Today";
+  if (date === addDays(today, 1)) return "Tomorrow";
+
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString("en-IN", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+}
