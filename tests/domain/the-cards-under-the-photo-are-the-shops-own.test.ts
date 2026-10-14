@@ -52,8 +52,25 @@ describe("what a shop starts with", () => {
   it("still shows the delivery card, because that one is read not written", () => {
     const page = read("apps/website/pages/product-detail-page.tsx");
 
-    expect(page).toContain("{deliveryPromise ? (");
-    expect(page).toContain("Timely Delivery");
+    // The label IS the promise ("Same-day delivery"), read from the shop's
+    // lead time rather than typed.
+    expect(page).toMatch(/\.\.\.\(deliveryPromise\s*\?\s*\[\{ key: "delivery", Icon: Truck, label: deliveryPromise/);
+  });
+
+  it("is a row of three at most, facts about the product first", () => {
+    // The owner asked for three, marketplace style. Delivery, cancellation and
+    // payment come first; the shop's cards only fill a slot left empty.
+    const page = code("apps/website/pages/product-detail-page.tsx");
+    const start = page.indexOf("const trustRow");
+    const row = page.slice(start, page.indexOf("].slice(0, 3);", start) + 14);
+
+    expect(start, "trustRow is gone").toBeGreaterThan(-1);
+    expect(row).toContain("].slice(0, 3);");
+    const order = ["key: \"delivery\"", "key: \"cancellation\"", "key: \"payment\"", "commerce.productTrustCards"].map(
+      (needle) => row.indexOf(needle),
+    );
+    expect(order.every((at) => at > -1), "a slot is missing").toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
 
   it("no longer hard-codes a card a shop cannot change", () => {
@@ -80,7 +97,8 @@ describe("what a shop writes", () => {
     const page = read("apps/website/pages/product-detail-page.tsx");
 
     expect(page).toMatch(/\.filter\(\s*\(card\) => card\.title\.trim\(\)\.length > 0,?\s*\)/);
-    expect(page).toContain("{card.subtitle.trim() ? (");
+    // No subtitle: the title stands in, rather than an empty line.
+    expect(page).toContain("detail: card.subtitle.trim() || card.title,");
   });
 
   it("has somewhere to be typed", () => {

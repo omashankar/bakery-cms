@@ -45,6 +45,13 @@ export const CANCELLATION_CLASS_CUSTOMER_TEXT: Record<CancellationClass, string>
   non_cancellable: "Cannot be cancelled once ordered.",
 };
 
+/** The same rule in two or three words, for the icon row on the product page. */
+export const CANCELLATION_CLASS_SHORT_TEXT: Record<CancellationClass, string> = {
+  standard: "Cancel before preparing",
+  made_to_order: "Cancel before preparing",
+  non_cancellable: "No cancellation",
+};
+
 export function isCancellableClass(cls: CancellationClass | undefined): boolean {
   return (cls ?? DEFAULT_CANCELLATION_CLASS) !== "non_cancellable";
 }

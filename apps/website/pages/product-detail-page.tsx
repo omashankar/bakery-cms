@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BadgeCheck,
+  Banknote,
   Check,
   ChevronRight,
+  CreditCard,
   Heart,
   ImageUp,
   Percent,
@@ -16,6 +18,7 @@ import {
   ThumbsDown,
   ThumbsUp,
   Truck,
+  type LucideIcon,
 } from "lucide-react";
 import { ScrollReveal, StaggerReveal } from "@/components/shared/scroll-reveal";
 import type { ProductVariantGroup, ProductVariantOption } from "@/types/product";
@@ -32,6 +35,7 @@ import { PriceDisplay } from "@/components/storefront/price-display";
 import { RatingSummary, ratingTone, ratingWord } from "@/components/storefront/rating-summary";
 import {
   CANCELLATION_CLASS_CUSTOMER_TEXT,
+  CANCELLATION_CLASS_SHORT_TEXT,
   DEFAULT_CANCELLATION_CLASS,
   productAllowsCod,
 } from "@/features/orders/lib/cancellation-policy";
@@ -572,12 +576,48 @@ export function ProductDetailPage({
   const closesAt = sameDayCutoffFor(commerce.sameDayCutoff, commerce.deliveryLeadDays);
   const timeLeft = useSameDayCountdown(closesAt);
 
-  // The short lines under the buy box: the shop's own, then counted so a
-  // single line does not get a two-column box to itself.
-  const trustCards = (commerce.productTrustCards ?? []).filter(
-    (card) => card.title.trim().length > 0,
-  );
-  const trustCount = (deliveryPromise ? 1 : 0) + 1 + trustCards.length;
+  /*
+    THE ICON ROW UNDER THE BUY BOX — three, like the marketplaces do it.
+
+    Facts about THIS product first: when it arrives, whether it can be
+    cancelled, how it can be paid for. The shop's own cards (Settings →
+    Orders) fill a slot only when one of those has nothing to say, so the
+    row never grows past three or claims what the product does not do.
+  */
+  const cancellationClass = cake.cancellationClass ?? DEFAULT_CANCELLATION_CLASS;
+  const trustRow: { key: string; Icon: LucideIcon; label: string; detail: string }[] = [
+    ...(deliveryPromise
+      ? [{ key: "delivery", Icon: Truck, label: deliveryPromise, detail: deliveryPromise }]
+      : []),
+    {
+      key: "cancellation",
+      Icon: RotateCcw,
+      label: CANCELLATION_CLASS_SHORT_TEXT[cancellationClass],
+      detail: CANCELLATION_CLASS_CUSTOMER_TEXT[cancellationClass],
+    },
+    productAllowsCod(cake)
+      ? {
+          key: "payment",
+          Icon: Banknote,
+          label: "Cash on Delivery",
+          detail: "Pay in cash when it arrives, or online.",
+        }
+      : {
+          // Said before the cart, not discovered at the payment step.
+          key: "payment",
+          Icon: CreditCard,
+          label: "Online payment only",
+          detail: "Paid online — no Cash on Delivery.",
+        },
+    ...(commerce.productTrustCards ?? [])
+      .filter((card) => card.title.trim().length > 0)
+      .map((card) => ({
+        key: card.id,
+        Icon: productTrustIcon(card.icon),
+        label: card.title,
+        detail: card.subtitle.trim() || card.title,
+      })),
+  ].slice(0, 3);
 
   const [askOpen, setAskOpen] = useState(false);  const [reviewOpen, setReviewOpen] = useState(false);
 
@@ -1946,58 +1986,30 @@ export function ProductDetailPage({
                 gets one card rather than a boast made up for it.
               */}
               {/*
-                ONE QUIET BOX OF SHORT LINES, not a card per point. They were
-                four centred tiles ~125px tall each — half a phone screen of
-                reassurance pushing the description out of sight.
+                A ROW OF THREE, icon over a two-word label, between two rules —
+                not a card per point. They were four centred tiles ~125px tall
+                each, half a phone screen pushing the description out of sight.
+                The full sentence is kept for screen readers and on hover.
               */}
               <ul
-                className={cn(
-                  "grid gap-x-6 gap-y-3 rounded-xl border border-border bg-cream-50 p-4 text-sm",
-                  trustCount > 1 && "sm:grid-cols-2",
-                )}
+                className="grid border-t border-border pt-4"
+                style={{ gridTemplateColumns: `repeat(${trustRow.length}, minmax(0, 1fr))` }}
               >
-                {deliveryPromise ? (
-                  <li className="flex items-start gap-2.5">
-                    <Truck className="mt-0.5 size-5 shrink-0 text-bakery-700" />
-                    <span className="min-w-0">
-                      <span className="block font-medium leading-snug text-foreground">Timely Delivery</span>
-                      <span className="block text-xs leading-snug text-muted-foreground">{deliveryPromise}</span>
+                {trustRow.map(({ key, Icon, label, detail }) => (
+                  <li
+                    key={key}
+                    title={detail}
+                    className="flex flex-col items-center gap-2 px-2 text-center"
+                  >
+                    <span className="flex size-10 items-center justify-center rounded-lg bg-cream-100">
+                      <Icon className="size-5 text-bakery-700" aria-hidden />
                     </span>
+                    <span className="max-w-[9rem] text-xs leading-snug text-foreground sm:text-sm">
+                      {label}
+                    </span>
+                    {detail !== label ? <span className="sr-only">{detail}</span> : null}
                   </li>
-                ) : null}
-                {/*
-                  WHAT HAPPENS IF THEY CANCEL, before they buy — the product's
-                  own class, in the words checkout repeats. A cake that cannot
-                  be refunded once baked should say so here, not in an email
-                  after the customer has asked.
-                */}
-                <li className="flex items-start gap-2.5">
-                  <RotateCcw className="mt-0.5 size-5 shrink-0 text-bakery-700" />
-                  <span className="min-w-0">
-                    <span className="block font-medium leading-snug text-foreground">Cancellation</span>
-                    <span className="block text-xs leading-snug text-muted-foreground">
-                      {CANCELLATION_CLASS_CUSTOMER_TEXT[cake.cancellationClass ?? DEFAULT_CANCELLATION_CLASS]}
-                      {/* Said before the cart, not discovered at the payment step. */}
-                      {productAllowsCod(cake) ? null : " Paid online — no Cash on Delivery."}
-                    </span>
-                  </span>
-                </li>
-                {trustCards.map((card) => {
-                  const Icon = productTrustIcon(card.icon);
-                  return (
-                    <li key={card.id} className="flex items-start gap-2.5">
-                      <Icon className="mt-0.5 size-5 shrink-0 text-bakery-700" />
-                      <span className="min-w-0">
-                        <span className="block font-medium leading-snug text-foreground">{card.title}</span>
-                        {card.subtitle.trim() ? (
-                          <span className="block text-xs leading-snug text-muted-foreground">
-                            {card.subtitle}
-                          </span>
-                        ) : null}
-                      </span>
-                    </li>
-                  );
-                })}
+                ))}
               </ul>
 
               {/*
