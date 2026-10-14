@@ -27,6 +27,11 @@ interface OrderSummaryPanelProps {
   placed?: boolean;
   /** Settled refunds, so a partially refunded order does not read as fully paid. */
   refunded?: number;
+  /**
+   * The line list at the top. The cart turns it off: its lines are the whole
+   * page beside this box, and the reference's cart summary is the money only.
+   */
+  showItems?: boolean;
 }
 
 function getCommerceLabels() {
@@ -58,6 +63,7 @@ export function OrderSummaryPanel({
   giftWrapLabel,
   placed = false,
   refunded = 0,
+  showItems = true,
 }: OrderSummaryPanelProps) {
   const freeDeliveryThreshold = getFreeDeliveryThreshold();
   const labels = getCommerceLabels();
@@ -92,6 +98,7 @@ export function OrderSummaryPanel({
         ) : null}
       </div>
 
+      {showItems ? (
       <ul className="mt-4 max-h-72 space-y-3 overflow-y-auto border-b border-border pb-4">
         {items.map((item) => (
           <li key={item.id} className="flex items-center gap-3 text-sm">
@@ -141,9 +148,10 @@ export function OrderSummaryPanel({
           </li>
         ))}
       </ul>
+      ) : null}
 
       <div className="mt-4">
-        <TaxBreakdown values={breakdown} />
+        <TaxBreakdown values={breakdown} bigTotal={!placed} />
       </div>
 
       {totals.deliveryZoneName ? (

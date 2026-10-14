@@ -12,6 +12,8 @@ export interface TaxBreakdownProps {
   showFreeDelivery?: boolean;
   showAllLines?: boolean;
   showTaxableAmount?: boolean;
+  /** Set the total as the box's headline — where the customer pays it. */
+  bigTotal?: boolean;
 }
 
 function Row({
@@ -19,17 +21,21 @@ function Row({
   value,
   tone,
   strong,
+  big,
 }: {
   label: string;
   value: string;
   tone?: "discount" | "muted";
   strong?: boolean;
+  /** The total as the headline of the box: larger, set off by a dashed rule. */
+  big?: boolean;
 }) {
   return (
     <div
       className={cn(
         "flex justify-between gap-4",
-        strong && "border-t border-border pt-2 text-base font-semibold",
+        strong && !big && "border-t border-border pt-2 text-base font-semibold",
+        strong && big && "mt-1 border-t border-dashed border-border pt-3 text-lg font-bold sm:text-xl",
         tone === "discount" && "text-green-700",
         tone === "muted" && "text-muted-foreground"
       )}
@@ -43,6 +49,7 @@ function Row({
 export function TaxBreakdown({
   values,
   size = "sm",
+  bigTotal = false,
   className,
   showFreeDelivery = true,
   showAllLines = false,
@@ -141,7 +148,7 @@ export function TaxBreakdown({
           tone="muted"
         />
       ) : null}
-      <Row label="Total" value={formatCurrency(values.total)} strong />
+      <Row label="Total" value={formatCurrency(values.total)} strong big={bigTotal} />
     </dl>
   );
 }

@@ -94,8 +94,11 @@ function type(value: string) {
 }
 
 function press(text: string) {
+  // By ACCESSIBLE name, as a screen reader and getByRole find it: each cart
+  // line now has its own visible "Remove", named "Remove item", beside the
+  // coupon's "Remove".
   const button = [...(container?.querySelectorAll("button") ?? [])].find(
-    (node) => node.textContent?.trim() === text,
+    (node) => (node.getAttribute("aria-label") ?? node.textContent)?.trim() === text,
   );
   act(() => {
     button?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
