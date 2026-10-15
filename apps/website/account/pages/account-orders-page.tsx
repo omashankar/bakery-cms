@@ -290,7 +290,15 @@ export function AccountOrdersPage() {
               </div>
 
               {/* Body */}
-              <div className="flex flex-col gap-5 px-5 py-5 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
+              {/*
+                THREE BANDS, the same in every card: what was bought and what
+                it cost; when, where and how it was paid, full width; then
+                what can be done. The strip used to share a row with the
+                buttons, so its width changed with how many there were and
+                no two cards lined up.
+              */}
+              <div className="space-y-4 px-5 py-5 sm:px-6">
+              <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 flex-1 space-y-4">
                   {/*
                     WHAT WAS ORDERED, WITH ITS PICTURE — the photo the line was
@@ -354,70 +362,71 @@ export function AccountOrdersPage() {
                     WHEN, WHERE AND HOW IT WAS PAID — the three things a
                     customer opens this page to check, all on the order already.
                   */}
-                  <dl className="grid gap-2 rounded-xl bg-muted/60 px-4 py-3 text-xs sm:grid-cols-3">
-                    <div className="flex items-start gap-2">
-                      <CalendarDays aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                      <div>
-                        <dt className="text-muted-foreground">{deliveryLabel(order)}</dt>
-                        <dd className="font-medium text-foreground">{deliveryWhen(order)}</dd>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <MapPin aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                      <div className="min-w-0">
-                        <dt className="text-muted-foreground">Deliver to</dt>
-                        <dd className="truncate font-medium text-foreground">
-                          {[order.address.fullName, order.address.city, order.address.pincode]
-                            .filter(Boolean)
-                            .join(", ")}
-                        </dd>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <CreditCard aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                      <div>
-                        <dt className="text-muted-foreground">Payment</dt>
-                        <dd className="font-medium text-foreground">{paymentText(order)}</dd>
-                      </div>
-                    </div>
-                  </dl>
 
                 </div>
 
-                <div className="flex shrink-0 flex-col items-start gap-3 lg:items-end">
-                  <div className="text-left lg:text-right">
+                <div className="shrink-0 text-right">
+                  <div>
                     <p className="text-xs text-muted-foreground">Order total</p>
                     <p className="text-lg font-bold text-foreground">
                       {formatCurrency(order.totals.total)}
                     </p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      render={<Link href={routes.store.orderDetail(order.orderNumber)} />}
-                    >
-                      {/*
-                        Nothing is left to track on an order that has arrived
-                        or been called off; it is the details that are wanted.
-                      */}
-                      {FINAL_STATUSES.has(order.status) ? "View details" : "Track order"}
-                    </Button>
-                    <Button
-                      variant="bakery"
-                      size="sm"
-                      onClick={() => handleReorder(order.orderNumber)}
-                    >
-                      Reorder
-                    </Button>
-                    {/* Only while the order can still be cancelled. */}
-                    {canCancel(order) ? (
-                      <Button variant="ghost" size="sm" onClick={() => setCancelling(order)}>
-                        Cancel order
-                      </Button>
-                    ) : null}
+                </div>
+              </div>
+              <dl className="grid gap-2 rounded-xl bg-muted/60 px-4 py-3 text-xs sm:grid-cols-3">
+                <div className="flex items-start gap-2">
+                  <CalendarDays aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <div>
+                    <dt className="text-muted-foreground">{deliveryLabel(order)}</dt>
+                    <dd className="font-medium text-foreground">{deliveryWhen(order)}</dd>
                   </div>
                 </div>
+                <div className="flex items-start gap-2">
+                  <MapPin aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0">
+                    <dt className="text-muted-foreground">Deliver to</dt>
+                    <dd className="truncate font-medium text-foreground">
+                      {[order.address.fullName, order.address.city, order.address.pincode]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </dd>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CreditCard aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <div>
+                    <dt className="text-muted-foreground">Payment</dt>
+                    <dd className="font-medium text-foreground">{paymentText(order)}</dd>
+                  </div>
+                </div>
+              </dl>
+              <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  render={<Link href={routes.store.orderDetail(order.orderNumber)} />}
+                >
+                  {/*
+                    Nothing is left to track on an order that has arrived
+                    or been called off; it is the details that are wanted.
+                  */}
+                  {FINAL_STATUSES.has(order.status) ? "View details" : "Track order"}
+                </Button>
+                <Button
+                  variant="bakery"
+                  size="sm"
+                  onClick={() => handleReorder(order.orderNumber)}
+                >
+                  Reorder
+                </Button>
+                {/* Only while the order can still be cancelled. */}
+                {canCancel(order) ? (
+                  <Button variant="ghost" size="sm" onClick={() => setCancelling(order)}>
+                    Cancel order
+                  </Button>
+                ) : null}
+              </div>
               </div>
             </div>
           ))}

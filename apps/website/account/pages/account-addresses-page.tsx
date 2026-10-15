@@ -301,7 +301,7 @@ export function AccountAddressesPage() {
               />
               <FieldError message={formState.errors.fullName?.message} />
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input id="email" type="email" {...register("email", { required: true })} />
@@ -346,7 +346,7 @@ export function AccountAddressesPage() {
                 {...register("landmark")}
               />
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
               <div className="space-y-2">
                 <Label htmlFor="altPhone">Alternate phone</Label>
                 <Input id="altPhone" {...register("altPhone")} />
@@ -375,7 +375,7 @@ export function AccountAddressesPage() {
               />
               <FieldError message={formState.errors.pincode?.message} />
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
               <div className="space-y-2">
                 <Label htmlFor="city">City</Label>
                 <Input
@@ -408,11 +408,11 @@ export function AccountAddressesPage() {
               </Label>
             </div>
             <div className="flex gap-2 pt-2">
-              <Button type="submit" variant="bakery" disabled={formState.isSubmitting}>
+              <Button type="submit" variant="bakery" className="h-10 flex-1" disabled={formState.isSubmitting}>
                 {editingId ? "Update address" : "Save address"}
               </Button>
               {editingId ? (
-                <Button type="button" variant="outline" onClick={cancelEdit}>
+                <Button type="button" variant="outline" className="h-10" onClick={cancelEdit}>
                   Cancel
                 </Button>
               ) : null}

@@ -175,11 +175,13 @@ export function AccountDashboardPage() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 pt-2 sm:flex-row">
+          {/* Right-aligned and sized to their words on a wide screen; two
+              800px-wide buttons read as a banner, not as a form's end. */}
+          <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
             <Button
               type="button"
               variant="outline"
-              className="sm:flex-1"
+              className="h-10 sm:min-w-32"
               onClick={resetForm}
               disabled={formState.isSubmitting}
             >
@@ -188,7 +190,7 @@ export function AccountDashboardPage() {
             <Button
               type="submit"
               variant="bakery"
-              className="sm:flex-1"
+              className="h-10 sm:min-w-32"
               disabled={formState.isSubmitting}
             >
               {formState.isSubmitting ? (
