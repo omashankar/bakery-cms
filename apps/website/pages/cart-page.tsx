@@ -28,7 +28,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { CheckoutProgress } from "@/apps/website/checkout/components/checkout-progress";
-import { CouponInput } from "@/apps/website/checkout/components/coupon-input";
+import { CartCouponPanel } from "@/apps/website/checkout/components/cart-coupon-panel";
 import { applyCouponCode, type AppliedCoupon } from "@/features/orders/lib/coupons";
 import { offersForCart } from "@/features/commerce/lib/coupon-offers";
 import {
@@ -45,7 +45,6 @@ import {
   type CartIssue,
 } from "@/features/orders/lib/cart-validation";
 import { ProductRailSection } from "@/apps/website/components/product-rail-section";
-import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import {
   getCommerceSettings,
@@ -359,11 +358,13 @@ export function CartPage({ catalog = [] }: CartPageProps) {
 
   return (
     <>
-      <StorePageHeader
-        title={itemCount > 0 ? `Shopping Cart (${itemCount})` : "Shopping Cart"}
-        breadcrumbs={[{ label: "Cart" }]}
-        titleOwnedByPage={itemCount > 0}
-      />
+      {/*
+        No breadcrumb: the focused header has the way home and the reference
+        opens its cart on the heading. The visible h1 sits beside the steps
+        once there are lines; until then (loading, or empty) this one is for
+        screen readers only, so nothing appears and then vanishes.
+      */}
+      {itemCount > 0 ? null : <h1 className="sr-only">Shopping Cart</h1>}
 
       {/* `pb-24` on a phone: the sticky checkout bar sits over the last of it. */}
       <section className={cn(layoutSpacing.sectionY, "pb-28 lg:pb-16")}>
@@ -450,8 +451,9 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                   out here and not at the address step.
                 */}
                 <PincodeCheck
-                  title="Check delivery to your PIN code"
-                  className="rounded-xl border border-border bg-card p-4"
+                  inline
+                  title="Enter delivery PIN code:"
+                  className="rounded-xl border border-border bg-card px-4 py-3"
                 />
                 <div className="space-y-4">
                   {items.map((item) => (
@@ -655,78 +657,6 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                   Nothing renders when the shop has no live coupons, which is
                   every install until an owner switches one on.
                 */}
-                {offers.length > 0 ? (
-                  <div className="rounded-xl border border-border bg-card p-4">
-                    <p className="flex items-center gap-2 text-sm font-semibold text-bakery-700">
-                      <Tag className="size-4" />
-                      Coupons for this order
-                    </p>
-                    {/*
-                      A CARD PER CODE, priced against THIS basket and applied
-                      in one press — the reference's coupon list. The saving
-                      is what the same rule checkout runs would take off, not
-                      the label's headline: "20% OFF" is a different number on
-                      every cart.
-                    */}
-                    <ul className="mt-3 grid gap-3 sm:grid-cols-2">
-                      {offers.map((offer) => {
-                        const check =
-                          offer.shortfall > 0 ? null : applyCouponCode(offer.code, couponLines);
-                        const saving = check?.ok ? check.coupon.discountAmount : 0;
-                        return (
-                          <li
-                            key={offer.code}
-                            className="flex flex-col gap-2 rounded-lg border border-dashed border-bakery-300 bg-cream-50 p-3"
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <p className="text-sm font-semibold text-foreground">
-                                  {saving > 0 ? `Save ${formatCurrency(saving)}` : offer.label}
-                                </p>
-                                {saving > 0 ? (
-                                  <p className="text-xs text-muted-foreground">{offer.label}</p>
-                                ) : null}
-                              </div>
-                              {check?.ok ? (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="shrink-0"
-                                  onClick={() => {
-                                    applyCoupon(check.coupon);
-                                    toast.success(
-                                      `${check.coupon.code} applied — you save ${formatCurrency(saving)}`,
-                                    );
-                                  }}
-                                >
-                                  Apply
-                                </Button>
-                              ) : null}
-                            </div>
-                            <span className="w-fit rounded border border-dashed border-border bg-card px-2 py-0.5 font-mono text-xs font-semibold tracking-wide">
-                              {offer.code}
-                            </span>
-                            <p
-                              className={cn(
-                                "text-xs",
-                                check?.ok ? "font-medium text-green-700" : "text-muted-foreground",
-                              )}
-                            >
-                              {check?.ok
-                                ? `You will save ${formatCurrency(saving)} with this code`
-                                : offer.shortfall > 0
-                                  ? `Add ${formatCurrency(offer.shortfall)} more to use it`
-                                  : check && !check.ok
-                                    ? check.message
-                                    : ""}
-                            </p>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                ) : null}
-
                 <div className="rounded-xl border border-border bg-cream-50 p-4">
                   <p className="text-sm font-medium">Order extras</p>
                   {commerce.giftWrapEnabled ? (
@@ -782,16 +712,14 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                   A coupon box of its own here would be a second coupon system
                   on the one screen where the customer decides what to pay.
                 */}
-                <div className="rounded-xl border border-border bg-card p-4">
-                  <p className="mb-3 text-sm font-medium">Have a coupon?</p>
-                  <CouponInput
-                    cart={couponLines}
-                    applied={coupon}
-                    lapsedReason={couponLapsedReason}
-                    onApply={applyCoupon}
-                    onRemove={() => applyCoupon(undefined)}
-                  />
-                </div>
+                <CartCouponPanel
+                  cart={couponLines}
+                  applied={coupon}
+                  lapsedReason={couponLapsedReason}
+                  offers={offers}
+                  onApply={applyCoupon}
+                  onRemove={() => applyCoupon(undefined)}
+                />
                 <OrderSummaryPanel
                   items={items}
                   totals={totals}

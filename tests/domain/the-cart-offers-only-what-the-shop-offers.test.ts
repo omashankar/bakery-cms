@@ -70,6 +70,20 @@ function render() {
   return container;
 }
 
+/**
+ * The coupons live in a dialog now, behind the cart's "Apply Coupons" row —
+ * as a customer reaches them. The dialog renders through a PORTAL on
+ * document.body, so it is read from the document, not the cart's container.
+ */
+function openCoupons() {
+  const row = [...document.querySelectorAll("button")].find((node) =>
+    node.textContent?.trim().startsWith("Apply Coupons"),
+  );
+  act(() => {
+    row?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+}
+
 beforeEach(() => {
   window.localStorage.clear();
   window.sessionStorage.clear();
@@ -82,6 +96,9 @@ afterEach(() => {
     });
   }
   container?.remove();
+  // The coupon dialog renders through a portal on <body>; left there it would
+  // let the next test pass on the previous one's text.
+  document.body.innerHTML = "";
   root = null;
   container = null;
 });
@@ -91,8 +108,13 @@ describe("which offers a basket is shown", () => {
     shopOffers({ code: "SAVE200", flatOff: 200 });
     addToCart(cartLineToAddInput(LINE));
 
-    const text = render().textContent ?? "";
+    render();
+    openCoupons();
+    const text = document.body.textContent ?? "";
     expect(text).toContain("SAVE200");
+    // The WORTH, from the card: the code alone is also in the input's
+    // "Try SAVE200" hint, so on its own it proves nothing about the cards.
+    expect(text).toContain("Save ₹200");
   });
 
   it("says how much more the basket needs", () => {
@@ -105,7 +127,9 @@ describe("which offers a basket is shown", () => {
     shopOffers({ code: "BIG500", flatOff: 500, minSubtotal: 1500 });
     addToCart(cartLineToAddInput(LINE));
 
-    expect(render().textContent).toMatch(/add ₹500 more/i);
+    render();
+    openCoupons();
+    expect(document.body.textContent).toMatch(/add ₹500 more/i);
   });
 
   it("says nothing about a shortfall the basket has already cleared", () => {

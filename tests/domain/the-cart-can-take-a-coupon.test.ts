@@ -79,8 +79,23 @@ function render() {
   return container;
 }
 
+/**
+ * The coupons live in a dialog now, behind the cart's "Apply Coupons" row —
+ * as a customer reaches them. The dialog renders through a PORTAL on
+ * document.body, so it is read from the document, not the cart's container.
+ */
+function openCoupons() {
+  const row = [...document.querySelectorAll("button")].find((node) =>
+    node.textContent?.trim().startsWith("Apply Coupons"),
+  );
+  act(() => {
+    row?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+}
+
 function type(value: string) {
-  const input = container?.querySelector('input[placeholder="Coupon code"]') as
+  if (!document.querySelector('input[placeholder="Coupon code"]')) openCoupons();
+  const input = document.querySelector('input[placeholder="Coupon code"]') as
     | HTMLInputElement
     | undefined;
   act(() => {
@@ -97,7 +112,7 @@ function press(text: string) {
   // By ACCESSIBLE name, as a screen reader and getByRole find it: each cart
   // line now has its own visible "Remove", named "Remove item", beside the
   // coupon's "Remove".
-  const button = [...(container?.querySelectorAll("button") ?? [])].find(
+  const button = [...document.querySelectorAll("button")].find(
     (node) => (node.getAttribute("aria-label") ?? node.textContent)?.trim() === text,
   );
   act(() => {
@@ -118,6 +133,9 @@ afterEach(() => {
     });
   }
   container?.remove();
+  // The coupon dialog renders through a portal on <body>; left there it would
+  // let the next test pass on the previous one's text.
+  document.body.innerHTML = "";
   root = null;
   container = null;
 });

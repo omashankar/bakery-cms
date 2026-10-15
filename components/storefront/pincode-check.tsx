@@ -46,6 +46,7 @@ import { getCommerceSettings } from "@/features/settings/lib/settings-repository
 export function PincodeCheck({
   className,
   title,
+  inline = false,
 }: {
   className?: string;
   /**
@@ -54,6 +55,12 @@ export function PincodeCheck({
    * over an empty box.
    */
   title?: string;
+  /**
+   * The title BESIDE the field on a wide screen — one slim row, as the
+   * reference's cart has it ("Enter Delivery Pincode: [ ] Check") — rather
+   * than a heading over a full-width box.
+   */
+  inline?: boolean;
 }) {
   const [zones, setZones] = useState<DeliveryZone[] | null>(null);
   const [entered, setEntered] = useState("");
@@ -137,7 +144,8 @@ export function PincodeCheck({
       others leaves nothing to its right to put an answer in.
     */
     <div className={cn("flex w-full min-w-0 flex-col gap-2", className)}>
-      {title ? <p className="text-sm font-medium text-foreground">{title}</p> : null}
+      <div className={cn(inline && "flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4")}>
+      {title ? <p className="shrink-0 text-sm font-medium text-foreground">{title}</p> : null}
       {/*
         ONE CONTROL, NOT TWO BOXES WITH A GAP.
 
@@ -157,7 +165,8 @@ export function PincodeCheck({
       */}
       <form
         className={cn(
-          "flex h-12 w-full min-w-0 overflow-hidden rounded-md border bg-card",
+          "flex w-full min-w-0 overflow-hidden rounded-md border bg-card",
+          inline ? "h-11 sm:max-w-md" : "h-12",
           outline,
         )}
         onSubmit={(event) => {
@@ -235,6 +244,7 @@ export function PincodeCheck({
           Check
         </button>
       </form>
+      </div>
 
       {/*
         UNDER THE FIELD, because the field is now level with every other
