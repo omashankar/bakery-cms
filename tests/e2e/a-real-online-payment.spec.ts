@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { PROBE_ADDRESS } from "./shop-state";
 
 import { probeEmail, signInAsCustomer } from "./sign-in";
+import { bookDeliverySlot } from "./delivery-slot";
 
 /**
  * A payment carried all the way through Razorpay, on a test key.
@@ -76,21 +77,8 @@ test.describe("paying for real, on a test key", () => {
     // Cart → Address → Personalize → Payment. Both are still enforced on the
     // server: the date must be a real calendar day at or after the lead time,
     // and the slot must be one the shop offers.
-    const earliest = new Date();
-    earliest.setDate(earliest.getDate() + 5);
-    await page
-      .getByLabel(/delivery date/i)
-      .fill(
-        [
-          earliest.getFullYear(),
-          String(earliest.getMonth() + 1).padStart(2, "0"),
-          String(earliest.getDate()).padStart(2, "0"),
-        ].join("-"),
-      );
-    const slot = page.getByLabel(/delivery time/i);
-    const options = await slot.locator("option").allTextContents();
-    const firstReal = options.find((text) => text && !/select a time/i.test(text));
-    if (firstReal) await slot.selectOption({ label: firstReal });
+    // One field and a dialog now: day, delivery type, window.
+    await bookDeliverySlot(page);
 
     await page.getByRole("button", { name: /continue|next/i }).first().click();
 

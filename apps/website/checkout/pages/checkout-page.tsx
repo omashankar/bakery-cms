@@ -42,6 +42,7 @@ import { DeliveryAddressPicker } from "@/apps/website/checkout/components/delive
 import { publishCheckoutStep } from "@/apps/website/checkout/lib/checkout-step-store";
 import { CouponInput } from "@/apps/website/checkout/components/coupon-input";
 import { OrderSummaryPanel } from "@/apps/website/checkout/components/order-summary-panel";
+import { DeliverySlotPicker } from "@/apps/website/checkout/components/delivery-slot-picker";
 import { calculateCartTotals, type CartTotals } from "@/features/orders/lib/cart-totals";
 import { OUTSIDE_ZONES_MESSAGE } from "@/features/commerce/lib/delivery-zone-utils";
 import {
@@ -87,7 +88,6 @@ import {
   addDays,
   earliestDeliveryDateString,
   isPastSameDayCutoff,
-  isPastTimeSlot,
 } from "@/features/orders/lib/delivery-date";
 import {
   clearCart,
@@ -1112,7 +1112,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
      */
     const needsWindow = deliveryTiers.length > 0 ? windowsForTier.length > 0 : true;
     if (needsWindow && !slotWithTier.timeSlot?.trim()) {
-      document.getElementById("deliveryTime")?.focus();
+      document.getElementById("deliveryDate")?.focus();
       setSlotError(
         deliveryTiers.length > 0
           ? "Choose a delivery time for this option"
@@ -1922,140 +1922,38 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                     <h2 className={storefrontHeading.card}>Personalize your order</h2>
 
                     <div className="mt-5 space-y-4">
-                      {deliveryTiers.length > 0 ? (
-                        <div className="space-y-2">
-                          <Label>How fast</Label>
-                          {/*
-                            The shop's own speeds and the shop's own prices.
-                            A shop that has set none up never sees this block,
-                            and gets the one delivery charge it always had.
-                          */}
-                          <div role="radiogroup" aria-label="How fast" className="space-y-2">
-                            {deliveryTiers.map((tier) => {
-                              const active = tier.id === deliveryTierId;
-                              return (
-                                <button
-                                  key={tier.id}
-                                  type="button"
-                                  role="radio"
-                                  aria-checked={active}
-                                  onClick={() => {
-                                    setSlotError(null);
-                                    setDeliveryTierId(tier.id);
-                                    // A window booked against the old tier
-                                    // may not exist on this one, and a select
-                                    // holding a value it has no option for
-                                    // shows blank while still submitting.
-                                    if (!tier.windows.includes(deliverySlot.timeSlot)) {
-                                      setDeliverySlot((prev) => ({ ...prev, timeSlot: "" }));
-                                    }
-                                  }}
-                                  className={cn(
-                                    "flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors",
-                                    active
-                                      ? "border-bakery-700 bg-bakery-50"
-                                      : "border-border bg-card hover:border-bakery-700"
-                                  )}
-                                >
-                                  <span>
-                                    <span className="block text-sm font-medium">{tier.label}</span>
-                                    {tier.description ? (
-                                      <span className="block text-xs text-muted-foreground">
-                                        {tier.description}
-                                      </span>
-                                    ) : null}
-                                  </span>
-                                  {/*
-                                    A free tier says Free rather than a
-                                    zero-rupee amount, the same way the
-                                    Delivery row does.
-                                  */}
-                                  <span className="shrink-0 text-sm font-semibold">
-                                    {tier.fee > 0 ? `+${formatCurrency(tier.fee)}` : "Free"}
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ) : null}
-                  {/* One slot for the whole order — an order is delivered
-                      once, even when each cake was added separately. */}
-                  <div className="space-y-3 rounded-xl border border-border bg-cream-50 p-4">
-                    <div>
-                      <p className="text-sm font-medium">When should we deliver?</p>
-                      <p className="text-xs text-muted-foreground">
-                        The earliest date depends on preparation time.
-                      </p>
-                    </div>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="deliveryDate">Delivery date</Label>
-                        <Input
-                          id="deliveryDate"
-                          aria-required
-                          type="date"
-                          min={earliestDeliveryDate}
-                          value={deliverySlot.date}
-                          aria-invalid={Boolean(slotError) && !deliverySlot.date}
-                          onChange={(event) => {
-                            setSlotError(null);
-                            setDeliverySlot((prev) => ({ ...prev, date: event.target.value }));
-                          }}
-                        />
-                      </div>
                       {/*
-                        Hidden when the chosen speed has no windows — a
-                        midnight or a next-day delivery has nothing to pick,
-                        and an empty dropdown labelled "Delivery time" reads
-                        as a list that failed to load.
+                        ONE FIELD AND A DIALOG — date, then the kind of
+                        delivery with its price, then the window — as the
+                        reference does it. One slot for the whole order: an
+                        order is delivered once, even when each cake was added
+                        separately.
                       */}
-                      {windowsForTier.length > 0 ? (
                       <div className="space-y-2">
-                        <Label htmlFor="deliveryTime">Delivery time</Label>
-                        <select
-                          id="deliveryTime"
-                          aria-required
-                          value={deliverySlot.timeSlot}
-                          aria-invalid={Boolean(slotError) && !deliverySlot.timeSlot}
-                          onChange={(event) => {
+                        <Label htmlFor="deliveryDate">Delivery date &amp; time</Label>
+                        <DeliverySlotPicker
+                          id="deliveryDate"
+                          slot={{ ...deliverySlot, tierId: deliveryTierId || undefined }}
+                          tiers={deliveryTiers}
+                          defaultWindows={slotOptions}
+                          earliestDate={earliestDeliveryDate}
+                          invalid={Boolean(slotError)}
+                          onChange={(next) => {
                             setSlotError(null);
+                            setDeliveryTierId(next.tierId);
                             setDeliverySlot((prev) => ({
                               ...prev,
-                              timeSlot: event.target.value,
+                              date: next.date,
+                              timeSlot: next.timeSlot,
                             }));
                           }}
-                          className="h-8 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20"
-                        >
-                          <option value="">Select a time</option>
-                          {/*
-                            Today windows that have already closed are not
-                            offered — the quote refuses them. The one already
-                            chosen stays listed whatever the clock says, so the
-                            select never renders a value it has no option for;
-                            changing the date is what clears it.
-                          */}
-                          {windowsForTier
-                            .filter(
-                              (slot) =>
-                                slot === deliverySlot.timeSlot ||
-                                !isPastTimeSlot(deliverySlot.date, slot),
-                            )
-                            .map((slot) => (
-                              <option key={slot} value={slot}>
-                                {slot}
-                              </option>
-                            ))}
-                        </select>
+                        />
+                        {slotError ? (
+                          <p role="alert" className="text-xs text-destructive">
+                            {slotError}
+                          </p>
+                        ) : null}
                       </div>
-                      ) : null}
-                    </div>
-                    {slotError ? (
-                      <p role="alert" className="text-xs text-destructive">
-                        {slotError}
-                      </p>
-                    ) : null}
-                  </div>
                       {occasionOptions.length > 0 ? (
                         <div className="space-y-2">
                           <Label>Occasion (optional)</Label>

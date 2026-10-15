@@ -210,8 +210,12 @@ describe("and the shop can enforce what it has set", () => {
 
   it("does not offer the customer a window the quote will refuse", () => {
     const page = read("apps/website/checkout/pages/checkout-page.tsx");
+    // The windows are offered by the delivery dialog now, filtered by the day
+    // picked in it; the floor (cutoff) is still the page's.
+    const picker = read("apps/website/checkout/components/delivery-slot-picker.tsx");
 
-    expect(page).toContain("!isPastTimeSlot(deliverySlot.date, slot)");
+    expect(picker).toContain("!isPastTimeSlot(date, window)");
+    expect(page).toContain("earliestDate={earliestDeliveryDate}");
     expect(page).toContain("isPastSameDayCutoff(floor, commerce.sameDayCutoff)");
   });
 });

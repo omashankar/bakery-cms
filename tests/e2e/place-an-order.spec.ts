@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { connect, PROBE_ADDRESS } from "./shop-state";
 import { probeEmail, removeCustomer, signInAsCustomer } from "./sign-in";
+import { bookDeliverySlot } from "./delivery-slot";
 
 /**
  * The one journey the whole shop exists for, driven the way a customer drives
@@ -94,39 +95,8 @@ test.describe("a customer placing an order", () => {
     // The shop requires a delivery date and slot, and both are enforced on the
     // server — the date must be a real calendar day at or after the lead time,
     // and the slot must be one the shop offers.
-    const earliest = new Date();
-    earliest.setDate(earliest.getDate() + 5);
-    const isoDay = [
-      earliest.getFullYear(),
-      String(earliest.getMonth() + 1).padStart(2, "0"),
-      String(earliest.getDate()).padStart(2, "0"),
-    ].join("-");
-    await page.getByLabel(/delivery date/i).fill(isoDay);
-
-    /**
-     * WAIT for a real window, then insist one was chosen.
-     *
-     * This read the options once and selected one only `if (firstReal)` —
-     * so when the shop's slots had not loaded yet, it selected nothing,
-     * pressed Continue anyway, and was correctly refused. The run then sat on
-     * Personalize and reported that checkout offers no online payment, which
-     * blamed the payment switch for a delivery slot that was never picked.
-     */
-    const slot = page.getByLabel(/delivery time/i);
-    await expect
-      .poll(
-        async () =>
-          (await slot.locator("option").allTextContents()).filter(
-            (text) => text && !/select a time/i.test(text),
-          ).length,
-        { message: "the shop offered no delivery window to choose" },
-      )
-      .toBeGreaterThan(0);
-
-    const windows = (await slot.locator("option").allTextContents()).filter(
-      (text) => text && !/select a time/i.test(text),
-    );
-    await slot.selectOption({ label: windows[0] });
+    // One field and a dialog now: day, delivery type, window.
+    await bookDeliverySlot(page);
 
     await page.getByRole("button", { name: /continue|next/i }).first().click();
 

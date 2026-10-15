@@ -3,6 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { adminSession } from "./admin-session";
 import { connect, PROBE_ADDRESS } from "./shop-state";
 import { probeEmail, removeCustomer, signInAsCustomer } from "./sign-in";
+import { bookDeliverySlot } from "./delivery-slot";
 
 /**
  * The cancel-and-refund journey, end to end, on a Razorpay TEST key.
@@ -41,21 +42,8 @@ async function buyAndPay(page: Page, productSlug: string, email: string): Promis
   await page.getByLabel(/PIN code/i).fill(PROBE_ADDRESS.pincode);
   await page.getByRole("button", { name: /continue|next/i }).first().click();
 
-  const earliest = new Date();
-  earliest.setDate(earliest.getDate() + 5);
-  await page
-    .getByLabel(/delivery date/i)
-    .fill(
-      [
-        earliest.getFullYear(),
-        String(earliest.getMonth() + 1).padStart(2, "0"),
-        String(earliest.getDate()).padStart(2, "0"),
-      ].join("-"),
-    );
-  const slot = page.getByLabel(/delivery time/i);
-  const options = await slot.locator("option").allTextContents();
-  const firstReal = options.find((text) => text && !/select a time/i.test(text));
-  if (firstReal) await slot.selectOption({ label: firstReal });
+  // One field and a dialog now: day, delivery type, window.
+  await bookDeliverySlot(page);
   await page.getByRole("button", { name: /continue|next/i }).first().click();
 
   await page.getByText(/pay online/i).first().click();
