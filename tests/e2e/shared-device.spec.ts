@@ -44,6 +44,16 @@ async function signOutThroughTheUi(page: Page) {
   await expect(page, "Logout did not return the customer to the storefront").toHaveURL(
     /\/store\/?$/,
   );
+  /*
+    AND THAT IT FINISHED. Signing out from /store "returns" to /store, so the
+    URL check passed the moment it ran — before the logout request answered
+    and the browser data was cleared — and the next assertion raced it. The
+    Login button is drawn only once the session is gone.
+  */
+  await expect(
+    page.getByRole("button", { name: "Login", exact: true }).first(),
+    "the customer is still signed in after Logout",
+  ).toBeVisible({ timeout: 15_000 });
 }
 
 test.describe("a shared device", () => {
@@ -100,10 +110,27 @@ test.describe("a shared device", () => {
     asha = await probeEmail("asha");
     await signInAsCustomer(page, asha);
     await page.goto("/store");
-    const firstProduct = page.locator('a[href^="/store/p/"]').first();
-    await expect(firstProduct).toBeVisible();
-    await page.goto((await firstProduct.getAttribute("href"))!);
-    await page.getByRole("button", { name: /add to cart/i }).first().click();
+    await expect(page.locator('a[href^="/store/p/"]').first()).toBeVisible();
+    /*
+      THE FIRST PRODUCT THAT ADDS, not simply the first on the page. A photo
+      cake refuses Add to Cart until a photo is uploaded — correctly — and the
+      shop's first card is one now, so the test was proving nothing about
+      sign-out. Tried in turn until the cart holds something.
+    */
+    const hrefs = [
+      ...new Set(
+        await page.locator('a[href^="/store/p/"]').evaluateAll((links) =>
+          links.map((link) => link.getAttribute("href") ?? ""),
+        ),
+      ),
+    ].slice(0, 6);
+    for (const href of hrefs) {
+      await page.goto(href);
+      await page.getByRole("button", { name: /add to cart/i }).first().click();
+      await page.waitForTimeout(600);
+      const cart = await page.evaluate((key) => localStorage.getItem(key as string), CART_KEY);
+      if (cart && cart !== "[]") break;
+    }
 
     // Asha's cart really has something in it. Without this the assertion at the
     // end passes for the wrong reason — an empty cart because the add never
@@ -114,6 +141,9 @@ test.describe("a shared device", () => {
       "the item was never added, so this test would prove nothing",
     ).toBeVisible();
 
+    // Off the cart first: it has the focused checkout header now, with no
+    // account menu to sign out from — as a customer would, from the shop.
+    await page.goto("/store");
     await signOutThroughTheUi(page);
 
     bilal = await probeEmail("bilal");

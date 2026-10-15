@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MapPin, Package, User } from "lucide-react";
 import { AccountNav } from "@/apps/website/account/components/account-nav";
+import { AccountProfileProvider, type AccountProfile } from "@/apps/website/account/components/account-context";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
@@ -16,25 +17,31 @@ const TABS = [
 ] as const;
 
 interface AccountShellProps {
-  /**
-   * The page's `<h1>`. Still required, and still never drawn — `StorePageHeader`
-   * keeps it in the document for search engines and screen readers.
-   *
-   * The `description` that used to sit beside it is gone rather than hidden.
-   * All three were this software's own sentences — "Manage delivery addresses
-   * for faster checkout." over a page of delivery addresses — so there was
-   * nothing of the shop's to lose and nothing for a crawler to miss.
-   */
-  title: string;
-  breadcrumbs?: { label: string; href?: string }[];
+  account: AccountProfile;
   children: React.ReactNode;
 }
 
-export function AccountShell({ title, breadcrumbs = [], children }: AccountShellProps) {
+/** Each tab's heading and its last crumb. */
+const PAGES: Record<string, { title: string; crumb?: string }> = {
+  [routes.account.dashboard]: { title: "My Profile" },
+  [routes.account.orders]: { title: "My Orders", crumb: "Orders" },
+  [routes.account.addresses]: { title: "Saved Addresses", crumb: "Addresses" },
+};
+
+/**
+ * RENDERED ONCE, BY THE ACCOUNT LAYOUT — not by each page. Every page used to
+ * wrap itself in this, so switching tabs threw the sidebar away and rebuilt
+ * it: the avatar and name went blank and came back, which was the flash the
+ * owner saw. Here it stays mounted and only the content beside it changes.
+ */
+export function AccountShell({ account, children }: AccountShellProps) {
   const pathname = usePathname() ?? "";
+  const page = PAGES[pathname] ?? PAGES[routes.account.dashboard];
+  const title = page.title;
+  const breadcrumbs = page.crumb ? [{ label: page.crumb }] : [];
 
   return (
-    <>
+    <AccountProfileProvider value={account}>
       <StorePageHeader
         title={title}
         breadcrumbs={[{ label: "My Profile", href: routes.account.dashboard }, ...breadcrumbs]}
@@ -80,6 +87,6 @@ export function AccountShell({ title, breadcrumbs = [], children }: AccountShell
           </div>
         </div>
       </section>
-    </>
+    </AccountProfileProvider>
   );
 }

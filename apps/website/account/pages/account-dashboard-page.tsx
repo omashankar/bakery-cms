@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { ChevronRight, Heart, LifeBuoy, Loader2, MapPin, Package } from "lucide-react";
 import { toast } from "@/lib/lazy-toast";
-import { AccountShell } from "@/apps/website/account/components/account-shell";
+import { useAccountProfile } from "@/apps/website/account/components/account-context";
 import { useCustomerAuth } from "@/apps/website/account/hooks/use-customer-auth";
 import { updateCustomerProfile } from "@/apps/website/account/lib/customer-session";
 import { Button } from "@/components/ui/button";
@@ -58,8 +58,15 @@ function splitName(name: string) {
 }
 
 export function AccountDashboardPage() {
-  const { session, ready } = useCustomerAuth();
-  const { register, handleSubmit, formState, reset } = useForm<ProfileForm>();
+  const { session } = useCustomerAuth();
+  // The server's answer fills the form in the first paint; the browser
+  // session takes over once it is read (after an edit, for one).
+  const profile = useAccountProfile();
+  const { register, handleSubmit, formState, reset } = useForm<ProfileForm>({
+    defaultValues: profile
+      ? { ...splitName(profile.name), email: profile.email, phone: profile.phone }
+      : undefined,
+  });
 
   useEffect(() => {
     if (!session) return;
@@ -68,9 +75,10 @@ export function AccountDashboardPage() {
   }, [session, reset]);
 
   const resetForm = () => {
-    if (!session) return;
-    const { firstName, lastName } = splitName(session.name);
-    reset({ firstName, lastName, email: session.email, phone: session.phone ?? "" });
+    const source = session ?? profile;
+    if (!source) return;
+    const { firstName, lastName } = splitName(source.name);
+    reset({ firstName, lastName, email: source.email, phone: source.phone ?? "" });
   };
 
   const onSubmit = async (data: ProfileForm) => {
@@ -101,14 +109,13 @@ export function AccountDashboardPage() {
     toast.success("Profile updated");
   };
 
-  if (!ready || !session) {
-    return null;
-  }
+  // No blank wait for the browser session any more: the layout has already
+  // signed the customer in on the server, and that blank was the flash
+  // between tabs.
+  if (!session && !profile) return null;
 
   return (
-    <AccountShell
-      title="My Profile"
-    >
+    <>
       {/* Personal Information */}
       <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
         <h2 className={cn(storefrontHeading.card, "text-foreground")}>
@@ -138,7 +145,7 @@ export function AccountDashboardPage() {
                 under it — My Orders emptied itself and said "No orders yet",
                 beneath a toast reading "Profile updated".
               */}
-              <Input id="email" type="email" value={session.email} readOnly disabled />
+              <Input id="email" type="email" value={session?.email ?? profile?.email ?? ""} readOnly disabled />
               <p className="text-xs text-muted-foreground">
                 Your orders are matched to this address. To use another one, sign in with it.
               </p>
@@ -230,6 +237,6 @@ export function AccountDashboardPage() {
           ))}
         </div>
       </div>
-    </AccountShell>
+    </>
   );
 }

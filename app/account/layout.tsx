@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { AccountShell } from "@/apps/website/account/components/account-shell";
 import { StorefrontLayoutShell } from "@/layouts/storefront-layout";
 import { routes } from "@/constants/routes";
 import { getCustomerAccount } from "@/lib/server/auth/customer-dal";
@@ -67,7 +68,15 @@ export default async function AccountLayout({
       maintenance={maintenance}
     >
       {cacheSeed ? <StorefrontCacheSeed data={cacheSeed} /> : null}
-      {children}
+      <AccountShell
+        account={{
+          name: String((account as { name?: string }).name ?? ""),
+          email: String((account as { email?: string }).email ?? ""),
+          phone: String((account as { phone?: string }).phone ?? ""),
+        }}
+      >
+        {children}
+      </AccountShell>
     </StorefrontLayoutShell>
   );
 }

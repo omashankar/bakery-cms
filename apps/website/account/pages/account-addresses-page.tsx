@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { MapPin, Pencil, Trash2 } from "lucide-react";
 import { stateForPincode } from "@/features/commerce/lib/india-states";
@@ -10,7 +10,7 @@ import {
   type CheckoutAddress,
 } from "@/features/orders/lib/checkout-draft";
 import { toast } from "@/lib/lazy-toast";
-import { AccountShell } from "@/apps/website/account/components/account-shell";
+import { useAccountProfile } from "@/apps/website/account/components/account-context";
 import { useCustomerAuth } from "@/apps/website/account/hooks/use-customer-auth";
 import {
   createSavedAddress,
@@ -81,7 +81,16 @@ function toForm(address: SavedAddress): AddressForm {
 }
 
 export function AccountAddressesPage() {
-  const { session, ready } = useCustomerAuth();
+  const { session: browserSession } = useCustomerAuth();
+  // The server's profile until the browser has read its own, so the page is
+  // in the first paint instead of a blank wait between tabs.
+  const profile = useAccountProfile();
+  // Memoised: it is a dependency of the effect that resets the form, and a
+  // fresh object every render would reset it every render.
+  const session = useMemo(
+    () => browserSession ?? (profile ? { ...profile, phone: profile.phone || undefined } : null),
+    [browserSession, profile],
+  );
   const [addresses, setAddresses] = useState<SavedAddress[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -162,15 +171,12 @@ export function AccountAddressesPage() {
     setAddresses(getSavedAddresses());
   };
 
-  if (!ready || !session) {
+  if (!session) {
     return null;
   }
 
   return (
-    <AccountShell
-      title="Saved Addresses"
-      breadcrumbs={[{ label: "Addresses" }]}
-    >
+    <>
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-4">
           {addresses.length === 0 ? (
@@ -420,6 +426,6 @@ export function AccountAddressesPage() {
           </form>
         </div>
       </div>
-    </AccountShell>
+    </>
   );
 }

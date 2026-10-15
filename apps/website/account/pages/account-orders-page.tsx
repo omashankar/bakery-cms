@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { CalendarDays, CreditCard, MapPin, Package } from "lucide-react";
 import { toast } from "@/lib/lazy-toast";
 import { AccountOrderStatusBadge } from "@/apps/website/account/components/account-order-status-badge";
-import { AccountShell } from "@/apps/website/account/components/account-shell";
+import { useAccountProfile } from "@/apps/website/account/components/account-context";
 import { useCustomerAuth } from "@/apps/website/account/hooks/use-customer-auth";
 import type { PlacedOrder } from "@/features/orders/lib/orders";
 import { cartLineChoices } from "@/features/cart/lib/cart";
@@ -48,6 +48,9 @@ function canCancel(order: PlacedOrder): boolean {
 }
 
 const PAGE_SIZE = 10;
+
+/** See the `orders` state: the last list this tab loaded, and whose it was. */
+let ordersCache: { owner: string; orders: PlacedOrder[] } | null = null;
 
 /** Orders with nothing left to happen to them. */
 const FINAL_STATUSES = new Set<PlacedOrder["status"]>(["delivered", "cancelled", "refunded"]);
@@ -118,9 +121,17 @@ function paymentText(order: PlacedOrder): string {
 export function AccountOrdersPage() {
   const labels = useBusinessLabels();
   const router = useRouter();
-  const { session, ready } = useCustomerAuth();
+  const { session } = useCustomerAuth();
+  const profile = useAccountProfile();
+  const owner = profile?.email ?? session?.email ?? "";
   const [page, setPage] = useState(1);
-  const [orders, setOrders] = useState<PlacedOrder[] | null>(null);
+  // The list from the last visit IN THIS TAB, for this customer — shown at
+  // once and refreshed behind it, so coming back to Orders is not a skeleton
+  // every time. Keyed by email: on a shared device the next person's list
+  // must never start as the last person's.
+  const [orders, setOrders] = useState<PlacedOrder[] | null>(() =>
+    ordersCache && ordersCache.owner === owner ? ordersCache.orders : null,
+  );
   const [cancelling, setCancelling] = useState<PlacedOrder | null>(null);
   const [loadError, setLoadError] = useState(false);
 
@@ -138,7 +149,9 @@ export function AccountOrdersPage() {
    * from the request, so this cannot be pointed at anyone else's history.
    */
   useEffect(() => {
-    if (!session) return;
+    // Not waiting for the browser session: the layout has signed the customer
+    // in on the server, and the request carries the same cookie.
+    if (!owner) return;
     let cancelled = false;
 
     (async () => {
@@ -148,6 +161,7 @@ export function AccountOrdersPage() {
         const body = (await res.json()) as { data?: PlacedOrder[] };
         if (!cancelled) {
           setOrders(body.data ?? []);
+          ordersCache = { owner, orders: body.data ?? [] };
           setLoadError(false);
         }
       } catch {
@@ -163,7 +177,7 @@ export function AccountOrdersPage() {
     return () => {
       cancelled = true;
     };
-  }, [session]);
+  }, [owner]);
 
   const totalPages = Math.max(1, Math.ceil((orders?.length ?? 0) / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -219,15 +233,12 @@ export function AccountOrdersPage() {
     router.push(routes.store.cart);
   }
 
-  if (!ready || !session) {
+  if (!owner) {
     return null;
   }
 
   return (
-    <AccountShell
-      title="My Orders"
-      breadcrumbs={[{ label: "Orders" }]}
-    >
+    <>
       {orders === null ? (
         /*
           Not an empty state. Until the shop has answered, this page does not
@@ -448,9 +459,13 @@ export function AccountOrdersPage() {
           }}
           onCancelled={(updated) => {
             setCancelling(null);
-            setOrders((current) =>
-              (current ?? []).map((entry) => (entry.orderNumber === updated.orderNumber ? updated : entry)),
-            );
+            setOrders((current) => {
+              const next = (current ?? []).map((entry) =>
+                entry.orderNumber === updated.orderNumber ? updated : entry,
+              );
+              ordersCache = { owner, orders: next };
+              return next;
+            });
             toast.success("Order cancelled", {
               description:
                 updated.paymentStatus === "paid"
@@ -460,6 +475,6 @@ export function AccountOrdersPage() {
           }}
         />
       ) : null}
-    </AccountShell>
+    </>
   );
 }
