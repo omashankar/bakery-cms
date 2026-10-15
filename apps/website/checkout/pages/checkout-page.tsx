@@ -490,6 +490,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
     reset,
     setValue,
     watch,
+    getValues,
     formState,
   } = useForm<CheckoutAddress>({
     defaultValues: getCheckoutDraft().address,
@@ -2365,6 +2366,41 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
             </div>
 
             <div className="order-2 space-y-4 lg:order-none lg:col-start-2 lg:sticky lg:top-24 lg:self-start">
+              {/*
+                WHERE IT IS GOING, beside the money — the reference keeps the
+                chosen address at the top of this column after the Address
+                step, with a way back to change it. On Personalize only: the
+                Payment step's review already states it, with its own Change.
+              */}
+              {step === 2 ? (
+                <div className="rounded-xl border border-border bg-card p-4 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-semibold text-foreground">
+                      Deliver to {getValues("fullName")}
+                    </p>
+                    {getValues("addressLabel") ? (
+                      <span className="rounded border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
+                        {getValues("addressLabel")}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-1 leading-relaxed text-muted-foreground">
+                    {formatAddress(getValues())}
+                  </p>
+                  {getValues("phone") ? (
+                    <p className="text-muted-foreground">Mobile: {getValues("phone")}</p>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => goToStep(1)}
+                  >
+                    Change address
+                  </Button>
+                </div>
+              ) : null}
               <OrderSummaryPanel
                 items={serverItems ?? items}
                 totals={totals}

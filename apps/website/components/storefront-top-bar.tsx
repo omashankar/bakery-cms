@@ -25,3 +25,23 @@ export function StorefrontTopBar({
 }) {
   return isFocusedCheckoutPath(usePathname()) ? focused : full;
 }
+
+/**
+ * The footer, except where the customer is paying: the reference ends its cart
+ * and checkout without one — no sitemap to wander through, one line of who the
+ * shop is.
+ */
+export function StorefrontFooterSlot({
+  full,
+  siteName,
+}: {
+  full: React.ReactNode;
+  siteName: string;
+}) {
+  if (!isFocusedCheckoutPath(usePathname())) return full;
+  return (
+    <footer className="border-t border-border py-5 text-center text-xs text-muted-foreground">
+      © {new Date().getFullYear()} {siteName}. Payments are secured and encrypted.
+    </footer>
+  );
+}
