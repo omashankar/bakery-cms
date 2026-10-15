@@ -30,26 +30,43 @@ import { expect, test } from "@playwright/test";
 
 const BOX = 'header input[type="search"]';
 
+/**
+ * The bar over the grid: its count — "(3 of 29 products)" while a search
+ * narrows it, "(29 products)" when nothing does — and the chip that names the
+ * term. It read "Showing 3 of 29" on a line of its own until the listing was
+ * redrawn, and this spec went on looking for that line.
+ */
+function readResultsBar() {
+  const count = [...document.querySelectorAll("p")]
+    .map((node) => (node.textContent ?? "").trim())
+    .find((text) => /^\(\d+( of \d+)? [^)]+\)$/.test(text));
+  const chip =
+    [...document.querySelectorAll("button")]
+      .map((node) => (node.textContent ?? "").trim())
+      .find((text) => text.startsWith("“")) ?? "";
+  const match = count?.match(/^\((\d+)(?: of (\d+))?/);
+  return {
+    line: `${count ?? ""} ${chip}`.trim(),
+    found: match ? Number(match[1]) : -1,
+    catalogue: match ? Number(match[2] ?? match[1]) : -1,
+  };
+}
+
 async function search(page: import("@playwright/test").Page, term: string) {
   await page.fill(BOX, term);
   await page.press(BOX, "Enter");
   await page.waitForURL(/[?&]q=/, { timeout: 15_000 });
   await page.waitForTimeout(1600);
 
-  return page.evaluate(() => {
-    const line = [...document.querySelectorAll("p")]
-      .map((node) => (node.textContent ?? "").trim())
-      .find((text) => text.startsWith("Showing "));
-    const match = line?.match(/Showing (\d+) of (\d+)/);
-    return {
-      url: location.pathname + location.search,
-      line: line ?? "",
-      total: match ? Number(match[2]) : -1,
-      names: [...document.querySelectorAll('a[href^="/store/p/"]')]
-        .map((card) => (card.textContent ?? "").toLowerCase())
-        .filter(Boolean),
-    };
-  });
+  const bar = await page.evaluate(readResultsBar);
+  return {
+    url: await page.evaluate(() => location.pathname + location.search),
+    line: bar.line,
+    total: bar.found,
+    names: await page
+      .locator('a[href^="/store/p/"]')
+      .evaluateAll((cards) => cards.map((card) => (card.textContent ?? "").toLowerCase()).filter(Boolean)),
+  };
 }
 
 test("the header search lands on results, and a second search replaces the first", async ({
@@ -75,12 +92,7 @@ test("the header search lands on results, and a second search replaces the first
   /* ---- the whole catalogue, for comparison ------------------------------ */
   await page.goto("/store/collections");
   await page.waitForTimeout(1600);
-  const everything = await page.evaluate(() => {
-    const line = [...document.querySelectorAll("p")]
-      .map((node) => (node.textContent ?? "").trim())
-      .find((text) => text.startsWith("Showing "));
-    return Number(line?.match(/Showing \d+ of (\d+)/)?.[1] ?? -1);
-  });
+  const everything = (await page.evaluate(readResultsBar)).catalogue;
   expect(everything, "the shop has too few products to tell a search from a browse")
     .toBeGreaterThan(first.total);
 
@@ -121,11 +133,6 @@ test("and the address the search page used to live at still finds things", async
   expect(page.url(), "the old address does not reach the collections page").toContain(
     "/store/collections",
   );
-  const line = await page.evaluate(
-    () =>
-      [...document.querySelectorAll("p")]
-        .map((node) => (node.textContent ?? "").trim())
-        .find((text) => text.startsWith("Showing ")) ?? "",
-  );
+  const line = (await page.evaluate(readResultsBar)).line;
   expect(line, "the term was dropped by the redirect").toContain("butterscotch");
 });

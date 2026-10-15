@@ -1,4 +1,5 @@
 
+import { RECENT_SEARCHES_KEY } from "@/apps/website/lib/recent-searches";
 import { safeSetItem } from "@/lib/safe-storage";
 const CUSTOMER_SESSION_KEY = "bakery-cms-customer-session";
 
@@ -175,6 +176,9 @@ const CUSTOMER_DEVICE_KEYS = [
   // reference, and the checkout overlay puts both on screen. The order itself
   // stays in `bakery-cms-orders`, so signing out loses them nothing.
   "bakery-cms-unconfirmed-order",
+  // What was typed into the header search — drawn under the box the moment
+  // the next person at this screen clicks it.
+  RECENT_SEARCHES_KEY,
 ] as const;
 
 /** Wipe this device's copy. Does NOT end the server session — see `signOutCustomer`. */
