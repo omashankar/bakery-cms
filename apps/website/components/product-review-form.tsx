@@ -149,6 +149,7 @@ export function ProductReviewForm({ productSlug, cakeName, onSubmitted }: Produc
           <div className="space-y-2">
             <Label htmlFor="review-name">Your name</Label>
             <Input
+              className="h-11"
               id="review-name"
               value={authorName}
               onChange={(event) => setAuthorName(event.target.value)}
@@ -158,6 +159,7 @@ export function ProductReviewForm({ productSlug, cakeName, onSubmitted }: Produc
           <div className="space-y-2">
             <Label htmlFor="review-email">Email (optional)</Label>
             <Input
+              className="h-11"
               id="review-email"
               type="email"
               value={authorEmail}
@@ -169,6 +171,7 @@ export function ProductReviewForm({ productSlug, cakeName, onSubmitted }: Produc
         <div className="space-y-2">
           <Label htmlFor="review-title">Title (optional)</Label>
           <Input
+            className="h-11"
             id="review-title"
             value={title}
             onChange={(event) => setTitle(event.target.value)}
@@ -231,7 +234,7 @@ export function ProductReviewForm({ productSlug, cakeName, onSubmitted }: Produc
           </p>
         </div>
 
-        <Button type="submit" variant="bakery" disabled={submitting || uploading}>
+        <Button type="submit" variant="bakery" className="h-11" disabled={submitting || uploading}>
           {submitting ? "Submitting..." : "Submit review"}
         </Button>
       </div>

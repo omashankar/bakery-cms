@@ -244,6 +244,7 @@ export function AccountAddressesPage() {
             <div className="space-y-2">
               <Label htmlFor="fullName">Full name</Label>
               <Input
+                className="h-11"
                 id="fullName"
                 autoComplete="name"
                 aria-invalid={formState.errors.fullName ? true : undefined}
@@ -254,11 +255,12 @@ export function AccountAddressesPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" {...register("email", { required: true })} />
+                <Input className="h-11" id="email" type="email" {...register("email", { required: true })} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone</Label>
                 <Input
+                  className="h-11"
                   id="phone"
                   type="tel"
                   inputMode="tel"
@@ -276,6 +278,7 @@ export function AccountAddressesPage() {
             <div className="space-y-2">
               <Label htmlFor="addressLine1">Address line 1</Label>
               <Input
+                className="h-11"
                 id="addressLine1"
                 autoComplete="address-line1"
                 placeholder="House no., building, street"
@@ -286,11 +289,12 @@ export function AccountAddressesPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="addressLine2">Address line 2</Label>
-              <Input id="addressLine2" {...register("addressLine2")} />
+              <Input className="h-11" id="addressLine2" {...register("addressLine2")} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="landmark">Landmark</Label>
               <Input
+                className="h-11"
                 id="landmark"
                 placeholder="A shop, a turning, anything easy to spot"
                 {...register("landmark")}
@@ -299,11 +303,11 @@ export function AccountAddressesPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="altPhone">Alternate phone</Label>
-                <Input id="altPhone" {...register("altPhone")} />
+                <Input className="h-11" id="altPhone" {...register("altPhone")} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="country">Country</Label>
-                <Input id="country" {...register("country")} />
+                <Input className="h-11" id="country" {...register("country")} />
               </div>
             </div>
             {/*
@@ -313,6 +317,7 @@ export function AccountAddressesPage() {
             <div className="space-y-2">
               <Label htmlFor="pincode">PIN code</Label>
               <Input
+                className="h-11"
                 id="pincode"
                 inputMode="numeric"
                 autoComplete="postal-code"
@@ -329,6 +334,7 @@ export function AccountAddressesPage() {
               <div className="space-y-2">
                 <Label htmlFor="city">City</Label>
                 <Input
+                  className="h-11"
                   id="city"
                   autoComplete="address-level2"
                   aria-invalid={formState.errors.city ? true : undefined}
@@ -339,6 +345,7 @@ export function AccountAddressesPage() {
               <div className="space-y-2">
                 <Label htmlFor="state">State</Label>
                 <Input
+                  className="h-11"
                   id="state"
                   autoComplete="address-level1"
                   aria-invalid={formState.errors.state ? true : undefined}
@@ -359,11 +366,11 @@ export function AccountAddressesPage() {
             </div>
             <div className="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end">
               {addresses.length > 0 ? (
-                <Button type="button" variant="outline" className="h-10 sm:min-w-28" onClick={cancelEdit}>
+                <Button type="button" variant="outline" className="h-11 sm:min-w-28" onClick={cancelEdit}>
                   Cancel
                 </Button>
               ) : null}
-              <Button type="submit" variant="bakery" className="h-10 sm:min-w-36" disabled={formState.isSubmitting}>
+              <Button type="submit" variant="bakery" className="h-11 sm:min-w-36" disabled={formState.isSubmitting}>
                 {editingId ? "Update address" : "Save address"}
               </Button>
             </div>

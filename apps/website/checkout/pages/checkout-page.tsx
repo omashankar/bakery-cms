@@ -1649,6 +1649,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       <div className="space-y-2 sm:col-span-2">
                         <Label htmlFor="fullName">Full name</Label>
                         <Input
+                          className="h-11"
                           id="fullName"
                           aria-required
                           {...register("fullName", { required: "Name is required" })}
@@ -1668,6 +1669,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       <div className="space-y-2">
                         <Label htmlFor="phone">Phone</Label>
                         <Input
+                          className="h-11"
                           id="phone"
                           aria-required
                           type="tel"
@@ -1690,11 +1692,12 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                           worth.
                         */}
                         <Label htmlFor="altPhone">Alternate phone (optional)</Label>
-                        <Input id="altPhone" type="tel" {...register("altPhone")} />
+                        <Input className="h-11" id="altPhone" type="tel" {...register("altPhone")} />
                       </div>
                       <div className="space-y-2 sm:col-span-2">
                         <Label htmlFor="addressLine1">Address line 1</Label>
                         <Input
+                          className="h-11"
                           id="addressLine1"
                           aria-required
                           {...register("addressLine1", { required: "Address is required" })}
@@ -1707,7 +1710,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       </div>
                       <div className="space-y-2 sm:col-span-2">
                         <Label htmlFor="addressLine2">Address line 2 (optional)</Label>
-                        <Input id="addressLine2" {...register("addressLine2")} />
+                        <Input className="h-11" id="addressLine2" {...register("addressLine2")} />
                       </div>
                       <div className="space-y-2 sm:col-span-2">
                         {/*
@@ -1718,6 +1721,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                         */}
                         <Label htmlFor="landmark">Landmark (optional)</Label>
                         <Input
+                          className="h-11"
                           id="landmark"
                           placeholder="A shop, a turning, anything easy to spot"
                           {...register("landmark")}
@@ -1726,6 +1730,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       <div className="space-y-2">
                         <Label htmlFor="city">City</Label>
                         <Input
+                          className="h-11"
                           id="city"
                           aria-required
                           {...register("city", { required: "City is required" })}
@@ -1739,6 +1744,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       <div className="space-y-2">
                         <Label htmlFor="state">State</Label>
                         <Input
+                          className="h-11"
                           id="state"
                           aria-required
                           {...register("state", { required: "State is required" })}
@@ -1752,6 +1758,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       <div className="space-y-2">
                         <Label htmlFor="pincode">PIN code</Label>
                         <Input
+                          className="h-11"
                           id="pincode"
                           aria-required
                           {...register("pincode", {
@@ -1795,7 +1802,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                           every country is a list nobody asked for.
                         */}
                         <Label htmlFor="country">Country (optional)</Label>
-                        <Input id="country" {...register("country")} />
+                        <Input className="h-11" id="country" {...register("country")} />
                       </div>
 
                       <div className="space-y-2 sm:col-span-2">
@@ -1871,7 +1878,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                             <Button
                               type="button"
                               variant="outline"
-                              className="sm:min-w-32"
+                              className="h-11 sm:min-w-32"
                               onClick={() => {
                                 setShowAddressForm(false);
                                 setEditingAddressId(null);
@@ -1901,7 +1908,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                           <Button
                             type="button"
                             variant="secondary"
-                            className="sm:min-w-32"
+                            className="h-11 sm:min-w-32"
                             onClick={() => void handleSubmit(saveAddressToBook)()}
                           >
                             {editingAddressId ? "Save changes" : "Save address"}
@@ -2057,6 +2064,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                             <div className="space-y-2">
                               <Label htmlFor="senderName">Name</Label>
                               <Input
+                                className="h-11"
                                 id="senderName"
                                 value={senderName}
                                 onChange={(event) => setSenderName(event.target.value)}
@@ -2065,6 +2073,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                             <div className="space-y-2">
                               <Label htmlFor="senderPhone">Phone</Label>
                               <Input
+                                className="h-11"
                                 id="senderPhone"
                                 type="tel"
                                 value={senderPhone}

@@ -213,7 +213,9 @@ export function CustomerAuthModal({
           <span className="mx-auto mb-3 flex size-14 items-center justify-center rounded-2xl bg-white/15 text-white">
             {step === "code" ? <ShieldCheck className="size-6" /> : <Mail className="size-6" />}
           </span>
-          <h2 className="font-heading text-xl font-bold">
+          {/* text-white said again: every heading takes text-foreground from
+              the base styles, so it does not inherit the band's white. */}
+          <h2 className="font-heading text-xl font-bold text-white">
             {step === "code" ? "Enter your code" : "Sign in"}
           </h2>
           <p className="mt-1 text-sm text-white/85">
@@ -294,6 +296,7 @@ function EmailStep({
       <div className="space-y-2">
         <Label htmlFor="auth-email">Email address</Label>
         <Input
+          className="h-11"
           id="auth-email"
           type="email"
           autoFocus
@@ -317,6 +320,7 @@ function EmailStep({
           Your name <span className="font-normal text-muted-foreground">(optional)</span>
         </Label>
         <Input
+          className="h-11"
           id="auth-name"
           autoComplete="name"
           placeholder="For your first order"
@@ -325,7 +329,7 @@ function EmailStep({
         />
       </div>
 
-      <Button type="submit" variant="bakery" className="w-full" disabled={!emailValid || loading}>
+      <Button type="submit" variant="bakery" className="h-11 w-full" disabled={!emailValid || loading}>
         {loading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
         {loading ? "Sending code…" : "Email me a code"}
       </Button>
@@ -395,7 +399,7 @@ function CodeStep({
         </div>
       </div>
 
-      <Button type="submit" variant="bakery" className="w-full" disabled={!codeValid || loading}>
+      <Button type="submit" variant="bakery" className="h-11 w-full" disabled={!codeValid || loading}>
         {loading ? <Loader2 className="size-4 animate-spin" /> : null}
         {loading ? "Checking…" : "Sign in"}
       </Button>

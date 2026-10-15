@@ -180,7 +180,7 @@ export function FaqPage({ faqs, contact }: FaqPageProps) {
                 </div>
 
                 <Button
-                  className="mt-6 w-full rounded-xl"
+                  className="mt-6 h-11 w-full rounded-xl"
                   render={<Link href={routes.store.contact} />}
                 >
                   Contact Support

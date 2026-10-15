@@ -152,6 +152,7 @@ export function DeliveryLocationButton() {
             }}
           >
             <Input
+              className="h-11"
               value={entered}
               // The same normalisation every zone rule is matched through, so
               // what the customer sees typed is exactly what gets compared.
@@ -161,7 +162,7 @@ export function DeliveryLocationButton() {
               aria-label="PIN code"
               placeholder="PIN code"
             />
-            <Button type="submit" variant="bakery" disabled={!entered || loading}>
+            <Button type="submit" variant="bakery" className="h-11" disabled={!entered || loading}>
               Check
             </Button>
           </form>

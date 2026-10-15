@@ -72,6 +72,7 @@ export function ProductQuestionForm({
         <div className="space-y-1">
           <Label htmlFor="question-name">Your name</Label>
           <Input
+            className="h-11"
             id="question-name"
             value={name}
             onChange={(event) => setName(event.target.value)}
@@ -81,6 +82,7 @@ export function ProductQuestionForm({
         <div className="space-y-1">
           <Label htmlFor="question-email">Email</Label>
           <Input
+            className="h-11"
             id="question-email"
             type="email"
             value={email}
@@ -99,7 +101,7 @@ export function ProductQuestionForm({
           required
         />
       </div>
-      <Button type="submit" variant="outline" disabled={sending}>
+      <Button type="submit" variant="outline" className="h-11" disabled={sending}>
         {sending ? "Sending…" : "Send question"}
       </Button>
     </form>

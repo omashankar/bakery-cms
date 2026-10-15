@@ -102,9 +102,9 @@ export function CouponInput({
           value={code}
           onChange={(event) => setCode(event.target.value.toUpperCase())}
           placeholder="Coupon code"
-          className="uppercase"
+          className="h-11 uppercase"
         />
-        <Button type="button" variant="outline" onClick={handleApply} disabled={loading}>
+        <Button type="button" variant="outline" className="h-11" onClick={handleApply} disabled={loading}>
           {loading ? <Loader2 className="size-4 animate-spin" /> : "Apply"}
         </Button>
       </div>

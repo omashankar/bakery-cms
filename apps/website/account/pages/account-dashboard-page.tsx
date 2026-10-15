@@ -127,11 +127,11 @@ export function AccountDashboardPage() {
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="firstName">First Name</Label>
-              <Input id="firstName" {...register("firstName", { required: true })} />
+              <Input className="h-11" id="firstName" {...register("firstName", { required: true })} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="lastName">Last Name</Label>
-              <Input id="lastName" {...register("lastName")} />
+              <Input className="h-11" id="lastName" {...register("lastName")} />
             </div>
           </div>
 
@@ -145,7 +145,7 @@ export function AccountDashboardPage() {
                 under it — My Orders emptied itself and said "No orders yet",
                 beneath a toast reading "Profile updated".
               */}
-              <Input id="email" type="email" value={session?.email ?? profile?.email ?? ""} readOnly disabled />
+              <Input className="h-11" id="email" type="email" value={session?.email ?? profile?.email ?? ""} readOnly disabled />
               <p className="text-xs text-muted-foreground">
                 Your orders are matched to this address. To use another one, sign in with it.
               </p>
@@ -159,6 +159,7 @@ export function AccountDashboardPage() {
                 up without one could never add it.
               */}
               <Input
+                className="h-11"
                 id="phone"
                 type="tel"
                 inputMode="tel"
@@ -188,7 +189,7 @@ export function AccountDashboardPage() {
             <Button
               type="button"
               variant="outline"
-              className="h-10 sm:min-w-32"
+              className="h-11 sm:min-w-32"
               onClick={resetForm}
               disabled={formState.isSubmitting}
             >
@@ -197,7 +198,7 @@ export function AccountDashboardPage() {
             <Button
               type="submit"
               variant="bakery"
-              className="h-10 sm:min-w-32"
+              className="h-11 sm:min-w-32"
               disabled={formState.isSubmitting}
             >
               {formState.isSubmitting ? (

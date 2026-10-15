@@ -271,8 +271,13 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
             margin stayed behind and held 32px of nothing above the tiles.
             Spacing under a heading belongs to the heading, which is the only
             thing that knows whether there is one.
+
+            `scroll-px-4` WITH THE `px-4`. Snapping measures from the
+            scroller's edge, not its padding, so the browser snapped the first
+            tile flush to the screen on load — scrollLeft 16, the gutter gone
+            and the tile touching the glass.
           */
-          "no-scrollbar -mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-4 sm:gap-5 sm:overflow-visible sm:px-0",
+          "no-scrollbar -mx-4 flex snap-x scroll-px-4 gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-4 sm:gap-5 sm:overflow-visible sm:scroll-px-0 sm:px-0",
           /*
             THE COLUMN COUNT FOLLOWS THE TILES. It was hard-wired to eight,
             so a shop with three categories got three cards and five columns

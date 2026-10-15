@@ -71,16 +71,17 @@ export function ContactForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="name">Full Name</Label>
-          <Input id="name" name="name" placeholder="Your full name" required />
+          <Input className="h-11" id="name" name="name" placeholder="Your full name" required />
         </div>
         <div className="space-y-2">
           <Label htmlFor="phone">Phone</Label>
-          <Input id="phone" name="phone" type="tel" placeholder="+91" />
+          <Input className="h-11" id="phone" name="phone" type="tel" placeholder="+91" />
         </div>
       </div>
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
         <Input
+          className="h-11"
           id="email"
           name="email"
           type="email"
@@ -92,17 +93,18 @@ export function ContactForm({
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="eventDate">Event Date</Label>
-            <Input id="eventDate" name="eventDate" type="date" />
+            <Input className="h-11" id="eventDate" name="eventDate" type="date" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="guestCount">Guest Count</Label>
-            <Input id="guestCount" name="guestCount" type="number" min={1} placeholder="150" />
+            <Input className="h-11" id="guestCount" name="guestCount" type="number" min={1} placeholder="150" />
           </div>
         </div>
       ) : null}
       <div className="space-y-2">
         <Label htmlFor="subject">Subject</Label>
         <Input
+          className="h-11"
           id="subject"
           name="subject"
           placeholder={`Order inquiry, custom ${labels.productWord.toLowerCase()}, etc.`}
@@ -139,7 +141,7 @@ export function ContactForm({
           className="min-h-32"
         />
       </div>
-      <Button type="submit" className="w-full" disabled={isSubmitting}>
+      <Button type="submit" className="h-11 w-full" disabled={isSubmitting}>
         {isSubmitting ? "Sending..." : submitLabel}
       </Button>
     </form>
