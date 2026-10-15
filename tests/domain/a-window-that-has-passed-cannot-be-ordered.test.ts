@@ -94,7 +94,10 @@ describe("reading a shop's own wording for a window", () => {
   it("gets noon and midnight the right way round", () => {
     // 12pm is noon and 12am is midnight: the hour wraps, the half-day does not.
     expect(timeSlotEndsAt("11:00 AM – 12:00 PM")).toBe(720);
-    expect(timeSlotEndsAt("11:30 PM – 12:30 AM")).toBe(30);
+    // Past midnight it closes at the end of ITS day — 30 minutes into the
+    // next. Read as 30, tonight's window was "past" from the moment the day
+    // began, so no midnight delivery could be booked for tonight.
+    expect(timeSlotEndsAt("11:30 PM – 12:30 AM")).toBe(24 * 60 + 30);
   });
 
   it("reads a plain range as a 24-hour clock", () => {
@@ -217,5 +220,17 @@ describe("and the shop can enforce what it has set", () => {
     expect(picker).toContain("!isPastTimeSlot(date, window)");
     expect(page).toContain("earliestDate={earliestDeliveryDate}");
     expect(page).toContain("isPastSameDayCutoff(floor, commerce.sameDayCutoff)");
+  });
+});
+
+describe("a window that runs to midnight", () => {
+  it("is still open tonight, and closes at the end of the day", () => {
+    const MIDNIGHT = "11:00 PM – 12:00 AM";
+    const day = "2026-10-15";
+    // It read "12:00 AM" as minute 0 and called the window closed all day.
+    expect(isPastTimeSlot(day, MIDNIGHT, new Date(2026, 9, 15, 10, 0))).toBe(false);
+    expect(isPastTimeSlot(day, MIDNIGHT, new Date(2026, 9, 15, 23, 30))).toBe(false);
+    // An ordinary window is unchanged.
+    expect(isPastTimeSlot(day, "10:00 AM – 12:00 PM", new Date(2026, 9, 15, 12, 0))).toBe(true);
   });
 });

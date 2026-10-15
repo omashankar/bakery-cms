@@ -155,8 +155,16 @@ export function timeSlotEndsAt(slot: string): number | null {
   const last = meridiem.at(-1);
   if (last) {
     // 12am is midnight and 12pm is noon: the hour wraps, the half-day does not.
-    const hour = (Number(last[1]) % 12) + (last[3] === "pm" ? 12 : 0);
-    return hour * 60 + Number(last[2]);
+    const toMinutes = (match: RegExpMatchArray) =>
+      ((Number(match[1]) % 12) + (match[3] === "pm" ? 12 : 0)) * 60 + Number(match[2]);
+    const end = toMinutes(last);
+    // A window that ENDS at or past midnight — "11:00 PM – 12:00 AM" — closes
+    // at the end of ITS day, not at its start. Read as 0 it was always
+    // "past", so a midnight delivery could never be booked for tonight and
+    // the server refused it too.
+    const first = meridiem[0];
+    if (meridiem.length > 1 && first && end <= toMinutes(first)) return end + 24 * 60;
+    return end;
   }
 
   // No am/pm anywhere: read it as a 24-hour clock rather than assuming.
