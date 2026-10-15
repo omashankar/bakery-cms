@@ -89,8 +89,11 @@ export function DeliverySlotPicker({
 
   function pickTier(next: DeliveryTier) {
     setTierId(next.id);
-    // A midnight or next-day service has nothing to choose: done.
+    // A service with no windows has nothing to choose: done. One with a
+    // single open window (midnight) has nothing to choose either.
+    const open = next.windows.filter((window) => !isPastTimeSlot(date, window));
     if (next.windows.length === 0) finish("", next.id);
+    else if (open.length === 1) finish(open[0], next.id);
     else setStage("time");
   }
 
