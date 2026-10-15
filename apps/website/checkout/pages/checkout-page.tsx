@@ -39,7 +39,7 @@ import { DELIVERY_ZONES_UPDATED_EVENT } from "@/features/commerce/lib/delivery-z
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import { CartIssuesAlert } from "@/apps/website/checkout/components/cart-issues-alert";
 import { DeliveryAddressPicker } from "@/apps/website/checkout/components/delivery-address-picker";
-import { CheckoutProgress } from "@/apps/website/checkout/components/checkout-progress";
+import { publishCheckoutStep } from "@/apps/website/checkout/lib/checkout-step-store";
 import { CouponInput } from "@/apps/website/checkout/components/coupon-input";
 import { OrderSummaryPanel } from "@/apps/website/checkout/components/order-summary-panel";
 import { calculateCartTotals, type CartTotals } from "@/features/orders/lib/cart-totals";
@@ -89,7 +89,6 @@ import {
   isPastSameDayCutoff,
   isPastTimeSlot,
 } from "@/features/orders/lib/delivery-date";
-import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import {
   clearCart,
   clearCartPreferences,
@@ -692,6 +691,16 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
     router.push(query ? `?${query}` : routes.store.checkout, { scroll: false });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
+
+  // The steps are drawn by the focused header now; tell it where we are, and
+  // how to go back to a completed step. `goToStep` reads only `searchParams`
+  // and the router, so re-publishing on those (and the step) keeps it current
+  // without re-publishing on every render.
+  useEffect(() => {
+    publishCheckoutStep({ step, onSelect: (target) => goToStep(target) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
+  }, [step, searchParams]);
+  useEffect(() => () => publishCheckoutStep(null), []);
 
   // Browser Back/Forward changes the URL; follow it back into the right step.
   useEffect(() => {
@@ -1517,23 +1526,15 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
         </div>
       ) : null}
 
-      <StorePageHeader
-        title="Checkout"
-        breadcrumbs={[
-          { label: "Cart", href: routes.store.cart },
-          { label: "Checkout" },
-        ]}
-      />
+      {/*
+        No breadcrumb and no in-page steps: the focused header carries both
+        the way home and the steps, which this page feeds (see the effect
+        publishing `step`).
+      */}
+      <h1 className="sr-only">Checkout</h1>
 
       <section className={layoutSpacing.sectionY}>
         <div className={layoutSpacing.container}>
-          <CheckoutProgress
-            currentStep={step}
-            onStepSelect={(target) => {
-              goToStep(target);
-            }}
-            className="mb-8"
-          />
 
           <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
             <div className="order-1 space-y-6 lg:order-none lg:col-start-1">

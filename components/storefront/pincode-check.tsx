@@ -66,6 +66,8 @@ export function PincodeCheck({
   const [entered, setEntered] = useState("");
   const [result, setResult] = useState<DeliveryLookup | null>(null);
   const [checking, setChecking] = useState(false);
+  // Inline only: the field, or the settled "Deliver to 324001 · Change" row.
+  const [editing, setEditing] = useState(true);
 
   useEffect(() => {
     let alive = true;
@@ -100,6 +102,16 @@ export function PincodeCheck({
     if (saved?.pincode) setEntered(saved.pincode);
   }, []);
 
+  useEffect(() => {
+    if (!inline || !zones || zones.length === 0) return;
+    const saved = readDeliveryLocation();
+    if (!saved?.pincode) return;
+    const found = lookUpDeliveryPincode(zones, saved.pincode, getCommerceSettings());
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a browser read, after mount
+    setResult(found);
+    if (found?.served) setEditing(false);
+  }, [inline, zones]);
+
   if (zones === null || zones.length === 0) return null;
 
   const check = () => {
@@ -109,6 +121,7 @@ export function PincodeCheck({
     setChecking(false);
     if (found?.served) {
       saveDeliveryLocation({ pincode: normalizePincode(entered), label: found.zoneName });
+      if (inline) setEditing(false);
     }
   };
 
@@ -126,6 +139,34 @@ export function PincodeCheck({
       : result.served
         ? "border-green-600"
         : "border-destructive";
+
+  if (inline && !editing && result?.served) {
+    return (
+      <div
+        className={cn("flex w-full min-w-0 items-center justify-between gap-3", className)}
+        aria-live="polite"
+      >
+        <p className="flex min-w-0 items-center gap-2 text-sm">
+          <MapPin className="size-4 shrink-0 text-bakery-700" aria-hidden="true" />
+          <span className="shrink-0 whitespace-nowrap text-muted-foreground">Deliver to:</span>
+          <span className="shrink-0 font-semibold text-foreground">{normalizePincode(entered)}</span>
+          {result.zoneName ? (
+            <span className="truncate text-muted-foreground">· {result.zoneName}</span>
+          ) : null}
+        </p>
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          aria-label="Change PIN code"
+          className="h-9 shrink-0 rounded-md border border-bakery-700 px-3 text-sm font-semibold text-bakery-700 transition-colors hover:bg-bakery-50"
+        >
+          {/* "Change" on a phone: the full label pushed the code onto two lines. */}
+          <span className="sm:hidden">Change</span>
+          <span className="hidden sm:inline">Change PIN code</span>
+        </button>
+      </div>
+    );
+  }
 
   return (
     /*
@@ -145,7 +186,12 @@ export function PincodeCheck({
     */
     <div className={cn("flex w-full min-w-0 flex-col gap-2", className)}>
       <div className={cn(inline && "flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4")}>
-      {title ? <p className="shrink-0 text-sm font-medium text-foreground">{title}</p> : null}
+      {title ? (
+        <p className="flex shrink-0 items-center gap-2 text-sm font-medium text-foreground">
+          {inline ? <MapPin className="size-4 text-bakery-700" aria-hidden="true" /> : null}
+          {title}
+        </p>
+      ) : null}
       {/*
         ONE CONTROL, NOT TWO BOXES WITH A GAP.
 
@@ -165,19 +211,21 @@ export function PincodeCheck({
       */}
       <form
         className={cn(
-          "flex w-full min-w-0 overflow-hidden rounded-md border bg-card",
-          inline ? "h-11 sm:max-w-md" : "h-12",
-          outline,
+          "flex w-full min-w-0 overflow-hidden rounded-md border",
+          inline ? "h-11 shrink-0 gap-2 border-transparent bg-transparent sm:flex-1" : "h-12 bg-card",
+          inline ? null : outline,
         )}
         onSubmit={(event) => {
           event.preventDefault();
           check();
         }}
       >
-        <MapPin
-          className="ml-3 size-4 shrink-0 self-center text-muted-foreground"
-          aria-hidden="true"
-        />
+        {inline ? null : (
+          <MapPin
+            className="ml-3 size-4 shrink-0 self-center text-muted-foreground"
+            aria-hidden="true"
+          />
+        )}
         <input
           type="text"
           value={entered}
@@ -212,7 +260,12 @@ export function PincodeCheck({
             above, where the track was already wider than 332.
           */
           size={1}
-          className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-base outline-none md:text-sm placeholder:text-muted-foreground"
+          className={cn(
+            "h-full min-w-0 flex-1 px-2.5 text-base outline-none md:text-sm placeholder:text-muted-foreground",
+            inline
+              ? cn("rounded-md border bg-muted/60 px-3", outline)
+              : "bg-transparent",
+          )}
         />
         {/*
           A WAY OUT OF A WRONG CODE, which the field did not have. Six digits
@@ -239,7 +292,14 @@ export function PincodeCheck({
         <button
           type="submit"
           disabled={!entered}
-          className="h-full shrink-0 bg-bakery-700 px-6 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          className={cn(
+            "h-full shrink-0 px-6 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50",
+            // Inline it is its own outlined button at the row's end, as the
+            // reference's — a filled block that looked disabled until typed in.
+            inline
+              ? "rounded-md border border-bakery-700 text-bakery-700 hover:bg-bakery-50"
+              : "bg-bakery-700 text-white",
+          )}
         >
           Check
         </button>

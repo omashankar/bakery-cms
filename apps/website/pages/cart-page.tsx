@@ -8,7 +8,6 @@ import {
   Pencil,
   ShieldCheck,
   ShoppingBag,
-  Tag,
   Trash2,
   Truck,
 } from "lucide-react";
@@ -27,8 +26,8 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { CheckoutProgress } from "@/apps/website/checkout/components/checkout-progress";
 import { CartCouponPanel } from "@/apps/website/checkout/components/cart-coupon-panel";
+import { publishCheckoutStep } from "@/apps/website/checkout/lib/checkout-step-store";
 import { applyCouponCode, type AppliedCoupon } from "@/features/orders/lib/coupons";
 import { offersForCart } from "@/features/commerce/lib/coupon-offers";
 import {
@@ -271,6 +270,12 @@ export function CartPage({ catalog = [] }: CartPageProps) {
    * page’s own trust rows were rewritten to that standard after one of them
    * printed a fallback as a fact under every product in the shop.
    */
+  // The header draws the steps; over an EMPTY cart it should draw none.
+  useEffect(() => {
+    publishCheckoutStep(loaded && items.length === 0 ? { step: 0, hidden: true } : { step: 0 });
+  }, [loaded, items.length]);
+  useEffect(() => () => publishCheckoutStep(null), []);
+
   const promise = loaded ? getDeliveryPromise() : "";
   const freeDeliveryOver = loaded ? getFreeDeliveryThreshold() : 0;
 
@@ -431,16 +436,12 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                 empty cart implies a checkout that is not happening.
               */}
               {/*
-                ONE ROW ON A DESKTOP, the heading and the steps — the reference
-                opens its cart this way. Stacked, the steps and then a title
-                under them pushed the first line ~90px further down.
+                The steps are in the header now, as the reference has them;
+                the page opens on its own heading.
               */}
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <h1 className="order-2 font-heading text-xl font-bold tracking-tight sm:text-2xl lg:order-1">
-                  Shopping Cart ({itemCount})
-                </h1>
-                <CheckoutProgress currentStep={0} className="order-1 mx-auto w-full max-w-2xl lg:order-2 lg:mx-0 lg:max-w-xl" />
-              </div>
+              <h1 className="font-heading text-xl font-bold tracking-tight">
+                Shopping Cart ({itemCount})
+              </h1>
 
               <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
               <div className="order-1 space-y-6 lg:order-none lg:col-start-1">

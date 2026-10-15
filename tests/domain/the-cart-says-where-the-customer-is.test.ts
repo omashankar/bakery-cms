@@ -40,6 +40,9 @@ vi.mock("next/navigation", () => ({
 }));
 
 const { CartPage } = await import("@/apps/website/pages/cart-page");
+// The steps are drawn by the cart/checkout header now, not the page body —
+// rendered together, as the layout puts them.
+const { FocusedCheckoutHeader } = await import("@/apps/website/components/focused-checkout-header");
 
 const LINE: CartLineItem = {
   id: "seed",
@@ -62,7 +65,12 @@ function render() {
   document.body.append(container);
   root = createRoot(container);
   act(() => {
-    root!.render(createElement(CartPage, { catalog: [] } as never));
+    root!.render(
+      createElement("div", null,
+        createElement(FocusedCheckoutHeader, { logo: "", logoLetter: "S", siteName: "Shop" }),
+        createElement(CartPage, { catalog: [] } as never),
+      ),
+    );
   });
   return container;
 }
