@@ -5,7 +5,8 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Check, Eye, EyeOff, KeyRound, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
-import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
+import { adminShell } from "@/apps/admin/components/admin-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -180,13 +181,13 @@ export function ChangePasswordPage() {
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center gap-2 pb-2">
             <KeyRound className="size-4 text-bakery-700" />
-            <CardTitle className="text-base">Update Password</CardTitle>
+            <CardTitle className="text-base">Update password</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
-            <PasswordField id="current" label="Current Password" value={current} onChange={setCurrent} placeholder="Enter current password" />
+            <PasswordField id="current" label="Current password" value={current} onChange={setCurrent} placeholder="Enter current password" />
 
             <div className="space-y-2">
-              <PasswordField id="new" label="New Password" value={next} onChange={setNext} placeholder="Enter new password" />
+              <PasswordField id="new" label="New password" value={next} onChange={setNext} placeholder="Enter new password" />
               {next ? (
                 <div className="space-y-1.5">
                   <div className="flex gap-1">
@@ -208,7 +209,7 @@ export function ChangePasswordPage() {
             </div>
 
             <div className="space-y-2">
-              <PasswordField id="confirm" label="Confirm Password" value={confirm} onChange={setConfirm} placeholder="Re-enter new password" />
+              <PasswordField id="confirm" label="Confirm password" value={confirm} onChange={setConfirm} placeholder="Re-enter new password" />
               {mismatch ? (
                 <p className="text-xs text-destructive">Passwords do not match.</p>
               ) : confirm && confirm === next ? (

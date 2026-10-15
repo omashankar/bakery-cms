@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DeliveryAnswer } from "@/components/storefront/delivery-answer";
 import { fetchZones } from "@/features/commerce/lib/commerce-api";
+import { loadDeliveryZones } from "@/features/commerce/lib/delivery-zones-repository";
+import { isStorefrontSeeded } from "@/lib/storefront-seed-flag";
 import {
   DELIVERY_LOCATION_UPDATED_EVENT,
   deliveryLocationLabel,
@@ -19,6 +21,7 @@ import {
 import { normalizePincode } from "@/features/commerce/lib/delivery-zone-utils";
 import type { DeliveryZone } from "@/types/delivery";
 import { cn } from "@/lib/utils";
+import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
 
 /**
  * WHERE AM I HAVING THIS SENT — in the header, where the reference puts it.
@@ -67,7 +70,9 @@ export function DeliveryLocationButton() {
     setOpen(true);
     if (zones !== null || loading) return;
     setLoading(true);
-    void fetchZones()
+    // The zones the page brought with it (StorefrontCacheSeed), or a request.
+    const read = isStorefrontSeeded() ? Promise.resolve(loadDeliveryZones()) : fetchZones();
+    void read
       .then((rows) => setZones(rows ?? []))
       // An empty list on failure, not a retry loop: the panel then says it
       // found no covering zone, which is what it knows, instead of claiming
@@ -94,7 +99,7 @@ export function DeliveryLocationButton() {
 
   const check = () => {
     if (zones === null) return;
-    const found = lookUpDeliveryPincode(zones, entered);
+    const found = lookUpDeliveryPincode(zones, entered, getCommerceSettings());
     setResult(found);
     if (found?.served) {
       const pincode = normalizePincode(entered);
@@ -147,6 +152,7 @@ export function DeliveryLocationButton() {
             }}
           >
             <Input
+              className="h-11"
               value={entered}
               // The same normalisation every zone rule is matched through, so
               // what the customer sees typed is exactly what gets compared.
@@ -156,7 +162,7 @@ export function DeliveryLocationButton() {
               aria-label="PIN code"
               placeholder="PIN code"
             />
-            <Button type="submit" variant="bakery" disabled={!entered || loading}>
+            <Button type="submit" variant="bakery" className="h-11" disabled={!entered || loading}>
               Check
             </Button>
           </form>

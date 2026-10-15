@@ -1,5 +1,5 @@
 import { ok } from "@/lib/server/http/response";
-import { withErrorHandler, AppError, NotFoundError } from "@/lib/server/http/errors";
+import { withErrorHandler, AppError, NotFoundError, ConflictError } from "@/lib/server/http/errors";
 import { validate, readJson } from "@/lib/server/http/validate";
 import { requireRole } from "@/lib/server/auth/dal";
 import { requestContext } from "@/lib/server/audit/audit-log";
@@ -7,6 +7,7 @@ import { requestContext } from "@/lib/server/audit/audit-log";
 import { sendTestEmail } from "@/lib/server/mail/send-test-email";
 
 import * as service from "./settings.service";
+import { StaleSectionError } from "./settings.repository";
 import { sectionSchemas, type SettingsSection } from "./settings.validators";
 import { allowlisted } from "@/lib/server/http/allowlist";
 
@@ -104,12 +105,22 @@ export const updateSectionController = withErrorHandler(
 
     const value = validate(schema, await readJson(request));
     const ctx = requestContext(request);
-    const updated = await service.updateSection(section, value, {
-      ...ctx,
-      actorId: session.sub,
-      actorEmail: session.email,
-    });
-    return settingsResponse(updated, "Settings updated");
+    // The section version this save was composed against; see
+    // `sectionVersions` on the settings model.
+    const header = request.headers.get("X-Section-Version");
+    const expected = header !== null && header !== "" ? Number(header) : undefined;
+    try {
+      const updated = await service.updateSection(
+        section,
+        value,
+        { ...ctx, actorId: session.sub, actorEmail: session.email },
+        Number.isFinite(expected) ? expected : undefined,
+      );
+      return settingsResponse(updated, "Settings updated");
+    } catch (error) {
+      if (error instanceof StaleSectionError) throw new ConflictError(error.message);
+      throw error;
+    }
   },
 );
 

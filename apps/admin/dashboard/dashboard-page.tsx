@@ -24,25 +24,41 @@ import {
   type DashboardDateRange,
 } from "./lib/dashboard-analytics";
 import { EMPTY_DASHBOARD_STATS, getDashboardStats } from "./lib/dashboard-data";
+import { DEFAULT_DASHBOARD_RANGE } from "./lib/dashboard-defaults";
 import { subscribeToAdminData } from "@/apps/admin/lib/admin-data-events";
-import { fetchOrderAnalytics } from "@/features/orders/lib/orders-api";
-import { ORDERS_UPDATED_EVENT } from "@/features/orders/lib/orders";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { fetchOrderAnalytics, type OrderAnalyticsResponse } from "@/features/orders/lib/orders-api";
+import type { AuditLogEntry } from "@/types/audit";
+import type { PlacedOrder } from "@/features/orders/lib/orders";
+import { ORDERS_UPDATED_EVENT, isOrdersCacheRefill } from "@/features/orders/lib/orders";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { type FiguresState } from "@/components/shared/panel-loading";
 
 const MAX_REFRESH_RETRIES = 4;
 const REFRESH_RETRY_BASE_MS = 5_000;
 
-export function DashboardPage() {
+export function DashboardPage({
+  initial = null,
+}: {
+  /** The default range's figures and the activity feed, read on the server. */
+  initial?: {
+    analytics: OrderAnalyticsResponse;
+    activity: AuditLogEntry[];
+    recentOrders: PlacedOrder[];
+  } | null;
+} = {}) {
   const [greetingName, setGreetingName] = useState<string | null>(null);
   const [stats, setStats] = useState(EMPTY_DASHBOARD_STATS);
-  const [commerce, setCommerce] = useState(EMPTY_DASHBOARD_COMMERCE_ANALYTICS);
-  const [range, setRange] = useState<DashboardDateRange>("30d");
+  const [commerce, setCommerce] = useState(() =>
+    initial
+      ? toDashboardCommerceAnalytics(DEFAULT_DASHBOARD_RANGE, initial.analytics)
+      : EMPTY_DASHBOARD_COMMERCE_ANALYTICS,
+  );
+  const [range, setRange] = useState<DashboardDateRange>(DEFAULT_DASHBOARD_RANGE);
   const [lastUpdated, setLastUpdated] = useState("");
   const [analyticsFailed, setAnalyticsFailed] = useState(false);
   // "Nothing has loaded" and "the last refresh failed" are different things to
   // say, and the caption said the first for both.
-  const [loadedOnce, setLoadedOnce] = useState(false);
+  const [loadedOnce, setLoadedOnce] = useState(Boolean(initial));
   // `stats` reads synchronously, but the effect that fills it runs after the
   // browser paints — so "New inquiries 0" was on screen for a frame regardless.
   const [statsLoaded, setStatsLoaded] = useState(false);
@@ -50,6 +66,8 @@ export function DashboardPage() {
   const attempts = useRef(0);
   /** Which range `attempts` is counting for — changing range starts over. */
   const loadedRange = useRef(range);
+  // The server answered the default range; its first request would repeat it.
+  const analyticsFromServer = useRef(Boolean(initial));
 
   useEffect(() => {
     const session = getDemoSession();
@@ -111,20 +129,28 @@ export function DashboardPage() {
       }
     }
 
-    void load();
+    if (analyticsFromServer.current) analyticsFromServer.current = false;
+    else void load();
     // Only the orders event, not all five. Each call is an aggregation over the
     // whole collection, and admin entry fires several of these events in quick
     // succession — subscribing to the lot turned one page view into a dozen
     // full-collection requests. Nothing here derives from products, inventory,
     // inquiries or notifications anyway.
-    window.addEventListener(ORDERS_UPDATED_EVENT, load);
+    // Not for a cache refill: the figures are computed on the SERVER, and
+    // copying the server's orders into this browser changes none of them. The
+    // refill announced itself twice on entry, so every visit asked for the same
+    // aggregation three times.
+    const onOrdersChanged = (event: Event) => {
+      if (!isOrdersCacheRefill(event)) void load();
+    };
+    window.addEventListener(ORDERS_UPDATED_EVENT, onOrdersChanged);
 
     return () => {
       // Both, not just the unsubscribe: a request already in flight would
       // otherwise still resolve and set state after this effect is torn down.
       cancelled = true;
       if (retry !== undefined) clearTimeout(retry);
-      window.removeEventListener(ORDERS_UPDATED_EVENT, load);
+      window.removeEventListener(ORDERS_UPDATED_EVENT, onOrdersChanged);
     };
   }, [range, retryKey]);
 
@@ -239,7 +265,7 @@ export function DashboardPage() {
       </section>
 
       <section className="grid items-stretch gap-3 sm:gap-4 lg:grid-cols-2">
-        <DashboardRecentOrders />
+        <DashboardRecentOrders initial={initial?.recentOrders ?? null} />
         <DashboardInquiriesPanel />
       </section>
 
@@ -252,7 +278,7 @@ export function DashboardPage() {
       </section>
 
       <section className="grid items-stretch gap-3 sm:gap-4 lg:grid-cols-2">
-        <DashboardActivityFeed />
+        <DashboardActivityFeed initial={initial?.activity ?? null} />
         <DashboardQuickActions />
       </section>
     </AdminPage>

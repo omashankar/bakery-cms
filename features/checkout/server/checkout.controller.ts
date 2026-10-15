@@ -8,6 +8,7 @@ import { getMaintenanceState } from "@/features/settings/server/maintenance.serv
 import {
   priceCart,
   UndeliverableAtSpeedError,
+  OutsideDeliveryZonesError,
   UnknownProductError,
   UnknownWeightError,
 } from "./pricing.server";
@@ -18,9 +19,19 @@ import {
   isOfferedTimeSlot,
   isPastSameDayCutoff,
   isPastTimeSlot,
+  offeredWindows,
+  shopClockNow,
 } from "@/features/orders/lib/delivery-date";
+import { getSettings } from "@/features/settings/server/settings.service";
+
+/** Now, as the shop's wall clock reads it (General → Timezone). */
+async function shopNow(): Promise<Date> {
+  const settings = (await getSettings().catch(() => null)) as { general?: { timezone?: string } } | null;
+  return shopClockNow(settings?.general?.timezone || "Asia/Kolkata");
+}
 import { checkMinimumOrder } from "@/features/checkout/lib/minimum-order";
 import { formatCurrency } from "@/utils/format";
+import { OUTSIDE_ZONES_MESSAGE } from "@/features/commerce/lib/delivery-zone-utils";
 
 /**
  * Prices a cart and holds the result as a draft.
@@ -77,7 +88,7 @@ export const quoteCartController = withErrorHandler(async (request: Request) => 
   // the zone. `deliveryAddress` only stands alone before the customer has
   // entered one, which is the running-total case it exists for.
   const pricingAddress = input.address
-    ? { city: input.address.city, pincode: input.address.pincode }
+    ? { city: input.address.city, pincode: input.address.pincode, state: input.address.state }
     : input.deliveryAddress;
 
   try {
@@ -96,7 +107,10 @@ export const quoteCartController = withErrorHandler(async (request: Request) => 
     // and printed on the invoice as a delivery it is expected to make.
     if (
       input.deliverySlot?.timeSlot &&
-      !isOfferedTimeSlot(input.deliverySlot.timeSlot, quote.commerce.deliveryTimeSlots ?? [])
+      !isOfferedTimeSlot(
+        input.deliverySlot.timeSlot,
+        offeredWindows(quote.commerce, input.deliveryTierId ?? input.deliverySlot.tierId),
+      )
     ) {
       throw new AppError(
         "That delivery time is not one this shop offers. Please choose another.",
@@ -115,7 +129,13 @@ export const quoteCartController = withErrorHandler(async (request: Request) => 
       Number(quote.commerce.deliveryLeadDays) || 0,
     );
 
-    if (input.deliverySlot?.date && isBeforeLeadTime(input.deliverySlot.date, leadDays)) {
+    // The SHOP's clock, not the server's. These compared against `new Date()`'s
+    // local getters, and the server runs in UTC: a 14:00 same-day cutoff closed
+    // at 19:30 IST, and between midnight and 05:30 IST "today" was yesterday,
+    // so none of these checks ran at all.
+    const now = await shopNow();
+
+    if (input.deliverySlot?.date && isBeforeLeadTime(input.deliverySlot.date, leadDays, now)) {
       throw new AppError(
         `We need ${leadDays} day${leadDays === 1 ? "" : "s"} to prepare an order for this area. Please choose a later delivery date.`,
         409,
@@ -133,14 +153,14 @@ export const quoteCartController = withErrorHandler(async (request: Request) => 
      * expired while they were paying is worse than honouring it.
      */
     if (input.deliverySlot?.date) {
-      if (isPastSameDayCutoff(input.deliverySlot.date, quote.commerce.sameDayCutoff ?? "")) {
+      if (isPastSameDayCutoff(input.deliverySlot.date, quote.commerce.sameDayCutoff ?? "", now)) {
         throw new AppError(
           "We have stopped taking orders for delivery today. Please choose a later date.",
           409,
           [{ field: "deliverySlot.date", message: "Orders for today have closed" }],
         );
       }
-      if (isPastTimeSlot(input.deliverySlot.date, input.deliverySlot.timeSlot ?? "")) {
+      if (isPastTimeSlot(input.deliverySlot.date, input.deliverySlot.timeSlot ?? "", now)) {
         throw new AppError(
           "That delivery window has already passed today. Please choose another.",
           409,
@@ -215,6 +235,11 @@ export const quoteCartController = withErrorHandler(async (request: Request) => 
         409,
         [{ field: "deliveryTierId", message: error.message }],
       );
+    }
+    if (error instanceof OutsideDeliveryZonesError) {
+      throw new AppError(OUTSIDE_ZONES_MESSAGE, 409, [
+        { field: "pincode", message: error.message },
+      ]);
     }
     throw error;
   }

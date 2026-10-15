@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CollectionsPage } from "@/apps/website";
+import { CollectionsListing } from "@/apps/website/pages/collections-listing";
 import { buildRouteMetadataServer } from "@/features/seo/server/seo-store.server";
 import { getStorefrontProductCards } from "@/features/products/data/products-service";
 import { getStorefrontCategories } from "@/apps/website/lib/storefront-categories.server";
@@ -35,7 +35,7 @@ export default async function Page(props: PageProps) {
   ]);
 
   return (
-    <CollectionsPage
+    <CollectionsListing
       categorySlug={category ?? ""}
       initialSearch={q ?? ""}
       catalog={catalog}

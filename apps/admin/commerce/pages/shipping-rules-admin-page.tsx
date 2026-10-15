@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { reportSettingsWrite } from "@/apps/admin/settings/lib/report-settings-write";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { TaxBreakdown } from "@/components/shared/tax-breakdown";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -113,7 +113,7 @@ export function ShippingRulesAdminPage() {
           hydration !== "ready"
             ? "How delivery is charged at checkout."
             : liveZonePricing
-              ? `Zone pricing on · ${stats.active} active zones`
+              ? `Zone pricing on · ${stats.active} active zone${stats.active === 1 ? "" : "s"}`
               : "Flat-fee shipping · zone pricing off"
         }
         className="gap-3"
@@ -184,6 +184,30 @@ export function ShippingRulesAdminPage() {
                   checked={settings.useZoneBasedDelivery}
                   onCheckedChange={(checked) =>
                     edit((prev) => ({ ...prev, useZoneBasedDelivery: checked === true }))
+                  }
+                />
+              </label>
+              {/*
+                WHAT HAPPENS OUTSIDE EVERY ZONE.
+
+                The product page's delivery check said "not delivered here"
+                for an address no zone covered, while checkout took the same
+                order at the fallback fee — a customer was told no and then
+                charged yes. One switch now decides both.
+              */}
+              <label className="flex items-center justify-between gap-4 rounded-xl border border-border p-4">
+                <div>
+                  <p className="font-medium">Deliver outside your zones</p>
+                  <p className="text-sm text-muted-foreground">
+                    {settings.deliverOutsideZones === false
+                      ? "Off — an address no zone covers cannot order, and the product page says so."
+                      : "On — an address no zone covers is charged the fallback fee below."}
+                  </p>
+                </div>
+                <Switch
+                  checked={settings.deliverOutsideZones !== false}
+                  onCheckedChange={(checked) =>
+                    edit((prev) => ({ ...prev, deliverOutsideZones: checked === true }))
                   }
                 />
               </label>
@@ -315,6 +339,15 @@ export function ShippingRulesAdminPage() {
                   ? ` · Est. ${previewTotals.estimatedDeliveryDays} day(s)`
                   : ""}
                 {previewTotals.delivery === 0 ? " · free at this cart value" : ""}
+              </p>
+            ) : previewTotals.deliverable === false ? (
+              // The address is outside every zone and the shop has switched
+              // off delivering outside them. The fee reads 0 because there is
+              // no delivery at all — it said "the fallback fee is set to zero"
+              // beside a fallback of ₹149.
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                No active zone covers this address, and delivering outside your zones is
+                off — checkout will not take this order.
               </p>
             ) : !settings.useZoneBasedDelivery ? (
               <p className="text-xs text-muted-foreground">

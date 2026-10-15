@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { SecuritySettingsPage } from "@/apps/admin/settings";
+import { SecuritySettingsPage } from "@/apps/admin/settings/components/security-settings-page";
 
 export const metadata: Metadata = {
   title: "Login Security",

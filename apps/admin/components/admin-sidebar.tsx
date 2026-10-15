@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { IntentLink as Link } from "@/components/shared/intent-link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -56,7 +56,7 @@ import {
 } from "@/constants/navigation";
 import { routes } from "@/constants/routes";
 import { isSettingsOwnedPath } from "@/lib/admin-settings-pages";
-import { countNewInquiries } from "@/apps/admin/inquiries";
+import { countNewInquiries } from "@/features/inquiries/lib/inquiries-repository";
 import { countInventoryAlerts } from "@/apps/admin/commerce/lib/inventory-repository";
 import {
   countUnreadNotifications,
@@ -141,6 +141,24 @@ function isChildLinkActive(
   return pathname.startsWith(`${childHref}/`);
 }
 
+/**
+ * Whether a top-level entry owns this path — itself, or something under it
+ * that no MORE SPECIFIC entry claims. "/admin/orders/cancellations" lit both
+ * Orders and Cancellations, because each tested only its own prefix.
+ */
+function ownsPath(itemHref: string, pathname: string): boolean {
+  if (pathname === itemHref) return true;
+  if (!pathname.startsWith(`${itemHref}/`)) return false;
+  return !adminNavSections.some((section) =>
+    section.items.some(
+      (other) =>
+        other.href !== itemHref &&
+        other.href.startsWith(`${itemHref}/`) &&
+        (pathname === other.href || pathname.startsWith(`${other.href}/`)),
+    ),
+  );
+}
+
 function findOpenMenuHref(pathname: string): string | null {
   for (const section of adminNavSections) {
     for (const item of section.items) {
@@ -174,8 +192,7 @@ function useNavActiveState(item: AdminNavItem) {
     const settingsActive =
       item.href === routes.admin.settings.overview && isSettingsOwnedPath(pathname);
     const parentActive =
-      pathname === item.href ||
-      pathname.startsWith(`${item.href}/`) ||
+      ownsPath(item.href, pathname) ||
       Boolean(childActive) ||
       settingsActive;
 
@@ -294,7 +311,7 @@ function NavItem({
         {hasChildren ? (
           <div className="pointer-events-none absolute top-0 left-full z-50 hidden pl-2 group-hover:pointer-events-auto group-hover:block group-focus-within:pointer-events-auto group-focus-within:block">
             <div className="w-52 overflow-hidden rounded-lg border border-sidebar-border bg-popover p-1 shadow-sm">
-              <p className="px-3 py-2 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+              <p className="px-3 py-2 text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
                 {item.label}
               </p>
               {item.children?.map((sub) => (
@@ -324,15 +341,15 @@ function NavItem({
         <NavIcon icon={Icon} active={isLeafActive} className="size-[18px]" />
         <span className="min-w-0 flex-1 truncate">{item.label}</span>
         {showNotificationBadge ? (
-          <span className="shrink-0 rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+          <span className="shrink-0 rounded-full bg-destructive px-1.5 py-0.5 text-[11px] font-bold leading-none text-white">
             {notificationBadge}
           </span>
         ) : showInventoryBadge ? (
-          <span className="shrink-0 rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+          <span className="shrink-0 rounded-full bg-amber-500 px-1.5 py-0.5 text-[11px] font-bold leading-none text-white">
             {inventoryBadge}
           </span>
         ) : showBadge ? (
-          <span className="shrink-0 rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+          <span className="shrink-0 rounded-full bg-destructive px-1.5 py-0.5 text-[11px] font-bold leading-none text-white">
             {inquiryBadge}
           </span>
         ) : null}
@@ -360,15 +377,15 @@ function NavItem({
           <NavIcon icon={Icon} className="size-[18px]" />
           <span className="min-w-0 flex-1 truncate font-medium">{item.label}</span>
           {showNotificationBadge ? (
-            <span className="shrink-0 rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+            <span className="shrink-0 rounded-full bg-destructive px-1.5 py-0.5 text-[11px] font-bold leading-none text-white">
               {notificationBadge}
             </span>
           ) : showInventoryBadge ? (
-            <span className="shrink-0 rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+            <span className="shrink-0 rounded-full bg-amber-500 px-1.5 py-0.5 text-[11px] font-bold leading-none text-white">
               {inventoryBadge}
             </span>
           ) : showBadge ? (
-            <span className="shrink-0 rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+            <span className="shrink-0 rounded-full bg-destructive px-1.5 py-0.5 text-[11px] font-bold leading-none text-white">
               {inquiryBadge}
             </span>
           ) : null}
@@ -483,8 +500,8 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
     return adminNavSections.map((section) => ({
       ...section,
       items: section.items
-        // The route and component stay named "cakes"; only the visible label
-        // changes. Shared with the command palette, which used to disagree.
+        // The route is /admin/products for every shop; the visible label is
+        // the shop's own word. Shared with the command palette, which used to disagree.
         .map((item) => ({ ...item, label: navItemLabel(item, labels) })),
     }));
   }, [labels]);
@@ -540,7 +557,7 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
             ) : null}
 
             {!collapsed && section.title ? (
-              <p className="mb-1.5 px-3 text-[10px] font-bold tracking-[0.1em] text-muted-foreground uppercase">
+              <p className="mb-1.5 px-3 text-[11px] font-bold tracking-[0.1em] text-muted-foreground uppercase">
                 {section.title}
               </p>
             ) : null}

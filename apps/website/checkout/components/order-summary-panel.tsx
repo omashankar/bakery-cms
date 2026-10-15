@@ -5,6 +5,7 @@ import { compareAtSavings, getFreeDeliveryThreshold } from "@/features/orders/li
 import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import { TaxBreakdown, taxBreakdownFromCartTotals } from "@/components/shared/tax-breakdown";
+import { OptimizedImage } from "@/components/shared/optimized-image";
 import { routes } from "@/constants/routes";
 import { formatCurrency } from "@/utils/format";
 import { cn } from "@/lib/utils";
@@ -26,6 +27,11 @@ interface OrderSummaryPanelProps {
   placed?: boolean;
   /** Settled refunds, so a partially refunded order does not read as fully paid. */
   refunded?: number;
+  /**
+   * The line list at the top. The cart turns it off: its lines are the whole
+   * page beside this box, and the reference's cart summary is the money only.
+   */
+  showItems?: boolean;
 }
 
 function getCommerceLabels() {
@@ -57,6 +63,7 @@ export function OrderSummaryPanel({
   giftWrapLabel,
   placed = false,
   refunded = 0,
+  showItems = true,
 }: OrderSummaryPanelProps) {
   const freeDeliveryThreshold = getFreeDeliveryThreshold();
   const labels = getCommerceLabels();
@@ -91,17 +98,24 @@ export function OrderSummaryPanel({
         ) : null}
       </div>
 
+      {showItems ? (
       <ul className="mt-4 max-h-72 space-y-3 overflow-y-auto border-b border-border pb-4">
         {items.map((item) => (
           <li key={item.id} className="flex items-center gap-3 text-sm">
             <span className="size-11 shrink-0 overflow-hidden rounded-lg border border-border bg-card">
               {item.image ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                /*
+                  Through the image optimiser at the box's own size. A raw
+                  <img> fetched the 600px product photo for a 44px square,
+                  once per line, on the page where the customer pays.
+                */
+                <OptimizedImage
                   src={item.image}
                   alt={item.name}
+                  width={44}
+                  height={44}
+                  sizes="44px"
                   className="size-full object-cover"
-                  loading="lazy"
                 />
               ) : null}
             </span>
@@ -134,9 +148,10 @@ export function OrderSummaryPanel({
           </li>
         ))}
       </ul>
+      ) : null}
 
       <div className="mt-4">
-        <TaxBreakdown values={breakdown} />
+        <TaxBreakdown values={breakdown} bigTotal={!placed} />
       </div>
 
       {totals.deliveryZoneName ? (
@@ -167,7 +182,10 @@ export function OrderSummaryPanel({
         </div>
       ) : null}
 
-      {!placed && totals.subtotal > 0 && totals.subtotal < freeDeliveryThreshold ? (
+      {!placed &&
+      totals.deliverable !== false &&
+      totals.subtotal > 0 &&
+      totals.subtotal < freeDeliveryThreshold ? (
         <p className="mt-3 text-xs text-muted-foreground">
           Add {formatCurrency(freeDeliveryThreshold - totals.subtotal)} more for free delivery.
         </p>

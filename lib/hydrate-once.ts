@@ -29,6 +29,14 @@ const inFlight = new Map<string, Promise<void>>();
  * catch. A FAILED run is not recorded as done, so the next screen that asks
  * gets a real attempt rather than the failure remembered for the session.
  */
+/**
+ * Record a key as hydrated by other means — the server sent its data with the
+ * page — so the browser does not fetch it again.
+ */
+export function markHydrated(key: string): void {
+  done.add(key);
+}
+
 export function hydrateOnce(key: string, run: () => Promise<void>): Promise<void> {
   if (done.has(key)) return Promise.resolve();
 

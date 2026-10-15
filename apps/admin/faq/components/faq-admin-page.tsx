@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import type { ServerContentRead } from "@/features/content/lib/content-api";
+import { applyServerFaqs } from "@/features/content/lib/faq-repository";
 import { faqsWritable } from "@/features/content/lib/content-api";
 import {
   Archive,
@@ -35,7 +37,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { formatRelativeTime } from "@/utils/format";
 import type { FaqItem } from "@/types/content";
-import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
+import { adminShell } from "@/apps/admin/components/admin-shell";
 import { bulkUpdateFaqStatus, deleteFaqs, loadFaqs } from "@/features/content/lib/faq-repository";
 import {
   defaultFaqFilters,
@@ -95,7 +98,19 @@ function FaqRowActions({
   );
 }
 
-export function FaqAdminPage() {
+export function FaqAdminPage({
+  initial = null,
+}: {
+  /** Every FAQs and its version, read on the server; null fetches as before. */
+  initial?: ServerContentRead<FaqItem[]> | null;
+} = {}) {
+  // Before this screen's passive effects, so its mount read finds the server's
+  // FAQs — not this browser's old copy or the shipped demo ones — and the
+  // write gate already open.
+  useLayoutEffect(() => {
+    if (initial) applyServerFaqs(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
+  }, []);
   const [mounted, setMounted] = useState(false);
   const [items, setItems] = useState<FaqItem[]>([]);
   const [filters, setFilters] = useState<FaqListFilters>(defaultFaqFilters);

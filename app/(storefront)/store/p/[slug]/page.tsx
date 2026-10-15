@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { ProductDetailPage } from "@/apps/website";
+import { ProductDetailPage } from "@/apps/website/pages/product-detail-page";
+import { ProductCard } from "@/components/storefront/product-card";
 import {
   getStorefrontCategories,
   getStorefrontCollections,
@@ -207,12 +208,17 @@ export default async function Page(props: PageProps) {
     (primaryId ? offered.categories.find((entry) => entry.id === primaryId) : undefined) ??
     offered.categories.find((entry) => entry.name === cake.category);
 
+  const related = pickRelated(catalog, cake.slug, cake.category);
+
   return (
     <ProductDetailPage
       cake={cake}
       modules={modules}
       editLineId={editLineId}
-      related={pickRelated(catalog, cake.slug, cake.category)}
+      related={related}
+      // Drawn here, on the server — the page is a client component and only
+      // places them. One element per card, so its grid wraps each.
+      relatedCards={related.map((item) => <ProductCard key={item.id} cake={item} framed />)}
       catalog={catalog}
       categoryCrumb={
         row ? { label: row.name, href: routes.store.collection(row.slug) } : undefined

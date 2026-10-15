@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/lazy-toast";
 import { SIGN_OUT_FAILED, signOutOfThisDevice } from "@/features/auth/lib/sign-out";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { routes } from "@/constants/routes";

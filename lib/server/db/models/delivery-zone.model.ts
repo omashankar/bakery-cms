@@ -12,6 +12,13 @@ const deliveryZoneSchema = new mongoose.Schema(
     name: { type: String, required: true },
     city: { type: String, default: "" },
     pincode: { type: String, default: "" },
+    // What the zone covers; absent on zones written before it existed, which
+    // keep their single city/pincode rule. See `DeliveryZoneCoverage`.
+    coverage: { type: String, enum: ["country", "states", "cities", "pincodes"] },
+    states: { type: [String], default: undefined },
+    cities: { type: [String], default: undefined },
+    pincodes: { type: [String], default: undefined },
+    excludedPincodes: { type: [String], default: undefined },
     radiusKm: { type: Number, default: 0 },
     deliveryCharge: { type: Number, default: 0 },
     minDeliveryDays: { type: Number, default: 0 },

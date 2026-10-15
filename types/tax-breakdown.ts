@@ -4,6 +4,8 @@ export interface TaxBreakdownValues {
   discount?: number;
   discountLabel?: string;
   delivery: number;
+  /** False when the address is outside every zone the shop delivers to. */
+  deliverable?: boolean;
   tax: number;
   taxLabel?: string;
   platformCharge?: number;

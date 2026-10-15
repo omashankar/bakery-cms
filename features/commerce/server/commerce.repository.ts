@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { connectDB } from "@/lib/server/db/mongoose";
 import { hasSeeded, markSeeded } from "@/lib/server/db/cms-store";
 import { CouponModel, type CouponDoc } from "@/lib/server/db/models/coupon.model";
@@ -51,6 +52,25 @@ export async function listCoupons(): Promise<StoredCoupon[]> {
   return docs.map((d) => toItem<StoredCoupon>(d));
 }
 
+/**
+ * Whether an incoming row is an OLDER copy of what is stored.
+ *
+ * Coupons and delivery zones are saved as the whole list from a browser cache
+ * filled once per admin session. A tab open since morning that toggled one
+ * coupon sent every other coupon back as it was that morning — so a leaked
+ * 50%-off code deactivated on a phone at noon was live again at three, and
+ * both saves reported success. An edit stamps `updatedAt` with the time of
+ * the edit, so a row this tab did not touch carries its old stamp, and a stored
+ * row with a later one has been changed elsewhere since: keep it.
+ *
+ * ISO timestamps compare as strings. A row with no stamp on either side is
+ * written as before.
+ */
+function isStaleCopy(incoming: { updatedAt?: string }, storedUpdatedAt: string | undefined): boolean {
+  if (!storedUpdatedAt) return false;
+  return !incoming.updatedAt || incoming.updatedAt < storedUpdatedAt;
+}
+
 export async function replaceCoupons(
   coupons: StoredCoupon[],
   /**
@@ -83,15 +103,18 @@ export async function replaceCoupons(
    * whatever it was created with. Same rule as `approval` on a WhatsApp template
    * — a server-owned field is not the client's to assert.
    */
+  const stored = await CouponModel.find({ _id: { $in: keepIds } })
+    .select({ usageCount: 1, updatedAt: 1 })
+    .lean();
   const storedCounts = new Map(
-    (
-      await CouponModel.find({ _id: { $in: keepIds } })
-        .select({ usageCount: 1 })
-        .lean()
-    ).map((doc) => [String(doc._id), (doc as { usageCount?: number }).usageCount ?? 0]),
+    stored.map((doc) => [String(doc._id), (doc as { usageCount?: number }).usageCount ?? 0]),
+  );
+  const storedStamps = new Map(
+    stored.map((doc) => [String(doc._id), (doc as { updatedAt?: string }).updatedAt]),
   );
 
-  const ops: Parameters<typeof CouponModel.bulkWrite>[0] = coupons.map((c) => ({
+  const fresh = coupons.filter((c) => !isStaleCopy(c, storedStamps.get(c.id)));
+  const ops: Parameters<typeof CouponModel.bulkWrite>[0] = fresh.map((c) => ({
     replaceOne: {
       filter: { _id: c.id },
       replacement: stripDoc({
@@ -185,7 +208,30 @@ export async function listZones(): Promise<DeliveryZone[]> {
     }
   }
   const docs = (await DeliveryZoneModel.find().sort({ priority: -1 }).lean()) as unknown as Record<string, unknown>[];
-  return docs.map((d) => toItem<DeliveryZone>(d));
+  return onePerId(docs).map((d) => toItem<DeliveryZone>(d));
+}
+
+/**
+ * ONE ZONE PER ID, the copy that saves reach.
+ *
+ * The live collection held the Kota zone twice: once under an ObjectId _id
+ * and once under the same hex as a STRING, which is what `replaceZones`
+ * upserts by. Both came back, so the admin list showed Kota twice (and React
+ * warned about the duplicate key), and the first edit to Kota would have
+ * updated only the string copy — leaving the ObjectId twin at the old charge,
+ * where a cheaper stale copy wins `findDeliveryZone`'s price tie-break.
+ *
+ * The string copy is kept because every write targets it; the twin is
+ * removed on the next save of the zone list (see `replaceZones`).
+ */
+export function onePerId(docs: Record<string, unknown>[]): Record<string, unknown>[] {
+  const byId = new Map<string, Record<string, unknown>>();
+  for (const doc of docs) {
+    const id = String(doc._id);
+    const held = byId.get(id);
+    if (!held || (typeof doc._id === "string" && typeof held._id !== "string")) byId.set(id, doc);
+  }
+  return docs.filter((doc) => byId.get(String(doc._id)) === doc);
 }
 
 export async function replaceZones(
@@ -204,7 +250,13 @@ export async function replaceZones(
   await markSeeded(ZONES_SEED_KEY);
 
   const keepIds = zones.map((z) => z.id);
-  const ops: Parameters<typeof DeliveryZoneModel.bulkWrite>[0] = zones.map((z) => ({
+  const storedStamps = new Map(
+    (await DeliveryZoneModel.find({ _id: { $in: keepIds } }).select({ updatedAt: 1 }).lean()).map(
+      (doc) => [String(doc._id), (doc as { updatedAt?: string }).updatedAt],
+    ),
+  );
+  const fresh = zones.filter((z) => !isStaleCopy(z, storedStamps.get(z.id)));
+  const ops: Parameters<typeof DeliveryZoneModel.bulkWrite>[0] = fresh.map((z) => ({
     replaceOne: { filter: { _id: z.id }, replacement: stripDoc(z) as DeliveryZoneDoc, upsert: true },
   }));
 
@@ -221,5 +273,19 @@ export async function replaceZones(
     ops.push({ deleteMany: { filter: { _id: { $in: removedIds } } } });
   }
 
+  // The ObjectId twin of any zone saved here (see `onePerId`), by exact id —
+  // its string copy is the one just written.
+  const twins = fresh
+    .map((z) => z.id)
+    .filter((id) => mongoose.isObjectIdOrHexString(id) && /^[0-9a-f]{24}$/i.test(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
   if (ops.length > 0) await DeliveryZoneModel.bulkWrite(ops);
+
+  // On the NATIVE collection, after the string copy is written. Through the
+  // model, Mongoose casts the filter to the schema's String _id — the
+  // ObjectId became the hex string, and the delete removed the copy just
+  // saved instead of its twin. That happened to the live Kota zone.
+  if (twins.length > 0) {
+    await DeliveryZoneModel.collection.deleteMany({ _id: { $in: twins } } as never);
+  }
 }

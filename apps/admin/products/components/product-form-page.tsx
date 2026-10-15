@@ -1,15 +1,20 @@
 "use client";
 
+import { useSeoServerSync } from "@/features/seo/lib/use-seo-server-sync";
 import Link from "next/link";
 import { PhotoField } from "@/apps/admin/media/components/photo-field";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
+import { applyServerCatalog } from "@/components/shared/catalog-server-sync";
+import { applyServerSeo } from "@/features/site-layout/lib/site-layout-hydration";
+import type { CatalogStore } from "@/types/catalog";
 import { ExternalLink, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -19,8 +24,9 @@ import {
   weightAxisLabel,
 } from "@/features/products/lib/product-pricing";
 import { routes } from "@/constants/routes";
-import { AdminMobileActionBar, AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminMobileActionBar, AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import type { ProductFormData, EntityStatus } from "@/types";
+import type { Product } from "@/types/product";
 import {
   adminCategories,
   adminCollections,
@@ -60,6 +66,11 @@ import { MAX_PRODUCT_PHOTOS } from "@/features/products/lib/product-limits";
 import { loadSeoStore, SEO_UPDATED_EVENT } from "@/features/seo/lib/seo-repository";
 import { getActiveLocale } from "@/features/settings/lib/active-locale";
 import type { ModuleSettings } from "@/types/settings";
+import {
+  classForCancellableTick,
+  isCancellableClass,
+  productAllowsCod,
+} from "@/features/orders/lib/cancellation-policy";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import {
   getModuleSettings,
@@ -78,6 +89,12 @@ import { formatCurrency } from "@/utils/format";
 interface ProductFormPageProps {
   mode: "add" | "edit";
   cakeId?: string;
+  /** The product, read on the server; null fetches it as before. */
+  initialProduct?: Product | null;
+  /** The taxonomy the pickers offer, read on the server. */
+  initialCatalog?: Partial<CatalogStore> | null;
+  /** The SEO store the search preview reads, and its version. */
+  initialSeo?: Parameters<typeof applyServerSeo>[0] | null;
 }
 
 /**
@@ -102,9 +119,31 @@ const SAVED_MESSAGE: Record<EntityStatus, string> = {
   archived: "Archived — hidden from the shop",
 };
 
-export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
+/** A stored product as the form edits it: no id, no timestamps. */
+function formDataOf(product: Product): ProductFormData {
+  const { id: _id, createdAt: _c, updatedAt: _u, ...data } = product;
+  return data;
+}
+
+export function ProductFormPage({
+  mode,
+  cakeId,
+  initialProduct = null,
+  initialCatalog = null,
+  initialSeo = null,
+}: ProductFormPageProps) {
+  // Before the mount effects below, so the pickers read the shop's taxonomy
+  // and the preview the shop's SEO store, without asking for either.
+  useLayoutEffect(() => {
+    if (initialCatalog) applyServerCatalog(initialCatalog);
+    if (initialSeo) applyServerSeo(initialSeo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
+  }, []);
+  // The search-preview domain reads the SEO store; the layout no longer loads it.
+  useSeoServerSync(!initialSeo);
   const router = useRouter();
-  const [form, setForm] = useState<ProductFormData>(createEmptyProductForm);
+  const loadedFromServer = mode === "edit" && initialProduct ? formDataOf(initialProduct) : null;
+  const [form, setForm] = useState<ProductFormData>(() => loadedFromServer ?? createEmptyProductForm());
   /**
    * Always at least one box, so a product with no photo yet has somewhere to
    * put the first one. Blank slots are dropped on submit — `handleSubmit`
@@ -154,11 +193,15 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
    * set by every writer — and this file has nine `setForm` call sites, so one
    * of them would eventually forget.
    */
-  const [baseline, setBaseline] = useState(() => JSON.stringify(createEmptyProductForm()));
-  const [isLoading, setIsLoading] = useState(mode === "edit");
+  const [baseline, setBaseline] = useState(() =>
+    JSON.stringify(loadedFromServer ?? createEmptyProductForm()),
+  );
+  const [isLoading, setIsLoading] = useState(mode === "edit" && !loadedFromServer);
   const [isSaving, setIsSaving] = useState(false);
   /** The status the SERVER holds, which is the only one the storefront honours. */
-  const [savedStatus, setSavedStatus] = useState<EntityStatus | null>(null);
+  const [savedStatus, setSavedStatus] = useState<EntityStatus | null>(
+    loadedFromServer?.status ?? null,
+  );
   const [slugTouched, setSlugTouched] = useState(mode === "edit");
   /*
     `metaTitleTouched` stood here, tracking whether the admin had typed a meta
@@ -264,11 +307,18 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
    *
    * The homepage builder already does exactly this, with the same event.
    */
-  const [catalogLists, setCatalogLists] = useState(() => ({
-    categories: adminCategories(),
-    occasions: adminOccasions(),
-    collections: adminCollections(),
-  }));
+  //
+  // Empty to start, on the server AND the client. The initializer used to call
+  // the three readers, which see localStorage in the browser and the shipped
+  // seed on the server — so the first client render listed different category
+  // names from the HTML it was hydrating, React threw hydration error #418 on
+  // every visit to Add Product, and re-rendered the whole form from scratch.
+  // The effect below fills the lists on mount.
+  const [catalogLists, setCatalogLists] = useState<{
+    categories: ReturnType<typeof adminCategories>;
+    occasions: ReturnType<typeof adminOccasions>;
+    collections: ReturnType<typeof adminCollections>;
+  }>({ categories: [], occasions: [], collections: [] });
 
   useEffect(() => {
     const sync = () =>
@@ -298,6 +348,8 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
 
   useEffect(() => {
     if (mode !== "edit" || !cakeId) return;
+    // Already filled from the server's read; see the page.
+    if (initialProduct) return;
 
     let cancelled = false;
 
@@ -1261,14 +1313,12 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                   product, which is what the rest of this tab is about.
                 */}
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm sm:col-span-2">
-                    <Checkbox
+                  <label className="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-3 text-sm sm:col-span-2">
+                    <span className="font-medium">Unlimited stock</span>
+                    <Switch
                       checked={form.unlimitedStock ?? false}
-                      onCheckedChange={(checked) =>
-                        patchForm({ unlimitedStock: checked === true })
-                      }
+                      onCheckedChange={(checked) => patchForm({ unlimitedStock: checked })}
                     />
-                    Unlimited stock
                   </label>
 
                   <div className="space-y-2">
@@ -1511,40 +1561,68 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                   rather than a mechanism used wrongly — dropped, not translated.
                 */}
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <label className="flex items-start gap-2 text-sm">
-                      <Checkbox
-                        className="mt-0.5"
-                        checked={form.allowsMessage}
-                        onCheckedChange={(checked) =>
-                          patchForm({ allowsMessage: checked === true })
-                        }
-                      />
-                      Ask for a message
-                    </label>
-                    <p className="text-xs text-muted-foreground">
-                      Puts a &ldquo;Message on this order&rdquo; box on the page. For
-                      something written on or sent with the {productLower}.
-                    </p>
-                  </div>
+                  <label className="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-3">
+                    <span>
+                      <span className="block text-sm font-medium">Ask for a message</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Puts a &ldquo;Message on this order&rdquo; box on the page. For
+                        something written on or sent with the {productLower}.
+                      </span>
+                    </span>
+                    <Switch
+                      checked={form.allowsMessage}
+                      onCheckedChange={(checked) => patchForm({ allowsMessage: checked })}
+                    />
+                  </label>
                   {modules.photoCake ? (
-                    <div className="space-y-1">
-                      <label className="flex items-start gap-2 text-sm">
-                        <Checkbox
-                          className="mt-0.5"
-                          checked={form.allowsPhotoUpload}
-                          onCheckedChange={(checked) =>
-                            patchForm({ allowsPhotoUpload: checked === true })
-                          }
-                        />
-                        Ask for a photo
-                      </label>
-                      <p className="text-xs text-muted-foreground">
-                        The customer uploads a picture and you receive it cut to the
-                        outline below. The printing is part of the price.
-                      </p>
-                    </div>
+                    <label className="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-3">
+                      <span>
+                        <span className="block text-sm font-medium">Ask for a photo</span>
+                        <span className="block text-xs text-muted-foreground">
+                          The customer uploads a picture and you receive it cut to the
+                          outline below. The printing is part of the price.
+                        </span>
+                      </span>
+                      <Switch
+                        checked={form.allowsPhotoUpload}
+                        onCheckedChange={(checked) => patchForm({ allowsPhotoUpload: checked })}
+                      />
+                    </label>
                   ) : null}
+                </div>
+
+                {/*
+                  TWO TOGGLES, as the shop asked — allow it or not, nothing more.
+                  Neither touches a genuine problem: a wrong, damaged or
+                  undelivered order can always be reported and is reviewed.
+                */}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-3">
+                    <span>
+                      <span className="block text-sm font-medium">Cash on Delivery</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Off: this {productLower} is paid online only.
+                      </span>
+                    </span>
+                    <Switch
+                      checked={productAllowsCod(form)}
+                      onCheckedChange={(checked) => patchForm({ codAllowed: checked })}
+                    />
+                  </label>
+                  <label className="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-3">
+                    <span>
+                      <span className="block text-sm font-medium">Order cancel</span>
+                      <span className="block text-xs text-muted-foreground">
+                        On: customers can cancel until you start preparing it.
+                      </span>
+                    </span>
+                    <Switch
+                      checked={isCancellableClass(form.cancellationClass)}
+                      onCheckedChange={(checked) =>
+                        patchForm({ cancellationClass: classForCancellableTick(checked) })
+                      }
+                    />
+                  </label>
                 </div>
 
                 {/*
@@ -1815,32 +1893,26 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                 </p>
               </div>
               <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm">
-                  <Checkbox
+                <label className="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-2.5 text-sm">
+                  <span className="font-medium">Featured on homepage</span>
+                  <Switch
                     checked={form.isFeatured}
-                    onCheckedChange={(checked) =>
-                      patchForm({ isFeatured: checked === true })
-                    }
+                    onCheckedChange={(checked) => patchForm({ isFeatured: checked })}
                   />
-                  Featured on homepage
                 </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <Checkbox
+                <label className="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-2.5 text-sm">
+                  <span className="font-medium">Trending</span>
+                  <Switch
                     checked={form.isTrending}
-                    onCheckedChange={(checked) =>
-                      patchForm({ isTrending: checked === true })
-                    }
+                    onCheckedChange={(checked) => patchForm({ isTrending: checked })}
                   />
-                  Trending
                 </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <Checkbox
+                <label className="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-2.5 text-sm">
+                  <span className="font-medium">Best seller</span>
+                  <Switch
                     checked={form.isBestSeller}
-                    onCheckedChange={(checked) =>
-                      patchForm({ isBestSeller: checked === true })
-                    }
+                    onCheckedChange={(checked) => patchForm({ isBestSeller: checked })}
                   />
-                  Best seller
                 </label>
               </div>
             </CardContent>
@@ -1898,7 +1970,7 @@ export function ProductFormPage({ mode, cakeId }: ProductFormPageProps) {
                   form.description ||
                   "Meta description preview will appear here."}
               </p>
-              <Badge variant="outline">{form.status}</Badge>
+              <Badge variant="outline">{formatStatusLabel(form.status)}</Badge>
             </CardContent>
           </Card>
 

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Mail, ShieldCheck, Sparkles } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/lazy-toast";
 import { Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,16 +32,9 @@ type Step = "email" | "code";
 const CODE_LENGTH = 6;
 const RESEND_SECONDS = 30;
 
-/** Fire from anywhere to open the single customer auth modal (lives in the navbar). */
-export const OPEN_AUTH_MODAL_EVENT = "bakery-open-auth-modal";
-
-export function openCustomerAuthModal(step: "phone" | "signup" = "phone") {
-  if (typeof window === "undefined") return;
-  // The two names are kept for the call sites that use them; both open the same
-  // flow, because with an emailed code there is no separate sign-up — the first
-  // successful sign-in for an address creates the account.
-  window.dispatchEvent(new CustomEvent(OPEN_AUTH_MODAL_EVENT, { detail: { step } }));
-}
+// Re-exported for existing importers; new code imports the events module, which
+// does not pull this modal in. See auth-modal-events.ts.
+export { OPEN_AUTH_MODAL_EVENT, openCustomerAuthModal } from "@/apps/website/account/lib/auth-modal-events";
 
 interface CustomerAuthModalProps {
   open: boolean;
@@ -220,7 +213,9 @@ export function CustomerAuthModal({
           <span className="mx-auto mb-3 flex size-14 items-center justify-center rounded-2xl bg-white/15 text-white">
             {step === "code" ? <ShieldCheck className="size-6" /> : <Mail className="size-6" />}
           </span>
-          <h2 className="font-heading text-xl font-bold">
+          {/* text-white said again: every heading takes text-foreground from
+              the base styles, so it does not inherit the band's white. */}
+          <h2 className="font-heading text-xl font-bold text-white">
             {step === "code" ? "Enter your code" : "Sign in"}
           </h2>
           <p className="mt-1 text-sm text-white/85">
@@ -301,6 +296,7 @@ function EmailStep({
       <div className="space-y-2">
         <Label htmlFor="auth-email">Email address</Label>
         <Input
+          className="h-11"
           id="auth-email"
           type="email"
           autoFocus
@@ -324,6 +320,7 @@ function EmailStep({
           Your name <span className="font-normal text-muted-foreground">(optional)</span>
         </Label>
         <Input
+          className="h-11"
           id="auth-name"
           autoComplete="name"
           placeholder="For your first order"
@@ -332,7 +329,7 @@ function EmailStep({
         />
       </div>
 
-      <Button type="submit" variant="bakery" className="w-full" disabled={!emailValid || loading}>
+      <Button type="submit" variant="bakery" className="h-11 w-full" disabled={!emailValid || loading}>
         {loading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
         {loading ? "Sending code…" : "Email me a code"}
       </Button>
@@ -402,7 +399,7 @@ function CodeStep({
         </div>
       </div>
 
-      <Button type="submit" variant="bakery" className="w-full" disabled={!codeValid || loading}>
+      <Button type="submit" variant="bakery" className="h-11 w-full" disabled={!codeValid || loading}>
         {loading ? <Loader2 className="size-4 animate-spin" /> : null}
         {loading ? "Checking…" : "Sign in"}
       </Button>

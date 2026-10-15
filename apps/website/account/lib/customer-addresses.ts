@@ -1,7 +1,25 @@
 import { safeSetItem } from "@/lib/safe-storage";
+import { hasCustomerSession } from "@/apps/website/account/lib/customer-session";
 import type { CheckoutAddress } from "@/features/orders/lib/checkout-draft";
 
+/**
+ * THIS DEVICE'S COPY of the address book. The account's copy is on the server
+ * (`/api/customer-auth/addresses`); this one is what the screens read
+ * synchronously, kept in step by `syncSavedAddresses` and by every write.
+ *
+ * The book lived ONLY here, so an address saved on a phone was missing on the
+ * laptop and clearing site data lost all of it — the same device-bound flaw
+ * My Orders had before it read the shop's records.
+ */
 const ADDRESSES_STORAGE_KEY = "bakery-cms-customer-addresses";
+/**
+ * Set while this device holds a change the server has not acknowledged. A
+ * sync then PUSHES instead of pulling, so a save made offline is not
+ * overwritten by the older list still on the server. Cleared on sign-out with
+ * the book itself (customer-session.ts).
+ */
+export const ADDRESSES_DIRTY_KEY = "bakery-cms-customer-addresses-dirty";
+const ADDRESSES_ENDPOINT = "/api/customer-auth/addresses";
 
 export interface SavedAddress extends CheckoutAddress {
   id: string;
@@ -26,10 +44,91 @@ function readAddresses(): SavedAddress[] {
   }
 }
 
-function writeAddresses(addresses: SavedAddress[]): void {
+/**
+ * Write this device's copy and, for a signed-in customer, the account's.
+ *
+ * `push: false` is for writing what the SERVER just sent, which must not be
+ * sent straight back. A guest's book stays on the device: there is no account
+ * to put it on, and checkout still offers it.
+ */
+function writeAddresses(addresses: SavedAddress[], { push = true } = {}): void {
   if (typeof window === "undefined") return;
   safeSetItem(ADDRESSES_STORAGE_KEY, JSON.stringify(addresses));
   window.dispatchEvent(new Event("bakery-addresses-updated"));
+  if (push && hasCustomerSession()) {
+    safeSetItem(ADDRESSES_DIRTY_KEY, "1");
+    void queue(() => pushAddresses(addresses));
+  }
+}
+
+/**
+ * One request at a time, in order. Two quick saves must reach the server as
+ * first-then-second; racing, the older list could land last and win.
+ */
+let pending: Promise<unknown> = Promise.resolve();
+function queue<T>(task: () => Promise<T>): Promise<T> {
+  const run = pending.then(task, task);
+  pending = run.catch(() => undefined);
+  return run;
+}
+
+async function pushAddresses(addresses: SavedAddress[]): Promise<boolean> {
+  try {
+    const res = await fetch(ADDRESSES_ENDPOINT, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ addresses }),
+    });
+    if (!res.ok) return false;
+    // Only if nothing newer was written while this was in flight.
+    if (JSON.stringify(readAddresses()) === JSON.stringify(addresses)) {
+      localStorage.removeItem(ADDRESSES_DIRTY_KEY);
+    }
+    return true;
+  } catch {
+    // Left dirty: the next sync pushes again instead of pulling over it.
+    return false;
+  }
+}
+
+/**
+ * Bring this device and the account into step. Returns the book as it now
+ * stands, or null when there is nothing to sync against (a guest, or the
+ * server could not be reached — the device copy stands in either case).
+ *
+ *   - this device has an unsent change: send it;
+ *   - the account's book has ever been saved: it wins, and replaces this
+ *     device's copy — even when it is empty, because an emptied book is a
+ *     choice the customer made on another device;
+ *   - it never has been, and this device has one: that is the customer's
+ *     book from before the account kept it — upload it.
+ */
+export function syncSavedAddresses(): Promise<SavedAddress[] | null> {
+  if (typeof window === "undefined" || !hasCustomerSession()) return Promise.resolve(null);
+
+  return queue(async () => {
+    const local = readAddresses();
+    if (localStorage.getItem(ADDRESSES_DIRTY_KEY)) {
+      return (await pushAddresses(local)) ? getSavedAddresses() : null;
+    }
+    try {
+      const res = await fetch(ADDRESSES_ENDPOINT, { credentials: "same-origin" });
+      if (!res.ok) return null;
+      const body = (await res.json()) as {
+        data?: { addresses?: SavedAddress[]; savedAt?: string | null };
+      };
+      const remote = Array.isArray(body.data?.addresses) ? body.data.addresses : [];
+      if (body.data?.savedAt) {
+        writeAddresses(remote, { push: false });
+      } else if (local.length > 0) {
+        await pushAddresses(local);
+      }
+      return getSavedAddresses();
+    } catch {
+      return null;
+    }
+  });
 }
 
 export function getSavedAddresses(): SavedAddress[] {

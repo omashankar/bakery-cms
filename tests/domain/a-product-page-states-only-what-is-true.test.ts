@@ -494,7 +494,7 @@ describe("the page does not call every product a cake", () => {
     const { html, unmount } = render({ ...CHARGER, rating: 4.8, reviewCount: 29 });
     try {
       expect(html).not.toContain("No published reviews yet");
-      expect(html).toContain("(29)");
+      expect(html).toContain("based on 29 ratings");
     } finally {
       unmount();
     }
@@ -1217,12 +1217,12 @@ describe("the two forms that used to stand open", () => {
   it("invites a question rather than opening a form nobody asked for", () => {
     const view = render(CAKE);
     try {
-      expect(view.html).toContain("Ask us");
+      expect(view.html).toContain("Ask a question");
       // The form itself is behind it.
       expect(view.html).not.toContain("Your question");
 
       const ask = [...view.container.querySelectorAll("button")].find(
-        (node) => node.textContent?.trim() === "Ask us",
+        (node) => node.textContent?.trim() === "Ask a question",
       );
       act(() => {
         ask?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -1237,11 +1237,11 @@ describe("the two forms that used to stand open", () => {
   it("does the same for the review form", () => {
     const view = render(CAKE);
     try {
-      expect(view.html).toContain("Write a review");
+      expect(view.html).toContain("Rate Product");
       expect(view.html).not.toContain("Your review");
 
       const write = [...view.container.querySelectorAll("button")].find(
-        (node) => node.textContent?.trim() === "Write a review",
+        (node) => node.textContent?.trim() === "Rate Product",
       );
       act(() => {
         write?.dispatchEvent(new MouseEvent("click", { bubbles: true }));

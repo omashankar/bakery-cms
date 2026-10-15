@@ -1,4 +1,7 @@
-import { StoreNotFoundPage } from "@/apps/website";
+// Direct, not through the `@/apps/website` barrel: the root not-found sits in
+// every route's tree, and the barrel dragged the storefront's pages into the
+// admin's JavaScript.
+import { StoreNotFoundPage } from "@/apps/website/pages/store-not-found-page";
 import { AppearanceStyleTag } from "@/components/shared/appearance-style-tag";
 import { getStorefrontChrome } from "@/apps/website/lib/storefront-chrome.server";
 

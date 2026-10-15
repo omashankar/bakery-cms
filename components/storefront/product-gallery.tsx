@@ -177,7 +177,10 @@ export function ProductGallery({ images, productName, badge }: ProductGalleryPro
             src={activeImage}
             alt={productName}
             fill
-            priority
+            // The product page's LCP. `priority` is deprecated in Next 16 and set
+            // no fetchpriority; this does.
+            loading="eager"
+            fetchPriority="high"
             sizes="(max-width: 1024px) 100vw, 45vw"
             className="object-cover"
           />

@@ -49,6 +49,34 @@ import {
   type GlobalSearchResult,
 } from "@/apps/admin/lib/global-search";
 import { cn } from "@/lib/utils";
+import { useCustomersServerSync } from "@/apps/admin/commerce/lib/use-customers-server-sync";
+import { usePagesServerSync } from "@/features/content/lib/use-pages-server-sync";
+import { useMediaServerSync } from "@/apps/admin/media/lib/use-media-server-sync";
+import { CUSTOMERS_UPDATED_EVENT } from "@/apps/admin/commerce/lib/customers-repository";
+import { MEDIA_UPDATED_EVENT } from "@/apps/admin/media/lib/media-utils";
+import { PAGES_UPDATED_EVENT } from "@/features/content/lib/pages-repository";
+import { ADMIN_DATA_EVENTS } from "@/apps/admin/lib/admin-data-events";
+
+/**
+ * What only the search reads: customer tags, CMS pages and the media library.
+ *
+ * The admin layout used to load all three on every screen for the sake of a
+ * palette most visits never open. Mounted on the first open and kept mounted,
+ * so it is one read per session, the same as before — just not up front.
+ */
+function SearchOnlySources(): null {
+  useCustomersServerSync();
+  usePagesServerSync();
+  useMediaServerSync();
+  return null;
+}
+
+const SEARCH_DATA_EVENTS = [
+  ...ADMIN_DATA_EVENTS,
+  CUSTOMERS_UPDATED_EVENT,
+  MEDIA_UPDATED_EVENT,
+  PAGES_UPDATED_EVENT,
+];
 
 /**
  * `products` is absent on purpose — it is the shop’s icon, and comes from the
@@ -128,7 +156,7 @@ function ResultButton({
             <Badge
               variant="outline"
               className={cn(
-                "shrink-0 text-[10px]",
+                "shrink-0 text-[11px]",
                 active && "border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground"
               )}
             >
@@ -158,6 +186,22 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
   const [groupFilter, setGroupFilter] = useState<GlobalSearchGroup | "all">("all");
   const [recentVersion, setRecentVersion] = useState(0);
   const labels = useBusinessLabels();
+  const [everOpened, setEverOpened] = useState(open);
+  // Set during render, not in an effect: React's documented way to derive
+  // state from a prop without a second commit.
+  if (open && !everOpened) setEverOpened(true);
+  // Bumped whenever a source the results read lands, so a query typed before
+  // the data arrived is answered again rather than left showing nothing.
+  const [dataVersion, setDataVersion] = useState(0);
+
+  useEffect(() => {
+    if (!everOpened) return;
+    const bump = () => setDataVersion((value) => value + 1);
+    for (const event of SEARCH_DATA_EVENTS) window.addEventListener(event, bump);
+    return () => {
+      for (const event of SEARCH_DATA_EVENTS) window.removeEventListener(event, bump);
+    };
+  }, [everOpened]);
 
   const parsedQuery = useMemo(() => parseGlobalSearchQuery(query), [query]);
   const effectiveGroupFilter =
@@ -173,7 +217,8 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
    */
   const results = useMemo(
     () => searchAdminGlobal(query, labels, { groupFilter: effectiveGroupFilter }),
-    [query, effectiveGroupFilter, labels]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- dataVersion re-reads the caches
+    [query, effectiveGroupFilter, labels, dataVersion]
   );
 
   const shortcuts = useMemo(() => getGlobalSearchShortcuts(labels), [labels]);
@@ -227,17 +272,8 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
     setActiveIndex(0);
   }, [query, groupFilter]);
 
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        onOpenChange(true);
-      }
-    }
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onOpenChange]);
+  // ⌘K / Ctrl K lives in the header (useCommandSearchShortcut), which is
+  // always loaded; this palette is loaded lazily.
 
   function handleInputKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key === "ArrowDown") {
@@ -258,6 +294,7 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
+      {everOpened ? <SearchOnlySources /> : null}
       <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-2xl" showCloseButton>
         <DialogHeader className="border-b border-border px-4 py-3 text-left">
           <DialogTitle className="sr-only">Global search</DialogTitle>
@@ -325,7 +362,7 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
               </p>
               {grouped.map((section) => (
                 <div key={section.group} className="mb-2 last:mb-0">
-                  <p className="px-3 py-1.5 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                  <p className="px-3 py-1.5 text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
                     {section.label}
                   </p>
                   <div className="space-y-0.5">
@@ -350,7 +387,7 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
               {recentResults.length > 0 ? (
                 <div className="mb-3">
                   <div className="flex items-center justify-between px-3 py-1.5">
-                    <p className="flex items-center gap-1.5 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                    <p className="flex items-center gap-1.5 text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
                       <Clock3 className="size-3.5" />
                       Recent
                     </p>
@@ -382,7 +419,7 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
               ) : null}
 
               <div className="mb-2">
-                <p className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                <p className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
                   <Sparkles className="size-3.5" />
                   Quick access
                 </p>
@@ -409,7 +446,7 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
                     <button
                       key={hint.prefix}
                       type="button"
-                      className="rounded-full border border-border bg-card px-2 py-0.5 font-mono text-[10px] hover:text-foreground"
+                      className="rounded-full border border-border bg-card px-2 py-0.5 font-mono text-[11px] hover:text-foreground"
                       onClick={() => setQuery(hint.prefix)}
                     >
                       {hint.prefix}
@@ -424,16 +461,16 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border bg-muted/40 px-4 py-2 text-[11px] text-muted-foreground">
           <div className="flex flex-wrap items-center gap-2">
             <span>
-              <kbd className="rounded border border-border bg-card px-1.5 py-0.5 font-mono text-[10px]">
+              <kbd className="rounded border border-border bg-card px-1.5 py-0.5 font-mono text-[11px]">
                 ↑
               </kbd>{" "}
-              <kbd className="rounded border border-border bg-card px-1.5 py-0.5 font-mono text-[10px]">
+              <kbd className="rounded border border-border bg-card px-1.5 py-0.5 font-mono text-[11px]">
                 ↓
               </kbd>{" "}
               navigate
             </span>
             <span>
-              <kbd className="rounded border border-border bg-card px-1.5 py-0.5 font-mono text-[10px]">
+              <kbd className="rounded border border-border bg-card px-1.5 py-0.5 font-mono text-[11px]">
                 Enter
               </kbd>{" "}
               open
@@ -446,36 +483,5 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
         </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-interface AdminCommandSearchTriggerProps {
-  onOpen: () => void;
-  className?: string;
-}
-
-export function AdminCommandSearchTrigger({ onOpen, className }: AdminCommandSearchTriggerProps) {
-  const [shortcut, setShortcut] = useState("Ctrl K");
-
-  useEffect(() => {
-    const isMac = /Mac|iPhone|iPad/.test(navigator.platform) || navigator.userAgent.includes("Mac");
-    setShortcut(isMac ? "⌘K" : "Ctrl K");
-  }, []);
-
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className={cn(
-        "relative flex h-8 w-full items-center rounded-md border border-sidebar-border bg-muted/40 pl-8 pr-3 text-left text-sm text-muted-foreground shadow-none transition-colors hover:bg-muted focus-visible:border-ring focus-visible:outline-none",
-        className
-      )}
-    >
-      <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
-      <span className="truncate">Search admin…</span>
-      <kbd className="ml-auto hidden rounded border border-border bg-card px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground lg:inline">
-        {shortcut}
-      </kbd>
-    </button>
   );
 }

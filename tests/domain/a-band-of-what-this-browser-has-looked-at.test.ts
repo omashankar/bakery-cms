@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 
 import { HOMEPAGE_SECTION_REGISTRY } from "@/constants/section-registry";
 import { RECENTLY_VIEWED_MAX } from "@/features/products/lib/recently-viewed";
+import { readSource } from "../renderer-source";
 
 /**
  * THE ONLY BAND ON THE HOMEPAGE THAT IS DIFFERENT FOR EVERY VISITOR.
@@ -30,7 +29,7 @@ import { RECENTLY_VIEWED_MAX } from "@/features/products/lib/recently-viewed";
  *   is worse than no band, so it draws nothing at all — measured on the live
  *   page: absent for a fresh browser, four cards after four product pages.
  */
-const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+const read = (path: string) => readSource(path);
 
 const RENDERER = "features/cms-sections/homepage-section-renderer.tsx";
 
@@ -71,7 +70,11 @@ describe("a band of what this browser has looked at", () => {
     const src = codeOf(read(RENDERER));
 
     expect(src, "the band is never dispatched").toContain('case "recently-viewed":');
-    expect(src, "the band is never drawn").toContain("<RecentlyViewedSection {...props} />");
+    // Handed the band and the catalogue it resolves slugs against — not every
+    // prop, which would serialise the page's product rails into it.
+    expect(src, "the band is never drawn").toContain(
+      "<RecentlyViewedSection {...shellPropsOf(props)} catalog={props.catalog} />",
+    );
   });
 
   it("and reads the browser in an effect, never during render", () => {

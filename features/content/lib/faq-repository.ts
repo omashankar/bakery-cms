@@ -4,6 +4,10 @@ import type { WriteResult } from "@/lib/write-result";
 import type { LandingFaq } from "@/constants/landing-data";
 import { faqs as seedFaqs } from "@/constants/landing-data";
 import {
+  FAQS_PATH,
+  applyServerContent,
+  onContentConflict,
+  type ServerContentRead,
   faqsLoaded,
   faqsWritable,
   fetchFaqs,
@@ -119,6 +123,18 @@ export function ensureFaqsWritable(): Promise<boolean> {
 /** Hydration: write the server's FAQs into the local cache (no re-push). */
 export function persistServerFaqs(items: FaqItem[]): void {
   lowPersist(items);
+}
+
+// A refused save replaces this tab's stale copy with the server's; see
+// `onContentConflict`.
+onContentConflict(FAQS_PATH, persistServerFaqs);
+
+/**
+ * The FAQs the SERVER read for this page, applied without a request — see
+ * `applyServerContent`.
+ */
+export function applyServerFaqs(read: ServerContentRead<FaqItem[]>): void {
+  applyServerContent(FAQS_PATH, read, { loaded: faqsLoaded, writable: faqsWritable }, persistServerFaqs);
 }
 
 export function loadFaqs(): FaqItem[] {

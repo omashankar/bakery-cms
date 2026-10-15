@@ -1,18 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowDownUp, ChevronDown, IndianRupee, SearchX, X } from "lucide-react";
-import { ProductCard } from "@/components/storefront/product-card";
 import { StaggerReveal } from "@/components/shared/scroll-reveal";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import {
-  filterProductsByCategory,
-  productsInCollection,
-  productsInDepartment,
-  productsTaggedForOccasion,
-} from "@/features/products/lib/product-catalog";
+  categoryPillsFor,
+  LISTING_PAGE_SIZE,
+  productsForListing,
+} from "@/apps/website/lib/collection-listing";
 import type { LandingProduct } from "@/constants/landing-data";
 import {
   applyCollectionFilters,
@@ -26,9 +24,7 @@ import {
   pruneOptionSelections,
   type CollectionFilters,
 } from "@/apps/website/lib/collection-filters";
-import { categories as demoCategories } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
-import { storefrontHeading } from "@/constants/typography";
 import { Button } from "@/components/ui/button";
 import {
   Pagination,
@@ -54,7 +50,7 @@ import { cn } from "@/lib/utils";
  * products here today. At eight, a shop with three hundred asks its customer
  * to press Next thirty-seven times.
  */
-const PAGE_SIZE = 24;
+const PAGE_SIZE = LISTING_PAGE_SIZE;
 
 /** How many numbered slots the pagination draws before it starts eliding. */
 const PAGE_SLOTS = 7;
@@ -109,7 +105,14 @@ export function paginationWindow(total: number, current: number): (number | null
   return out;
 }
 
-interface CollectionsPageProps {
+export interface CollectionsPageProps {
+  /**
+   * Every card this page can show, drawn on the SERVER and keyed by product
+   * id (see `CollectionsListing`). This component filters, sorts and pages;
+   * it no longer draws a card, so neither the card's code nor the price
+   * formatting it does runs in the browser.
+   */
+  cards: Record<string, React.ReactNode>;
   categorySlug?: string;
   /**
    * What the shop's customer typed into the header, straight off the URL.
@@ -210,6 +213,7 @@ interface CollectionsPageProps {
 }
 
 export function CollectionsPage({
+  cards,
   categorySlug: categorySlugProp,
   initialSearch = "",
   catalog,
@@ -225,49 +229,17 @@ export function CollectionsPage({
    * already has two rows called "Seasonal" with the same slug, which would
    * render two identical pills pointing at the same page.
    */
-  const categoryPills = useMemo(() => {
-    const source = categoriesFromShop?.length ? categoriesFromShop : demoCategories;
-    /*
-      `headline` rides along, optional, because the demo fallback has none —
-      the Map's type is what decides whether the shop's own phrase survives
-      the dedup, and a narrower one silently drops it.
-    */
-    const bySlug = new Map<
-      string,
-      { id: string; name: string; slug: string; headline?: string }
-    >();
-    for (const category of source) {
-      if (category.slug && !bySlug.has(category.slug)) bySlug.set(category.slug, category);
-    }
-    return [...bySlug.values()];
-  }, [categoriesFromShop]);
-
-  // Filtering stays on the client (it is interactive), but the catalogue it
-  // filters arrives from the server, so the first paint shows real cakes. The
-  // pills are passed too: a category's slug and its name are edited
-  // independently, so only this list can say which product belongs to which
-  // route — "Birthday Cakes" lives at /birthday here.
-  const inCategory = useMemo(() => {
-    // A collection is a LIST, not a match. `productsInCollection` walks the
-    // ids so the owner's order survives and a product that merely shares the
-    // name is not swept in.
-    if (collection) return productsInCollection(catalog, collection.productIds);
-    /*
-      An occasion matches the product's own tags, and ONLY those — not the
-      category that happens to share its slug. `filterProductsByCategory` ORs
-      the two, which is right at the old address and wrong here: the point of
-      this page is to show what the shop tagged for this occasion.
-    */
-    if (occasion) return productsTaggedForOccasion(catalog, occasion.slug);
-    /*
-      A DEPARTMENT IS TWO STEPS from a product: it holds categories and they
-      hold products. So this is the one source that cannot be a name match or
-      an id list of products — it is every product in any of its categories,
-      matched by category id, which both the stored row and the card carry.
-    */
-    if (department) return productsInDepartment(catalog, department.categoryIds);
-    return filterProductsByCategory(catalog, categorySlug || undefined, categoryPills);
-  }, [catalog, categorySlug, categoryPills, collection, occasion, department]);
+  const categoryPills = useMemo(() => categoryPillsFor(categoriesFromShop), [categoriesFromShop]);
+  // Which products this page is about — the same answer the server drew the
+  // cards from (`productsForListing`).
+  const inCategory = useMemo(
+    () =>
+      productsForListing(
+        { catalog, categorySlug, categories: categoriesFromShop, collection, occasion, department },
+        categoryPills,
+      ),
+    [catalog, categorySlug, categoriesFromShop, categoryPills, collection, occasion, department],
+  );
 
   const activeCategory = categoryPills.find((cat) => cat.slug === categorySlug);
   /**
@@ -580,7 +552,15 @@ export function CollectionsPage({
               */}
               <div className="mb-5 flex flex-col gap-0 bg-muted sm:flex-row sm:items-stretch sm:justify-between">
                 <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1 px-4 py-3">
-                  <h1 className={heading ? storefrontHeading.page : "sr-only"}>{pageTitle}</h1>
+                  {/* A bar title, not a page headline: the bar is the heading here, and a
+                      32px word beside two 14px controls outweighed the filters. */}
+                  <h1
+                    className={
+                      heading ? "font-heading text-xl font-bold tracking-tight sm:text-2xl" : "sr-only"
+                    }
+                  >
+                    {pageTitle}
+                  </h1>
                   <p className="text-sm text-muted-foreground">{countLine}</p>
                   {filters.search.trim() ? (
                     /*
@@ -625,13 +605,13 @@ export function CollectionsPage({
                 */}
                 <div className="grid grid-cols-2 divide-x divide-border border-t border-border sm:flex sm:shrink-0 sm:border-t-0 sm:border-l">
                   {priceBands.length > 0 ? (
-                    <label className="relative flex min-w-0 flex-1 items-center gap-2 px-3 py-2 sm:flex-none sm:px-4">
+                    <label className="relative flex min-w-0 flex-1 items-center gap-2 px-3 py-2 sm:min-w-52 sm:flex-none sm:px-4">
                       <IndianRupee
                         aria-hidden="true"
                         className="size-4 shrink-0 text-muted-foreground"
                       />
                       <span className="flex min-w-0 flex-col">
-                        <span className="text-[11px] leading-tight font-medium text-muted-foreground">
+                        <span className="text-xs leading-tight font-semibold text-foreground">
                           Filter by price
                         </span>
                         {/*
@@ -680,13 +660,13 @@ export function CollectionsPage({
                     </label>
                   ) : null}
 
-                  <label className="relative flex min-w-0 flex-1 items-center gap-2 px-3 py-2 sm:flex-none sm:px-4">
+                  <label className="relative flex min-w-0 flex-1 items-center gap-2 px-3 py-2 sm:min-w-52 sm:flex-none sm:px-4">
                     <ArrowDownUp
                       aria-hidden="true"
                       className="size-4 shrink-0 text-muted-foreground"
                     />
                     <span className="flex min-w-0 flex-col">
-                      <span className="text-[11px] leading-tight font-medium text-muted-foreground">
+                      <span className="text-xs leading-tight font-semibold text-foreground">
                         Sort by
                       </span>
                       <span className="truncate text-sm font-semibold text-bakery-700">
@@ -753,6 +733,10 @@ export function CollectionsPage({
                   )}
                 </div>
               ) : (
+                <>
+                {/* The cards' titles are h3; without an h2 above them the page went
+                    h1 -> h3, which screen-reader users navigate by. */}
+                <h2 className="sr-only">{labels.productWordPlural}</h2>
                 <StaggerReveal
                   key={`${categorySlug}-${currentPage}`}
                   /*
@@ -784,10 +768,11 @@ export function CollectionsPage({
                     width. More would compete with the one that decides
                     LCP and make it slower.
                   */}
-                  {paginated.map((cake, index) => (
-                    <ProductCard key={cake.id} cake={cake} priority={index < 4} />
+                  {paginated.map((cake) => (
+                    <Fragment key={cake.id}>{cards[cake.id]}</Fragment>
                   ))}
                 </StaggerReveal>
+                </>
               )}
 
               {filtered.length > PAGE_SIZE ? (

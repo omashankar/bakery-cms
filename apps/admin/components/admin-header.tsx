@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type Ref } from "react";
+import { useCallback, useEffect, useState, type Ref } from "react";
 import { KeyRound, LogOut, Menu, PanelLeft, PanelLeftClose, Search, User, X } from "lucide-react";
 import { LogoutConfirmDialog } from "@/apps/admin/profile/components/logout-confirm-dialog";
 import {
@@ -23,10 +23,27 @@ import { AdminNotificationBell } from "@/apps/admin/commerce/components/admin-no
 import { routes } from "@/constants/routes";
 import { cn } from "@/lib/utils";
 import { AdminBreadcrumbs } from "./admin-breadcrumbs";
+import dynamic from "next/dynamic";
+import { useIdle } from "@/hooks/use-idle";
 import {
-  AdminCommandSearch,
   AdminCommandSearchTrigger,
-} from "./admin-command-search";
+  useCommandSearchShortcut,
+} from "./admin-command-search-trigger";
+
+/**
+ * The search palette, loaded when it is first wanted or once the screen has
+ * settled — not before the screen's own content.
+ *
+ * It carries the whole global search (products, orders, customers, media,
+ * inventory, pages and their helpers), and every admin screen used to download
+ * and hydrate it ahead of its own data: on a throttled phone the screen's first
+ * request went out 3.5s after the HTML arrived, and the JavaScript was most of
+ * that wait.
+ */
+const AdminCommandSearch = dynamic(
+  () => import("./admin-command-search").then((m) => m.AdminCommandSearch),
+  { ssr: false },
+);
 import { adminShell } from "./admin-shell";
 
 interface AdminHeaderProps {
@@ -72,6 +89,11 @@ export function AdminHeader({
   onSidebarToggle,
 }: AdminHeaderProps) {
   const [commandOpen, setCommandOpen] = useState(false);
+  // Fetch the palette's code in the background once the screen is idle, so the
+  // first ⌘K does not wait on a download.
+  const paletteWanted = useIdle(3000);
+  const openPalette = useCallback(() => setCommandOpen(true), []);
+  useCommandSearchShortcut(openPalette);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [initials, setInitials] = useState("AU");
   const [displayName, setDisplayName] = useState("Administrator");
@@ -105,7 +127,9 @@ export function AdminHeader({
 
   return (
     <>
-      <AdminCommandSearch open={commandOpen} onOpenChange={setCommandOpen} />
+      {commandOpen || paletteWanted ? (
+        <AdminCommandSearch open={commandOpen} onOpenChange={setCommandOpen} />
+      ) : null}
 
       <header className={cn("sticky top-0 z-40 pt-[env(safe-area-inset-top)]", adminShell.header)}>
         <div
@@ -179,7 +203,7 @@ export function AdminHeader({
                 <Avatar className="size-7 ring-1 ring-sidebar-border">
                   {/* The uploaded photo, which had no way to reach this header before. */}
                   {photoUrl ? <AvatarImage src={photoUrl} alt="" /> : null}
-                  <AvatarFallback className="bg-primary/15 text-[10px] font-semibold text-primary">
+                  <AvatarFallback className="bg-primary/15 text-[11px] font-semibold text-primary">
                     {initials}
                   </AvatarFallback>
                 </Avatar>

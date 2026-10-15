@@ -17,6 +17,7 @@ import {
 import { persistServerBanners } from "@/features/content/lib/banners-repository";
 import { persistServerTestimonials } from "@/features/content/lib/testimonials-repository";
 import { persistServerFaqs } from "@/features/content/lib/faq-repository";
+import { isStorefrontSeeded } from "@/lib/storefront-seed-flag";
 
 /**
  * Hydrates banners, testimonials and FAQ from the server once on mount, so the
@@ -41,6 +42,8 @@ import { persistServerFaqs } from "@/features/content/lib/faq-repository";
  */
 export function ContentServerSync() {
   useEffect(() => {
+    // Filled with the page by StorefrontCacheSeed — the same answer, already here.
+    if (isStorefrontSeeded()) return;
     let cancelled = false;
 
     (async () => {

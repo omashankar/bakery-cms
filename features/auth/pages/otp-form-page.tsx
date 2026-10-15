@@ -4,9 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Loader2, ShieldCheck } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/lazy-toast";
 import { AuthCard } from "@/features/auth/components/auth-card";
-import { AuthDemoNotice } from "@/features/auth/components/auth-demo-notice";
 import { OtpInput } from "@/features/auth/components/otp-input";
 import { getResetFlow, markResetVerified } from "@/features/auth/lib/reset-flow";
 import {
@@ -115,8 +114,6 @@ export function OtpFormPage() {
         </button>
         <span className="text-muted-foreground">Enter the 6-digit code</span>
       </div>
-
-      <AuthDemoNotice />
     </AuthCard>
   );
 }

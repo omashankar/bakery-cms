@@ -198,7 +198,11 @@ export function loadPages(): CmsPage[] {
  */
 export function persistServerPages(pages: CmsPage[]): void {
   persist(pages);
+  // The command search re-runs on this; it loads the pages when it opens.
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(PAGES_UPDATED_EVENT));
 }
+
+export const PAGES_UPDATED_EVENT = "bakery-pages-updated";
 
 export function getPublishedPages(): CmsPage[] {
   return loadPages()

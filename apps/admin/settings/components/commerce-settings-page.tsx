@@ -14,6 +14,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { calculateCartTotals } from "@/features/orders/lib/cart-totals";
 import type { CommerceSettings } from "@/types/settings";
+import Link from "next/link";
+import { routes } from "@/constants/routes";
 import { formatCurrency } from "@/utils/format";
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import {
@@ -152,7 +154,7 @@ export function CommerceSettingsPage() {
         hydration === "ready"
           ? `${
               saved.freeDeliveryThreshold > 0
-                ? `Delivery ${formatCurrency(saved.deliveryFee)} · free above ${formatCurrency(saved.freeDeliveryThreshold)}`
+                ? `${saved.useZoneBasedDelivery ? "Delivery by zone" : `Delivery ${formatCurrency(saved.deliveryFee)}`} · free above ${formatCurrency(saved.freeDeliveryThreshold)}`
                 : "Delivery free on every order"
             } · ${livePaymentMethodsOn} payment method${livePaymentMethodsOn === 1 ? "" : "s"}`
           : undefined
@@ -202,6 +204,22 @@ export function CommerceSettingsPage() {
                     }))
                   }
                 />
+                {/*
+                  WHICH FEE IS ACTUALLY CHARGED. With zone pricing on this box
+                  is not used — the zones set the fee — and the preview beside
+                  it showed the zone fallback (₹149) under "Standard ₹99".
+                */}
+                {settings.useZoneBasedDelivery ? (
+                  <p className="text-xs text-pretty text-muted-foreground">
+                    Not used while zone pricing is on: each zone sets its own fee, and an
+                    address outside your zones is charged{" "}
+                    {formatCurrency(settings.zoneFallbackDeliveryFee)}. Change these in{" "}
+                    <Link href={routes.admin.commerce.shippingRules} className="underline underline-offset-2">
+                      Shipping Rules
+                    </Link>
+                    .
+                  </p>
+                ) : null}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="freeDeliveryThreshold">Free delivery above</Label>
@@ -416,6 +434,30 @@ export function CommerceSettingsPage() {
                     edit((prev) => ({ ...prev, checkoutTerms: e.target.value }))
                   }
                 />
+              </div>
+              {/*
+                THE CANCELLATION POLICY. Each product's own rule (Products →
+                Cancellation) is shown beside the cart line; this is the
+                wording around them, shown at checkout and COPIED onto every
+                order — so changing it here changes it for new orders only.
+              */}
+              <div className="space-y-2">
+                <Label htmlFor="cancellationPolicyText">Cancellation policy</Label>
+                <textarea
+                  id="cancellationPolicyText"
+                  className={adminTextareaClassName}
+                  rows={5}
+                  value={settings.cancellationPolicyText ?? ""}
+                  onChange={(e) =>
+                    edit((prev) => ({ ...prev, cancellationPolicyText: e.target.value }))
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Shown at checkout and saved with each order. Orders already placed
+                  keep the wording they were placed under. It cannot take away a
+                  customer&apos;s right to a refund when the order is wrong, damaged
+                  or not delivered — those are always reviewed.
+                </p>
               </div>
             </CardContent>
           </Card>

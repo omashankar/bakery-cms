@@ -1,4 +1,5 @@
 import {
+  ACTIVE_STATUSES,
   filterOrdersInPreviousWindow,
   filterOrdersInWindow,
   getAnalyticsWindow,
@@ -119,7 +120,13 @@ export async function getOrderAnalytics(
 
   const current = filterOrdersInWindow(orders, window);
   const previous = filterOrdersInPreviousWindow(orders, window);
-  const summary = getReportsSummary(current);
+  const summary = {
+    ...getReportsSummary(current),
+    // Work still to do is a count of NOW, not of the range. Counted from the
+    // range, a wedding cake ordered six weeks ahead and still "confirmed"
+    // vanished from a 30-day view, and the card said "All clear" in green.
+    activeOrders: await repo.countInStatuses(ACTIVE_STATUSES),
+  };
   const previousSummary = getReportsSummary(previous);
 
   return {

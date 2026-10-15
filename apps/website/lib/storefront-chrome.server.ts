@@ -1,3 +1,4 @@
+import { footerPromisesFrom, type FooterPromise } from "@/apps/website/lib/footer-promises";
 import { cache } from "react";
 
 import { getSettings } from "@/features/settings/server/settings.service";
@@ -124,6 +125,14 @@ export interface StorefrontChrome {
   socialLinks: { platform: string; href: string; label: string }[];
   footer: FooterSettings;
   /**
+   * The band across the top of the footer, on every page — the reference's
+   * "700+ cities / 100% secure payments" row. Built only from what the shop's
+   * own settings make true: its delivery promise, its free-delivery threshold,
+   * and whether it takes payment online. Nothing the software cannot know, so
+   * no customer counts and no city totals; an empty list draws no band.
+   */
+  footerPromises: FooterPromise[];
+  /**
    * The shop palette as CSS custom properties, for the FIRST paint.
    *
    * Nothing server-rendered these, so every visitor was painted the hardcoded
@@ -233,6 +242,8 @@ function fallbackChrome(): StorefrontChrome {
     // but these would be live links to somebody else's profiles.
     socialLinks: [],
     footer: defaultFooterSettings,
+    // Nothing claimed while the settings cannot be read.
+    footerPromises: [],
     // Nothing, so the stylesheet defaults stand. Writing the demo palette
     // here would paint a database outage as a deliberate rebrand.
     appearance: {},
@@ -508,6 +519,10 @@ export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => 
           links: Array.isArray(column?.links) ? column.links : [],
         })),
       },
+      footerPromises: footerPromisesFrom(
+        (settings.commerce ?? {}) as Record<string, unknown>,
+        general.currency,
+      ),
       // Re-derived from the stored value rather than trusted: the schema
       // only constrains future writes, so a row at rest can hold a colour
       // that was allowed in years earlier. `appearanceCssVariables` returns

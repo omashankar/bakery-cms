@@ -76,7 +76,7 @@ vi.mock("@/features/products/data/products-client", async (importOriginal) => {
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: () => undefined, replace: () => undefined, refresh: () => undefined }),
-  usePathname: () => "/admin/cakes/cake-1",
+  usePathname: () => "/admin/products/cake-1",
 }));
 
 const { ProductFormPage } = await import("@/apps/admin/products/components/product-form-page");

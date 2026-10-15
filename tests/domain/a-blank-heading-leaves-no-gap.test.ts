@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { sectionHeaderDraws } from "@/components/shared/section-header";
+import { readSource } from "../renderer-source";
 
 /**
  * SPACING UNDER A HEADING BELONGS TO THE HEADING.
@@ -23,7 +23,7 @@ import { sectionHeaderDraws } from "@/components/shared/section-header";
  * Nothing in the diff shows it. `mt-6` beside a heading that is not there
  * looks exactly like `mt-6` beside a heading that is.
  */
-const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+const read = (path: string) => readSource(path);
 
 const RENDERER = "features/cms-sections/homepage-section-renderer.tsx";
 

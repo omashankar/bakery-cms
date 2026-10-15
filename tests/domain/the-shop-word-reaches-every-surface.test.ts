@@ -28,26 +28,26 @@ function trail(pathname: string) {
 
 describe("the admin breadcrumb", () => {
   it("names the catalog with the shop's own plural", () => {
-    expect(trail("/admin/cakes")).toBe("Dashboard > Zzyzxes");
+    expect(trail("/admin/products")).toBe("Dashboard > Zzyzxes");
   });
 
   it("says Add and Edit in the shop's own singular", () => {
-    expect(trail("/admin/cakes/add")).toBe("Dashboard > Zzyzxes > Add Zzyzx");
-    expect(trail("/admin/cakes/abc123/edit")).toBe("Dashboard > Zzyzxes > Edit Zzyzx");
+    expect(trail("/admin/products/add")).toBe("Dashboard > Zzyzxes > Add Zzyzx");
+    expect(trail("/admin/products/abc123/edit")).toBe("Dashboard > Zzyzxes > Edit Zzyzx");
   });
 
   it("names a single record with the shop's own singular", () => {
     // The fallback branch, reached by a product id that is not add/edit/preview.
-    expect(trail("/admin/cakes/abc123")).toBe("Dashboard > Zzyzxes > Zzyzx Details");
+    expect(trail("/admin/products/abc123")).toBe("Dashboard > Zzyzxes > Zzyzx Details");
   });
 
   it("leaves no bakery noun anywhere in a product trail", () => {
     for (const path of [
-      "/admin/cakes",
-      "/admin/cakes/add",
-      "/admin/cakes/abc123",
-      "/admin/cakes/abc123/edit",
-      "/admin/cakes/abc123/preview",
+      "/admin/products",
+      "/admin/products/add",
+      "/admin/products/abc123",
+      "/admin/products/abc123/edit",
+      "/admin/products/abc123/preview",
     ]) {
       expect(trail(path), path).not.toMatch(/cake/i);
     }
@@ -171,7 +171,7 @@ describe("the command palette", () => {
     const { getGlobalSearchChromeEntries, getGlobalSearchGroupLabel, getGlobalSearchGroupHints } =
       await import("@/apps/admin/lib/global-search");
 
-    const nav = getGlobalSearchChromeEntries(FLORIST).find((e) => e.id.endsWith("/admin/cakes"));
+    const nav = getGlobalSearchChromeEntries(FLORIST).find((e) => e.id.endsWith("/admin/products"));
     expect(nav?.title).toBe("Bouquets");
 
     expect(getGlobalSearchGroupLabel("products", FLORIST)).toBe("Bouquets");
@@ -201,7 +201,7 @@ describe("the command palette", () => {
       "@/apps/admin/lib/global-search"
     );
 
-    const nav = getGlobalSearchChromeEntries(FLORIST).find((e) => e.id.endsWith("/admin/cakes"));
+    const nav = getGlobalSearchChromeEntries(FLORIST).find((e) => e.id.endsWith("/admin/products"));
     // Renamed to Bouquets, and "products" still finds it — that is the built-in
     // label, kept as a keyword precisely so a rename does not orphan the row.
     expect(nav?.keywords).toContain("products");
@@ -222,7 +222,7 @@ describe("the command palette", () => {
     const stored = {
       id: "action-add-cake",
       title: "Add new cake",
-      href: "/admin/cakes/add",
+      href: "/admin/products/add",
       group: "actions" as const,
       visitedAt: "2026-01-01T00:00:00.000Z",
     };

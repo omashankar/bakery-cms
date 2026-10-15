@@ -802,6 +802,7 @@ export function HomepageBuilderPage() {
                         key={half.instanceId}
                         section={half}
                         {...previewData}
+                        labels={labels}
                         embedded
                         selected={selectedId === half.instanceId}
                         interactive
@@ -820,6 +821,7 @@ export function HomepageBuilderPage() {
                   key={section.instanceId}
                   section={section}
                   {...previewData}
+                  labels={labels}
                   selected={ctx.selected}
                   interactive
                   onSelect={ctx.onSelect}

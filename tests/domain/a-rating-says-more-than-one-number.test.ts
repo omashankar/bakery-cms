@@ -21,6 +21,8 @@ import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 const approved: Array<Record<string, unknown>> = [];
 const helpfulCalls: string[] = [];
 const helpfulAnswer = { value: 7 as number | null };
+const unhelpfulCalls: string[] = [];
+const unhelpfulAnswer = { value: 2 as number | null };
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: () => undefined, replace: () => undefined, refresh: () => undefined }),
@@ -34,6 +36,10 @@ vi.mock("@/features/reviews/lib/reviews-api", () => ({
   markReviewHelpfulRequest: async (id: string) => {
     helpfulCalls.push(id);
     return helpfulAnswer.value;
+  },
+  markReviewUnhelpfulRequest: async (id: string) => {
+    unhelpfulCalls.push(id);
+    return unhelpfulAnswer.value;
   },
   reviewsHydration: { promise: Promise.resolve(), settle: () => undefined },
 }));
@@ -89,24 +95,27 @@ async function render() {
 }
 
 /**
- * The summary block, found by what only it contains.
+ * The summary block, found by the name it gives itself.
  *
- * `.bg-cream-50` matches the price panel further up the page, and a width
- * selector matches every progress-ish element in the document. Both of those
- * made an assertion pass, or fail, for reasons that had nothing to do with the
+ * A class selector (`.bg-cream-50`) matched the price panel further up the
+ * page, and a width selector matches every progress-ish element in the
+ * document; each review's rating chip also reads "5 ★" now. All of those made
+ * an assertion pass, or fail, for reasons that had nothing to do with the
  * histogram.
  */
 function summary() {
-  return [...(container?.querySelectorAll("div") ?? [])].find(
-    (node) => node.className.includes("bg-cream-50") && (node.textContent ?? "").includes("5 ★"),
-  );
+  return container?.querySelector<HTMLElement>('[role="group"][aria-label="Ratings summary"]');
 }
 
-function press(text: string) {
-  const button = [...(container?.querySelectorAll("button") ?? [])].find((node) =>
-    (node.textContent ?? "").includes(text),
+/**
+ * A vote button, by the name it announces. The thumbs show only an icon and a
+ * count, so their text cannot find them — and an exact match keeps "Helpful"
+ * from also finding "Not helpful".
+ */
+function press(label: string) {
+  return [...(container?.querySelectorAll("button") ?? [])].find(
+    (node) => node.getAttribute("aria-label") === label,
   );
-  return button;
 }
 
 beforeEach(() => {
@@ -114,6 +123,8 @@ beforeEach(() => {
   approved.length = 0;
   helpfulCalls.length = 0;
   helpfulAnswer.value = 7;
+  unhelpfulCalls.length = 0;
+  unhelpfulAnswer.value = 2;
 });
 
 afterEach(() => {
@@ -136,7 +147,7 @@ describe("the shape of the ratings, not just their average", () => {
     // Four reviews: three fives and a one. 4.0, not the 4.2 stored on the
     // product — the bars and the number beside them come from the same rows.
     expect(summary).toContain("4");
-    expect(summary).toContain("4 reviews");
+    expect(summary).toContain("based on 4 ratings");
     expect(summary).toContain("5 ★");
     expect(summary).toContain("1 ★");
   });
@@ -187,7 +198,7 @@ describe("saying a review helped", () => {
   it("counts the press and shows the number the server settled on", async () => {
     approved.push(review("a", 5));
 
-    const view = await render();
+    await render();
     await act(async () => {
       press("Helpful")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
@@ -195,7 +206,7 @@ describe("saying a review helped", () => {
     expect(helpfulCalls).toEqual(["a"]);
     // The SERVER's number, not this browser's guess: two readers a second apart
     // must not each end up showing their own count.
-    expect(view.textContent).toContain("7 people found this helpful");
+    expect(press("Marked helpful")?.textContent).toBe("7");
   });
 
   it("will not let the same browser say it twice", async () => {
@@ -251,10 +262,10 @@ describe("saying a review helped", () => {
     approved.push(review("a", 5));
     window.localStorage.setItem("bakery-cms-helpful-reviews", JSON.stringify(["a"]));
 
-    const view = await render();
+    await render();
 
-    expect(view.textContent).toContain("Marked helpful");
-    expect(view.textContent).not.toContain(">Helpful<");
+    expect(press("Marked helpful")).toBeTruthy();
+    expect(press("Helpful")).toBeUndefined();
   });
 
   it("still counts the press when the request fails", async () => {
@@ -263,26 +274,101 @@ describe("saying a review helped", () => {
     approved.push(review("a", 5));
     helpfulAnswer.value = null;
 
-    const view = await render();
+    await render();
     await act(async () => {
       press("Helpful")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    expect(view.textContent).toContain("Marked helpful");
-    expect(view.textContent).toContain("1 person found this helpful");
+    expect(press("Marked helpful")?.textContent).toBe("1");
   });
 
   it("says nothing about a review nobody has marked", async () => {
-    // "Helpful (0)" reads as a verdict on the review rather than an absence of
-    // votes.
+    // "👍 0" reads as a verdict on the review rather than an absence of votes.
     approved.push(review("a", 5));
 
-    expect((await render()).textContent).not.toContain("found this helpful");
+    await render();
+
+    expect(press("Helpful")?.textContent).toBe("");
+    expect(press("Not helpful")?.textContent).toBe("");
   });
 
-  it("shows the count a review already carries", async () => {
-    approved.push(review("a", 5, { helpfulCount: 3 }));
+  it("shows the counts a review already carries", async () => {
+    approved.push(review("a", 5, { helpfulCount: 3, unhelpfulCount: 1 }));
 
-    expect((await render()).textContent).toContain("3 people found this helpful");
+    await render();
+
+    expect(press("Helpful")?.textContent).toBe("3");
+    expect(press("Not helpful")?.textContent).toBe("1");
+  });
+});
+
+/**
+ * The other thumb, asked for by the shop on 2026-10-12 to match its reference
+ * storefront. It is a count to read and nothing more: the list is still
+ * ordered featured-first, then newest, whatever either number says.
+ */
+describe("saying a review did not help", () => {
+  it("counts the press and shows the number the server settled on", async () => {
+    approved.push(review("a", 5));
+
+    await render();
+    await act(async () => {
+      press("Not helpful")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(unhelpfulCalls).toEqual(["a"]);
+    expect(helpfulCalls).toEqual([]);
+    expect(press("Marked not helpful")?.textContent).toBe("2");
+  });
+
+  it("gives one vote per review between the two thumbs", async () => {
+    approved.push(review("a", 5));
+
+    await render();
+    await act(async () => {
+      press("Helpful")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    const down = press("Not helpful");
+    expect((down as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => {
+      down?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(unhelpfulCalls).toEqual([]);
+  });
+
+  it("counts one vote when both thumbs are hit before either can disable", async () => {
+    approved.push(review("a", 5));
+
+    await render();
+    await act(async () => {
+      press("Not helpful")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      press("Helpful")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(unhelpfulCalls).toEqual(["a"]);
+    expect(helpfulCalls).toEqual([]);
+  });
+
+  it("remembers across a reload, and keeps the other thumb shut", async () => {
+    approved.push(review("a", 5));
+    window.localStorage.setItem("bakery-cms-unhelpful-reviews", JSON.stringify(["a"]));
+
+    await render();
+
+    expect(press("Marked not helpful")).toBeTruthy();
+    expect((press("Helpful") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("does not move a review down the list", async () => {
+    approved.push(
+      review("a", 5, { unhelpfulCount: 40 }),
+      review("b", 5, { helpfulCount: 40 }),
+    );
+
+    const view = await render();
+    const text = view.textContent ?? "";
+
+    expect(text.indexOf("Review a")).toBeLessThan(text.indexOf("Review b"));
   });
 });

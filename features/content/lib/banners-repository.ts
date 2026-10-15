@@ -4,6 +4,10 @@ import type { WriteResult } from "@/lib/write-result";
 import { fixBrokenImageUrl } from "@/constants/demo-images";
 import { defaultBanners, selectActiveHeroBanners } from "./banners-utils";
 import {
+  BANNERS_PATH,
+  applyServerContent,
+  onContentConflict,
+  type ServerContentRead,
   bannersLoaded,
   bannersWritable,
   fetchBanners,
@@ -126,6 +130,18 @@ export function ensureBannersWritable(): Promise<boolean> {
 /** Hydration: write the server's banners into the local cache (no re-push). */
 export function persistServerBanners(banners: Banner[]): void {
   persist(banners);
+}
+
+// A refused save replaces this tab's stale copy with the server's; see
+// `onContentConflict`.
+onContentConflict(BANNERS_PATH, persistServerBanners);
+
+/**
+ * The banners the SERVER read for this page, applied without a request — see
+ * `applyServerContent`.
+ */
+export function applyServerBanners(read: ServerContentRead<Banner[]>): void {
+  applyServerContent(BANNERS_PATH, read, { loaded: bannersLoaded, writable: bannersWritable }, persistServerBanners);
 }
 
 /**

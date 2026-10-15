@@ -13,9 +13,10 @@ import {
   TrendingUp,
   Wallet,
 } from "lucide-react";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
 import { useCommerceOverviews } from "@/apps/admin/commerce/lib/use-commerce-overviews";
+import type { CommerceOverviewsResponse } from "@/features/orders/lib/orders-api";
 import { getPaymentAnalytics } from "@/features/payments/lib/payment-analytics";
 import {
   getOrders,
@@ -36,13 +37,18 @@ const quickLinks = [
   { href: routes.admin.commerce.refunds, label: "Refunds", icon: RotateCcw },
 ];
 
-export function PaymentsAdminPage() {
+export function PaymentsAdminPage({
+  initial = null,
+}: {
+  /** The payment counters over every order, read on the server. */
+  initial?: CommerceOverviewsResponse | null;
+} = {}) {
   const [orders, setOrders] = useState<PlacedOrder[]>([]);
-  const [mounted, setMounted] = useState(false);
-  const { overviews } = useCommerceOverviews();
+  const [loadedLocal, setLoadedLocal] = useState(false);
+  const { overviews } = useCommerceOverviews(initial);
 
   useEffect(() => {
-    setMounted(true);
+    setLoadedLocal(true);
 
     function refresh() {
       setOrders(getOrders());
@@ -67,6 +73,10 @@ export function PaymentsAdminPage() {
   // UTC days, so an IST admin loses everything placed before 05:30 and gains
   // yesterday evening's. Every other caller sends it; this path must too.
   const serverBacked = Boolean(overviews?.payments);
+  // The server's figures are the same in its HTML and on hydration, so they
+  // show at once; the local fallback reads this browser's cache, which the
+  // server never had, so it waits for mount.
+  const mounted = serverBacked || loadedLocal;
   const a =
     overviews?.payments ?? getPaymentAnalytics(orders, Intl.DateTimeFormat().resolvedOptions().timeZone);
 

@@ -16,7 +16,7 @@ import { RefundOrderDialog } from "@/apps/admin/commerce/components/refund-order
 import { RefundTimeline } from "@/apps/admin/commerce/components/refund-timeline";
 import { formatRefundReason } from "@/apps/admin/commerce/lib/refund-utils";
 import { runBrowserPrint } from "@/features/commerce/lib/print-invoice";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { OrderStatusTimeline } from "@/components/shared/order-status-timeline";
 import { getOrderTimeline } from "@/features/orders/lib/order-tracking";
 import { isTerminalOrderStatus } from "@/features/orders/lib/order-status-meta";
@@ -42,6 +42,7 @@ import { routes } from "@/constants/routes";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { reportedAsSignedOut, reportedAsSignedOutOnRead } from "@/apps/admin/lib/report-write";
 import { addressLines } from "@/features/orders/lib/address-format";
+import { preparationStartedAt } from "@/features/orders/lib/cancellation-policy";
 
 interface OrderDetailPageProps {
   orderId: string;
@@ -294,7 +295,7 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(260px,1fr)]">
           <section className="space-y-4">
           <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-            <h2 className="font-heading text-lg font-semibold">Items</h2>
+            <h2 className="font-heading text-base font-semibold">Items</h2>
             <ul className="mt-4 space-y-4">
               {order.items.map((item) => (
                 <li key={item.id} className="flex gap-4">
@@ -360,7 +361,7 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
           </div>
 
           <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-            <h2 className="font-heading text-lg font-semibold">Fulfillment timeline</h2>
+            <h2 className="font-heading text-base font-semibold">Fulfillment timeline</h2>
             <div className="mt-4">
               <OrderStatusTimeline steps={timeline} />
             </div>
@@ -368,7 +369,7 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
 
           {order.orderNotes ? (
             <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-              <h2 className="font-heading text-lg font-semibold">Customer instructions</h2>
+              <h2 className="font-heading text-base font-semibold">Customer instructions</h2>
               <p className="mt-2 text-sm text-muted-foreground">{order.orderNotes}</p>
             </div>
           ) : null}
@@ -383,7 +384,7 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
           */}
           {order.personalisation ? (
             <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-              <h2 className="font-heading text-lg font-semibold">Personalisation</h2>
+              <h2 className="font-heading text-base font-semibold">Personalisation</h2>
               <dl className="mt-3 space-y-3 text-sm">
                 {order.personalisation.occasion ? (
                   <div>
@@ -432,7 +433,7 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
             thing that can put a courier in front of a customer.
           */}
           <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-            <h2 className="font-heading text-lg font-semibold">Delivery partner</h2>
+            <h2 className="font-heading text-base font-semibold">Delivery partner</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               Shown to the customer on their tracking page. Leave the name blank to remove it.
             </p>
@@ -468,7 +469,7 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
           </div>
 
           <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-            <h2 className="font-heading text-lg font-semibold">Internal notes</h2>
+            <h2 className="font-heading text-base font-semibold">Internal notes</h2>
             <textarea
               className={`${adminTextareaClassName} mt-3`}
               value={adminNotes}
@@ -484,7 +485,7 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
 
         <aside className="space-y-4">
           <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-            <h2 className="font-heading text-lg font-semibold">Customer</h2>
+            <h2 className="font-heading text-base font-semibold">Customer</h2>
             <div className="mt-4 space-y-3 text-sm">
               <p className="font-medium">{order.address.fullName}</p>
               <div className="flex items-center gap-2 text-muted-foreground">
@@ -513,7 +514,7 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
           </div>
 
           <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-            <h2 className="font-heading text-lg font-semibold">Delivery</h2>
+            <h2 className="font-heading text-base font-semibold">Delivery</h2>
             <div className="mt-4 flex gap-2 text-sm text-muted-foreground">
               <MapPin className="mt-0.5 size-4 shrink-0" />
               <div>
@@ -535,7 +536,7 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
           </div>
 
           <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-            <h2 className="font-heading text-lg font-semibold">Payment</h2>
+            <h2 className="font-heading text-base font-semibold">Payment</h2>
             <dl className="mt-4 space-y-2 text-sm">
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Method</dt>
@@ -570,7 +571,7 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
 
           {order.refundRecord?.history.length ? (
             <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-              <h2 className="font-heading text-lg font-semibold">Refund timeline</h2>
+              <h2 className="font-heading text-base font-semibold">Refund timeline</h2>
               <div className="mt-4">
                 <RefundTimeline events={order.refundRecord.history} />
               </div>
@@ -578,7 +579,7 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
           ) : null}
 
           <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-            <h2 className="font-heading text-lg font-semibold">Summary</h2>
+            <h2 className="font-heading text-base font-semibold">Summary</h2>
             <div className="mt-4">
               <TaxBreakdown
                 values={taxBreakdownFromCartTotals(order.totals, {
@@ -607,6 +608,21 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
               ))}
             </AdminSelect>
 
+            {/*
+              WHAT CANCELLING TURNS ON: when the kitchen started (stamped by
+              the first move to Preparing). Until then the customer may cancel,
+              if the products' "Order cancel" toggle allows it.
+            */}
+            <div className="mt-3 space-y-1 text-xs text-muted-foreground">
+              <p>
+                Preparation:{" "}
+                {preparationStartedAt(order)
+                  ? `started ${formatDate(preparationStartedAt(order)!, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}`
+                  : "not started"}
+              </p>
+              <p>Customer can cancel: {order.cancellationPolicy?.policyClass === "non_cancellable" ? "no" : "yes, until preparation starts"}</p>
+            </div>
+
             <div className="mt-4 space-y-2">
               <Button
                 variant="outline"
@@ -619,13 +635,16 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
               </Button>
               {!isTerminal ? (
                 <>
-                  <Button
-                    variant="destructive"
-                    className="w-full"
-                    onClick={() => setCancelOpen(true)}
-                  >
-                    Cancel order
-                  </Button>
+                  {/* A delivered order is refunded, not cancelled — the server refuses it. */}
+                  {order.status !== "delivered" ? (
+                    <Button
+                      variant="destructive"
+                      className="w-full"
+                      onClick={() => setCancelOpen(true)}
+                    >
+                      Cancel order
+                    </Button>
+                  ) : null}
                   <Button
                     variant="outline"
                     className="w-full"

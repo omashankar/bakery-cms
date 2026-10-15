@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import {
   FolderInput,
   Grid3x3,
@@ -28,7 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/utils/format";
-import type { MediaFile } from "@/types/media";
+import type { MediaFile, MediaFolder } from "@/types/media";
 import {
   bulkMoveMediaToFolder,
   countMediaUsage,
@@ -55,8 +55,9 @@ import { MediaThumbnail } from "./media-thumbnail";
 import { MediaToolsDialog } from "./media-tools-dialog";
 import { MediaUploadDialog } from "./media-upload-dialog";
 import { useMediaUsageSync } from "../lib/use-media-usage-sync";
-import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
-import { useMediaServerSync } from "@/apps/admin/media/lib/use-media-server-sync";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
+import { adminShell } from "@/apps/admin/components/admin-shell";
+import { applyServerMedia, useMediaServerSync } from "@/apps/admin/media/lib/use-media-server-sync";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 const PAGE_SIZE = 12;
@@ -69,7 +70,18 @@ const EMPTY_STATS = {
   unused: 0,
 };
 
-export function MediaLibraryPage() {
+export function MediaLibraryPage({
+  initial = null,
+}: {
+  /** The library read on the server for this page; null fetches as before. */
+  initial?: { files: MediaFile[]; folders: MediaFolder[] } | null;
+} = {}) {
+  // Before every passive effect on this screen (the sync below, the first
+  // `refresh`), so the cache already holds the server's library when they run.
+  useLayoutEffect(() => {
+    if (initial) applyServerMedia(initial.files, initial.folders);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
+  }, []);
   const labels = useBusinessLabels();
   /**
    * This screen's own data, asked for NOW.

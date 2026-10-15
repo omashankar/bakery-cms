@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { InquiriesHubPage } from "@/apps/admin/inquiries";
+import { InquiriesHubPage } from "@/apps/admin/inquiries/components/inquiries-hub-page";
 
 export const metadata: Metadata = {
   title: "Inquiries",

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { hydrateOnce } from "@/lib/hydrate-once";
+import { hydrateOnce, markHydrated } from "@/lib/hydrate-once";
+import type { Product } from "@/types/product";
 
 import { fetchProducts } from "@/features/products/data/products-client";
 import { persistProducts } from "@/features/products/lib/products-repository";
@@ -32,4 +33,14 @@ export function useProductCacheSync(): void {
       }
     });
   }, []);
+}
+
+/**
+ * The catalogue the SERVER read for this page, applied without a request.
+ * Used where a screen draws straight from this cache (Inventory), which on a
+ * fresh browser meant the shipped demo stock levels until the fetch landed.
+ */
+export function applyServerProducts(products: Product[]): void {
+  persistProducts(products);
+  markHydrated("products");
 }

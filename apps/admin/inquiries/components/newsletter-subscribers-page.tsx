@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { Copy, Mail, Trash2, UserCheck, UserX, Users } from "lucide-react";
 import { toast } from "sonner";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
@@ -25,7 +25,8 @@ import { ListLoading } from "@/components/shared/list-loading";
 import { type FiguresState } from "@/components/shared/panel-loading";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
-import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
+import { adminShell } from "@/apps/admin/components/admin-shell";
 import { formatRelativeTime } from "@/utils/format";
 import type { NewsletterSubscriber } from "@/types/inquiry";
 import {
@@ -39,11 +40,27 @@ import {
   type NewsletterFilters,
 } from "@/features/inquiries/lib/newsletter-repository";
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
-import { useNewsletterServerSync } from "@/features/inquiries/lib/use-newsletter-server-sync";
+import {
+  applyServerSubscribers,
+  useNewsletterServerSync,
+} from "@/features/inquiries/lib/use-newsletter-server-sync";
 
 const PAGE_SIZE = 12;
 
-export function NewsletterSubscribersPage({ embedded = false }: { embedded?: boolean } = {}) {
+export function NewsletterSubscribersPage({
+  embedded = false,
+  initial = null,
+}: {
+  embedded?: boolean;
+  /** Every subscriber, read on the server; null fetches as before. */
+  initial?: NewsletterSubscriber[] | null;
+} = {}) {
+  // Before the sync below and this screen's mount read, so both find the
+  // server's subscribers already in the cache.
+  useLayoutEffect(() => {
+    if (initial) applyServerSubscribers(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
+  }, []);
   /**
    * This screen's own data, asked for NOW.
    *
@@ -141,14 +158,24 @@ export function NewsletterSubscribersPage({ embedded = false }: { embedded?: boo
   }
 
   async function copyEmails() {
-    if (filtered.length === 0) {
-      toast.error("No emails to copy");
+    // Active only, whatever the filter shows. This button is the shop's only
+    // export, and it is used to fill a mailing — the default "All" filter put
+    // every unsubscribed address back into the next campaign.
+    const active = filtered.filter((item) => item.isActive);
+    if (active.length === 0) {
+      toast.error("No active subscribers to copy");
       return;
     }
-    const emails = filtered.map((item) => item.email).join(", ");
+    const emails = active.map((item) => item.email).join(", ");
+    const skipped = filtered.length - active.length;
     try {
       await navigator.clipboard.writeText(emails);
-      toast.success(`Copied ${filtered.length} email${filtered.length === 1 ? "" : "s"}`);
+      toast.success(`Copied ${active.length} email${active.length === 1 ? "" : "s"}`, {
+        description:
+          skipped > 0
+            ? `${skipped} unsubscribed ${skipped === 1 ? "address was" : "addresses were"} left out.`
+            : undefined,
+      });
     } catch {
       toast.error("Could not copy emails");
     }

@@ -1,3 +1,4 @@
+import { withoutStaffOnlyFields } from "@/features/orders/server/customer-view";
 import { requestContext } from "@/lib/server/audit/audit-log";
 import {
   clearCustomerCookie,
@@ -10,10 +11,13 @@ import { rateLimit } from "@/lib/server/http/rate-limit";
 import { ok } from "@/lib/server/http/response";
 import { readJson, validate } from "@/lib/server/http/validate";
 import * as orderService from "@/features/orders/server/order.service";
+import { cancelAsCustomer } from "@/features/orders/server/cancellation.service";
 
 import * as service from "./customer-auth.service";
 import {
+  customerCancellationSchema,
   requestCodeSchema,
+  savedAddressesSchema,
   updateCustomerProfileSchema,
   verifyCodeSchema,
 } from "./customer-auth.validators";
@@ -92,6 +96,52 @@ export const updateCustomerProfileController = withErrorHandler(async (request: 
 });
 
 /**
+ * A customer cancels one of THEIR orders, where its products allow it and the
+ * shop has not started preparing it (see `cancelAsCustomer`).
+ *
+ * The email that proves ownership comes from the session; the order number
+ * from the URL is only a name, checked against it in the service. Budgeted,
+ * because each cancellation emails the customer.
+ */
+export const requestOrderCancellationController = withErrorHandler(
+  async (request: Request, ctx: { params: Promise<{ orderNumber: string }> }) => {
+    const customer = await requireCustomer();
+    const { orderNumber } = await ctx.params;
+    const requestCtx = requestContext(request);
+    rateLimit(`customer-cancel:${customer.id}`, { limit: 10, windowMs: 15 * 60 * 1000 });
+
+    const input = validate(customerCancellationSchema, await readJson(request));
+    const order = await cancelAsCustomer(
+      decodeURIComponent(orderNumber),
+      customer.email,
+      input.reason,
+      { ...requestCtx, actorEmail: customer.email },
+    );
+    return ok(withoutStaffOnlyFields(order), "Order cancelled");
+  },
+);
+
+/**
+ * The signed-in customer's own address book — keyed on the SESSION, never on
+ * anything in the request, so it cannot be pointed at another account's.
+ */
+export const myAddressesController = withErrorHandler(async () => {
+  const customer = await requireCustomer();
+  return ok(await service.getAddresses(customer.id), "Your addresses");
+});
+
+export const saveMyAddressesController = withErrorHandler(async (request: Request) => {
+  const customer = await requireCustomer();
+  const ctx = requestContext(request);
+  // A save per click is the honest rate; this only stops a loop.
+  rateLimit(`customer-addresses:${customer.id}`, { limit: 60, windowMs: 60 * 1000 });
+  if (ctx.ip) rateLimit(`customer-addresses-ip:${ctx.ip}`, { limit: 120, windowMs: 60 * 1000 });
+
+  const input = validate(savedAddressesSchema, await readJson(request));
+  return ok(await service.saveAddresses(customer.id, input.addresses), "Addresses saved");
+});
+
+/**
  * The signed-in customer's own orders.
  *
  * The email comes from the SESSION, never from the request. The previous
@@ -103,5 +153,6 @@ export const updateCustomerProfileController = withErrorHandler(async (request: 
  */
 export const myOrdersController = withErrorHandler(async () => {
   const customer = await requireCustomer();
-  return ok(await orderService.getByCustomer(customer.email), "Your orders");
+  const orders = await orderService.getByCustomer(customer.email);
+  return ok(orders.map(withoutStaffOnlyFields), "Your orders");
 });

@@ -75,6 +75,10 @@ const orderSchema = new mongoose.Schema(
     couponReleased: { type: Boolean },
     refundReference: { type: String },
     refundRecord: { type: mongoose.Schema.Types.Mixed },
+    // The cancellation workflow — see features/orders/lib/cancellation-policy.ts.
+    // Mixed, like the refund record beside it; shaped by the service.
+    preparationStartedAt: { type: String },
+    cancellationPolicy: { type: mongoose.Schema.Types.Mixed },
     createdAt: { type: String },
     updatedAt: { type: String },
   },

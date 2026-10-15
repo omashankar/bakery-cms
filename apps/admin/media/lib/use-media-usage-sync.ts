@@ -28,9 +28,22 @@ interface Source {
   url: string;
 }
 
+/*
+ * No "Wedding page layout": that builder and its route were removed, and the
+ * 404 made every load incomplete. The index then never called itself complete,
+ * so every delete dialog sat on "Still checking" for good, and the hook re-fired
+ * all seven requests three more times on every visit to Media.
+ *
+ * Catalog and products are read from the SERVER here. Category, occasion and
+ * collection tiles were never checked at all, and the product check read this
+ * browser's product cache — filled once per admin session, so a photo added
+ * to a product created in the same session read as "Unused", and deleting it
+ * destroyed the Cloudinary file under a live product.
+ */
 const SOURCES: Source[] = [
   { label: "Homepage layout", context: "Builder", url: "/api/homepage-sections" },
-  { label: "Wedding page layout", context: "Builder", url: "/api/wedding-sections" },
+  { label: "Catalog", context: "Catalog", url: "/api/catalog" },
+  { label: "Products", context: "Products", url: "/api/products" },
   { label: "CMS pages", context: "Pages", url: "/api/pages" },
   { label: "Testimonials", context: "Content", url: "/api/content/testimonials" },
   { label: "Header", context: "Site layout", url: "/api/site-layout/header" },

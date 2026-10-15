@@ -1,23 +1,18 @@
-"use client";
-
 import { OptimizedImage } from "@/components/shared/optimized-image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { Heart, Star } from "lucide-react";
+import { Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 /* Still the wishlist heart — only the buy button went. */
-import { Button } from "@/components/ui/button";
+import { ProductCardWishlist } from "@/components/storefront/product-card-wishlist";
+import { EarliestDelivery } from "@/components/storefront/earliest-delivery";
 import { PriceDisplay } from "@/components/storefront/price-display";
 import type { LandingProduct } from "@/constants/landing-data";
 import { routes } from "@/constants/routes";
-import { isInWishlist, toggleWishlist } from "@/apps/website/lib/wishlist";
 import {
   defaultProductUnitPrice,
   displayCompareAtPrice,
 } from "@/features/products/lib/product-pricing";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
-import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 interface ProductCardProps {
   cake: LandingProduct;
@@ -60,6 +55,13 @@ interface ProductCardProps {
    * heart and not the button.
    */
   showWishlist?: boolean;
+  /**
+   * A white card with a hairline, for the homepage rows. The reference draws
+   * its rows' cards boxed — they sit on a tinted band, where words straight on
+   * the tint read as loose — and keeps them to name, price and rating. The
+   * listing's cards stay unboxed on the page's own ground.
+   */
+  framed?: boolean;
 }
 
 export function ProductCard({
@@ -68,9 +70,8 @@ export function ProductCard({
   variant = "default",
   className,
   showWishlist = true,
+  framed = false,
 }: ProductCardProps) {
-  const labels = useBusinessLabels();
-  const [wishlisted, setWishlisted] = useState(false);
   /**
    * The price the SHOP will charge, not the base price on the record.
    *
@@ -86,18 +87,6 @@ export function ProductCard({
   // to move with it or the card advertises a discount computed against the
   // wrong basis.
   const compareAt = displayCompareAtPrice(cake.price, cake.compareAtPrice, price);
-
-  useEffect(() => {
-    setWishlisted(isInWishlist(cake.slug));
-  }, [cake.slug]);
-
-  const handleWishlist = (event: React.MouseEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const added = toggleWishlist(cake.slug);
-    setWishlisted(added);
-    toast.success(added ? "Added to wishlist" : "Removed from wishlist");
-  };
 
   /**
    * The product page has refused this since it was written — the button is
@@ -115,22 +104,30 @@ export function ProductCard({
     <article
       className={cn(
         /*
-          A SHADOW AT REST, not only on hover.
-
-          The card carried a 1px border and nothing else until a pointer
-          touched it, so a grid of four read as four rectangles ruled onto
-          the background — and on a phone, where there is no hover at all,
-          that was the only state there was. The border goes almost away in
-          exchange: two ways of separating a card from its ground is one
-          too many, and the box drawn round each picture was the heavier.
+          NO BOX ROUND THE CARD — the marketplace shape the shop pointed at.
+          The picture carries its own rounded edge and the words sit under it
+          on the page's ground, so a grid reads as pictures, not as a ruled
+          sheet of rectangles.
         */
-        "group flex h-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm",
+        "group flex h-full flex-col",
+        framed &&
+          "overflow-hidden rounded-xl border border-border/70 bg-card transition-shadow hover:shadow-md",
+        /*
+          A PANEL ON HOVER, and only then: the reference lifts the card it is
+          pointing at onto white with a shadow. The negative margin gives that
+          panel room to reach past the picture without moving the picture or
+          breaking the grid's alignment at rest.
+        */
+        !framed && "-m-1.5 rounded-2xl p-1.5 transition-shadow hover:bg-card hover:shadow-lg",
         className
       )}
     >
       <div
         className={cn(
+          // Framed, the card clips the corners; a radius here would round
+          // the picture's bottom edge against a straight seam.
           "relative overflow-hidden bg-cream-100",
+          !framed && "rounded-xl",
           variant === "tall" ? "aspect-[3/4]" : "aspect-square"
         )}
       >
@@ -139,7 +136,9 @@ export function ProductCard({
             src={cake.image}
             alt={cake.name}
             fill
-            priority={priority}
+            // Next 16 deprecates `priority`; the LCP card loads eagerly and says so.
+            loading={priority ? "eager" : "lazy"}
+            fetchPriority={priority ? "high" : "auto"}
             /*
               THE GRID CHANGED, so this had to. It claimed 25vw from 1024 up
               where the grid was three across, and 50vw below 640 where the
@@ -148,7 +147,7 @@ export function ProductCard({
               md / 4 at xl, and these are those widths.
             */
             sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw"
-            className="object-cover"
+            className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
           />
         </Link>
         {cake.badge ? (
@@ -156,56 +155,7 @@ export function ProductCard({
             {cake.badge}
           </Badge>
         ) : null}
-        {showWishlist ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            /*
-              `size-7` is 28px and every guideline asks for 44. The pseudo
-              element grows the HIT AREA by 8px a side without moving the
-              circle a customer sees, which is why it is `after:` rather than
-              padding: padding would make the button itself 44px and the card
-              would gain a visibly larger blob.
-            */
-            className="absolute top-2.5 right-2.5 border border-border bg-card/95 shadow-sm after:absolute after:-inset-2 after:content-['']"
-            onClick={handleWishlist}
-            aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
-          >
-            <Heart className={cn("size-4", wishlisted && "fill-bakery-700 text-bakery-700")} />
-          </Button>
-        ) : null}
-        {/*
-          THE RATING, ON THE PICTURE.
-
-          It sat in the price row, at the other end from the price. The shop
-          pointed at a listing where it sits low-left ON the photograph and
-          asked for that — and it is the better place for a second reason:
-          the price row now carries a price, a struck-through price and a
-          discount, and a fourth thing on that line is a scrum.
-
-          THE COUNT IS ONLY DRAWN IF THERE IS ONE. A rating with no reviews
-          behind it is a number this shop has not earned, and `(0)` beside
-          it reads worse than nothing at all.
-        */}
-        {cake.rating ? (
-          <span
-            className="absolute bottom-2.5 left-2.5 flex items-center gap-1 rounded-md border border-border bg-card/95 px-1.5 py-0.5 text-[11px] font-semibold text-foreground shadow-sm"
-            aria-label={
-              cake.reviewCount
-                ? `Rated ${cake.rating} out of 5 from ${cake.reviewCount} reviews`
-                : `Rated ${cake.rating} out of 5`
-            }
-          >
-            {cake.rating}
-            <Star aria-hidden="true" className="size-3 fill-green-700 text-green-700" />
-            {cake.reviewCount ? (
-              <span className="font-normal text-muted-foreground">
-                ({cake.reviewCount.toLocaleString()})
-              </span>
-            ) : null}
-          </span>
-        ) : null}
+        {showWishlist ? <ProductCardWishlist slug={cake.slug} /> : null}
       </div>
 
       {/*
@@ -215,59 +165,59 @@ export function ProductCard({
         mixed up two different cards: the ones it centres are CATEGORY tiles —
         a name and a from-price, no product behind them — while its product
         cards, the ones with a name, a price and a rating, are ranged left.
-        This is a product card.
-
-        Ranged left is also the better of the two here regardless: a name that
-        wraps to two lines centres its second line under its first, and four
-        of those across a row have four different shapes.
       */}
-      <div className="flex flex-1 flex-col gap-2 p-3">
+      <div className={cn("flex flex-1 flex-col gap-1.5", framed ? "px-2.5 pt-2 pb-2.5" : "px-0.5 pt-2.5")}>
         {/*
-          NO CATEGORY OVER THE NAME.
-
-          It was a small uppercase line above every product — ENGAGEMENT CAKE,
-          PHOTO CAKES — and the shop asked for it to go. It is worth saying
-          why it is no loss: on a row the customer reached BY category, it
-          repeats the heading four times; and the card already links to the
-          product, where the category is on the page it lands on.
-
-          The wrapper stays. It holds the name, and the name alone wraps to
-          two lines, so the div is what keeps the price pinned to the bottom
-          of a card whose neighbour has a one-line name.
+          NO CATEGORY OVER THE NAME, and NO BUY BUTTON: the card is the link,
+          and every choice that makes a cake — size, flavour, a message — is
+          made on the product page, which the card cannot ask.
         */}
-        <div>
-          <h3 className="font-heading text-sm font-semibold leading-snug">
-            <Link
-              href={routes.store.cake(cake.slug)}
-              className="line-clamp-2"
+        <h3 className="text-sm leading-snug text-foreground sm:text-[15px]">
+          <Link href={routes.store.cake(cake.slug)} className="line-clamp-2 hover:text-bakery-700">
+            {cake.name}
+          </Link>
+        </h3>
+
+        {/*
+          THE RATING AT THE END OF THE PRICE LINE, as the shop's reference has
+          it: a green pill a customer finds without looking for it. Only when
+          there is one — a rating with no reviews behind it is a number this
+          shop has not earned.
+        */}
+        <div className="mt-auto flex items-center justify-between gap-2">
+          <PriceDisplay price={price} compareAtPrice={compareAt} size="sm" className="min-w-0" />
+          {cake.rating ? (
+            <span
+              className="inline-flex shrink-0 items-center gap-0.5 rounded bg-green-700 px-1.5 py-0.5 text-xs font-semibold text-white"
+              aria-label={`Rated ${cake.rating} out of 5`}
             >
-              {cake.name}
-            </Link>
-          </h3>
-        </div>
-
-        {/*
-          NO BUY BUTTON ON A CARD, ANYWHERE. The shop asked for it, and the
-          card is the better argument: every choice that makes one of these a
-          thing somebody wants — size, flavour, a message, a photograph — is
-          made on the product page, and the card cannot ask. A grid add was
-          always priced AS a set of choices the customer had not seen, and
-          they met them for the first time on the invoice.
-
-          It was 24 solid full-width buttons on the shop-all page. The card
-          itself is the link.
-        */}
-        <div className="mt-auto space-y-1">
-          <PriceDisplay price={price} compareAtPrice={compareAt} size="sm" />
-          {outOfStock ? (
-            /*
-              STILL SAYS SO. The button used to carry this, and without
-              something here a customer taps through to a product page to find
-              it unavailable — sent there by us, with the card giving no hint.
-            */
-            <p className="text-xs font-medium text-muted-foreground">Out of stock</p>
+              {cake.rating}
+              <Star aria-hidden="true" className="size-3 fill-white text-white" />
+            </span>
           ) : null}
         </div>
+
+        {framed ? (
+          outOfStock ? <p className="text-xs font-medium text-muted-foreground">Out of stock</p> : null
+        ) : (
+        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+          {outOfStock ? (
+            /*
+              STILL SAYS SO, in place of the delivery day it cannot have —
+              without it a customer taps through to find it unavailable.
+            */
+            <span className="font-medium">Out of stock</span>
+          ) : (
+            <EarliestDelivery />
+          )}
+          {cake.rating && cake.reviewCount ? (
+            // Not on a phone: the pill above already says there is a rating.
+            <span className="hidden shrink-0 sm:inline">
+              {cake.reviewCount.toLocaleString()} {cake.reviewCount === 1 ? "Review" : "Reviews"}
+            </span>
+          ) : null}
+        </div>
+        )}
       </div>
     </article>
   );

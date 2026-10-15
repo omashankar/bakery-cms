@@ -32,7 +32,8 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ListLoading } from "@/components/shared/list-loading";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
-import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
+import { adminShell } from "@/apps/admin/components/admin-shell";
 import { StockStatusBadge } from "@/apps/admin/commerce/components/stock-status-badge";
 import { deriveStockStatus } from "@/features/inventory/lib/inventory-utils";
 import { getInventorySettings } from "@/apps/admin/commerce/lib/inventory-repository";
@@ -130,10 +131,23 @@ export function filterProducts(cakes: CakeEntity[], filters: ProductListFilters)
     });
 }
 
-export function ProductsListPage() {
+export function ProductsListPage({
+  initial = null,
+  initialCategories = null,
+}: {
+  /** Read on the server so the table is in the HTML; null fetches as before. */
+  initial?: CakeEntity[] | null;
+  /** The category names, for the rows' first render; see the page. */
+  initialCategories?: Array<{ id: string; name: string }> | null;
+} = {}) {
+  // Two flags, not one. `loaded`: the list is here (from the server or the
+  // fetch) — the table waits on this. `mounted`: this is the browser — what
+  // reads this browser's caches (the category options, the stock thresholds)
+  // waits on this, so the first render matches the server's HTML.
   const [mounted, setMounted] = useState(false);
+  const [loaded, setLoaded] = useState(Boolean(initial));
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [cakes, setCakes] = useState<CakeEntity[]>([]);
+  const [cakes, setCakes] = useState<CakeEntity[]>(initial ?? []);
   const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
   const labels = useBusinessLabels();
   const productLower = labels.productWord.toLowerCase();
@@ -166,12 +180,17 @@ export function ProductsListPage() {
         error instanceof Error ? error.message : `Failed to load ${productsLower}`,
       );
     } finally {
-      setMounted(true);
+      setLoaded(true);
     }
   }
 
   useEffect(() => {
+    setMounted(true);
+    // The server already sent the list; asking again on mount is the request
+    // this page used to wait on.
+    if (initial) return;
     void refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only
   }, []);
 
   useEffect(() => {
@@ -280,7 +299,10 @@ export function ProductsListPage() {
   }
 
   function categoryName(categoryId: string) {
-    return adminCategories().find((item) => item.id === categoryId)?.name ?? "—";
+    // Before mount, the server's names: this browser's catalogue cache is not
+    // readable during the render that has to match the server's HTML.
+    const list = mounted || !initialCategories ? adminCategories() : initialCategories;
+    return list.find((item) => item.id === categoryId)?.name ?? "—";
   }
 
   /**
@@ -482,7 +504,7 @@ export function ProductsListPage() {
         </div>
       </FilterPanel>
 
-      {!mounted ? (
+      {!loaded ? (
         /*
           `mounted` gated the STAT CARDS and nothing else, so the table below
           rendered "No Cakes found — add your first cake" on every cold load,
@@ -584,17 +606,17 @@ export function ProductsListPage() {
                           <p className="truncate font-medium text-foreground">{cake.name}</p>
                           <div className="mt-0.5 flex flex-wrap gap-1">
                             {cake.isFeatured ? (
-                              <Badge variant="gold" className="text-[10px]">
+                              <Badge variant="gold" className="text-[11px]">
                                 Featured
                               </Badge>
                             ) : null}
                             {cake.isTrending ? (
-                              <Badge variant="outline" className="text-[10px]">
+                              <Badge variant="outline" className="text-[11px]">
                                 Trending
                               </Badge>
                             ) : null}
                             {cake.isBestSeller ? (
-                              <Badge variant="bakery" className="text-[10px]">
+                              <Badge variant="bakery" className="text-[11px]">
                                 Best Seller
                               </Badge>
                             ) : null}

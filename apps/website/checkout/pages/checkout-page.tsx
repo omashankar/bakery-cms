@@ -9,15 +9,17 @@ import {
   CreditCard,
   Loader2,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/lazy-toast";
 import {
   getCustomerSession,
   syncCustomerSession,
+  hasCustomerSessionSettled,
 } from "@/apps/website/account/lib/customer-session";
 import {
   createSavedAddress,
   getDefaultAddress,
   getSavedAddresses,
+  syncSavedAddresses,
   updateSavedAddress,
   type SavedAddress,
 } from "@/apps/website/account/lib/customer-addresses";
@@ -28,7 +30,7 @@ import {
   ProcessingState,
   type PaymentUIState,
 } from "@/features/payments/components/processing-state";
-import { openCustomerAuthModal } from "@/apps/website/account/components/customer-auth-modal";
+import { openCustomerAuthModal } from "@/apps/website/account/lib/auth-modal-events";
 import {
   getCommerceSettings,
   SETTINGS_UPDATED_EVENT,
@@ -37,10 +39,12 @@ import { DELIVERY_ZONES_UPDATED_EVENT } from "@/features/commerce/lib/delivery-z
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import { CartIssuesAlert } from "@/apps/website/checkout/components/cart-issues-alert";
 import { DeliveryAddressPicker } from "@/apps/website/checkout/components/delivery-address-picker";
-import { CheckoutProgress } from "@/apps/website/checkout/components/checkout-progress";
+import { publishCheckoutStep } from "@/apps/website/checkout/lib/checkout-step-store";
 import { CouponInput } from "@/apps/website/checkout/components/coupon-input";
 import { OrderSummaryPanel } from "@/apps/website/checkout/components/order-summary-panel";
+import { DeliverySlotPicker } from "@/apps/website/checkout/components/delivery-slot-picker";
 import { calculateCartTotals, type CartTotals } from "@/features/orders/lib/cart-totals";
+import { OUTSIDE_ZONES_MESSAGE } from "@/features/commerce/lib/delivery-zone-utils";
 import {
   clearCheckoutDraft,
   EMPTY_CHECKOUT_ADDRESS,
@@ -54,6 +58,11 @@ import {
   type OrderPersonalisation,
   type PaymentMethod,
 } from "@/features/orders/lib/checkout-draft";
+import {
+  CANCELLATION_CLASS_CUSTOMER_TEXT,
+  DEFAULT_CANCELLATION_CLASS,
+  productAllowsCod,
+} from "@/features/orders/lib/cancellation-policy";
 import {
   getDeliveryTimeSlots,
   getMinDeliveryDate,
@@ -79,9 +88,7 @@ import {
   addDays,
   earliestDeliveryDateString,
   isPastSameDayCutoff,
-  isPastTimeSlot,
 } from "@/features/orders/lib/delivery-date";
-import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import {
   clearCart,
   clearCartPreferences,
@@ -196,8 +203,11 @@ function hasDeliverableAddress(address?: Partial<CheckoutAddress>): boolean {
 }
 
 interface CheckoutPageProps {
-  /** Live published catalogue, fetched on the server. */
-  catalog: LandingProduct[];
+  /**
+   * Live published catalogue, fetched on the server — only the four fields
+   * this page reads (see `CheckoutCatalogEntry`).
+   */
+  catalog: CheckoutCatalogEntry[];
   /**
    * The shop's name, read on the SERVER.
    *
@@ -210,6 +220,18 @@ interface CheckoutPageProps {
    */
   siteName: string;
 }
+
+/**
+ * What checkout needs to know about a product: whether it is still sold and
+ * in stock, the categories a scoped coupon is checked against, and its
+ * occasions for the occasion picker. The route used to send every product's
+ * whole record — descriptions, images, variants — 120 KB of HTML to parse on
+ * a phone for four fields.
+ */
+export type CheckoutCatalogEntry = Pick<
+  LandingProduct,
+  "slug" | "inStock" | "categoryIds" | "occasions" | "cancellationClass" | "codAllowed"
+>;
 
 export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   const labels = useBusinessLabels();
@@ -310,14 +332,31 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   // Null while unknown — do not hide a method on a guess.
   const [onlinePaymentReady, setOnlinePaymentReady] = useState<boolean | null>(null);
 
+  /**
+   * The cart lines that take no cash — made to order, personalised, or
+   * switched off by the shop (`productAllowsCod`). One of them takes Cash on
+   * Delivery off the whole order; the server refuses it too, so this only
+   * keeps the customer from choosing something that would be refused.
+   */
+  const codBlockedBy = useMemo(() => {
+    const bySlug = new Map(catalog.map((product) => [product.slug, product]));
+    return items
+      .filter((item) => {
+        const product = bySlug.get(item.productSlug);
+        return product ? !productAllowsCod(product) : false;
+      })
+      .map((item) => item.name);
+  }, [items, catalog]);
+
   const availablePaymentOptions = useMemo(
     () =>
       paymentOptions.filter(
         (option) =>
           commerce.paymentMethods[option.value] &&
-          (option.value !== "razorpay" || onlinePaymentReady !== false)
+          (option.value !== "razorpay" || onlinePaymentReady !== false) &&
+          (option.value !== "cod" || codBlockedBy.length === 0)
       ),
-    [commerce.paymentMethods, onlinePaymentReady]
+    [commerce.paymentMethods, onlinePaymentReady, codBlockedBy]
   );
 
   // Offering "Pay Online" when the gateway has no keys means the customer
@@ -377,10 +416,12 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
           // this line runs. Reading the cache here made the list a snapshot of
           // an arbitrary moment, and nothing re-took it.
           getEnabledCheckoutMethods(commerce.paymentMethods).filter(
-            (method) => method.id !== "razorpay" || onlinePaymentReady !== false
+            (method) =>
+              (method.id !== "razorpay" || onlinePaymentReady !== false) &&
+              (method.id !== "cod" || codBlockedBy.length === 0)
           )
         : [],
-    [ready, commerce.paymentMethods, onlinePaymentReady]
+    [ready, commerce.paymentMethods, onlinePaymentReady, codBlockedBy]
   );
 
   /**
@@ -449,6 +490,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
     reset,
     setValue,
     watch,
+    getValues,
     formState,
   } = useForm<CheckoutAddress>({
     defaultValues: getCheckoutDraft().address,
@@ -483,7 +525,11 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
      * cookie was perfectly valid. The cache is a render hint; only the server
      * knows.
      */
-    const signedIn = await syncCustomerSession();
+    // The layout already asked the server with this page (StorefrontCacheSeed);
+    // that answer is as authoritative as a second request would be.
+    const signedIn = hasCustomerSessionSettled()
+      ? getCustomerSession()
+      : await syncCustomerSession();
     if (cancelled) return;
 
     // Being bounced back to the cart with no explanation reads as a broken
@@ -552,6 +598,24 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
       // A typed-but-unsaved address must stay editable on return.
       if (!matching) setShowAddressForm(true);
     }
+
+    /*
+      THE ACCOUNT'S BOOK, which this device may not hold yet — an address
+      saved on the customer's phone, opened at checkout on their laptop.
+      Applied as a pick only where nothing was picked above, so it never
+      replaces an address the customer is in the middle of.
+    */
+    void syncSavedAddresses().then((synced) => {
+      if (!synced) return;
+      setSavedAddresses(synced);
+      if (addresses.length === 0 && !draftHasAddress) {
+        const fresh = getDefaultAddress();
+        if (fresh) {
+          setAddressChoice(fresh.id);
+          reset(toCheckoutAddress(fresh, session?.email ?? ""));
+        }
+      }
+    });
     // "Nothing to choose from: go straight to the form" stood here, and it was
     // the ONLY thing opening the form for a first-time customer — once, at
     // mount, never again. `addressFormOpen` derives that from the book itself,
@@ -629,6 +693,16 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  // The steps are drawn by the focused header now; tell it where we are, and
+  // how to go back to a completed step. `goToStep` reads only `searchParams`
+  // and the router, so re-publishing on those (and the step) keeps it current
+  // without re-publishing on every render.
+  useEffect(() => {
+    publishCheckoutStep({ step, onSelect: (target) => goToStep(target) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
+  }, [step, searchParams]);
+  useEffect(() => () => publishCheckoutStep(null), []);
+
   // Browser Back/Forward changes the URL; follow it back into the right step.
   useEffect(() => {
     if (!ready) return;
@@ -690,6 +764,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
 
   const watchedCity = watch("city");
   const watchedPincode = watch("pincode");
+  const watchedState = watch("state");
   // The 3-up control is not an <input>, so its value is watched rather than
   // registered; `setValue` is what writes the choice back into the form.
   const watchedAddressLabel = watch("addressLabel");
@@ -771,6 +846,20 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
       quantity: item.quantity,
     }));
   }, [items, catalog]);
+  /**
+   * Each kind of cancellation rule in this cart, strictest first — the lines
+   * the policy box above the consent tick reads. From the server-sent
+   * catalogue, the same one the order's own copy is built from.
+   */
+  const cartPolicyClasses = useMemo(() => {
+    const bySlug = new Map(catalog.map((product) => [product.slug, product.cancellationClass]));
+    const present = new Set(
+      items.map((item) => bySlug.get(item.productSlug) ?? DEFAULT_CANCELLATION_CLASS),
+    );
+    return (["non_cancellable", "made_to_order", "standard"] as const).filter((cls) =>
+      present.has(cls),
+    );
+  }, [items, catalog]);
   const couponCheck = useMemo(
     () => (coupon ? applyCouponCode(coupon.code, couponLines) : null),
     [coupon, couponLines],
@@ -809,10 +898,11 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
         deliveryAddress: {
           city: watchedCity,
           pincode: watchedPincode,
+          state: watchedState,
         },
         commerceOverride: commerce,
       }),
-    [items, validCoupon, giftWrap, deliveryTierId, watchedCity, watchedPincode, commerce]
+    [items, validCoupon, giftWrap, deliveryTierId, watchedCity, watchedPincode, watchedState, commerce]
   );
 
   const totals = serverTotals ?? localTotals;
@@ -1022,7 +1112,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
      */
     const needsWindow = deliveryTiers.length > 0 ? windowsForTier.length > 0 : true;
     if (needsWindow && !slotWithTier.timeSlot?.trim()) {
-      document.getElementById("deliveryTime")?.focus();
+      document.getElementById("deliveryDate")?.focus();
       setSlotError(
         deliveryTiers.length > 0
           ? "Choose a delivery time for this option"
@@ -1437,23 +1527,15 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
         </div>
       ) : null}
 
-      <StorePageHeader
-        title="Checkout"
-        breadcrumbs={[
-          { label: "Cart", href: routes.store.cart },
-          { label: "Checkout" },
-        ]}
-      />
+      {/*
+        No breadcrumb and no in-page steps: the focused header carries both
+        the way home and the steps, which this page feeds (see the effect
+        publishing `step`).
+      */}
+      <h1 className="sr-only">Checkout</h1>
 
       <section className={layoutSpacing.sectionY}>
         <div className={layoutSpacing.container}>
-          <CheckoutProgress
-            currentStep={step}
-            onStepSelect={(target) => {
-              goToStep(target);
-            }}
-            className="mb-8"
-          />
 
           <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
             <div className="order-1 space-y-6 lg:order-none lg:col-start-1">
@@ -1567,6 +1649,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       <div className="space-y-2 sm:col-span-2">
                         <Label htmlFor="fullName">Full name</Label>
                         <Input
+                          className="h-11"
                           id="fullName"
                           aria-required
                           {...register("fullName", { required: "Name is required" })}
@@ -1586,6 +1669,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       <div className="space-y-2">
                         <Label htmlFor="phone">Phone</Label>
                         <Input
+                          className="h-11"
                           id="phone"
                           aria-required
                           type="tel"
@@ -1608,11 +1692,12 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                           worth.
                         */}
                         <Label htmlFor="altPhone">Alternate phone (optional)</Label>
-                        <Input id="altPhone" type="tel" {...register("altPhone")} />
+                        <Input className="h-11" id="altPhone" type="tel" {...register("altPhone")} />
                       </div>
                       <div className="space-y-2 sm:col-span-2">
                         <Label htmlFor="addressLine1">Address line 1</Label>
                         <Input
+                          className="h-11"
                           id="addressLine1"
                           aria-required
                           {...register("addressLine1", { required: "Address is required" })}
@@ -1625,7 +1710,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       </div>
                       <div className="space-y-2 sm:col-span-2">
                         <Label htmlFor="addressLine2">Address line 2 (optional)</Label>
-                        <Input id="addressLine2" {...register("addressLine2")} />
+                        <Input className="h-11" id="addressLine2" {...register("addressLine2")} />
                       </div>
                       <div className="space-y-2 sm:col-span-2">
                         {/*
@@ -1636,6 +1721,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                         */}
                         <Label htmlFor="landmark">Landmark (optional)</Label>
                         <Input
+                          className="h-11"
                           id="landmark"
                           placeholder="A shop, a turning, anything easy to spot"
                           {...register("landmark")}
@@ -1644,6 +1730,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       <div className="space-y-2">
                         <Label htmlFor="city">City</Label>
                         <Input
+                          className="h-11"
                           id="city"
                           aria-required
                           {...register("city", { required: "City is required" })}
@@ -1657,6 +1744,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       <div className="space-y-2">
                         <Label htmlFor="state">State</Label>
                         <Input
+                          className="h-11"
                           id="state"
                           aria-required
                           {...register("state", { required: "State is required" })}
@@ -1670,6 +1758,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       <div className="space-y-2">
                         <Label htmlFor="pincode">PIN code</Label>
                         <Input
+                          className="h-11"
                           id="pincode"
                           aria-required
                           {...register("pincode", {
@@ -1680,6 +1769,17 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                         {formState.errors.pincode ? (
                           <p role="alert" className="text-xs text-destructive">
                             {formState.errors.pincode.message}
+                          </p>
+                        ) : null}
+                        {/*
+                          SAID HERE, under the PIN, as soon as it is typed — not
+                          as a failed payment. The shop delivers only inside its
+                          zones and this address is in none of them; the server
+                          refuses the order for the same reason.
+                        */}
+                        {totals.deliverable === false ? (
+                          <p role="alert" className="text-xs text-destructive">
+                            {OUTSIDE_ZONES_MESSAGE}
                           </p>
                         ) : null}
                         {commerce.useZoneBasedDelivery && totals.deliveryZoneName ? (
@@ -1702,7 +1802,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                           every country is a list nobody asked for.
                         */}
                         <Label htmlFor="country">Country (optional)</Label>
-                        <Input id="country" {...register("country")} />
+                        <Input className="h-11" id="country" {...register("country")} />
                       </div>
 
                       <div className="space-y-2 sm:col-span-2">
@@ -1778,7 +1878,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                             <Button
                               type="button"
                               variant="outline"
-                              className="sm:min-w-32"
+                              className="h-11 sm:min-w-32"
                               onClick={() => {
                                 setShowAddressForm(false);
                                 setEditingAddressId(null);
@@ -1808,7 +1908,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                           <Button
                             type="button"
                             variant="secondary"
-                            className="sm:min-w-32"
+                            className="h-11 sm:min-w-32"
                             onClick={() => void handleSubmit(saveAddressToBook)()}
                           >
                             {editingAddressId ? "Save changes" : "Save address"}
@@ -1829,140 +1929,38 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                     <h2 className={storefrontHeading.card}>Personalize your order</h2>
 
                     <div className="mt-5 space-y-4">
-                      {deliveryTiers.length > 0 ? (
-                        <div className="space-y-2">
-                          <Label>How fast</Label>
-                          {/*
-                            The shop's own speeds and the shop's own prices.
-                            A shop that has set none up never sees this block,
-                            and gets the one delivery charge it always had.
-                          */}
-                          <div role="radiogroup" aria-label="How fast" className="space-y-2">
-                            {deliveryTiers.map((tier) => {
-                              const active = tier.id === deliveryTierId;
-                              return (
-                                <button
-                                  key={tier.id}
-                                  type="button"
-                                  role="radio"
-                                  aria-checked={active}
-                                  onClick={() => {
-                                    setSlotError(null);
-                                    setDeliveryTierId(tier.id);
-                                    // A window booked against the old tier
-                                    // may not exist on this one, and a select
-                                    // holding a value it has no option for
-                                    // shows blank while still submitting.
-                                    if (!tier.windows.includes(deliverySlot.timeSlot)) {
-                                      setDeliverySlot((prev) => ({ ...prev, timeSlot: "" }));
-                                    }
-                                  }}
-                                  className={cn(
-                                    "flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors",
-                                    active
-                                      ? "border-bakery-700 bg-bakery-50"
-                                      : "border-border bg-card hover:border-bakery-700"
-                                  )}
-                                >
-                                  <span>
-                                    <span className="block text-sm font-medium">{tier.label}</span>
-                                    {tier.description ? (
-                                      <span className="block text-xs text-muted-foreground">
-                                        {tier.description}
-                                      </span>
-                                    ) : null}
-                                  </span>
-                                  {/*
-                                    A free tier says Free rather than a
-                                    zero-rupee amount, the same way the
-                                    Delivery row does.
-                                  */}
-                                  <span className="shrink-0 text-sm font-semibold">
-                                    {tier.fee > 0 ? `+${formatCurrency(tier.fee)}` : "Free"}
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ) : null}
-                  {/* One slot for the whole order — an order is delivered
-                      once, even when each cake was added separately. */}
-                  <div className="space-y-3 rounded-xl border border-border bg-cream-50 p-4">
-                    <div>
-                      <p className="text-sm font-medium">When should we deliver?</p>
-                      <p className="text-xs text-muted-foreground">
-                        The earliest date depends on preparation time.
-                      </p>
-                    </div>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="deliveryDate">Delivery date</Label>
-                        <Input
-                          id="deliveryDate"
-                          aria-required
-                          type="date"
-                          min={earliestDeliveryDate}
-                          value={deliverySlot.date}
-                          aria-invalid={Boolean(slotError) && !deliverySlot.date}
-                          onChange={(event) => {
-                            setSlotError(null);
-                            setDeliverySlot((prev) => ({ ...prev, date: event.target.value }));
-                          }}
-                        />
-                      </div>
                       {/*
-                        Hidden when the chosen speed has no windows — a
-                        midnight or a next-day delivery has nothing to pick,
-                        and an empty dropdown labelled "Delivery time" reads
-                        as a list that failed to load.
+                        ONE FIELD AND A DIALOG — date, then the kind of
+                        delivery with its price, then the window — as the
+                        reference does it. One slot for the whole order: an
+                        order is delivered once, even when each cake was added
+                        separately.
                       */}
-                      {windowsForTier.length > 0 ? (
                       <div className="space-y-2">
-                        <Label htmlFor="deliveryTime">Delivery time</Label>
-                        <select
-                          id="deliveryTime"
-                          aria-required
-                          value={deliverySlot.timeSlot}
-                          aria-invalid={Boolean(slotError) && !deliverySlot.timeSlot}
-                          onChange={(event) => {
+                        <Label htmlFor="deliveryDate">Delivery date &amp; time</Label>
+                        <DeliverySlotPicker
+                          id="deliveryDate"
+                          slot={{ ...deliverySlot, tierId: deliveryTierId || undefined }}
+                          tiers={deliveryTiers}
+                          defaultWindows={slotOptions}
+                          earliestDate={earliestDeliveryDate}
+                          invalid={Boolean(slotError)}
+                          onChange={(next) => {
                             setSlotError(null);
+                            setDeliveryTierId(next.tierId);
                             setDeliverySlot((prev) => ({
                               ...prev,
-                              timeSlot: event.target.value,
+                              date: next.date,
+                              timeSlot: next.timeSlot,
                             }));
                           }}
-                          className="h-8 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20"
-                        >
-                          <option value="">Select a time</option>
-                          {/*
-                            Today windows that have already closed are not
-                            offered — the quote refuses them. The one already
-                            chosen stays listed whatever the clock says, so the
-                            select never renders a value it has no option for;
-                            changing the date is what clears it.
-                          */}
-                          {windowsForTier
-                            .filter(
-                              (slot) =>
-                                slot === deliverySlot.timeSlot ||
-                                !isPastTimeSlot(deliverySlot.date, slot),
-                            )
-                            .map((slot) => (
-                              <option key={slot} value={slot}>
-                                {slot}
-                              </option>
-                            ))}
-                        </select>
+                        />
+                        {slotError ? (
+                          <p role="alert" className="text-xs text-destructive">
+                            {slotError}
+                          </p>
+                        ) : null}
                       </div>
-                      ) : null}
-                    </div>
-                    {slotError ? (
-                      <p role="alert" className="text-xs text-destructive">
-                        {slotError}
-                      </p>
-                    ) : null}
-                  </div>
                       {occasionOptions.length > 0 ? (
                         <div className="space-y-2">
                           <Label>Occasion (optional)</Label>
@@ -2066,6 +2064,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                             <div className="space-y-2">
                               <Label htmlFor="senderName">Name</Label>
                               <Input
+                                className="h-11"
                                 id="senderName"
                                 value={senderName}
                                 onChange={(event) => setSenderName(event.target.value)}
@@ -2074,6 +2073,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                             <div className="space-y-2">
                               <Label htmlFor="senderPhone">Phone</Label>
                               <Input
+                                className="h-11"
                                 id="senderPhone"
                                 type="tel"
                                 value={senderPhone}
@@ -2124,8 +2124,23 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                   <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
                     <h2 className={storefrontHeading.card}>Payment method</h2>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Pay securely online, or choose Cash on Delivery.
+                      {codBlockedBy.length > 0
+                        ? "Pay securely online."
+                        : "Pay securely online, or choose Cash on Delivery."}
                     </p>
+                    {/*
+                      WHY THERE IS NO CASH OPTION, rather than a method that
+                      silently vanished. Only said on a shop that offers cash.
+                    */}
+                    {codBlockedBy.length > 0 && commerce.paymentMethods.cod ? (
+                      <p className="mt-2 rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+                        Cash on Delivery isn&apos;t available for{" "}
+                        <span className="font-medium text-foreground">
+                          {[...new Set(codBlockedBy)].join(", ")}
+                        </span>
+                        . Please pay online.
+                      </p>
+                    ) : null}
 
                     <div className="mt-5">
                       <PaymentMethodList
@@ -2258,6 +2273,41 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
             </div>
 
             <div className="order-2 space-y-4 lg:order-none lg:col-start-2 lg:sticky lg:top-24 lg:self-start">
+              {/*
+                WHERE IT IS GOING, beside the money — the reference keeps the
+                chosen address at the top of this column after the Address
+                step, with a way back to change it. On Personalize only: the
+                Payment step's review already states it, with its own Change.
+              */}
+              {step === 2 ? (
+                <div className="rounded-xl border border-border bg-card p-4 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-semibold text-foreground">
+                      Deliver to {getValues("fullName")}
+                    </p>
+                    {getValues("addressLabel") ? (
+                      <span className="rounded border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
+                        {getValues("addressLabel")}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-1 leading-relaxed text-muted-foreground">
+                    {formatAddress(getValues())}
+                  </p>
+                  {getValues("phone") ? (
+                    <p className="text-muted-foreground">Mobile: {getValues("phone")}</p>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => goToStep(1)}
+                  >
+                    Change address
+                  </Button>
+                </div>
+              ) : null}
               <OrderSummaryPanel
                 items={serverItems ?? items}
                 totals={totals}
@@ -2303,6 +2353,34 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       the order stores the moment it was ticked rather than the
                       fact that a page once contained the words.
                     */}
+                    {/*
+                      THE CANCELLATION POLICY, BEFORE PAYMENT — each kind of
+                      item in this cart once, in the words its product page
+                      used, and the shop's own policy wording under a
+                      disclosure. Ticking the box below agrees to it, and the
+                      order keeps a copy of exactly this.
+                    */}
+                    <div className="mb-3 rounded-lg bg-muted/60 px-3 py-2.5 text-xs">
+                      <p className="font-medium text-foreground">Cancellation policy</p>
+                      <ul className="mt-1 list-disc space-y-0.5 pl-4 text-muted-foreground">
+                        {cartPolicyClasses.map((cls) => (
+                          <li key={cls}>{CANCELLATION_CLASS_CUSTOMER_TEXT[cls]}</li>
+                        ))}
+                      </ul>
+                      {commerce.cancellationPolicyText?.trim() ? (
+                        <details className="mt-1.5">
+                          <summary className="cursor-pointer text-bakery-700">
+                            Read the full policy
+                          </summary>
+                          <p className="mt-1 whitespace-pre-line text-muted-foreground">
+                            {commerce.cancellationPolicyText}
+                          </p>
+                        </details>
+                      ) : null}
+                      <p className="mt-1.5 text-muted-foreground">
+                        Ticking the box below also agrees to this policy.
+                      </p>
+                    </div>
                     <label className="flex cursor-pointer items-start justify-center gap-3 text-xs text-muted-foreground">
                       {/*
                         An id, because the visible label is the shop's own
@@ -2396,6 +2474,9 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                     disabled={
                       placing ||
                       cartBlocked ||
+                      // Outside every zone, on a shop that delivers only
+                      // inside them — the reason is under the PIN code.
+                      totals.deliverable === false ||
                       (commerce.minOrderValue > 0 && totals.subtotal < commerce.minOrderValue)
                     }
                   >

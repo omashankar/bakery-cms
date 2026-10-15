@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowLeft, Code2, Info } from "lucide-react";
 import { toast } from "sonner";
-import { adminShell } from "@/apps/admin/components";
+import { adminShell } from "@/apps/admin/components/admin-shell";
 import { adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,9 +18,13 @@ import {
   type CustomCode,
 } from "@/features/settings/lib/custom-code-repository";
 import { SettingsSectionShell } from "./settings-section-shell";
+import { useLayoutEffect } from "react";
 import { useHydratedForm } from "@/features/settings/lib/use-hydrated-form";
 import { adminConfigHydration } from "@/features/admin-config/lib/admin-config-api";
-import { ensureAdminConfigHydrated } from "@/features/admin-config/lib/admin-config-hydration";
+import {
+  applyServerAdminConfig,
+  ensureAdminConfigHydrated,
+} from "@/features/admin-config/lib/admin-config-hydration";
 import { SettingsHydrationNotice } from "./settings-field-error";
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 
@@ -29,7 +33,17 @@ function countLines(value: string): number {
   return trimmed ? trimmed.split("\n").length : 0;
 }
 
-export function CustomCodeSettingsPage() {
+export function CustomCodeSettingsPage({
+  initial = null,
+}: {
+  /** The admin config blobs and account, read on the server; null fetches as before. */
+  initial?: Parameters<typeof applyServerAdminConfig>[0] | null;
+} = {}) {
+  // Before the form's own hydration effect, so it finds the gate open.
+  useLayoutEffect(() => {
+    if (initial) applyServerAdminConfig(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
+  }, []);
   // The shared hydrated form. The comment this replaces claimed the admin
   // shell had already hydrated by the time this page rendered, so a plain
   // load would read the server's copy. It does not: `useAdminConfigServerSync`

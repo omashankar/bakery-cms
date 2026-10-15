@@ -19,10 +19,11 @@ export function StoreNotFoundPage() {
             Sorry, the page you are looking for does not exist or has been moved.
           </p>
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-            <Button render={<Link href={routes.store.home} />}>
+            <Button size="lg" render={<Link href={routes.store.home} />}>
               Back to Home
             </Button>
             <Button
+              size="lg"
               variant="outline"
               render={<Link href={routes.store.collections} />}
             >

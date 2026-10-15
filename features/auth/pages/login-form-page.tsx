@@ -5,9 +5,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/lazy-toast";
 import { AuthCard } from "@/features/auth/components/auth-card";
-import { AuthDemoNotice } from "@/features/auth/components/auth-demo-notice";
 import { setDemoSession } from "@/features/auth/lib/session";
 import { loginRequest } from "@/features/auth/lib/auth-api";
 import { markSessionRenewed } from "@/features/auth/lib/session-expiry";
@@ -82,7 +81,6 @@ export function LoginFormPage() {
       description="Enter your staff credentials to open the bakery dashboard."
       footer={
         <div className="flex flex-col items-center gap-3 text-center">
-          <AuthDemoNotice />
           <Link
             href={routes.store.home}
             className="text-sm font-medium text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"

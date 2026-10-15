@@ -20,6 +20,14 @@ const mongoose = require("mongoose") as typeof import("mongoose");
  */
 const SNAPSHOT_PATH = path.join(process.cwd(), "node_modules", ".cache", "e2e-shop-state.json");
 
+/**
+ * Where the checkout specs deliver to. It has to be INSIDE one of the shop's
+ * delivery zones: this shop delivers only to its zones, so an address outside
+ * them greys Place order out — and every checkout spec failed on a Mumbai PIN
+ * once the shop's only zone was Kota.
+ */
+export const PROBE_ADDRESS = { city: "Kota", state: "Rajasthan", pincode: "324001" } as const;
+
 export interface ShopSnapshot {
   orderIds: string[];
   auditIds: string[];

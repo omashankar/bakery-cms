@@ -1,6 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 
 import {
   heroCopySideOf,
@@ -9,6 +7,7 @@ import {
 import { HOMEPAGE_SECTION_REGISTRY } from "@/constants/section-registry";
 import { headerSchema } from "@/features/site-layout/server/site-layout.validators";
 import type { HomepageSectionInstance } from "@/types/homepage-builder";
+import { readSource } from "../renderer-source";
 
 /**
  * THE HERO RUNS EDGE TO EDGE, and there is no second hero to choose.
@@ -22,7 +21,7 @@ import type { HomepageSectionInstance } from "@/types/homepage-builder";
  * the absence of the one that does not: a stored `layout` key is now an
  * ignored leftover, and nothing may read it back into a branch.
  */
-const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+const read = (path: string) => readSource(path);
 
 const RENDERER = "features/cms-sections/homepage-section-renderer.tsx";
 const CAROUSEL = "features/cms-sections/hero-carousel.tsx";

@@ -64,6 +64,7 @@ export const TEMPLATE_VARIABLE_CONTRACT: Record<string, readonly string[]> = {
    * money is coming back depends on whether any was taken, and that is the first
    * thing they will want to know.
    */
+  refund_failed: [...STORE_VARIABLES, "customer_name", "order_number", "refund_amount"],
   order_cancelled: [
     ...STORE_VARIABLES,
     "customer_name",

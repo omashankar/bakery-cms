@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import {
   Check,
   Flag,
@@ -14,7 +14,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { SafeImage } from "@/components/shared/safe-image";
-import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
+import { adminShell } from "@/apps/admin/components/admin-shell";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import { loadProducts } from "@/features/products/lib/products-repository";
 import {
@@ -45,7 +46,7 @@ import {
   toggleReviewFeatured,
   updateReview,
 } from "@/features/reviews/lib/reviews-repository";
-import { useReviewsServerSync } from "@/features/reviews/lib/use-reviews-server-sync";
+import { applyServerReviews, useReviewsServerSync } from "@/features/reviews/lib/use-reviews-server-sync";
 import {
   defaultReviewFilters,
   filterReviews,
@@ -71,7 +72,18 @@ const EMPTY_OVERVIEW: ProductReviewOverview = {
   averageRating: 0,
 };
 
-export function ReviewsAdminPage() {
+export function ReviewsAdminPage({
+  initial = null,
+}: {
+  /** Every review, read on the server for this page; null fetches as before. */
+  initial?: ProductReview[] | null;
+} = {}) {
+  // Before this screen's passive effects (the sync and the first refresh), so
+  // they find the server's reviews already in the cache.
+  useLayoutEffect(() => {
+    if (initial) applyServerReviews(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
+  }, []);
   const labels = useBusinessLabels();
   const [mounted, setMounted] = useState(false);
   const [reviews, setReviews] = useState<ProductReview[]>([]);
@@ -264,7 +276,7 @@ export function ReviewsAdminPage() {
             >
               <Plus className="size-4" />
               <span className="sm:hidden">Add</span>
-              <span className="hidden sm:inline">Add review</span>
+              <span className="hidden sm:inline">Add Review</span>
             </Button>
           </div>
         }
@@ -455,7 +467,7 @@ export function ReviewsAdminPage() {
                         <p className="font-medium text-foreground">{review.authorName}</p>
                         <ReviewStatusBadge status={review.status} />
                         {review.isFeatured ? (
-                          <Badge variant="gold" className="text-[10px]">
+                          <Badge variant="gold" className="text-[11px]">
                             Featured
                           </Badge>
                         ) : null}

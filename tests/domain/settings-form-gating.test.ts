@@ -520,8 +520,10 @@ describe("admin screens that gate on hydration by hand", () => {
      */
     const code = stripComments(source(file));
 
+    // Closed — or open from the read the SERVER page made and handed down as
+    // `initial`, which is a resolved read too, made before the HTML was sent.
     expect(code, "the gate starts open").toMatch(
-      /useState<"pending" \| "ready" \| "unavailable">\("pending"\)/,
+      /useState<"pending" \| "ready" \| "unavailable">\(\s*(?:initial \? "ready" : )?"pending",?\s*\)/,
     );
 
     const inAThen = thenSpans(code);

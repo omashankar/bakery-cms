@@ -1,9 +1,7 @@
 import { randomUUID } from "node:crypto";
 
-import { createMongoStore } from "@/lib/server/db/cms-store";
 import { writeAuditLog } from "@/lib/server/audit/audit-log";
 import { NotFoundError } from "@/lib/server/http/errors";
-import { seedInquiries } from "@/features/inquiries/lib/inquiries-repository";
 import type { Inquiry } from "@/types/inquiry";
 
 import * as repo from "./inquiry.repository";
@@ -16,22 +14,13 @@ interface RequestCtx {
   actorEmail?: string;
 }
 
-/**
- * One-time demo seed marker. The 12 sample inquiries are inserted on the first
- * admin read so the list is populated as before; the flag makes it idempotent
- * and — crucially — prevents deleted demo inquiries from resurrecting.
- */
-const seededFlag = createMongoStore<{ done: boolean }>({
-  key: "inquiries-seeded",
-  seed: () => ({ done: false }),
-});
-
-async function ensureSeeded(): Promise<void> {
-  const flag = await seededFlag.read();
-  if (flag.done) return;
-  await repo.seedIfEmpty(seedInquiries());
-  await seededFlag.write({ done: true });
-}
+/*
+  No demo seed. The first admin read used to insert sample rows for real —
+  addresses at email.com, a real mail provider, most of them "active" — so a
+  new shop's "Copy emails" pasted strangers into its first campaign, and its
+  inbox opened on invented wedding leads. The reviews service dropped its seed
+  for the same reason. An empty list is the honest answer for a new shop.
+*/
 
 // ---- Public (storefront contact form) -------------------------------------
 
@@ -81,7 +70,6 @@ export function getAnsweredProductQuestions(productSlug: string): Promise<Inquir
 // ---- Admin ----------------------------------------------------------------
 
 export async function getInquiries(): Promise<Inquiry[]> {
-  await ensureSeeded();
   return repo.listAll();
 }
 

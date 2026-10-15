@@ -95,9 +95,11 @@ describe("the list a shop is offered", () => {
       A COUNT, so that hiding a row by accident is as loud as offering one.
       Measured in the browser: 29 rows, then 27 once two were hidden, now 18 —
       the same 18, because the nine hidden in between are deleted outright.
+      21 since "shop-promises" — the rating and delivery facts the shop asked
+      to have back on the page, as a band of their own.
     */
-    expect(HOMEPAGE_SECTION_REGISTRY).toHaveLength(20);
-    expect(offered).toHaveLength(20 - DROPPED.length);
+    expect(HOMEPAGE_SECTION_REGISTRY).toHaveLength(21);
+    expect(offered).toHaveLength(21 - DROPPED.length);
     expect(
       HOMEPAGE_SECTION_REGISTRY.filter((entry) => entry.notOffered)
         .map((entry) => entry.type)

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readSource } from "../renderer-source";
 
 import {
   HOMEPAGE_SECTION_REGISTRY,
@@ -112,7 +111,7 @@ describe("every list field", () => {
    * while Why Choose Us — the only reader of `items` — had no field at all and
    * rendered null forever.
    */
-  const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+  const read = (path: string) => readSource(path);
 
   /**
    * The component the renderer's own `switch (section.type)` dispatches to.

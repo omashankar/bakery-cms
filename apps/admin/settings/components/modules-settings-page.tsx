@@ -136,7 +136,13 @@ export function ModulesSettingsPage() {
       resetDisabled={!canSave}
     >
       <SettingsHydrationNotice hydration={hydration} />
-      <div className="grid gap-4 lg:grid-cols-2">
+      {/*
+        One card now. A "Builders" card stood beside it holding nothing — its
+        only switch (Wedding Builder) left with the feature — and read as a
+        broken page. Narrower than the old two-column grid so a single card
+        does not leave half the screen empty.
+      */}
+      <div className="grid max-w-3xl gap-4">
         <Card className="shadow-sm">
           <CardHeader>
             <CardTitle className="text-base">Product options</CardTitle>
@@ -155,21 +161,6 @@ export function ModulesSettingsPage() {
                 onCheckedChange={(checked) => toggle(mod.key, checked)}
               />
             ))}
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-base">Builders</CardTitle>
-            <CardDescription>Optional website builders for bakery-specific pages.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/*
-              The Wedding Builder switch stood here. The feature it switched
-              is gone — the page, the builder and the band it published — so
-              the switch went with it rather than staying as a control that
-              decides nothing.
-            */}
           </CardContent>
         </Card>
       </div>

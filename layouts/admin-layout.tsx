@@ -1,13 +1,11 @@
 "use client";
 
 import { safeSetItem } from "@/lib/safe-storage";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
-import {
-  AdminHeader,
-  AdminSidebar,
-} from "@/apps/admin/components";
+import { AdminHeader } from "@/apps/admin/components/admin-header";
+import { AdminSidebar } from "@/apps/admin/components/admin-sidebar";
 import { adminShell } from "@/apps/admin/components/admin-shell";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
@@ -17,19 +15,14 @@ import { SessionGuard } from "@/features/auth/components/session-guard";
 import { useProductCacheSync } from "@/features/products/data/use-product-cache-sync";
 import { useInventoryServerSync } from "@/apps/admin/commerce/lib/use-inventory-server-sync";
 import { useOrdersServerSync } from "@/features/orders/lib/use-orders-server-sync";
-import { useInvoiceSettingsServerSync } from "@/features/commerce/lib/use-invoice-settings-server-sync";
-import { useCustomersServerSync } from "@/apps/admin/commerce/lib/use-customers-server-sync";
-import { useMediaServerSync } from "@/apps/admin/media/lib/use-media-server-sync";
-import { usePagesServerSync } from "@/features/content/lib/use-pages-server-sync";
 import { useCommunicationsServerSync } from "@/apps/admin/communications/lib/use-communications-server-sync";
 import { useInquiriesServerSync } from "@/features/inquiries/lib/use-inquiries-server-sync";
-import { useNewsletterServerSync } from "@/features/inquiries/lib/use-newsletter-server-sync";
-import { useReviewsServerSync } from "@/features/reviews/lib/use-reviews-server-sync";
-import { useSeoServerSync } from "@/features/seo/lib/use-seo-server-sync";
 import { useAdminConfigServerSync } from "@/features/admin-config/lib/use-admin-config-server-sync";
-import { useSecurityCenterServerSync } from "@/features/settings/lib/use-security-center-server-sync";
 import { ensureSiteLayoutHydrated } from "@/components/shared/site-layout-server-sync";
 import { useIdle } from "@/hooks/use-idle";
+import { applyServerSettings } from "@/features/settings/lib/settings-repository";
+import { applyServerInquiries } from "@/features/inquiries/lib/use-inquiries-server-sync";
+import type { Inquiry } from "@/types/inquiry";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_COLLAPSED_KEY = "bakery-cms-sidebar-collapsed";
@@ -37,15 +30,35 @@ const SIDEBAR_COLLAPSED_KEY = "bakery-cms-sidebar-collapsed";
 interface AdminLayoutShellProps {
   children: React.ReactNode;
   className?: string;
+  /** The full settings, read on the server for this page; see `applyServerSettings`. */
+  initialSettings?: Record<string, unknown> | null;
+  /** Every enquiry, read on the server for this page; see `applyServerInquiries`. */
+  initialInquiries?: unknown[] | null;
 }
 
 /**
- * Every admin cache this browser keeps, refilled from the server.
+ * The admin caches the SHELL reads on every screen, refilled from the server.
  *
- * These are the SEARCH INDEX and the screens’ offline copies, not the data the
- * page in front of the admin is rendering — each screen fetches its own. They
- * are collected into a child component so the layout can mount them a beat
- * later; see the call site.
+ * Only these: the sidebar badges and the notification bell derive from orders,
+ * inquiries, products and inventory thresholds, filtered by the notification
+ * settings; the header shows the admin profile.
+ *
+ * This used to be fifteen hooks — ~34 requests on opening ANY admin screen,
+ * measured on a production build, every one of them a whole collection parsed
+ * and written to localStorage while the page the admin opened was still
+ * waiting for its own data. The rest now load where they are read:
+ *
+ * - invoice settings, newsletter, reviews, SEO, security centre — their own
+ *   screens already open their own reads (security now does, see its page);
+ * - customers and CMS pages — only the command search reads them, so it loads
+ *   them when it opens;
+ * - the media library — every upload and picker loads it (`useMediaUpload`,
+ *   `MediaPicker`), and the Media screen does;
+ * - the backup export, which copies these caches, loads them itself.
+ *
+ * Products stay here even though the bell only needs their stock: the bell's
+ * stock-dismissal prune reads the product cache, and without it a cold browser
+ * would prune against the shipped demo products.
  */
 function AdminDataHydration(): null {
   // Refresh the browser product cache from the server, for the admin screens
@@ -55,30 +68,14 @@ function AdminDataHydration(): null {
   useInventoryServerSync();
   // Hydrate all orders from the server (so admin sees orders from any device).
   useOrdersServerSync();
-  // Hydrate invoice settings from the server.
-  useInvoiceSettingsServerSync();
-  // Hydrate admin-managed customer metadata (tags/notes/marketing) from the server.
-  useCustomersServerSync();
-  // Hydrate the media library (files + folders) from the server. Stays here,
-  // unlike the media USAGE index: the dashboard tiles, the global search and
-  // the product form’s media picker all read this one.
-  useMediaServerSync();
-  // Hydrate the CMS pages so the admin global search finds the real ones.
-  usePagesServerSync();
-  // Hydrate email/WhatsApp templates + notification settings from the server.
+  // Email/WhatsApp templates + notification settings: the bell filters by
+  // the settings and reads the read/dismissed state.
   useCommunicationsServerSync();
-  // Hydrate inquiries (contact-form submissions) from the server.
+  // Inquiries (contact-form submissions): the sidebar's "new" badge.
   useInquiriesServerSync();
-  // Hydrate newsletter subscribers from the server.
-  useNewsletterServerSync();
-  // Hydrate product reviews (all moderation states) from the server.
-  useReviewsServerSync();
-  // Hydrate SEO settings (global + per-route) from the server.
-  useSeoServerSync();
-  // Hydrate admin-only config blobs (profile, gateways, notif prefs, custom code).
+  // Admin-only config blobs: the header's profile, and the payment screens'
+  // gateway and notification switches, which have no read of their own.
   useAdminConfigServerSync();
-  // Hydrate the Security Center — derived from the real audit trail + sessions.
-  useSecurityCenterServerSync();
   /**
    * Header, footer and appearance — moved off the ROOT providers.
    *
@@ -95,7 +92,22 @@ function AdminDataHydration(): null {
   return null;
 }
 
-export function AdminLayoutShell({ children, className }: AdminLayoutShellProps) {
+export function AdminLayoutShell({
+  children,
+  className,
+  initialSettings = null,
+  initialInquiries = null,
+}: AdminLayoutShellProps) {
+  // A LAYOUT effect: it runs after the first render, so nothing reads the
+  // seeded cache while hydrating (rendering it then put a status line in the
+  // client's General settings header that the server's HTML did not have),
+  // and before every screen's passive effects — so a form's own
+  // `ensureSettingsHydrated` finds the gate already open instead of fetching.
+  useLayoutEffect(() => {
+    if (initialSettings) applyServerSettings(initialSettings);
+    if (initialInquiries) applyServerInquiries(initialInquiries as Inquiry[]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
+  }, []);
   // Keep the access token fresh (renew on mount + every 10 min + on refocus) so
   // the hydration calls don’t start 401-ing after the 15-min token expiry. Eager,
   // and the only one that is: every deferred read below depends on it working.

@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -9,6 +8,7 @@ import {
   timeLeftToday,
 } from "@/features/orders/lib/delivery-date";
 import { HOMEPAGE_SECTION_REGISTRY } from "@/constants/section-registry";
+import { readSource } from "../renderer-source";
 
 /**
  * A COUNTDOWN ON THE HOMEPAGE IS THE SHOP'S OWN DEADLINE, OR THERE IS NONE.
@@ -21,7 +21,7 @@ import { HOMEPAGE_SECTION_REGISTRY } from "@/constants/section-registry";
  * The pure rules that decide whether there is a deadline at all live in
  * a-countdown-is-only-shown-when-there-is-one.test.ts, beside the arithmetic.
  */
-const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+const read = (path: string) => readSource(path);
 
 /**
  * The source with its prose taken out.
@@ -225,9 +225,10 @@ describe("which units the clock shows", () => {
   const shown = (left: string) =>
     countdownCells(countdownParts(left)!).map(([, value]) => value);
 
-  it("drops the units that are not there yet, and keeps two", () => {
-    expect(labels("05:12:09")).toEqual(["Hours", "Minutes"]);
-    expect(shown("05:12:09")).toEqual(["05", "12"]);
+  it("drops the units that are not there yet, and keeps the seconds running", () => {
+    // Seconds all day, at the shop's request: the clock is seen to run.
+    expect(labels("05:12:09")).toEqual(["Hours", "Minutes", "Seconds"]);
+    expect(shown("05:12:09")).toEqual(["05", "12", "09"]);
 
     expect(labels("00:12:09")).toEqual(["Minutes", "Seconds"]);
     expect(shown("00:12:09")).toEqual(["12", "09"]);
@@ -263,7 +264,11 @@ describe("which units the clock shows", () => {
         enough to time this file out when the suite runs under contention —
         which is a flake, and a flake on a guard is worse than no guard.
       */
-      if (cells.length < 1 || cells.length > 2 || Number(cells[0][1]) === 0) {
+      if (
+        cells.length < 1 ||
+        Number(cells[0][1]) === 0 ||
+        cells[cells.length - 1][0] !== "Seconds"
+      ) {
         bad.push(`${left} -> ${cells.map(([l, v]) => `${v} ${l}`).join(" | ")}`);
       }
     }
@@ -274,8 +279,8 @@ describe("which units the clock shows", () => {
   it("and a trailing zero stays, because it is a reading", () => {
     // "01 hours 00 minutes" is an hour left. "00 hours" is a unit that is not
     // there — which is the one this drops, and the only one.
-    expect(shown("01:00:30")).toEqual(["01", "00"]);
-    expect(labels("01:00:30")).toEqual(["Hours", "Minutes"]);
+    expect(shown("01:00:30")).toEqual(["01", "00", "30"]);
+    expect(labels("01:00:30")).toEqual(["Hours", "Minutes", "Seconds"]);
   });
 
   it("is read by the band rather than re-derived inside it", () => {

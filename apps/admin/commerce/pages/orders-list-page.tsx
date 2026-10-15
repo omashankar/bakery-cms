@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
@@ -28,7 +28,8 @@ import {
   exportOrdersToCsv,
   type OrderListFilters,
 } from "@/apps/admin/commerce/lib/order-utils";
-import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
+import { adminShell } from "@/apps/admin/components/admin-shell";
 import {
   bulkUpdateOrderStatus,
   type OrderStatus,
@@ -67,7 +68,8 @@ const EMPTY_STATS = {
 const statusTabs: Array<{ value: OrderListFilters["status"]; label: string; short: string }> = [
   { value: "all", label: "All", short: "All" },
   { value: "pending", label: "Pending", short: "Pending" },
-  { value: "confirmed", label: "Confirmed", short: "Confirm" },
+  // The word every row's badge uses for this status (order-status-meta).
+  { value: "confirmed", label: "Accepted", short: "Accepted" },
   { value: "preparing", label: "Preparing", short: "Prep" },
   { value: "ready", label: "Ready", short: "Ready" },
   { value: "out_for_delivery", label: "Out for delivery", short: "Delivery" },
@@ -76,21 +78,37 @@ const statusTabs: Array<{ value: OrderListFilters["status"]; label: string; shor
   { value: "refunded", label: "Refunded", short: "Refund" },
 ];
 
-export function OrdersListPage() {
+interface OrdersListPageProps {
+  /**
+   * The default view's first page and the counters, read on the server so they
+   * are in the HTML. Null means the browser fetches them, as it always did.
+   */
+  initial?: {
+    orders: PlacedOrder[];
+    total: number;
+    stats: typeof EMPTY_STATS;
+  } | null;
+}
+
+export function OrdersListPage({ initial = null }: OrdersListPageProps = {}) {
   const router = useRouter();
-  const [orders, setOrders] = useState<PlacedOrder[]>([]);
+  const [orders, setOrders] = useState<PlacedOrder[]>(initial?.orders ?? []);
   const [filters, setFilters] = useState<OrderListFilters>(defaultOrderFilters);
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkStatus, setBulkStatus] = useState<OrderStatus>("preparing");
   const [applying, setApplying] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initial);
   const [failed, setFailed] = useState(false);
-  const [stats, setStats] = useState(EMPTY_STATS);
+  const [stats, setStats] = useState(initial?.stats ?? EMPTY_STATS);
   const [statsFailed, setStatsFailed] = useState(false);
-  const [statsLoaded, setStatsLoaded] = useState(false);
-  const [totalMatching, setTotalMatching] = useState(0);
+  const [statsLoaded, setStatsLoaded] = useState(Boolean(initial));
+  const [totalMatching, setTotalMatching] = useState(initial?.total ?? 0);
+  // The server already answered the default view; its first request would ask
+  // for exactly that again. Spent on the first run of each effect below.
+  const listFromServer = useRef(Boolean(initial));
+  const statsFromServer = useRef(Boolean(initial));
   const [reloadKey, setReloadKey] = useState(0);
 
   const query = useMemo(
@@ -126,6 +144,10 @@ export function OrdersListPage() {
     page: number;
   };
   useEffect(() => {
+    if (listFromServer.current) {
+      listFromServer.current = false;
+      return;
+    }
     let cancelled = false;
 
     (async () => {
@@ -148,6 +170,10 @@ export function OrdersListPage() {
   // Counts and revenue come from a Mongo aggregation over every order, so they
   // stay right regardless of how many rows this page happens to show.
   useEffect(() => {
+    if (statsFromServer.current) {
+      statsFromServer.current = false;
+      return;
+    }
     let cancelled = false;
 
     (async () => {
@@ -514,7 +540,7 @@ export function OrdersListPage() {
                 <Badge
                   variant={active ? "secondary" : "outline"}
                   className={cn(
-                    "h-5 min-w-5 justify-center px-1.5 text-[10px]",
+                    "h-5 min-w-5 justify-center px-1.5 text-[11px]",
                     active && "border-transparent bg-primary-foreground/20 text-primary-foreground"
                   )}
                 >

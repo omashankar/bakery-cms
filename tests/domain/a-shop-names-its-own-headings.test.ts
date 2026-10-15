@@ -110,7 +110,7 @@ describe("and every gate between the box and the page", () => {
   it("is what the product page actually renders", () => {
     const pdp = read("apps/website/pages/product-detail-page.tsx");
 
-    expect(pdp).toContain("<DetailSection title={labels.descriptionHeading}>");
+    expect(pdp).toMatch(/<DetailSection\s+title=\{labels\.descriptionHeading\}/);
     // …and the parts inside it read their heading off the block, not a label.
     expect(pdp).toContain("{block.heading}:");
   });

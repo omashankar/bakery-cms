@@ -3,30 +3,136 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Package } from "lucide-react";
-import { toast } from "sonner";
+import { CalendarDays, CreditCard, MapPin, Package } from "lucide-react";
+import { toast } from "@/lib/lazy-toast";
 import { AccountOrderStatusBadge } from "@/apps/website/account/components/account-order-status-badge";
-import { AccountShell } from "@/apps/website/account/components/account-shell";
+import { useAccountProfile } from "@/apps/website/account/components/account-context";
 import { useCustomerAuth } from "@/apps/website/account/hooks/use-customer-auth";
 import type { PlacedOrder } from "@/features/orders/lib/orders";
 import { cartLineChoices } from "@/features/cart/lib/cart";
+import { settledRefundAmount } from "@/features/orders/lib/order-overviews";
 import { reorderFromOrder } from "@/apps/website/lib/reorder";
 import { fetchProducts } from "@/features/products/data/products-client";
 import { EmptyState } from "@/components/shared/empty-state";
+import { OptimizedImage } from "@/components/shared/optimized-image";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
-import { formatCurrency, formatDate } from "@/utils/format";
+import { formatCalendarDate, formatCurrency, formatDate } from "@/utils/format";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
+import dynamic from "next/dynamic";
+import {
+  DEFAULT_CANCELLATION_CLASS,
+  customerCancellation,
+} from "@/features/orders/lib/cancellation-policy";
+
+// Loaded on the press that opens it: most visits to My Orders never cancel.
+const CancelOrderDialog = dynamic(
+  () =>
+    import("@/apps/website/account/components/cancel-order-dialog").then(
+      (module) => module.CancelOrderDialog,
+    ),
+  { ssr: false },
+);
+
+/**
+ * Whether this order offers "Cancel order": its products' "Order cancel"
+ * toggle allows it and the shop has not started preparing it. The server
+ * checks the same rule again.
+ */
+function canCancel(order: PlacedOrder): boolean {
+  return customerCancellation({
+    ...order,
+    policyClass: order.cancellationPolicy?.policyClass ?? DEFAULT_CANCELLATION_CLASS,
+  }).allowed;
+}
 
 const PAGE_SIZE = 10;
+
+/** See the `orders` state: the last list this tab loaded, and whose it was. */
+let ordersCache: { owner: string; orders: PlacedOrder[] } | null = null;
+
+/** Orders with nothing left to happen to them. */
+const FINAL_STATUSES = new Set<PlacedOrder["status"]>(["delivered", "cancelled", "refunded"]);
+
+/** The heading over the order's date line. */
+function deliveryLabel(order: PlacedOrder): string {
+  if (order.status === "delivered") return "Delivered on";
+  if (order.status === "cancelled" || order.status === "refunded") return "Delivery";
+  return order.deliverySlot?.date ? "Delivery on" : "Expected by";
+}
+
+/**
+ * When it arrived, or is due — from the order's own record.
+ *
+ * Delivered: the moment the shop marked it so, falling back to the day that
+ * was booked. Still to come: the day and window chosen at checkout, which is
+ * a calendar date ("2026-10-06") and goes through `formatCalendarDate` so no
+ * timezone can move it to the day before.
+ */
+function deliveryWhen(order: PlacedOrder): string {
+  const slot = order.deliverySlot;
+  const booked = slot?.date
+    ? formatCalendarDate(slot.date, { weekday: "short", day: "numeric", month: "short" })
+    : "";
+  if (order.status === "delivered") {
+    const at = [...order.statusHistory].reverse().find((event) => event.status === "delivered")?.at;
+    return at ? formatDate(at) : booked || "—";
+  }
+  if (order.status === "cancelled") return "Cancelled";
+  if (order.status === "refunded") return "Refunded";
+  if (booked) return slot?.timeSlot ? `${booked} · ${slot.timeSlot}` : booked;
+  return order.estimatedDelivery ? formatDate(order.estimatedDelivery) : "To be confirmed";
+}
+
+/**
+ * How it was paid, in the customer's words. A refund is named only once money
+ * has actually gone back (`settledRefundAmount`); a refund still being worked
+ * on says so, and nothing is promised beyond the record.
+ */
+function paymentText(order: PlacedOrder): string {
+  const refunded = settledRefundAmount(order);
+  if (refunded > 0) return `Refunded ${formatCurrency(refunded)}`;
+  if (order.refundRecord?.status === "requested" || order.refundRecord?.status === "processing") {
+    return "Refund in progress";
+  }
+  // The shop said no — for instance the cake was already baked. Said plainly,
+  // so the customer knows to ask the shop rather than wait.
+  if (order.refundRecord?.status === "rejected") return "Paid online · refund declined";
+  // Cancelled after paying, from before cancelling opened a refund request:
+  // the shop owes this money, and "Paid online" alone would hide that.
+  if (order.status === "cancelled" && order.paymentStatus === "paid" && !order.refundRecord) {
+    return "Paid online · refund pending";
+  }
+  switch (order.paymentStatus) {
+    case "paid":
+      return "Paid online";
+    case "cod":
+      return order.status === "delivered" ? "Paid on delivery" : "Cash on delivery";
+    case "refunded":
+      return "Refunded";
+    case "failed":
+      return "Payment failed";
+    default:
+      return "Payment pending";
+  }
+}
 
 export function AccountOrdersPage() {
   const labels = useBusinessLabels();
   const router = useRouter();
-  const { session, ready } = useCustomerAuth();
+  const { session } = useCustomerAuth();
+  const profile = useAccountProfile();
+  const owner = profile?.email ?? session?.email ?? "";
   const [page, setPage] = useState(1);
-  const [orders, setOrders] = useState<PlacedOrder[] | null>(null);
+  // The list from the last visit IN THIS TAB, for this customer — shown at
+  // once and refreshed behind it, so coming back to Orders is not a skeleton
+  // every time. Keyed by email: on a shared device the next person's list
+  // must never start as the last person's.
+  const [orders, setOrders] = useState<PlacedOrder[] | null>(() =>
+    ordersCache && ordersCache.owner === owner ? ordersCache.orders : null,
+  );
+  const [cancelling, setCancelling] = useState<PlacedOrder | null>(null);
   const [loadError, setLoadError] = useState(false);
 
   /**
@@ -43,7 +149,9 @@ export function AccountOrdersPage() {
    * from the request, so this cannot be pointed at anyone else's history.
    */
   useEffect(() => {
-    if (!session) return;
+    // Not waiting for the browser session: the layout has signed the customer
+    // in on the server, and the request carries the same cookie.
+    if (!owner) return;
     let cancelled = false;
 
     (async () => {
@@ -53,6 +161,7 @@ export function AccountOrdersPage() {
         const body = (await res.json()) as { data?: PlacedOrder[] };
         if (!cancelled) {
           setOrders(body.data ?? []);
+          ordersCache = { owner, orders: body.data ?? [] };
           setLoadError(false);
         }
       } catch {
@@ -68,7 +177,7 @@ export function AccountOrdersPage() {
     return () => {
       cancelled = true;
     };
-  }, [session]);
+  }, [owner]);
 
   const totalPages = Math.max(1, Math.ceil((orders?.length ?? 0) / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -124,15 +233,12 @@ export function AccountOrdersPage() {
     router.push(routes.store.cart);
   }
 
-  if (!ready || !session) {
+  if (!owner) {
     return null;
   }
 
   return (
-    <AccountShell
-      title="My Orders"
-      breadcrumbs={[{ label: "Orders" }]}
-    >
+    <>
       {orders === null ? (
         /*
           Not an empty state. Until the shop has answered, this page does not
@@ -195,58 +301,143 @@ export function AccountOrdersPage() {
               </div>
 
               {/* Body */}
-              <div className="flex flex-col gap-4 px-5 py-5 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
-                <ul className="space-y-1 text-sm text-muted-foreground">
-                  {order.items.slice(0, 3).map((item) => (
-                    <li key={item.id}>
-                      <span className="font-medium text-foreground">{item.quantity} ×</span>{" "}
-                      {item.name}
-                      {/*
-                        The customer's own record of what they ordered. It read
-                        "2 × Chocolate Truffle Cake" and stopped — no size, no
-                        flavour, and none of the options they were charged for —
-                        so the one page they can check their own order on could
-                        not tell two different orders of the same product apart.
-                      */}
-                      {cartLineChoices(item).length > 0 ? (
-                        <span className="block text-xs">
-                          {cartLineChoices(item).join(" · ")}
-                        </span>
-                      ) : null}
-                    </li>
-                  ))}
+              {/*
+                THREE BANDS, the same in every card: what was bought and what
+                it cost; when, where and how it was paid, full width; then
+                what can be done. The strip used to share a row with the
+                buttons, so its width changed with how many there were and
+                no two cards lined up.
+              */}
+              <div className="space-y-4 px-5 py-5 sm:px-6">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 flex-1 space-y-4">
+                  {/*
+                    WHAT WAS ORDERED, WITH ITS PICTURE — the photo the line was
+                    placed with, which is stored on the order itself, so it is
+                    the cake they bought even if the product's photos have
+                    changed since. Name and picture lead to the product.
+                  */}
+                  <ul className="space-y-3">
+                    {order.items.slice(0, 3).map((item) => {
+                      const choices = cartLineChoices(item);
+                      return (
+                        <li key={item.id} className="flex items-center gap-3">
+                          <Link
+                            href={routes.store.product(item.productSlug)}
+                            className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted"
+                            aria-hidden="true"
+                            tabIndex={-1}
+                          >
+                            {item.image ? (
+                              <OptimizedImage
+                                src={item.image}
+                                alt=""
+                                width={64}
+                                height={64}
+                                className="size-full object-cover"
+                              />
+                            ) : (
+                              <Package className="size-6 text-muted-foreground" />
+                            )}
+                          </Link>
+                          <div className="min-w-0 text-sm">
+                            <Link
+                              href={routes.store.product(item.productSlug)}
+                              className="line-clamp-2 font-medium text-foreground hover:underline"
+                            >
+                              {item.name}
+                            </Link>
+                            {/*
+                              The customer's own record of what they ordered:
+                              size, flavour and every option they were charged
+                              for, so two orders of one product can be told
+                              apart.
+                            */}
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              Qty {item.quantity}
+                              {choices.length > 0 ? ` · ${choices.join(" · ")}` : ""}
+                            </p>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
                   {order.items.length > 3 ? (
-                    <li className="text-bakery-700">
+                    <p className="text-sm font-medium text-bakery-700">
                       +{order.items.length - 3} more item
                       {order.items.length - 3 === 1 ? "" : "s"}
-                    </li>
+                    </p>
                   ) : null}
-                </ul>
 
-                <div className="flex flex-col items-start gap-3 lg:items-end">
-                  <div className="text-left lg:text-right">
+                  {/*
+                    WHEN, WHERE AND HOW IT WAS PAID — the three things a
+                    customer opens this page to check, all on the order already.
+                  */}
+
+                </div>
+
+                <div className="shrink-0 text-right">
+                  <div>
                     <p className="text-xs text-muted-foreground">Order total</p>
                     <p className="text-lg font-bold text-foreground">
                       {formatCurrency(order.totals.total)}
                     </p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      render={<Link href={routes.store.orderDetail(order.orderNumber)} />}
-                    >
-                      Track order
-                    </Button>
-                    <Button
-                      variant="bakery"
-                      size="sm"
-                      onClick={() => handleReorder(order.orderNumber)}
-                    >
-                      Reorder
-                    </Button>
+                </div>
+              </div>
+              <dl className="grid gap-2 rounded-xl bg-muted/60 px-4 py-3 text-xs sm:grid-cols-3">
+                <div className="flex items-start gap-2">
+                  <CalendarDays aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <div>
+                    <dt className="text-muted-foreground">{deliveryLabel(order)}</dt>
+                    <dd className="font-medium text-foreground">{deliveryWhen(order)}</dd>
                   </div>
                 </div>
+                <div className="flex items-start gap-2">
+                  <MapPin aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0">
+                    <dt className="text-muted-foreground">Deliver to</dt>
+                    <dd className="truncate font-medium text-foreground">
+                      {[order.address.fullName, order.address.city, order.address.pincode]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </dd>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CreditCard aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <div>
+                    <dt className="text-muted-foreground">Payment</dt>
+                    <dd className="font-medium text-foreground">{paymentText(order)}</dd>
+                  </div>
+                </div>
+              </dl>
+              <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  render={<Link href={routes.store.orderDetail(order.orderNumber)} />}
+                >
+                  {/*
+                    Nothing is left to track on an order that has arrived
+                    or been called off; it is the details that are wanted.
+                  */}
+                  {FINAL_STATUSES.has(order.status) ? "View details" : "Track order"}
+                </Button>
+                <Button
+                  variant="bakery"
+                  size="sm"
+                  onClick={() => handleReorder(order.orderNumber)}
+                >
+                  Reorder
+                </Button>
+                {/* Only while the order can still be cancelled. */}
+                {canCancel(order) ? (
+                  <Button variant="ghost" size="sm" onClick={() => setCancelling(order)}>
+                    Cancel order
+                  </Button>
+                ) : null}
+              </div>
               </div>
             </div>
           ))}
@@ -259,6 +450,31 @@ export function AccountOrdersPage() {
           ) : null}
         </div>
       )}
-    </AccountShell>
+      {cancelling ? (
+        <CancelOrderDialog
+          order={cancelling}
+          open
+          onOpenChange={(open) => {
+            if (!open) setCancelling(null);
+          }}
+          onCancelled={(updated) => {
+            setCancelling(null);
+            setOrders((current) => {
+              const next = (current ?? []).map((entry) =>
+                entry.orderNumber === updated.orderNumber ? updated : entry,
+              );
+              ordersCache = { owner, orders: next };
+              return next;
+            });
+            toast.success("Order cancelled", {
+              description:
+                updated.paymentStatus === "paid"
+                  ? "Your refund is on its way to the way you paid."
+                  : "We have emailed you a confirmation.",
+            });
+          }}
+        />
+      ) : null}
+    </>
   );
 }

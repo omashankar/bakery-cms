@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PrivacyPage } from "@/apps/website";
+import { PrivacyPage } from "@/apps/website/pages/privacy-page";
 import { canPreviewDraft } from "@/apps/website/lib/preview-access.server";
 import { buildRouteMetadataServer } from "@/features/seo/server/seo-store.server";
 

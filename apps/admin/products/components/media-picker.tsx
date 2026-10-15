@@ -1,10 +1,12 @@
 "use client";
 
+import { useMediaServerSync } from "@/apps/admin/media/lib/use-media-server-sync";
 import { useMemo, useRef, useState, useEffect } from "react";
 import { ImageIcon, Loader2, Search, Upload } from "lucide-react";
 import { loadMediaFiles, MEDIA_UPDATED_EVENT } from "@/apps/admin/media/lib/media-repository";
 import { useMediaUpload } from "@/apps/admin/media/lib/use-media-upload";
 import { SafeImage } from "@/components/shared/safe-image";
+import { thumbnailImageUrl } from "@/lib/image-url";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -34,6 +36,10 @@ export function MediaPicker({
   onSelect,
   description = "Choose an image, or drop a new one in to upload it.",
 }: MediaPickerProps) {
+  // The library is read where it is used — here — rather than by the admin
+  // layout on every screen. An upload's `addMediaFile` waits on the media
+  // gate, and only this read opens it.
+  useMediaServerSync();
   const [search, setSearch] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -251,7 +257,8 @@ export function MediaPicker({
                   }}
                 >
                   <div className="relative aspect-square bg-muted">
-                    <SafeImage src={file.url} alt={file.alt || file.name} className="object-cover" />
+                    {/* A preview sized to the tile; onSelect still hands back the stored URL. */}
+                    <SafeImage src={thumbnailImageUrl(file.url, 160)} alt={file.alt || file.name} className="object-cover" />
                   </div>
                   <p className="truncate px-2 py-2 text-xs font-medium">{file.name}</p>
                 </button>

@@ -5,6 +5,8 @@ import { MapPin, X } from "lucide-react";
 
 import { DeliveryAnswer } from "@/components/storefront/delivery-answer";
 import { fetchZones } from "@/features/commerce/lib/commerce-api";
+import { loadDeliveryZones } from "@/features/commerce/lib/delivery-zones-repository";
+import { isStorefrontSeeded } from "@/lib/storefront-seed-flag";
 import {
   lookUpDeliveryPincode,
   readDeliveryLocation,
@@ -14,6 +16,7 @@ import {
 import { normalizePincode } from "@/features/commerce/lib/delivery-zone-utils";
 import type { DeliveryZone } from "@/types/delivery";
 import { cn } from "@/lib/utils";
+import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
 
 /**
  * CAN IT REACH ME — asked on the page where the customer is deciding.
@@ -40,15 +43,37 @@ import { cn } from "@/lib/utils";
  * still there at checkout — and the answer is rendered by the same
  * `DeliveryAnswer`, so the two screens cannot come to word it differently.
  */
-export function PincodeCheck({ className }: { className?: string }) {
+export function PincodeCheck({
+  className,
+  title,
+  inline = false,
+}: {
+  className?: string;
+  /**
+   * A heading drawn INSIDE, so it goes away with the control — a shop with no
+   * zones renders nothing here, and a caller's own heading would be left
+   * over an empty box.
+   */
+  title?: string;
+  /**
+   * The title BESIDE the field on a wide screen — one slim row, as the
+   * reference's cart has it ("Enter Delivery Pincode: [ ] Check") — rather
+   * than a heading over a full-width box.
+   */
+  inline?: boolean;
+}) {
   const [zones, setZones] = useState<DeliveryZone[] | null>(null);
   const [entered, setEntered] = useState("");
   const [result, setResult] = useState<DeliveryLookup | null>(null);
   const [checking, setChecking] = useState(false);
+  // Inline only: the field, or the settled "Deliver to 324001 · Change" row.
+  const [editing, setEditing] = useState(true);
 
   useEffect(() => {
     let alive = true;
-    void fetchZones()
+    // The zones the page brought with it (StorefrontCacheSeed), or a request.
+    const read = isStorefrontSeeded() ? Promise.resolve(loadDeliveryZones()) : fetchZones();
+    void read
       // An empty list on failure rather than a retry loop — the control then
       // simply does not mount, which is the same as a shop with no zones and
       // is the quiet failure rather than a loud wrong claim.
@@ -77,15 +102,26 @@ export function PincodeCheck({ className }: { className?: string }) {
     if (saved?.pincode) setEntered(saved.pincode);
   }, []);
 
+  useEffect(() => {
+    if (!inline || !zones || zones.length === 0) return;
+    const saved = readDeliveryLocation();
+    if (!saved?.pincode) return;
+    const found = lookUpDeliveryPincode(zones, saved.pincode, getCommerceSettings());
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a browser read, after mount
+    setResult(found);
+    if (found?.served) setEditing(false);
+  }, [inline, zones]);
+
   if (zones === null || zones.length === 0) return null;
 
   const check = () => {
     setChecking(true);
-    const found = lookUpDeliveryPincode(zones, entered);
+    const found = lookUpDeliveryPincode(zones, entered, getCommerceSettings());
     setResult(found);
     setChecking(false);
     if (found?.served) {
       saveDeliveryLocation({ pincode: normalizePincode(entered), label: found.zoneName });
+      if (inline) setEditing(false);
     }
   };
 
@@ -104,6 +140,34 @@ export function PincodeCheck({ className }: { className?: string }) {
         ? "border-green-600"
         : "border-destructive";
 
+  if (inline && !editing && result?.served) {
+    return (
+      <div
+        className={cn("flex w-full min-w-0 items-center justify-between gap-3", className)}
+        aria-live="polite"
+      >
+        <p className="flex min-w-0 items-center gap-2 text-sm">
+          <MapPin className="size-4 shrink-0 text-bakery-700" aria-hidden="true" />
+          <span className="shrink-0 whitespace-nowrap text-muted-foreground">Deliver to:</span>
+          <span className="shrink-0 font-semibold text-foreground">{normalizePincode(entered)}</span>
+          {result.zoneName ? (
+            <span className="truncate text-muted-foreground">· {result.zoneName}</span>
+          ) : null}
+        </p>
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          aria-label="Change PIN code"
+          className="h-9 shrink-0 rounded-md border border-bakery-700 px-3 text-sm font-semibold text-bakery-700 transition-colors hover:bg-bakery-50"
+        >
+          {/* "Change" on a phone: the full label pushed the code onto two lines. */}
+          <span className="sm:hidden">Change</span>
+          <span className="hidden sm:inline">Change PIN code</span>
+        </button>
+      </div>
+    );
+  }
+
   return (
     /*
       THE FIELD IS AS WIDE AS EVERY OTHER CONTROL IN THIS COLUMN, and the
@@ -121,6 +185,13 @@ export function PincodeCheck({ className }: { className?: string }) {
       others leaves nothing to its right to put an answer in.
     */
     <div className={cn("flex w-full min-w-0 flex-col gap-2", className)}>
+      <div className={cn(inline && "flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4")}>
+      {title ? (
+        <p className="flex shrink-0 items-center gap-2 text-sm font-medium text-foreground">
+          {inline ? <MapPin className="size-4 text-bakery-700" aria-hidden="true" /> : null}
+          {title}
+        </p>
+      ) : null}
       {/*
         ONE CONTROL, NOT TWO BOXES WITH A GAP.
 
@@ -140,18 +211,21 @@ export function PincodeCheck({ className }: { className?: string }) {
       */}
       <form
         className={cn(
-          "flex h-12 w-full min-w-0 overflow-hidden rounded-md border bg-card",
-          outline,
+          "flex w-full min-w-0 overflow-hidden rounded-md border",
+          inline ? "h-11 shrink-0 gap-2 border-transparent bg-transparent sm:flex-1" : "h-12 bg-card",
+          inline ? null : outline,
         )}
         onSubmit={(event) => {
           event.preventDefault();
           check();
         }}
       >
-        <MapPin
-          className="ml-3 size-4 shrink-0 self-center text-muted-foreground"
-          aria-hidden="true"
-        />
+        {inline ? null : (
+          <MapPin
+            className="ml-3 size-4 shrink-0 self-center text-muted-foreground"
+            aria-hidden="true"
+          />
+        )}
         <input
           type="text"
           value={entered}
@@ -166,7 +240,8 @@ export function PincodeCheck({ className }: { className?: string }) {
           inputMode="numeric"
           autoComplete="postal-code"
           aria-label="PIN code"
-          placeholder="Enter PIN code to check delivery"
+          // Short enough to read whole at 390px; it was cut to "check deliv…".
+          placeholder="Enter delivery PIN code"
           /*
             `size={1}`, AND IT IS NOT ABOUT THE RENDERED WIDTH — the CSS below
             sets that. `size` sets an input's INTRINSIC width, and its default
@@ -185,7 +260,12 @@ export function PincodeCheck({ className }: { className?: string }) {
             above, where the track was already wider than 332.
           */
           size={1}
-          className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-base outline-none md:text-sm placeholder:text-muted-foreground"
+          className={cn(
+            "h-full min-w-0 flex-1 px-2.5 text-base outline-none md:text-sm placeholder:text-muted-foreground",
+            inline
+              ? cn("rounded-md border bg-muted/60 px-3", outline)
+              : "bg-transparent",
+          )}
         />
         {/*
           A WAY OUT OF A WRONG CODE, which the field did not have. Six digits
@@ -212,11 +292,19 @@ export function PincodeCheck({ className }: { className?: string }) {
         <button
           type="submit"
           disabled={!entered}
-          className="h-full shrink-0 bg-bakery-700 px-6 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          className={cn(
+            "h-full shrink-0 px-6 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50",
+            // Inline it is its own outlined button at the row's end, as the
+            // reference's — a filled block that looked disabled until typed in.
+            inline
+              ? "rounded-md border border-bakery-700 text-bakery-700 hover:bg-bakery-50"
+              : "bg-bakery-700 text-white",
+          )}
         >
           Check
         </button>
       </form>
+      </div>
 
       {/*
         UNDER THE FIELD, because the field is now level with every other

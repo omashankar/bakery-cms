@@ -7,7 +7,11 @@ import { sendTemplatedEmail } from "@/features/communications/server/email.servi
 import * as orderRepo from "@/features/orders/server/order.repository";
 
 import * as repo from "./customer-auth.repository";
-import type { RequestCodeInput, VerifyCodeInput } from "./customer-auth.validators";
+import type {
+  RequestCodeInput,
+  SavedAddressRecord,
+  VerifyCodeInput,
+} from "./customer-auth.validators";
 
 interface RequestCtx {
   ip: string;
@@ -228,4 +232,34 @@ export async function updateProfile(
   patch: { name?: string; phone?: string },
 ): Promise<void> {
   await repo.updateProfile(id, patch);
+}
+
+/**
+ * The signed-in customer's address book.
+ *
+ * At most one default: a book where two say "default" would leave checkout
+ * choosing between them by array order. The first one marked wins, and an
+ * unmarked book gets its first entry — the same rule the browser applies.
+ */
+export async function getAddresses(
+  id: string,
+): Promise<{ addresses: SavedAddressRecord[]; savedAt: string | null }> {
+  const { addresses, savedAt } = await repo.findAddresses(id);
+  return {
+    addresses: addresses as SavedAddressRecord[],
+    savedAt: savedAt ? new Date(savedAt).toISOString() : null,
+  };
+}
+
+export async function saveAddresses(
+  id: string,
+  addresses: SavedAddressRecord[],
+): Promise<SavedAddressRecord[]> {
+  const firstDefault = addresses.findIndex((address) => address.isDefault);
+  const marked = addresses.map((address, index) => ({
+    ...address,
+    isDefault: index === (firstDefault >= 0 ? firstDefault : 0),
+  }));
+  await repo.replaceAddresses(id, marked);
+  return marked;
 }

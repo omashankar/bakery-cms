@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readSource } from "../renderer-source";
 
 /**
  * THE ROWS THAT SCROLL SIDEWAYS, AND WHAT THEY SHOW WHILE DOING IT.
@@ -22,7 +21,7 @@ import { join } from "node:path";
  * these are the rules as written. The widths themselves are measured in
  * tests/e2e/a-row-scrolls-without-saying-so.spec.ts.
  */
-const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+const read = (path: string) => readSource(path);
 
 const RENDERER = "features/cms-sections/homepage-section-renderer.tsx";
 const CSS = "app/globals.css";

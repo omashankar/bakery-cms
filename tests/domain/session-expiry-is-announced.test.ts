@@ -110,6 +110,9 @@ const EXEMPT = [
   // Runs on the SERVER and calls WhatsApp, not this app. There is no browser
   // session here to have ended.
   "features/communications/server/whatsapp-client.server.ts",
+  // Same: on the SERVER, asking Razorpay for the account balance after a
+  // refused refund. A 401 there is a bad key, not an ended session.
+  "features/payments/server/razorpay-refund.server.ts",
 ];
 
 /**
@@ -1024,7 +1027,7 @@ describe("a write refused because the session ended", () => {
             check.slice(at, at + 240),
             `${path} looks at ${state} and then says nothing about it`,
           ).toContain("return true;");
-        }
+        }
       }
 
       /**

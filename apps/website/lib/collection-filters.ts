@@ -1,5 +1,21 @@
+import { groupIndian } from "@/utils/format";
 import type { LandingProduct } from "@/constants/landing-data";
 import { searchHaystack } from "@/features/products/lib/product-catalog";
+
+/**
+ * Text order without `localeCompare`.
+ *
+ * Every sort here breaks a tie by name, and the first `localeCompare` on a page
+ * loads the browser's collation data — 112ms of main thread on the collections
+ * page in a throttled CPU profile, spent ordering facet labels that only ever
+ * tie on a count. Case-folded code-point order is the same answer for the
+ * words a shop types into these lists.
+ */
+function compareText(a: string, b: string): number {
+  const x = a.toLowerCase();
+  const y = b.toLowerCase();
+  return x < y ? -1 : x > y ? 1 : 0;
+}
 
 
 export type CollectionSort = "name" | "price-asc" | "price-desc" | "popular";
@@ -155,7 +171,9 @@ export function priceBandsFor(cakes: { price: number }[]): PriceBand[] {
 
   if (cuts.length === 0) return [];
 
-  const money = (value: number) => value.toLocaleString("en-IN");
+  // Grouped without `Intl`: the first number a page formats in the browser
+  // loads the locale data, ~100ms on a phone, for four band labels.
+  const money = groupIndian;
   const bands: PriceBand[] = [];
   let from = 0;
   for (const cut of cuts) {
@@ -236,7 +254,7 @@ export function getFilterOccasionOptions(products: LandingProduct[]): string[] {
   }
 
   return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .sort((a, b) => b[1] - a[1] || compareText(a[0], b[0]))
     .map(([label]) => label);
 }
 
@@ -293,7 +311,7 @@ export function getFilterOptionFacets(products: LandingProduct[]): CollectionFil
   }
 
   const commonest = (counts: Map<string, number>) =>
-    [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? "";
+    [...counts.entries()].sort((a, b) => b[1] - a[1] || compareText(a[0], b[0]))[0]?.[0] ?? "";
 
   return [...facets.entries()]
     .map(([key, facet]) => ({
@@ -301,7 +319,7 @@ export function getFilterOptionFacets(products: LandingProduct[]): CollectionFil
       name: commonest(facet.names),
       carriers: facet.carriers,
       options: [...facet.labels.values()]
-        .sort((a, b) => b.count - a.count || a.text.localeCompare(b.text))
+        .sort((a, b) => b.count - a.count || compareText(a.text, b.text))
         .map((label) => label.text),
     }))
     /**
@@ -319,7 +337,7 @@ export function getFilterOptionFacets(products: LandingProduct[]): CollectionFil
         (facet.options.length === 1 && facet.carriers < products.length),
     )
     // The questions most of the shop answers, first.
-    .sort((a, b) => b.carriers - a.carriers || a.name.localeCompare(b.name))
+    .sort((a, b) => b.carriers - a.carriers || compareText(a.name, b.name))
     .map(({ key, name, options }) => ({ key, name, options }));
 }
 
@@ -419,7 +437,7 @@ export function getFilterFlavourOptions(products: LandingProduct[]): string[] {
   }
 
   return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .sort((a, b) => b[1] - a[1] || compareText(a[0], b[0]))
     .map(([label]) => label);
 }
 
@@ -453,7 +471,7 @@ export function getFilterWeightOptions(products: LandingProduct[]): string[] {
   }
 
   return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .sort((a, b) => b[1] - a[1] || compareText(a[0], b[0]))
     .map(([label]) => label);
 }
 
@@ -655,7 +673,7 @@ export function applyCollectionFilters(
     if (filters.sort === "price-asc") return a.price - b.price;
     if (filters.sort === "price-desc") return b.price - a.price;
     if (filters.sort === "popular") return (b.rating ?? 0) - (a.rating ?? 0);
-    return a.name.localeCompare(b.name);
+    return compareText(a.name, b.name);
   });
 
   return result;

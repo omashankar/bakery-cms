@@ -212,6 +212,18 @@ export function seedEmailTemplates(): EmailTemplateRecord[] {
       ...base,
     },
     {
+      id: "email-refund-failed",
+      slug: "refund_failed",
+      name: "Refund failed",
+      description: "Sent when the payment provider reports a refund it could not complete.",
+      category: "transactional",
+      subject: "We could not complete your refund for {{order_number}}",
+      previewText: "Your refund did not go through yet.",
+      body: "Hi {{customer_name}},\n\nWe tried to refund {{refund_amount}} for order {{order_number}}, but the payment provider could not complete it.\n\nNo money has reached you yet. We are looking into it and will try again or contact you.\n\nQuestions? Email {{store_email}}\n\n— {{store_name}}",
+      variables: ["customer_name", "order_number", "refund_amount", "store_email", "store_name"],
+      ...base,
+    },
+    {
       id: "email-abandoned-cart",
       slug: "abandoned_cart",
       name: "Abandoned cart reminder",

@@ -190,6 +190,18 @@ describe("writes persist to the store", () => {
     expect((await getProductById(created.id))?.price).toBe(750);
   });
 
+  it("removes a compare-at price the form cleared", async () => {
+    // The form sends no compare-at when the box is emptied. The update kept
+    // the old one, so it could never be removed — and one that had fallen
+    // below the price blocked every save while the error said "Clear it".
+    const created = await createProduct(form({ slug: "clear-compare", price: 500, compareAtPrice: 650 }));
+    const { compareAtPrice: _cleared, ...withoutCompareAt } = form({ slug: "clear-compare", price: 500 });
+
+    await updateProduct(created.id, withoutCompareAt);
+
+    expect((await getProductById(created.id))?.compareAtPrice).toBeUndefined();
+  });
+
   it("returns null when updating something that does not exist", async () => {
     expect(await updateProduct("nope", form())).toBeNull();
   });

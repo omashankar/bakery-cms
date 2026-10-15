@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { CollectionsPage } from "@/apps/website/pages/collections-page";
+import { CollectionsListing } from "@/apps/website/pages/collections-listing";
 import { getStorefrontProductCards } from "@/features/products/data/products-service";
 import {
   getStorefrontCategories,
@@ -66,7 +66,7 @@ export default async function Page({ params }: PageProps) {
     mistake, and a full catalogue is a better answer to that than a dead end.
   */
   return (
-    <CollectionsPage
+    <CollectionsListing
       catalog={catalog}
       categories={categories}
       occasion={occasion ? { name: occasion.name, slug: occasion.slug } : undefined}

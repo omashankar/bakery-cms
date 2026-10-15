@@ -74,6 +74,18 @@ const HSTS = {
 };
 
 const nextConfig: NextConfig = {
+  /**
+   * Where a build is written, overridable for a side-by-side production build.
+   *
+   * `next build` and a running `next dev` both write generated route types
+   * under `.next`, and doing both at once interleaved them into a file neither
+   * could parse — every later type check failed. `NEXT_DIST_DIR=.next-prod`
+   * keeps a measurement build out of the dev server's way.
+   */
+  distDir: process.env.NEXT_DIST_DIR || ".next",
+  // Off unless asked for: a measurement build maps every byte of browser
+  // JavaScript back to the file it came from.
+  productionBrowserSourceMaps: process.env.NEXT_SOURCEMAPS === "1",
   // Mongoose is a large CommonJS package with dynamic requires — let Node load it
   // directly instead of bundling it into the server build (faster, avoids issues).
   serverExternalPackages: ["mongoose", "cloudinary"],
@@ -103,6 +115,16 @@ const nextConfig: NextConfig = {
      * Two copies of this list would drift; one cannot.
      */
     remotePatterns: remoteImagePatterns(cloudinaryCloudName),
+    /**
+     * The default ladder plus 192 and 480, measured on a 412px phone at 2x.
+     *
+     * A two-across product card there needs ~412px of picture and the next
+     * rung was 640 — 2.4x the pixels it shows, on every card of every rail.
+     * Category tiles (~172 needed) and the why-us circles (~136) jumped to
+     * 256 the same way. Both new rungs sit under the smallest device size,
+     * as `imageSizes` must.
+     */
+    imageSizes: [32, 48, 64, 96, 128, 192, 256, 384, 480],
   },
   /**
    * Inlined into the client bundle so the renderer can scope res.cloudinary.com
@@ -146,6 +168,14 @@ const nextConfig: NextConfig = {
        */
       { source: "/", destination: "/store", permanent: false },
       { source: "/landing", destination: "/platform", permanent: true },
+      /*
+        ADMIN ADDRESSES THAT NOW SAY WHAT THE PAGE IS. Products lived at
+        /admin/cakes and Order Settings at /admin/settings/commerce; a
+        bookmark or an old link still lands on the right page.
+      */
+      { source: "/admin/cakes", destination: "/admin/products", permanent: true },
+      { source: "/admin/cakes/:path*", destination: "/admin/products/:path*", permanent: true },
+      { source: "/admin/settings/commerce", destination: "/admin/settings/orders", permanent: true },
       /*
         THE SEARCH PAGE IS GONE; THE RESULTS ARE ON THE COLLECTIONS PAGE.
 

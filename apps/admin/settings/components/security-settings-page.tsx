@@ -1,5 +1,6 @@
 "use client";
 
+import { useSecurityCenterServerSync } from "@/features/settings/lib/use-security-center-server-sync";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -83,6 +84,9 @@ function clamp(value: number, { min, max }: { min: number; max: number }): numbe
 }
 
 export function SecuritySettingsPage() {
+  // The only screen that reads the Security Center, so it opens its own read —
+  // the admin layout no longer loads it on every page.
+  useSecurityCenterServerSync();
   const router = useRouter();
   // The shared section form. This page hand-rolled it and never resynced: a
   // one-shot `[]`-dep effect read localStorage on mount, with no
@@ -360,8 +364,9 @@ export function SecuritySettingsPage() {
                   />
                   <p className="text-xs text-muted-foreground">
                     Wrong passwords allowed per minute before sign-in is refused.
-                    Counted per internet connection, not per person — so everyone
-                    on the shop&rsquo;s WiFi shares this number.
+                    Counted per account — but a browser you have signed in from
+                    before keeps its own count, so a stranger guessing your
+                    password cannot lock you out of it.
                   </p>
                 </div>
               </CardContent>

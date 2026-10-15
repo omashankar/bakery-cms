@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 
 import { hydrateSettingsFromServer } from "@/features/settings/lib/settings-repository";
+import { isStorefrontSeeded } from "@/lib/storefront-seed-flag";
 
 /**
  * Hydrates local settings from the server once on mount, so the rest of the app
@@ -34,6 +35,9 @@ export function SettingsServerSync() {
   const privileged = pathname?.startsWith("/admin") ?? false;
 
   useEffect(() => {
+    // A visitor's read, filled with the page by StorefrontCacheSeed. The admin
+    // (privileged) read still runs — a soft navigation into the admin needs it.
+    if (!privileged && isStorefrontSeeded()) return;
     void hydrateSettingsFromServer({ privileged });
   }, [privileged]);
 

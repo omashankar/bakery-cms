@@ -23,6 +23,47 @@ interface Envelope<T> {
  */
 const versions = new Map<string, number>();
 
+/**
+ * Where a refused write puts the list the server actually holds.
+ *
+ * On a 409 this only re-read the VERSION and threw the items away. The local
+ * cache kept this tab's stale list, so the admin's next save sent that list
+ * again — now carrying the fresh version, which the server accepted — and
+ * erased whatever the other device had added: a banner, an FAQ, a
+ * testimonial, with a green toast. The repository registers its cache writer
+ * here, so a conflict replaces the stale copy with the real one.
+ */
+const conflictSinks = new Map<string, (items: unknown) => void>();
+
+export function onContentConflict<T>(path: string, persistServer: (items: T) => void): void {
+  conflictSinks.set(path, persistServer as (items: unknown) => void);
+}
+
+/** A collection the SERVER read for an admin page, and its version. */
+export interface ServerContentRead<T> {
+  items: T;
+  version: number;
+}
+
+/**
+ * Apply a collection the server read with the page, as if `getJson` had just
+ * fetched it as an admin: the version a save must carry, the cache, and both
+ * gates — an admin page's read is the complete collection, so it is writable.
+ * The cache is written before the gates open, so nothing waiting on them reads
+ * the old copy.
+ */
+export function applyServerContent<T>(
+  path: string,
+  read: ServerContentRead<T>,
+  gates: { loaded: { markSettled: () => void }; writable: { markSettled: () => void } },
+  persistServer: (items: T) => void,
+): void {
+  versions.set(path, read.version);
+  persistServer(read.items);
+  gates.loaded.markSettled();
+  gates.writable.markSettled();
+}
+
 /** A read, and whether it was the complete collection or a visitor's subset. */
 export interface ContentRead<T> {
   items: T;
@@ -82,10 +123,12 @@ async function putJson(path: string, body: unknown): Promise<boolean> {
     if (version) versions.set(path, Number(version));
 
     if (res.status === 409) {
-      // Someone else moved it on. Re-read so this tab stops being stale — the
-      // caller reports the refusal, and the admin's next attempt is against
-      // what is actually stored rather than conflicting forever.
-      void getJson(path);
+      // Someone else moved it on. Re-read AND keep what was read, so this tab
+      // stops being stale and the screen shows the other device's change.
+      // Awaited: the caller's rollback then sees the cache is no longer its
+      // own list and leaves the server's copy standing.
+      const read = await getJson(path);
+      if (read?.full) conflictSinks.get(path)?.(read.items);
       return false;
     }
 

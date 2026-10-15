@@ -14,6 +14,23 @@ interface Envelope<T> {
   data: T | null;
 }
 
+/**
+ * The version each document was read at, sent back with its save.
+ *
+ * Header, footer, appearance and SEO are whole-document replaces built from a
+ * cache filled once per admin session. Without a version, a tab left open since
+ * morning saved its morning copy over a change made since on another device,
+ * and both reported success. The server now refuses a stale version (409); the
+ * conflict writes the server's copy into this tab's cache, so the screen shows
+ * the other change and the admin re-applies theirs on top of it.
+ */
+const versions = new Map<string, number>();
+const conflictSinks = new Map<string, (value: unknown) => void>();
+
+export function onSiteLayoutConflict<T>(key: string, persistServer: (value: T) => void): void {
+  conflictSinks.set(url(key), persistServer as (value: unknown) => void);
+}
+
 async function getJson<T>(path: string): Promise<T | null> {
   try {
     const res = await fetch(path, { headers: { Accept: "application/json" } });
@@ -21,6 +38,8 @@ async function getJson<T>(path: string): Promise<T | null> {
       noteAuthStatus(res.status);
       return null;
     }
+    const version = res.headers?.get?.("X-Content-Version");
+    if (version) versions.set(path, Number(version));
     const json = (await res.json()) as Envelope<T>;
     return json.success ? json.data : null;
   } catch {
@@ -40,11 +59,22 @@ async function getJson<T>(path: string): Promise<T | null> {
  */
 async function putJson(path: string, body: unknown): Promise<boolean> {
   try {
+    const known = versions.get(path);
     const res = await fetch(path, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(known === undefined ? {} : { "X-Content-Version": String(known) }),
+      },
       body: JSON.stringify(body),
     });
+    const version = res.headers?.get?.("X-Content-Version");
+    if (version) versions.set(path, Number(version));
+    if (res.status === 409) {
+      const current = await getJson(path);
+      if (current !== null) conflictSinks.get(path)?.(current);
+      return false;
+    }
     noteAuthStatus(res.status);
     return res.ok;
   } catch {
@@ -74,6 +104,21 @@ async function guardedPut(path: string, body: unknown): Promise<boolean> {
 }
 
 const url = (key: string) => `/api/site-layout/${key}`;
+
+/** A section the SERVER read for an admin page, and its version. */
+export interface ServerSiteLayoutRead<T> {
+  value: T;
+  version: number;
+}
+
+/**
+ * Record the version a section was read at by the server page, as `getJson`
+ * does for a fetch — without it the screen's next save carries no version and
+ * the server cannot refuse it for being composed against an older copy.
+ */
+export function rememberSiteLayoutVersion(key: string, version: number): void {
+  versions.set(url(key), version);
+}
 
 export const fetchSeoStore = () => getJson<SeoStore>(url("seo"));
 export const replaceSeoRequest = (store: SeoStore) => guardedSeoPut(url("seo"), store);

@@ -22,14 +22,13 @@
  *     were already exempt from the top-up.
  */
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 
 import { buildCategoryRail } from "@/features/products/lib/homepage-rails";
 import { resolveRegistryEntry, getRegistryEntry } from "@/constants/section-registry";
 import type { LandingProduct } from "@/constants/landing-data";
+import { readSource } from "../renderer-source";
 
-const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+const read = (path: string) => readSource(path);
 /** Comments quoting the old shape are not the old shape. */
 const code = (path: string) =>
   read(path)

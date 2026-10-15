@@ -1,14 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { CheckCircle2, Download, Loader2, Package, SearchX } from "lucide-react";
 import { getOrderByNumber, type PlacedOrder } from "@/features/orders/lib/orders";
 import { fetchOrderByNumber } from "@/features/orders/lib/orders-api";
 import { readOrderLookupEmail } from "@/features/orders/lib/order-access";
 import { hasCustomerSession } from "@/apps/website/account/lib/customer-session";
-import { openCustomerAuthModal } from "@/apps/website/account/components/customer-auth-modal";
+import { openCustomerAuthModal } from "@/apps/website/account/lib/auth-modal-events";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import { Button } from "@/components/ui/button";
@@ -38,9 +37,17 @@ const paymentLabels = {
  */
 type Lookup = "looking" | "found" | "missing";
 
-export function OrderSuccessPage() {
-  const searchParams = useSearchParams();
-  const orderNumber = searchParams.get("order");
+export function OrderSuccessPage({
+  orderNumber,
+}: {
+  /**
+   * `?order=`, read by the server page. It was `useSearchParams` here, which
+   * on this otherwise static route made the whole screen client-only: the
+   * HTML carried an empty box, and the confirmation a customer had just paid
+   * for appeared 3.4s later on a throttled phone.
+   */
+  orderNumber: string | null;
+}) {
   const [order, setOrder] = useState<PlacedOrder | null>(null);
   const [lookup, setLookup] = useState<Lookup>("looking");
   const [signedIn, setSignedIn] = useState(false);

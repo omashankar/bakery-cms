@@ -152,6 +152,21 @@ export async function findActiveReset(email: string) {
   }).sort({ createdAt: -1 });
 }
 
+/**
+ * Spend one attempt on a reset code, atomically. False when none are left.
+ *
+ * The check used to be a read (`attempts < max`) and a later `$inc` — every
+ * request fired at once saw the same count and all of them got to guess.
+ */
+export async function claimResetAttempt(id: string, max: number): Promise<boolean> {
+  await connectDB();
+  const res = await PasswordResetModel.updateOne(
+    { _id: id, attempts: { $lt: max } },
+    { $inc: { attempts: 1 } },
+  );
+  return res.modifiedCount === 1;
+}
+
 export async function incrementResetAttempts(id: string) {
   await connectDB();
   return PasswordResetModel.findByIdAndUpdate(id, { $inc: { attempts: 1 } }, { new: true });

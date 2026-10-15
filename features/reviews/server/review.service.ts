@@ -253,6 +253,13 @@ export async function markReviewHelpful(id: string): Promise<{ helpfulCount: num
   return { helpfulCount: count };
 }
 
+/** Count one reader who found an approved review NOT helpful. Same rules. */
+export async function markReviewUnhelpful(id: string): Promise<{ unhelpfulCount: number }> {
+  const count = await repo.incrementUnhelpful(id);
+  if (count === null) throw new NotFoundError("Review not found");
+  return { unhelpfulCount: count };
+}
+
 // ---- Admin ----------------------------------------------------------------
 
 export async function getReviews(): Promise<ProductReview[]> {

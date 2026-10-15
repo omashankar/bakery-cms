@@ -49,7 +49,7 @@ export function DashboardStatCard({
   const content = (
     <div className="flex items-start justify-between gap-2.5 sm:gap-3">
       <div className="min-w-0 flex-1 space-y-0.5 sm:space-y-1">
-        <p className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase sm:text-[11px]">
+        <p className="text-[11px] font-medium tracking-wider text-muted-foreground uppercase sm:text-[11px]">
           {title}
         </p>
         {figures === "loading" ? (

@@ -63,9 +63,34 @@ async function getJson<T>(path: string): Promise<T | null> {
   }
 }
 
+/**
+ * The version of each section this browser last read, sent back with its save.
+ *
+ * A section save replaces the whole section, built from a cache filled once
+ * per admin session — so a laptop open since morning saved its morning copy
+ * over a change made since on a phone. The server refuses a stale version
+ * (409) and the caller merges; see `updateStore` in settings-repository.
+ */
+const sectionVersions = new Map<string, number>();
+
+/** Record the section versions a full read carried; see `applyServerSettings`. */
+export function rememberSectionVersions(data: unknown): void {
+  rememberVersions(data);
+}
+
+function rememberVersions(data: unknown): void {
+  const versions = (data as { sectionVersions?: Record<string, unknown> } | null)?.sectionVersions;
+  if (!versions || typeof versions !== "object") return;
+  for (const [section, version] of Object.entries(versions)) {
+    if (typeof version === "number") sectionVersions.set(section, version);
+  }
+}
+
 /** Full settings (admin only — 401 for others → null). */
-export function fetchFullSettings() {
-  return getJson<Partial<AppSettings>>("/api/settings");
+export async function fetchFullSettings() {
+  const data = await getJson<Partial<AppSettings>>("/api/settings");
+  rememberVersions(data);
+  return data;
 }
 
 /** Storefront-safe subset (no auth). */
@@ -82,18 +107,46 @@ export function fetchPublicSettings() {
  * pages already surface as "saved on this device only" and keep Save enabled for.
  */
 export async function pushSection(section: string, value: unknown): Promise<boolean> {
-  if (!(await settingsHydration.waitForSettled())) return false;
+  return (await pushSectionDetailed(section, value)) === "saved";
+}
+
+/**
+ * `pushSection`, telling a refusal for staleness apart from any other.
+ *
+ * "conflict" means another device saved this section since this browser read
+ * it; the caller can merge and try again. Anything else that is not "saved" is
+ * an ordinary failure.
+ */
+export async function pushSectionDetailed(
+  section: string,
+  value: unknown,
+): Promise<"saved" | "conflict" | "failed"> {
+  if (!(await settingsHydration.waitForSettled())) return "failed";
 
   try {
+    const known = sectionVersions.get(section);
     const res = await fetch(`/api/settings/${section}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(known === undefined ? {} : { "X-Section-Version": String(known) }),
+      },
       body: JSON.stringify(value),
     });
+    if (res.status === 409) return "conflict";
     noteAuthStatus(res.status);
-    return res.ok;
+    if (!res.ok) return "failed";
+    try {
+      const json = (await res.json()) as Envelope<unknown>;
+      if (json.success) rememberVersions(json.data);
+    } catch {
+      // The save landed; a body we cannot read only costs the version, and the
+      // next save then goes unchecked rather than failing.
+      sectionVersions.delete(section);
+    }
+    return "saved";
   } catch {
-    return false;
+    return "failed";
   }
 }
 

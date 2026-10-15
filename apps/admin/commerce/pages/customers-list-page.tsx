@@ -30,7 +30,8 @@ import {
 } from "@/apps/admin/commerce/lib/customer-profile-utils";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
 import { type FiguresState } from "@/components/shared/panel-loading";
-import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
+import { adminShell } from "@/apps/admin/components/admin-shell";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ListPagination } from "@/components/shared/list-pagination";
@@ -49,11 +50,16 @@ const EMPTY_STATS = {
 
 const segmentOptions = ["all", "new", "returning", "vip", "at_risk", "inactive"] as const;
 
-export function CustomersListPage() {
+export function CustomersListPage({
+  initial = null,
+}: {
+  /** Read on the server so the table is in the HTML; null fetches as before. */
+  initial?: CustomerProfile[] | null;
+} = {}) {
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
+  const [mounted, setMounted] = useState(Boolean(initial));
   const [failed, setFailed] = useState(false);
-  const [customers, setCustomers] = useState<CustomerProfile[]>([]);
+  const [customers, setCustomers] = useState<CustomerProfile[]>(initial ?? []);
   const [filters, setFilters] = useState<CustomerListFilters>(defaultCustomerFilters);
   const [page, setPage] = useState(1);
 
@@ -73,7 +79,8 @@ export function CustomersListPage() {
       setMounted(true);
     }
 
-    void refresh();
+    // The server already sent the list; the listener still refreshes it.
+    if (!initial) void refresh();
     window.addEventListener(CUSTOMERS_UPDATED_EVENT, refresh);
     return () => {
       cancelled = true;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   fetchCommerceOverviews,
@@ -22,14 +22,22 @@ import {
  * here is a full-collection aggregation. Call `reload()` after a mutation
  * instead, once the server has actually accepted it.
  */
-export function useCommerceOverviews(): {
+export function useCommerceOverviews(
+  /** The counters the server read with the page; the first fetch is skipped. */
+  initial: CommerceOverviewsResponse | null = null,
+): {
   overviews: CommerceOverviewsResponse | null;
   reload: () => void;
 } {
-  const [overviews, setOverviews] = useState<CommerceOverviewsResponse | null>(null);
+  const [overviews, setOverviews] = useState<CommerceOverviewsResponse | null>(initial);
   const [reloadKey, setReloadKey] = useState(0);
+  const fromServer = useRef(Boolean(initial));
 
   useEffect(() => {
+    if (fromServer.current) {
+      fromServer.current = false;
+      return;
+    }
     let cancelled = false;
 
     (async () => {

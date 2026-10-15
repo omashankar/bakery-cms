@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   BadgeCheck,
   CalendarClock,
@@ -13,7 +13,7 @@ import {
   User,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import {
   getAdminProfile,
   saveAdminProfile,
@@ -22,7 +22,10 @@ import {
 } from "@/features/auth/lib/admin-profile";
 import { useHydratedForm } from "@/features/settings/lib/use-hydrated-form";
 import { adminConfigHydration } from "@/features/admin-config/lib/admin-config-api";
-import { ensureAdminConfigHydrated } from "@/features/admin-config/lib/admin-config-hydration";
+import {
+  applyServerAdminConfig,
+  ensureAdminConfigHydrated,
+} from "@/features/admin-config/lib/admin-config-hydration";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -57,7 +60,17 @@ function initials(name: string) {
   return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
 }
 
-export function AdminProfilePage() {
+export function AdminProfilePage({
+  initial = null,
+}: {
+  /** The admin config blobs and account, read on the server; null fetches as before. */
+  initial?: Parameters<typeof applyServerAdminConfig>[0] | null;
+} = {}) {
+  // Before the form's own hydration effect, so it finds the gate open.
+  useLayoutEffect(() => {
+    if (initial) applyServerAdminConfig(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
+  }, []);
   // The shared hydrated form. This page read `getAdminProfile()` once on mount
   // with no gate — and that read DERIVES a placeholder profile from the signed-in
   // email when the local blob is absent, which on a hard load it is. Saving is a
@@ -300,7 +313,7 @@ export function AdminProfilePage() {
             <CardContent className="space-y-5">
               <div className="grid gap-5 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="fullName">Full Name</Label>
+                  <Label htmlFor="fullName">Full name</Label>
                   <Input
                     id="fullName"
                     value={form.fullName}
@@ -309,7 +322,7 @@ export function AdminProfilePage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
+                  <Label htmlFor="email">Email address</Label>
                   <div className="relative">
                     <Mail className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
@@ -323,7 +336,7 @@ export function AdminProfilePage() {
                   <p className="text-xs text-muted-foreground">Email cannot be changed.</p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="mobile">Mobile Number</Label>
+                  <Label htmlFor="mobile">Mobile number</Label>
                   <Input
                     id="mobile"
                     type="tel"
@@ -372,9 +385,9 @@ export function AdminProfilePage() {
             <CardContent className="divide-y divide-border text-sm">
               {[
                 { label: "Role", value: profile.role },
-                { label: "Account Status", value: profile.status },
-                { label: "Last Login", value: formatDate(profile.lastLogin) },
-                { label: "Account Created", value: formatDate(profile.createdAt) },
+                { label: "Account status", value: profile.status },
+                { label: "Last login", value: formatDate(profile.lastLogin) },
+                { label: "Account created", value: formatDate(profile.createdAt) },
               ].map((row) => (
                 <div key={row.label} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
                   <span className="text-muted-foreground">{row.label}</span>

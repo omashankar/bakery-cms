@@ -35,6 +35,45 @@ export const updateCustomerProfileSchema = z.object({
   phone: z.string().trim().max(32).optional(),
 });
 
+/**
+ * One saved address: the checkout's address fields plus the book's own four.
+ *
+ * Strip, not passthrough — anything else a browser sends is dropped rather
+ * than stored on the account. Every string is length-capped, because this is
+ * written by the customer's browser and read back into checkout.
+ */
+const savedAddressSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  label: z.string().trim().max(40).default("Home"),
+  isDefault: z.boolean().default(false),
+  createdAt: z.string().trim().max(40),
+  updatedAt: z.string().trim().max(40),
+  fullName: z.string().trim().max(120).default(""),
+  email: z.string().trim().max(200).default(""),
+  phone: z.string().trim().max(32).default(""),
+  addressLine1: z.string().trim().max(200).default(""),
+  addressLine2: z.string().trim().max(200).optional(),
+  landmark: z.string().trim().max(200).optional(),
+  city: z.string().trim().max(80).default(""),
+  state: z.string().trim().max(80).default(""),
+  pincode: z.string().trim().max(12).default(""),
+  country: z.string().trim().max(80).optional(),
+  altPhone: z.string().trim().max(32).optional(),
+  addressLabel: z.enum(["Home", "Office", "Other"]).optional(),
+});
+
+/** The whole book, replaced in one write. Twenty is more than anyone keeps. */
+export const savedAddressesSchema = z.object({
+  addresses: z.array(savedAddressSchema).max(20, "You can save up to 20 addresses"),
+});
+
+export type SavedAddressRecord = z.infer<typeof savedAddressSchema>;
+
+/** A customer cancelling: an optional line saying why. */
+export const customerCancellationSchema = z.object({
+  reason: z.string().trim().max(300).optional(),
+});
+
 export type RequestCodeInput = z.infer<typeof requestCodeSchema>;
 export type VerifyCodeInput = z.infer<typeof verifyCodeSchema>;
 export type UpdateCustomerProfileInput = z.infer<typeof updateCustomerProfileSchema>;

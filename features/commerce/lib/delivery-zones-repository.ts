@@ -5,7 +5,7 @@ import {
   findDeliveryZone,
   getUniqueZoneCities,
 } from "./delivery-zone-utils";
-import { replaceZonesRequest, zonesHydration } from "./commerce-api";
+import { fetchZones, replaceZonesRequest, zonesHydration } from "./commerce-api";
 import type { WriteResult } from "@/lib/write-result";
 
 const STORAGE_KEY = "bakery-cms-delivery-zones";
@@ -54,6 +54,13 @@ async function persist(zones: DeliveryZone[]): Promise<boolean> {
 
   lowPersist(zones);
   const accepted = await replaceZonesRequest(zones, knownIds);
+  // The server keeps a stored row newer than this tab's copy (see `isStaleCopy`),
+  // so after a save the cache is refreshed: a zone changed on another device
+  // shows its real state here instead of this tab's old one.
+  if (accepted) {
+    const fresh = await fetchZones();
+    if (Array.isArray(fresh)) persistServerZones(fresh);
+  }
 
   // Roll back ONLY if this write is still the one in the cache.
   //
@@ -87,6 +94,15 @@ function readIds(raw: string | null): string[] {
 /** Hydration: write the server's zones into the local cache (no re-push). */
 export function persistServerZones(zones: DeliveryZone[]): void {
   lowPersist(zones);
+}
+
+/**
+ * The zones the SERVER read for an admin page — switched-off ones included —
+ * applied without a request: the cache, then the gate a save waits on.
+ */
+export function applyServerZones(zones: DeliveryZone[]): void {
+  persistServerZones(zones);
+  zonesHydration.markSettled();
 }
 
 export function seedZones(): DeliveryZone[] {
@@ -322,6 +338,7 @@ export function getActiveDeliveryZones(): DeliveryZone[] {
 export function resolveDeliveryZoneForAddress(address: {
   city?: string;
   pincode?: string;
+  state?: string;
 }): ReturnType<typeof findDeliveryZone> {
   return findDeliveryZone(loadDeliveryZones(), address);
 }

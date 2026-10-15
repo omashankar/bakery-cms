@@ -1,3 +1,4 @@
+import { onSiteLayoutConflict } from "@/features/site-layout/lib/site-layout-api";
 import { safeSetItem } from "@/lib/safe-storage";
 import type { HeaderNavItem, HeaderSettings } from "@/types/site-layout";
 import { defaultHeaderSettings } from "./header-utils";
@@ -93,6 +94,10 @@ export async function saveHeaderSettings(
 export function persistServerHeader(settings: HeaderSettings): void {
   persist(settings);
 }
+
+// A save refused because another device saved first puts the server's copy
+// here, so the screen shows it; see `onSiteLayoutConflict`.
+onSiteLayoutConflict("header", persistServerHeader);
 
 /**
  * Reset goes through the same path, and that matters most here.

@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Info } from "lucide-react";
 import { reportWrite } from "@/apps/admin/lib/report-write";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { getGatewayConfig } from "@/features/payments/registry/gateways";
 import {
   getGatewayRuntime,
@@ -26,6 +26,19 @@ import { routes } from "@/constants/routes";
 interface GatewayConfigPageProps {
   gatewayId: string;
 }
+
+/**
+ * How a payment method is written. `capitalize` made "upi" into "Upi" and
+ * "emi" into "Emi" — acronyms a customer knows in capitals.
+ */
+const METHOD_NAMES: Record<string, string> = {
+  upi: "UPI",
+  emi: "EMI",
+  card: "Card",
+  netbanking: "Net banking",
+  wallet: "Wallet",
+  cod: "Cash on delivery",
+};
 
 export function GatewayConfigPage({ gatewayId }: GatewayConfigPageProps) {
   const config = getGatewayConfig(gatewayId);
@@ -199,7 +212,7 @@ export function GatewayConfigPage({ gatewayId }: GatewayConfigPageProps) {
               value={
                 <div className="flex flex-wrap justify-end gap-1">
                   {config.supportedCurrencies.map((c) => (
-                    <Badge key={c} variant="outline" className="text-[10px]">{c}</Badge>
+                    <Badge key={c} variant="outline" className="text-[11px]">{c}</Badge>
                   ))}
                 </div>
               }
@@ -210,7 +223,7 @@ export function GatewayConfigPage({ gatewayId }: GatewayConfigPageProps) {
               value={
                 <div className="flex flex-wrap justify-end gap-1">
                   {config.supportedMethodIds.map((m) => (
-                    <Badge key={m} variant="outline" className="text-[10px] capitalize">{m}</Badge>
+                    <Badge key={m} variant="outline" className="text-[11px]">{METHOD_NAMES[m] ?? m}</Badge>
                   ))}
                 </div>
               }

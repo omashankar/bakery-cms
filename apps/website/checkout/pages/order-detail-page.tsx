@@ -1,6 +1,6 @@
 "use client";
 
-import { toast } from "sonner";
+import { toast } from "@/lib/lazy-toast";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -22,9 +22,16 @@ import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
 import { storefrontHeading } from "@/constants/typography";
 import { layoutSpacing } from "@/constants/spacing";
-import { formatCurrency } from "@/utils/format";
+import { formatCurrency, formatDate } from "@/utils/format";
 import { settledRefundAmount } from "@/features/orders/lib/order-overviews";
 import { formatAddress } from "@/features/orders/lib/address-format";
+import {
+  CANCELLATION_CLASS_CUSTOMER_TEXT,
+  DEFAULT_CANCELLATION_CLASS,
+  REFUND_STATE_LABELS,
+  customerCancellation,
+  refundState,
+} from "@/features/orders/lib/cancellation-policy";
 
 const paymentLabels = {
   cod: "Cash on Delivery",
@@ -290,6 +297,56 @@ export function OrderDetailPage() {
                     {formatAddress(order.address)}
                   </p>
                 </div>
+              </div>
+
+              {/*
+                CANCELLATION AND REFUND, kept apart: the policy this order was
+                placed under (the copy, not today's wording) and the refund's
+                own state — "Processed" only once the payment provider has said
+                so.
+              */}
+              <div className="rounded-xl border border-border bg-card p-6 text-sm shadow-sm">
+                <h2 className={storefrontHeading.card}>Cancellation &amp; refund</h2>
+                <dl className="mt-4 space-y-3">
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Policy</dt>
+                    <dd className="text-foreground">
+                      {CANCELLATION_CLASS_CUSTOMER_TEXT[
+                        order.cancellationPolicy?.policyClass ?? DEFAULT_CANCELLATION_CLASS
+                      ]}
+                      {order.cancellationPolicy?.acceptedAt ? (
+                        <span className="block text-xs text-muted-foreground">
+                          Agreed at checkout on {formatDate(order.cancellationPolicy.acceptedAt)}
+                        </span>
+                      ) : null}
+                    </dd>
+                  </div>
+                  {refundState(order) !== "not_applicable" ? (
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Refund</dt>
+                      <dd className="text-foreground">
+                        {REFUND_STATE_LABELS[refundState(order)]}
+                        {order.refundRecord?.gatewayRefunds?.some((refund) => refund.testMode) ? (
+                          <span className="block text-xs text-amber-800">
+                            Test mode — a simulated refund; no real money moved.
+                          </span>
+                        ) : null}
+                      </dd>
+                    </div>
+                  ) : null}
+                </dl>
+                {customerCancellation({
+                  ...order,
+                  policyClass: order.cancellationPolicy?.policyClass ?? DEFAULT_CANCELLATION_CLASS,
+                }).allowed ? (
+                  <p className="mt-4 text-xs text-muted-foreground">
+                    Need to cancel?{" "}
+                    <Link href={routes.account.orders} className="text-bakery-700 hover:underline">
+                      Go to My Orders
+                    </Link>{" "}
+                    (sign in with the email you ordered with).
+                  </p>
+                ) : null}
               </div>
 
               {order.orderNotes ? (

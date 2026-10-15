@@ -38,6 +38,12 @@ export interface GatewayRefund {
   processedAt?: string;
   /** The gateway's reason, when it ended `failed`. */
   failureReason?: string;
+  /**
+   * Made with Razorpay TEST keys: a simulated refund, no real money. Stamped
+   * when the refund is created, so the record stays honest after the shop
+   * switches to live keys.
+   */
+  testMode?: boolean;
 }
 
 export interface RefundRecord {

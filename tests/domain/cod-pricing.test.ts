@@ -34,6 +34,7 @@ const state = vi.hoisted(() => ({
   coupons: [] as Record<string, unknown>[],
   redemptions: [] as string[],
   audit: [] as Record<string, unknown>[],
+  draft: null as Record<string, unknown> | null,
 }));
 
 vi.mock("@/features/products/server/product.repository", () => ({
@@ -83,7 +84,8 @@ vi.mock("@/features/payments/server/unclaimed-payment.repository", () => ({
 }));
 
 vi.mock("@/features/checkout/server/draft.repository", () => ({
-  findDraft: async () => null,
+  findDraft: async () => state.draft,
+  consumeDraft: async () => true,
   claimDraft: async () => null,
 }));
 
@@ -118,6 +120,7 @@ function setCommerce(overrides: Record<string, unknown> = {}) {
   state.coupons = [];
   state.redemptions = [];
   state.audit = [];
+  state.draft = null;
 }
 
 /** A COD order that names a real product but costs it at a rupee. */
@@ -245,5 +248,69 @@ describe("the shop's minimum order value, at placement", () => {
     setCommerce({ minOrderValue: 0 });
     await codOrder();
     expect(state.inserted).not.toBeNull();
+  });
+});
+
+describe("Cash on Delivery switched off", () => {
+  /*
+    The checkout ALWAYS sends a draft for COD, and the payment-method check was
+    skipped whenever a draft existed — on the claim that the quote endpoint
+    refuses it first. The quote never sees the payment method. So a shop that
+    turned COD off still took COD orders, straight to "confirmed".
+  */
+  it("is refused even when the cart was quoted", async () => {
+    setCommerce({ paymentMethods: { ...defaultCommerceSettings.paymentMethods, cod: false } });
+    state.draft = {
+      id: "draft-1",
+      items: [{ productSlug: "black-forest", name: "Black Forest", price: 5000, quantity: 1 }],
+      totals: { subtotal: 5000, total: 5250, tax: 250, itemCount: 1 },
+      deliveryAddress: address,
+    };
+
+    await expect(codOrder({ draftId: "draft-1" })).rejects.toThrow(/not available/);
+    expect(state.inserted).toBeNull();
+  });
+
+  it("a quoted COD order goes through while COD is on", async () => {
+    setCommerce();
+    state.draft = {
+      id: "draft-1",
+      items: [{ productSlug: "black-forest", name: "Black Forest", price: 5000, quantity: 1 }],
+      totals: { subtotal: 5000, total: 5250, tax: 250, itemCount: 1 },
+      deliveryAddress: address,
+    };
+
+    await codOrder({ draftId: "draft-1" });
+    expect(state.inserted).not.toBeNull();
+  });
+});
+
+describe("the delivery an order is placed for", () => {
+  /*
+    With a draft the slot checks are skipped — the quote made them — and the
+    order then stored the REQUEST's slot, which the quote never saw. Quoted for
+    tomorrow 10–12, placed with today at a window already gone: accepted, and
+    printed on the invoice and the kitchen alert.
+  */
+  it("is the one the cart was quoted for, not the one the request names", async () => {
+    setCommerce();
+    state.draft = {
+      id: "draft-1",
+      items: [{ productSlug: "black-forest", name: "Black Forest", price: 5000, quantity: 1 }],
+      totals: { subtotal: 5000, total: 5250, tax: 250, itemCount: 1 },
+      deliveryAddress: address,
+      deliverySlot: { date: "2099-01-02", timeSlot: "10:00 AM – 12:00 PM" },
+    };
+
+    await codOrder({
+      draftId: "draft-1",
+      deliverySlot: { date: "2020-01-01", timeSlot: "06:00 AM – 07:00 AM", tierLabel: "Standard" },
+    });
+
+    expect(state.inserted?.deliverySlot).toMatchObject({
+      date: "2099-01-02",
+      timeSlot: "10:00 AM – 12:00 PM",
+      tierLabel: "Standard",
+    });
   });
 });

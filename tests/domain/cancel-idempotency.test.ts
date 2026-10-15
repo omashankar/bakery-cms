@@ -21,6 +21,25 @@ const state = vi.hoisted(() => ({
   order: null as Record<string, unknown> | null,
   restoredStock: [] as unknown[][],
   couponReleases: [] as string[],
+  relabels: [] as Array<{ id: string; quantity: number; status: string }>,
+}));
+
+// After the stock comes back, the product is relabelled from its NEW quantity.
+// Its stored label still says "out_of_stock" — the state the last sale left.
+vi.mock("@/features/products/server/product.repository", () => ({
+  findBySlug: async (slug: string) => ({
+    id: `p-${slug}`,
+    slug,
+    stockQuantity: 3,
+    unlimitedStock: false,
+    stockStatus: "out_of_stock",
+  }),
+  setStockStatusFor: async (id: string, quantity: number, status: string) => {
+    state.relabels.push({ id, quantity, status });
+  },
+}));
+vi.mock("@/features/inventory/server/inventory.service", () => ({
+  getSettings: async () => ({ defaultLowStockThreshold: 2, trackStockHistory: true }),
 }));
 
 vi.mock("@/features/orders/server/order.repository", () => ({
@@ -39,6 +58,14 @@ vi.mock("@/features/orders/server/order.repository", () => ({
     if (state.order?.couponReleased === true) return false;
     state.order = { ...state.order, couponReleased: true };
     return true;
+  },
+
+  // `{ refundRecord.version: expected }` — a stale write matches nothing.
+  compareAndSetRefund: async (_id: string, expected: number, fields: Record<string, unknown>) => {
+    const current = Number((state.order?.refundRecord as { version?: number } | undefined)?.version) || 0;
+    if (current !== expected) return null;
+    state.order = { ...state.order, ...fields };
+    return { ...state.order };
   },
 
   restoreStock: async (reductions: unknown[]) => {
@@ -90,8 +117,21 @@ function harness(over: Record<string, unknown> = {}) {
   };
   state.restoredStock.length = 0;
   state.couponReleases.length = 0;
+  state.relabels.length = 0;
   return state;
 }
+
+describe("cancelling puts the cakes back on sale", () => {
+  it("relabels the product from its restored quantity, by the shop's threshold", async () => {
+    const h = harness();
+
+    await service.cancel("order-1", undefined, CTX);
+
+    // 3 on the shelf, the shop's threshold is 2 — in stock, not out of it, and
+    // not the built-in 10's "low stock" either.
+    expect(h.relabels).toEqual([{ id: "p-choc", quantity: 3, status: "in_stock" }]);
+  });
+});
 
 describe("cancelling twice", () => {
   it("restores the stock once, not once per click", async () => {
@@ -135,16 +175,15 @@ describe("cancelling twice", () => {
     expect(second?.status).toBe("cancelled");
   });
 
-  it("does not put a delivered order's stock back", async () => {
-    // Those cakes have left the building; adding them back invents stock the
-    // next customer can be sold.
+  it("refuses to cancel a delivered order, and touches nothing", async () => {
+    // A delivered order is refunded instead: cancelling it emailed a cash
+    // customer "no payment was taken" and shut the COD refund path for good.
     const h = harness({ status: "delivered" });
 
-    await service.cancel("order-1", undefined, CTX);
+    await expect(service.cancel("order-1", undefined, CTX)).rejects.toThrow(/refund/i);
 
     expect(h.restoredStock).toHaveLength(0);
-    // The coupon still comes back — that is not a physical good.
-    expect(h.couponReleases).toEqual(["WELCOME10"]);
+    expect(h.couponReleases).toHaveLength(0);
   });
 
   it("does nothing at all for an order already cancelled", async () => {
@@ -154,6 +193,87 @@ describe("cancelling twice", () => {
 
     expect(h.restoredStock).toHaveLength(0);
     expect(h.couponReleases).toHaveLength(0);
+  });
+});
+
+/**
+ * A PAID order cancelled is a refund the shop owes — and nothing asked for it.
+ *
+ * The customer was emailed "a refund is on its way" while the only trace on
+ * the shop's side was a console line: a paid order cancelled on 2 September
+ * 2026 had no refund request six weeks later. Cancelling opens the request
+ * now; paying it out stays the shop's own click (its choice, 2026-10-13).
+ */
+describe("cancelling a paid order", () => {
+  it("opens a full refund request for the shop to approve", async () => {
+    const h = harness({ paymentMethod: "razorpay", paymentStatus: "paid" });
+
+    const result = await service.cancel("order-1", "time issue", CTX);
+
+    const record = h.order?.refundRecord as Record<string, unknown> | undefined;
+    expect(record, "no refund was asked for").toBeDefined();
+    expect(record?.status).toBe("requested");
+    expect(record?.amount).toBe(300);
+    expect(record?.reason).toBe("order_cancelled");
+    expect(record?.reasonDetail).toBe("time issue");
+    // The caller is handed the order as it now stands, request and all.
+    expect((result as { refundRecord?: unknown } | null)?.refundRecord).toBeDefined();
+    // And no money moved: the payment still reads as taken.
+    expect(h.order?.paymentStatus).toBe("paid");
+  });
+
+  it("asks once, however many times Cancel is pressed", async () => {
+    const h = harness({ paymentMethod: "razorpay", paymentStatus: "paid" });
+
+    await Promise.all([
+      service.cancel("order-1", undefined, CTX),
+      service.cancel("order-1", undefined, CTX),
+    ]);
+    await service.cancel("order-1", undefined, CTX);
+
+    const history = (h.order?.refundRecord as { history?: unknown[] } | undefined)?.history;
+    expect(history).toHaveLength(1);
+  });
+
+  it("lets the shop say no — the cake may already be baked", async () => {
+    const h = harness({ paymentMethod: "razorpay", paymentStatus: "paid" });
+    await service.cancel("order-1", "changed mind", CTX);
+
+    await service.declineRefund("order-1", "Cake was already baked", CTX);
+
+    const record = h.order?.refundRecord as {
+      status: string;
+      history: Array<{ status: string; note?: string }>;
+    };
+    expect(record.status).toBe("rejected");
+    expect(record.history.at(-1)).toMatchObject({
+      status: "rejected",
+      note: "Declined: Cake was already baked",
+    });
+    // Declining moves no money and marks nothing refunded.
+    expect(h.order?.paymentStatus).toBe("paid");
+  });
+
+  it("will not decline what is not an open request", async () => {
+    harness({ paymentMethod: "cod", paymentStatus: "cod" });
+    await service.cancel("order-1", undefined, CTX);
+    // No request was opened for a cash order, so there is nothing to decline.
+    await expect(service.declineRefund("order-1", undefined, CTX)).rejects.toThrow(/requested/);
+
+    const h = harness({ paymentMethod: "razorpay", paymentStatus: "paid" });
+    await service.cancel("order-1", undefined, CTX);
+    await service.declineRefund("order-1", undefined, CTX);
+    // Declining twice: the second finds a declined case, not a request.
+    await expect(service.declineRefund("order-1", undefined, CTX)).rejects.toThrow(/requested/);
+    expect((h.order?.refundRecord as { history: unknown[] }).history).toHaveLength(2);
+  });
+
+  it("asks for nothing when no money was taken", async () => {
+    const h = harness({ paymentMethod: "cod", paymentStatus: "cod" });
+
+    await service.cancel("order-1", undefined, CTX);
+
+    expect(h.order?.refundRecord).toBeUndefined();
   });
 });
 
@@ -178,9 +298,9 @@ describe("the guards' actual queries", () => {
     return source.slice(start, source.indexOf("\n}", start));
   };
 
-  it("cancelIfActive only matches an order that is not already finished", () => {
+  it("cancelIfActive only matches an order that is not finished or delivered", () => {
     const fn = bodyOf("export async function cancelIfActive(");
-    expect(fn).toContain('status: { $nin: ["cancelled", "refunded"] }');
+    expect(fn).toContain('status: { $nin: ["cancelled", "refunded", "delivered"] }');
   });
 
   it("claimCouponRelease only matches an unreleased order", () => {

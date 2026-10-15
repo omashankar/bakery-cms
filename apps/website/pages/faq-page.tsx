@@ -4,12 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, HelpCircle, Mail, MessageCircle, Phone, Search } from "lucide-react";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { FaqList } from "@/components/shared/faq-list";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -107,32 +102,23 @@ export function FaqPage({ faqs, contact }: FaqPageProps) {
                   No matching questions found.
                 </div>
               ) : (
-                <Accordion
-                  // The accordion is uncontrolled, so its defaultValue is only
-                  // read once. Searching or switching category produces a
-                  // different first result, and changing defaultValue in place
-                  // warns. Keying on that first id starts a fresh accordion for
-                  // a genuinely new list — which also opens the top match,
-                  // rather than leaving every filtered result collapsed.
+                <>
+                {/* The questions are h3 (the accordion's header); this is the h2
+                    they sit under, so the outline does not jump from h1. */}
+                <h2 className="sr-only">Questions and answers</h2>
+                <FaqList
+                  // Keyed on the first result: searching or switching category
+                  // is a new list, and a fresh one opens its top match rather
+                  // than keeping whichever item happened to be open before.
                   key={categoryFiltered[0]?.id ?? "none"}
-                  defaultValue={[categoryFiltered[0]?.id ?? "1"]}
+                  name="faq-page"
+                  items={categoryFiltered}
                   className="space-y-3"
-                >
-                  {categoryFiltered.map((faq) => (
-                    <AccordionItem
-                      key={faq.id}
-                      value={faq.id}
-                      className="overflow-hidden rounded-2xl border border-border bg-card transition-colors hover:border-bakery-300"
-                    >
-                      <AccordionTrigger className="px-5 py-4 text-left font-heading font-semibold hover:no-underline">
-                        {faq.question}
-                      </AccordionTrigger>
-                      <AccordionContent className="px-5 pb-4 leading-relaxed text-muted-foreground">
-                        {faq.answer}
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
+                  itemClassName="overflow-hidden rounded-2xl border border-border bg-card transition-colors hover:border-bakery-300"
+                  questionClassName="px-5 py-4 font-heading font-semibold"
+                  answerClassName="px-5 pb-4 leading-relaxed text-muted-foreground"
+                />
+                </>
               )}
 
               {category !== "all" ? (
@@ -194,7 +180,7 @@ export function FaqPage({ faqs, contact }: FaqPageProps) {
                 </div>
 
                 <Button
-                  className="mt-6 w-full rounded-xl"
+                  className="mt-6 h-11 w-full rounded-xl"
                   render={<Link href={routes.store.contact} />}
                 >
                   Contact Support

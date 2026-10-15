@@ -37,7 +37,8 @@ import {
 import { routes } from "@/constants/routes";
 import { formatRelativeTime } from "@/utils/format";
 import type { CmsPage } from "@/types/content";
-import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
+import { adminShell } from "@/apps/admin/components/admin-shell";
 import {
   deletePageRequest,
   fetchPages,
@@ -109,9 +110,14 @@ const EMPTY_OVERVIEW: PageOverview = {
   system: 0,
 };
 
-export function PagesListPage() {
-  const [mounted, setMounted] = useState(false);
-  const [pages, setPages] = useState<CmsPage[]>([]);
+export function PagesListPage({
+  initial = null,
+}: {
+  /** Read on the server so the table is in the HTML; null fetches as before. */
+  initial?: CmsPage[] | null;
+} = {}) {
+  const [mounted, setMounted] = useState(Boolean(initial));
+  const [pages, setPages] = useState<CmsPage[]>(initial ?? []);
   const [filters, setFilters] = useState<PageListFilters>(defaultPageFilters);
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -132,7 +138,10 @@ export function PagesListPage() {
   }
 
   useEffect(() => {
+    // The server already sent the list.
+    if (initial) return;
     void refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only
   }, []);
 
   const filtered = useMemo(() => filterPages(pages, filters), [pages, filters]);

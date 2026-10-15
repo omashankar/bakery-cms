@@ -1,5 +1,5 @@
 import { loadProducts } from "@/features/products/lib/products-repository";
-import { countNewInquiries } from "@/apps/admin/inquiries";
+import { countNewInquiries } from "@/features/inquiries/lib/inquiries-repository";
 import { loadMediaFiles } from "@/apps/admin/media/lib/media-repository";
 import { getActivityLog } from "@/features/settings/lib/settings-repository";
 import { getOrders, type PlacedOrder } from "@/features/orders/lib/orders";

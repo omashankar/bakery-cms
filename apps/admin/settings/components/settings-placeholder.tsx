@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, type LucideIcon } from "lucide-react";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -55,7 +55,7 @@ export function SettingsPlaceholder({
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="font-heading text-lg font-bold text-foreground">{title}</h2>
-                <Badge variant="outline" className="text-[10px]">Coming soon</Badge>
+                <Badge variant="outline" className="text-[11px]">Coming soon</Badge>
               </div>
               <p className="mt-1 text-sm text-muted-foreground">{description}</p>
             </div>

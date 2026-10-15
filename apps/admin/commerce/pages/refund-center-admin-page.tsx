@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+
 import {
   Banknote,
   CheckCircle2,
@@ -11,7 +12,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import {
   FilterPanel,
@@ -39,7 +40,7 @@ import {
   type PlacedOrder,
   type RefundOrderInput,
 } from "@/features/orders/lib/orders";
-import { fetchRefundCasesPage } from "@/features/orders/lib/orders-api";
+import { declineRefundRequest, fetchRefundCasesPage } from "@/features/orders/lib/orders-api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,10 +73,17 @@ const caseTabs: Array<{
 function RefundCaseDetail({
   order,
   onIssueRefund,
+  onDeclineRefund,
 }: {
   order: PlacedOrder;
   onIssueRefund: () => void;
+  onDeclineRefund: () => void;
 }) {
+  // A request nothing has been paid against — the only case the shop can
+  // still say no to. See `declineRefund` on the server.
+  const declinable =
+    order.refundRecord?.status === "requested" &&
+    (order.refundRecord.gatewayRefunds?.length ?? 0) === 0;
   return (
     <div className="space-y-4">
       <Card className="shadow-sm">
@@ -181,6 +189,17 @@ function RefundCaseDetail({
               Issue refund
             </Button>
           ) : null}
+          {/*
+            THE OTHER ANSWER. A cancelled paid order opens a refund request on
+            its own, and whether to pay it is the shop's decision — a cake that
+            was already baked may not be. Issue refund can still pay a partial
+            amount; this is for paying nothing.
+          */}
+          {declinable ? (
+            <Button variant="outline" className="w-full" onClick={onDeclineRefund}>
+              Decline refund
+            </Button>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -196,16 +215,23 @@ function RefundCaseDetail({
   );
 }
 
-export function RefundCenterAdminPage() {
-  const [orders, setOrders] = useState<PlacedOrder[]>([]);
+export function RefundCenterAdminPage({
+  initial = null,
+}: {
+  /** The default view's first page, read on the server; null fetches as before. */
+  initial?: { items: PlacedOrder[]; total: number; overview: RefundOverview } | null;
+} = {}) {
+  // The server answered the default view; its first request would repeat it.
+  const listFromServer = useRef(Boolean(initial));
+  const [orders, setOrders] = useState<PlacedOrder[]>(initial?.items ?? []);
   const [filters, setFilters] = useState<RefundListFilters>(defaultRefundFilters);
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [refundTarget, setRefundTarget] = useState<PlacedOrder | null>(null);
-  const [total, setTotal] = useState(0);
-  const [overview, setOverview] = useState<RefundOverview>(EMPTY_REFUND_OVERVIEW);
+  const [total, setTotal] = useState(initial?.total ?? 0);
+  const [overview, setOverview] = useState<RefundOverview>(initial?.overview ?? EMPTY_REFUND_OVERVIEW);
   const [reloadKey, setReloadKey] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initial);
   const [failed, setFailed] = useState(false);
 
   /**
@@ -240,6 +266,10 @@ export function RefundCenterAdminPage() {
     page: number;
   };
   useEffect(() => {
+    if (listFromServer.current) {
+      listFromServer.current = false;
+      return;
+    }
     let cancelled = false;
     async function load() {
       // Re-armed on EVERY request, not just the first: without this a refilter
@@ -302,6 +332,29 @@ export function RefundCenterAdminPage() {
     if (caseType === "refunded") return overview.refundedCount;
     if (caseType === "requested") return overview.requestedCount;
     return overview.processingCount;
+  }
+
+  /**
+   * Say no to a requested refund. The reason is optional and goes on the
+   * refund's timeline; Cancel on the prompt changes nothing.
+   */
+  async function handleDecline(order: PlacedOrder) {
+    const reason = window.prompt(
+      `Decline the refund for ${order.orderNumber}? Why (optional — kept on the timeline):`,
+      "",
+    );
+    if (reason === null) return;
+    const done = await declineRefundRequest(order.id, reason);
+    if (!done) {
+      if (!reportedAsSignedOut()) {
+        toast.error("Could not decline the refund", {
+          description: "It may have changed since this page loaded — reload and try again.",
+        });
+      }
+      return;
+    }
+    toast.success(`Refund declined · ${order.orderNumber}`);
+    setReloadKey((key) => key + 1);
   }
 
   async function handleRefundConfirm(input: RefundOrderInput) {
@@ -474,7 +527,7 @@ export function RefundCenterAdminPage() {
                 <Badge
                   variant={active ? "secondary" : "outline"}
                   className={cn(
-                    "h-5 min-w-5 justify-center px-1.5 text-[10px]",
+                    "h-5 min-w-5 justify-center px-1.5 text-[11px]",
                     active && "border-transparent bg-primary-foreground/20 text-primary-foreground"
                   )}
                 >
@@ -616,6 +669,7 @@ export function RefundCenterAdminPage() {
             <RefundCaseDetail
               order={selected}
               onIssueRefund={() => setRefundTarget(selected)}
+              onDeclineRefund={() => void handleDecline(selected)}
             />
           ) : (
             <Card className="shadow-sm">
@@ -641,6 +695,7 @@ export function RefundCenterAdminPage() {
             <RefundCaseDetail
               order={selected}
               onIssueRefund={() => setRefundTarget(selected)}
+              onDeclineRefund={() => void handleDecline(selected)}
             />
           </div>
         ) : null}

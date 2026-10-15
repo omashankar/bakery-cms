@@ -3,9 +3,18 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { isOfferedTimeSlot, normaliseTimeSlot } from "@/features/orders/lib/delivery-date";
+import {
+  isOfferedTimeSlot,
+  isPastSameDayCutoff,
+  isPastTimeSlot,
+  normaliseTimeSlot,
+  offeredWindows,
+  shopClockNow,
+} from "@/features/orders/lib/delivery-date";
 import { placeOrderSchema } from "@/features/orders/server/order.validators";
 import { quoteSchema } from "@/features/checkout/server/checkout.validators";
+
+const source = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
 /**
  * WHEN the customer asked for the cake was never checked as hard as WHAT they
@@ -150,20 +159,65 @@ describe("a delivery time the shop actually offers", () => {
  * slot list mid-checkout.
  */
 describe("where the offered-slot rule is applied", () => {
-  const source = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
   it("is enforced at placement, for an unquoted cart", () => {
     const service = source("features/orders/server/order.service.ts");
 
-    expect(service).toContain("isOfferedTimeSlot(input.deliverySlot.timeSlot, commerce.deliveryTimeSlots");
+    expect(service).toMatch(/isOfferedTimeSlot\(\s*input\.deliverySlot\.timeSlot,\s*offeredWindows\(commerce,/);
     expect(service).toMatch(/!draft &&\s*input\.deliverySlot\?\.timeSlot/);
   });
 
   it("is enforced at the quote, before any money moves", () => {
     const controller = source("features/checkout/server/checkout.controller.ts");
 
-    expect(controller).toContain("isOfferedTimeSlot(input.deliverySlot.timeSlot");
-    expect(controller).toContain("quote.commerce.deliveryTimeSlots");
+    expect(controller).toMatch(/isOfferedTimeSlot\(\s*input\.deliverySlot\.timeSlot,\s*offeredWindows\(quote\.commerce,/);
+  });
+});
+
+describe("a delivery speed's own windows", () => {
+  /*
+    The server checked only the shop-wide list, so a speed with its own windows
+    ("Midnight", 11:30 PM – 12:00 AM) was refused at the quote for every
+    customer who picked it, and could not be bought.
+  */
+  const commerce = {
+    deliveryTimeSlots: ["10:00 AM – 12:00 PM"],
+    deliveryTiers: [
+      { id: "midnight", windows: ["11:30 PM – 12:00 AM"] },
+      { id: "next-day", windows: [] as string[] },
+    ],
+  };
+
+  it("are the ones offered when that speed is chosen", () => {
+    expect(isOfferedTimeSlot("11:30 PM – 12:00 AM", offeredWindows(commerce, "midnight"))).toBe(true);
+    expect(isOfferedTimeSlot("10:00 AM – 12:00 PM", offeredWindows(commerce, "midnight"))).toBe(false);
+  });
+
+  it("fall back to the shop-wide list with no speed, or an unknown one", () => {
+    expect(offeredWindows(commerce, undefined)).toEqual(["10:00 AM – 12:00 PM"]);
+    expect(offeredWindows(commerce, "gone")).toEqual(["10:00 AM – 12:00 PM"]);
+  });
+});
+
+describe("the shop's clock, not the server's", () => {
+  /*
+    The cutoff and window checks read `new Date()`'s local getters, and the
+    server runs in UTC: a 14:00 same-day cutoff closed at 19:30 IST.
+  */
+  it("closes a 14:00 cutoff at 14:00 in Kolkata", () => {
+    // 09:00 UTC is 14:30 IST.
+    const now = shopClockNow("Asia/Kolkata", new Date("2026-10-09T09:00:00.000Z"));
+    expect(isPastSameDayCutoff("2026-10-09", "14:00", now)).toBe(true);
+    // The server's own clock at the same instant says 09:00 — still open.
+    const before = shopClockNow("Asia/Kolkata", new Date("2026-10-09T08:00:00.000Z")); // 13:30 IST
+    expect(isPastSameDayCutoff("2026-10-09", "14:00", before)).toBe(false);
+  });
+
+  it("knows it is already tomorrow in Kolkata at 20:00 UTC", () => {
+    // 20:00 UTC on the 9th is 01:30 IST on the 10th.
+    const now = shopClockNow("Asia/Kolkata", new Date("2026-10-09T20:00:00.000Z"));
+    expect(isPastTimeSlot("2026-10-10", "10:00 AM – 12:00 PM", now)).toBe(false);
+    expect(isPastSameDayCutoff("2026-10-10", "01:00", now)).toBe(true);
   });
 
   it("stops the admin screen inventing a slot nobody chose", () => {

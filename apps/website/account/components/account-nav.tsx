@@ -9,7 +9,8 @@ import {
   getCustomerSession,
   signOutCustomer,
 } from "@/apps/website/account/lib/customer-session";
-import { getAccountInitials } from "@/apps/website/account/components/account-menu";
+import { getAccountInitials } from "@/apps/website/account/lib/account-initials";
+import { displayNameOf, useAccountProfile } from "@/apps/website/account/components/account-context";
 import { routes } from "@/constants/routes";
 import { cn } from "@/lib/utils";
 
@@ -27,12 +28,17 @@ interface AccountNavProps {
 export function AccountNav({ className, onNavigate }: AccountNavProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
+  const profile = useAccountProfile();
+  // The server's answer first, so the avatar and name are in the first paint;
+  // the browser session updates them after an edit.
+  const [mounted, setMounted] = useState(Boolean(profile));
+  const [name, setName] = useState(profile ? displayNameOf(profile) : "");
+  const [phone, setPhone] = useState(profile?.phone ?? "");
 
   useEffect(() => {
     const load = () => {
+      // Only when the browser has one: before it does, the server's stands.
+      if (!getCustomerSession()) return;
       setName(getCustomerDisplayName());
       setPhone(getCustomerSession()?.phone ?? "");
     };

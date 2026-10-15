@@ -11,10 +11,17 @@ import { routes } from "@/constants/routes";
 import type { PlacedOrder } from "@/features/orders/lib/orders";
 import { formatCurrency, formatRelativeTime } from "@/utils/format";
 import { getRecentOrders } from "../lib/dashboard-data";
+import { DASHBOARD_RECENT_ORDERS } from "../lib/dashboard-defaults";
+import { hasOrdersSyncSettled } from "@/features/orders/lib/orders";
 import { subscribeToAdminData } from "@/apps/admin/lib/admin-data-events";
 import { useOrdersServerSync } from "@/features/orders/lib/use-orders-server-sync";
 
-export function DashboardRecentOrders() {
+export function DashboardRecentOrders({
+  initial = null,
+}: {
+  /** The newest orders, read on the server; null reads the cache as before. */
+  initial?: PlacedOrder[] | null;
+} = {}) {
   /**
    * This screen's own data, asked for NOW.
    *
@@ -27,9 +34,9 @@ export function DashboardRecentOrders() {
    * layout's later call join this read rather than repeat it — and the rest of
    * the batch still waits its turn.
    */
-  useOrdersServerSync();
+  useOrdersServerSync(!initial);
 
-  const [orders, setOrders] = useState<PlacedOrder[]>([]);
+  const [orders, setOrders] = useState<PlacedOrder[]>(initial ?? []);
   /**
    * Whether the first effect has run.
    *
@@ -39,16 +46,21 @@ export function DashboardRecentOrders() {
    * where the browser-held store is empty, and seeding from it would be a
    * hydration mismatch.
    */
-  const [loaded, setLoaded] = useState(false);
+  const [loaded, setLoaded] = useState(Boolean(initial));
 
   useEffect(() => {
     function refresh() {
-      setOrders(getRecentOrders(4));
+      // The server's newest orders stand until the cache holds the server's
+      // copy too: before that it is empty or this browser's old slice, and
+      // any other store's event would swap a true list for that.
+      if (initial && !hasOrdersSyncSettled()) return;
+      setOrders(getRecentOrders(DASHBOARD_RECENT_ORDERS));
       setLoaded(true);
     }
 
     refresh();
     return subscribeToAdminData(refresh);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
   }, []);
 
   return (
@@ -90,7 +102,12 @@ export function DashboardRecentOrders() {
                       </p>
                       <AdminOrderStatusBadge status={order.status} />
                     </div>
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {/* "4m ago" reads the clock, which moves between the
+                        server's render and hydration. */}
+                    <p
+                      className="mt-0.5 truncate text-xs text-muted-foreground"
+                      suppressHydrationWarning
+                    >
                       {order.address.fullName} · {formatRelativeTime(order.placedAt)}
                     </p>
                   </div>

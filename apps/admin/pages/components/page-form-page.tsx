@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
-import { slugify } from "@/features/products/lib/product-utils";
+import { formatStatusLabel, slugify } from "@/features/products/lib/product-utils";
 import { PhotoField } from "@/apps/admin/media/components/photo-field";
 import { resolveSaveStatus, type SaveIntent } from "@/lib/publishing/save-status";
 import { Badge } from "@/components/ui/badge";
@@ -25,11 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { routes } from "@/constants/routes";
-import {
-  AdminMobileActionBar,
-  AdminPage,
-  AdminPageHeader,
-} from "@/apps/admin/components";
+import { AdminMobileActionBar, AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import type {
   CmsPageAboutContent,
   CmsPageAboutHighlight,
@@ -901,7 +897,7 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
                 <span className="text-sm font-medium">Status</span>
                 <div className="flex items-center gap-2">
                   <Badge variant={savedStatus === "published" ? "success" : "outline"}>
-                    {savedStatus ?? "draft"}
+                    {formatStatusLabel(savedStatus ?? "draft")}
                   </Badge>
                   {mode === "edit" ? (
                     <Button

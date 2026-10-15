@@ -1,3 +1,4 @@
+import { onSiteLayoutConflict } from "@/features/site-layout/lib/site-layout-api";
 import { safeSetItem } from "@/lib/safe-storage";
 import type { FooterSettings } from "@/types/site-layout";
 import { defaultFooterSettings } from "./footer-utils";
@@ -93,6 +94,10 @@ export async function saveFooterSettings(
 export function persistServerFooter(settings: FooterSettings): void {
   persist(settings);
 }
+
+// A save refused because another device saved first puts the server's copy
+// here, so the screen shows it; see `onSiteLayoutConflict`.
+onSiteLayoutConflict("footer", persistServerFooter);
 
 /**
  * Reset goes through the same path, and that matters most here.

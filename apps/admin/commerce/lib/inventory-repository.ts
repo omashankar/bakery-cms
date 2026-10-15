@@ -41,9 +41,19 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-function emitInventoryUpdated(): void {
+/**
+ * `serverCopy`: the local cache was just overwritten with what the server
+ * already holds, so nothing on the server changed — a listener that re-reads
+ * the server (the inventory overview) can skip it.
+ */
+function emitInventoryUpdated(serverCopy = false): void {
   if (typeof window === "undefined") return;
-  window.dispatchEvent(new Event(INVENTORY_UPDATED_EVENT));
+  window.dispatchEvent(new CustomEvent(INVENTORY_UPDATED_EVENT, { detail: { serverCopy } }));
+}
+
+/** True for an update that only copied the server's state into this browser. */
+export function isServerCopyUpdate(event: Event): boolean {
+  return event instanceof CustomEvent && event.detail?.serverCopy === true;
 }
 
 export function getInventorySettings(): InventorySettings {
@@ -80,13 +90,13 @@ export async function saveInventorySettings(
 export function persistServerHistory(entries: StockHistoryEntry[]): void {
   if (typeof window === "undefined") return;
   safeSetItem(HISTORY_KEY, JSON.stringify(entries.slice(0, MAX_HISTORY)));
-  emitInventoryUpdated();
+  emitInventoryUpdated(true);
 }
 
 export function persistServerSettings(settings: InventorySettings): void {
   if (typeof window === "undefined") return;
   safeSetItem(SETTINGS_KEY, JSON.stringify(settings));
-  emitInventoryUpdated();
+  emitInventoryUpdated(true);
 }
 
 export function loadStockHistory(cakeId?: string): StockHistoryEntry[] {

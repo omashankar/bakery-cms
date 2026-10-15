@@ -1,6 +1,5 @@
 /** Authentication feature module */
 export { AuthCard } from "./components/auth-card";
-export { AuthDemoNotice } from "./components/auth-demo-notice";
 export { OtpInput } from "./components/otp-input";
 export { AuthLogoutMenuItem } from "./components/auth-logout-menu-item";
 export { LoginFormPage } from "./pages/login-form-page";

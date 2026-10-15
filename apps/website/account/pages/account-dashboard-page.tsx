@@ -4,8 +4,8 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { ChevronRight, Heart, LifeBuoy, Loader2, MapPin, Package } from "lucide-react";
-import { toast } from "sonner";
-import { AccountShell } from "@/apps/website/account/components/account-shell";
+import { toast } from "@/lib/lazy-toast";
+import { useAccountProfile } from "@/apps/website/account/components/account-context";
 import { useCustomerAuth } from "@/apps/website/account/hooks/use-customer-auth";
 import { updateCustomerProfile } from "@/apps/website/account/lib/customer-session";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,11 @@ type ProfileForm = {
   firstName: string;
   lastName: string;
   email: string;
+  phone: string;
 };
+
+/** A 10-digit Indian mobile, with or without +91 / 0 in front; blank is allowed. */
+const MOBILE = /^(?:\+?91[\s-]?|0)?[6-9]\d{9}$/;
 
 const quickLinks = [
   {
@@ -54,23 +58,32 @@ function splitName(name: string) {
 }
 
 export function AccountDashboardPage() {
-  const { session, ready } = useCustomerAuth();
-  const { register, handleSubmit, formState, reset } = useForm<ProfileForm>();
+  const { session } = useCustomerAuth();
+  // The server's answer fills the form in the first paint; the browser
+  // session takes over once it is read (after an edit, for one).
+  const profile = useAccountProfile();
+  const { register, handleSubmit, formState, reset } = useForm<ProfileForm>({
+    defaultValues: profile
+      ? { ...splitName(profile.name), email: profile.email, phone: profile.phone }
+      : undefined,
+  });
 
   useEffect(() => {
     if (!session) return;
     const { firstName, lastName } = splitName(session.name);
-    reset({ firstName, lastName, email: session.email });
+    reset({ firstName, lastName, email: session.email, phone: session.phone ?? "" });
   }, [session, reset]);
 
   const resetForm = () => {
-    if (!session) return;
-    const { firstName, lastName } = splitName(session.name);
-    reset({ firstName, lastName, email: session.email });
+    const source = session ?? profile;
+    if (!source) return;
+    const { firstName, lastName } = splitName(source.name);
+    reset({ firstName, lastName, email: source.email, phone: source.phone ?? "" });
   };
 
   const onSubmit = async (data: ProfileForm) => {
     const name = `${data.firstName} ${data.lastName}`.trim();
+    const phone = data.phone.trim();
 
     /**
      * Saved on the SERVER, and only reported when the server says so.
@@ -85,7 +98,7 @@ export function AccountDashboardPage() {
      * toast. Moving to another address now means signing in as that address and
      * proving it, which is the only version of the change that can be true.
      */
-    const updated = await updateCustomerProfile({ name });
+    const updated = await updateCustomerProfile({ name, phone });
     if (!updated) {
       toast.error("Could not update your profile", {
         description: "Please check your connection and try again.",
@@ -96,14 +109,13 @@ export function AccountDashboardPage() {
     toast.success("Profile updated");
   };
 
-  if (!ready || !session) {
-    return null;
-  }
+  // No blank wait for the browser session any more: the layout has already
+  // signed the customer in on the server, and that blank was the flash
+  // between tabs.
+  if (!session && !profile) return null;
 
   return (
-    <AccountShell
-      title="My Profile"
-    >
+    <>
       {/* Personal Information */}
       <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
         <h2 className={cn(storefrontHeading.card, "text-foreground")}>
@@ -115,11 +127,11 @@ export function AccountDashboardPage() {
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="firstName">First Name</Label>
-              <Input id="firstName" {...register("firstName", { required: true })} />
+              <Input className="h-11" id="firstName" {...register("firstName", { required: true })} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="lastName">Last Name</Label>
-              <Input id="lastName" {...register("lastName")} />
+              <Input className="h-11" id="lastName" {...register("lastName")} />
             </div>
           </div>
 
@@ -133,32 +145,51 @@ export function AccountDashboardPage() {
                 under it — My Orders emptied itself and said "No orders yet",
                 beneath a toast reading "Profile updated".
               */}
-              <Input id="email" type="email" value={session.email} readOnly disabled />
+              <Input className="h-11" id="email" type="email" value={session?.email ?? profile?.email ?? ""} readOnly disabled />
               <p className="text-xs text-muted-foreground">
                 Your orders are matched to this address. To use another one, sign in with it.
               </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Mobile Number</Label>
+              {/*
+                EDITABLE. It said "cannot be changed", but this account signs in
+                with an email and a code — the phone is a contact detail, and
+                the profile endpoint has always taken it. A customer who signed
+                up without one could never add it.
+              */}
               <Input
+                className="h-11"
                 id="phone"
                 type="tel"
-                value={session.phone ?? ""}
-                readOnly
-                disabled
-                className="cursor-not-allowed bg-cream-50 text-muted-foreground"
+                inputMode="tel"
+                autoComplete="tel"
+                placeholder="10-digit mobile number"
+                aria-invalid={formState.errors.phone ? true : undefined}
+                {...register("phone", {
+                  validate: (value) =>
+                    !value.trim() || MOBILE.test(value.replace(/\s+/g, "")) ||
+                    "Enter a 10-digit mobile number",
+                })}
               />
-              <p className="text-xs text-muted-foreground">
-                Mobile number cannot be changed
+              <p
+                className={cn(
+                  "text-xs",
+                  formState.errors.phone ? "text-destructive" : "text-muted-foreground",
+                )}
+              >
+                {formState.errors.phone?.message ?? "We call this number if a delivery needs it."}
               </p>
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 pt-2 sm:flex-row">
+          {/* Right-aligned and sized to their words on a wide screen; two
+              800px-wide buttons read as a banner, not as a form's end. */}
+          <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
             <Button
               type="button"
               variant="outline"
-              className="sm:flex-1"
+              className="h-11 sm:min-w-32"
               onClick={resetForm}
               disabled={formState.isSubmitting}
             >
@@ -167,7 +198,7 @@ export function AccountDashboardPage() {
             <Button
               type="submit"
               variant="bakery"
-              className="sm:flex-1"
+              className="h-11 sm:min-w-32"
               disabled={formState.isSubmitting}
             >
               {formState.isSubmitting ? (
@@ -207,6 +238,6 @@ export function AccountDashboardPage() {
           ))}
         </div>
       </div>
-    </AccountShell>
+    </>
   );
 }

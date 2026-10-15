@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { routes } from "@/constants/routes";
 import { storefrontHeading } from "@/constants/typography";
 import { layoutSpacing } from "@/constants/spacing";
-import { toast } from "sonner";
+import { toast } from "@/lib/lazy-toast";
 
 type TrackOrderForm = {
   orderNumber: string;
@@ -85,7 +85,7 @@ export function TrackOrderPage() {
                   <Input
                     id="orderNumber"
                     placeholder="BK-20260708-1234"
-                    className="uppercase"
+                    className="h-11 uppercase"
                     aria-invalid={!!formState.errors.orderNumber}
                     {...register("orderNumber", { required: "Order number is required" })}
                   />
@@ -98,6 +98,7 @@ export function TrackOrderPage() {
                 <div className="space-y-2">
                   <Label htmlFor="email">Email used at checkout</Label>
                   <Input
+                    className="h-11"
                     id="email"
                     type="email"
                     placeholder="you@example.com"
@@ -113,7 +114,7 @@ export function TrackOrderPage() {
                 <Button
                   type="submit"
                   variant="bakery"
-                  className="w-full"
+                  className="h-11 w-full"
                   disabled={formState.isSubmitting}
                 >
                   Track order
@@ -177,7 +178,7 @@ export function TrackOrderPage() {
                 </p>
                 <Button
                   variant="outline"
-                  className="mt-4 w-full"
+                  className="mt-4 h-10 w-full"
                   render={<Link href={routes.store.contact} />}
                 >
                   Contact support

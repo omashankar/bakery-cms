@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ChevronDown, Link2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { reportWrite } from "@/apps/admin/lib/report-write";
@@ -63,7 +63,10 @@ import type {
 import { SettingsSectionShell } from "@/apps/admin/settings/components/settings-section-shell";
 import { useHydratedForm } from "@/features/settings/lib/use-hydrated-form";
 import { siteLayoutHydration } from "@/features/site-layout/lib/site-layout-api";
-import { ensureSiteLayoutHydrated } from "@/components/shared/site-layout-server-sync";
+import {
+  applyServerSiteLayout,
+  ensureSiteLayoutHydrated,
+} from "@/components/shared/site-layout-server-sync";
 import { SettingsHydrationNotice } from "@/apps/admin/settings/components/settings-field-error";
 import {
   loadHeaderSettings,
@@ -247,18 +250,18 @@ function NavRowCard({
               the database still holds it.
             */}
             {item.badge?.trim() ? (
-              <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {item.badge}
               </span>
             ) : null}
             {item.icon ? (
-              <span className="shrink-0 text-[10px] text-muted-foreground">{item.icon}</span>
+              <span className="shrink-0 text-[11px] text-muted-foreground">{item.icon}</span>
             ) : null}
             {item.highlight ? (
-              <span className="shrink-0 text-[10px] text-muted-foreground">Highlighted</span>
+              <span className="shrink-0 text-[11px] text-muted-foreground">Highlighted</span>
             ) : null}
             {item.dividerBefore ? (
-              <span className="shrink-0 text-[10px] text-muted-foreground">Divider</span>
+              <span className="shrink-0 text-[11px] text-muted-foreground">Divider</span>
             ) : null}
           </span>
             <Button
@@ -698,7 +701,18 @@ function NavRowCard({
   );
 }
 
-export function HeaderAdminPage() {
+export function HeaderAdminPage({
+  initial = null,
+}: {
+  /** Header, footer and appearance with versions, read on the server. */
+  initial?: Parameters<typeof applyServerSiteLayout>[0] | null;
+} = {}) {
+  // Before the form's own hydration effect, so it finds the gate open and the
+  // server's copy in the cache instead of asking for all three again.
+  useLayoutEffect(() => {
+    if (initial) applyServerSiteLayout(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
+  }, []);
   // The shared hydrated form. This page hand-rolled it: a one-shot `[]`-dep
   // effect read localStorage on mount and declared the form ready in the same
   // tick. `SiteLayoutServerSync` reads the server's copy from a root-layout

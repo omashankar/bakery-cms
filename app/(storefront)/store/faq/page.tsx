@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { FaqPage } from "@/apps/website";
+import { FaqPage } from "@/apps/website/pages/faq-page";
 import { buildRouteMetadataServer } from "@/features/seo/server/seo-store.server";
 import { getContent } from "@/features/content/server/content.service";
 import { getStorefrontContact } from "@/apps/website/lib/storefront-contact.server";

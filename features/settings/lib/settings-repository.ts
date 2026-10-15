@@ -31,7 +31,8 @@ import {
 import {
   fetchFullSettings,
   fetchPublicSettings,
-  pushSection,
+  pushSectionDetailed,
+  rememberSectionVersions,
   resetSectionRequest,
   SERVER_SECTIONS,
   settingsHydration,
@@ -160,6 +161,44 @@ export async function hydrateSettingsFromServer(
   const server = full ?? (await fetchPublicSettings());
   if (!server) return false;
 
+  mergeServerSettings(server);
+
+  // Only a FULL read may open the gate: the public subset carries no
+  // smtp/security/analytics, so settling on it would still let those sections
+  // be pushed as this browser's seed.
+  if (full) settingsHydration.markSettled();
+  return Boolean(full);
+}
+
+/**
+ * The full settings the SERVER read for this admin page, applied without a
+ * request.
+ *
+ * Every settings screen waits for the hydration gate before showing its form,
+ * and the gate's opener was a browser fetch of /api/settings that only began
+ * after the admin bundle had loaded — the General screen painted its form at
+ * 6.8s on a throttled phone. The admin layout reads the same document on the
+ * server (password redacted, as the API does) and hands it here before any
+ * screen mounts, so the gate is already open when they ask.
+ */
+export function applyServerSettings(full: Partial<AppSettings> & { sectionVersions?: unknown }): void {
+  if (typeof window === "undefined") return;
+  rememberSectionVersions(full);
+  mergeServerSettings(full);
+  settingsHydration.markSettled();
+}
+
+/**
+ * The PUBLIC settings the storefront layout read with the page, applied the
+ * way `hydrateSettingsFromServer` applies a visitor's read: merged into the
+ * cache, and the gate left shut — a public read never vouches for a save.
+ */
+export function applyPublicSettings(server: Partial<AppSettings>): void {
+  if (typeof window === "undefined") return;
+  mergeServerSettings(server);
+}
+
+function mergeServerSettings(server: Partial<AppSettings>): void {
   const current = loadSettings();
   const merged = mergeAppSettings({
     ...current,
@@ -188,12 +227,6 @@ export async function hydrateSettingsFromServer(
   });
 
   saveSettings(merged);
-
-  // Only a FULL read may open the gate: the public subset carries no
-  // smtp/security/analytics, so settling on it would still let those sections
-  // be pushed as this browser's seed.
-  if (full) settingsHydration.markSettled();
-  return Boolean(full);
 }
 
 /**
@@ -302,9 +335,17 @@ async function updateStore(
     return { value: saved, persisted: false };
   }
 
+  const base = parseCache(previousRaw);
   const results = await Promise.all(
-    sections.map((key) => pushSection(key, saved[key as keyof AppSettings]))
+    sections.map(async (key) => {
+      const mine = saved[key as keyof AppSettings];
+      const outcome = await pushSectionDetailed(key, mine);
+      if (outcome !== "conflict") return outcome === "saved";
+      return mergeAndRetry(key as keyof AppSettings, base, mine);
+    })
   );
+  // A merged retry may have changed what was saved; the cache holds the truth.
+  if (results.every(Boolean)) Object.assign(saved, loadSettings());
 
   // A patch touching no server-backed section (the activity log) has nothing
   // that could fail, so it is trivially persisted.
@@ -315,6 +356,55 @@ async function updateStore(
   // admin's own typing and they must be able to retry it. Only the cache is
   // undone — that is the copy every other form reads its section from.
   return { value: saved, persisted };
+}
+
+function parseCache(raw: string | null): AppSettings | null {
+  if (!raw) return null;
+  try {
+    return mergeAppSettings(JSON.parse(raw) as Partial<AppSettings>);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Another device saved this section since this browser read it.
+ *
+ * Refusing alone was not enough: the form holds the WHOLE section, so the
+ * admin's next save would send the other device's fields back at their old
+ * values. Instead the change is rebased: read the server's section, keep every
+ * field THIS form changed (compared with what it was composed from), take the
+ * server's value for the rest, and save that once more. Two people editing
+ * different fields both keep their edit; the same field goes to the one who
+ * pressed Save last, as it would have anyway.
+ */
+async function mergeAndRetry(
+  key: keyof AppSettings,
+  base: AppSettings | null,
+  mine: AppSettings[keyof AppSettings],
+): Promise<boolean> {
+  if (!(await hydrateSettingsFromServer())) return false;
+  const theirs = loadSettings()[key];
+  const merged = rebaseSection(base?.[key], mine, theirs);
+  const outcome = await pushSectionDetailed(key, merged);
+  if (outcome !== "saved") return false;
+  saveSettings(mergeAppSettings({ ...loadSettings(), [key]: merged }));
+  return true;
+}
+
+/** Field-level three-way merge of one section; see `mergeAndRetry`. */
+export function rebaseSection<T>(base: T | undefined, mine: T, theirs: T): T {
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+  const isRecord = (v: unknown): v is Record<string, unknown> =>
+    typeof v === "object" && v !== null && !Array.isArray(v);
+  // A list (social links) or a scalar is one value: mine if I changed it.
+  if (!isRecord(mine) || !isRecord(theirs)) return base !== undefined && same(base, mine) ? theirs : mine;
+  const from: Record<string, unknown> = isRecord(base) ? base : {};
+  const out: Record<string, unknown> = { ...theirs };
+  for (const field of Object.keys(mine)) {
+    if (!same(from[field], mine[field])) out[field] = mine[field];
+  }
+  return out as T;
 }
 
 /**

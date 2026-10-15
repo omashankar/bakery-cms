@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { applyServerCommunications } from "@/apps/admin/communications/lib/use-communications-server-sync";
 import {
   CheckCircle2,
   Eye,
@@ -13,7 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { reportWrite } from "@/apps/admin/lib/report-write";
-import { AdminMobileActionBar, AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminMobileActionBar, AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
 import { EmailTemplatePreviewDialog } from "@/apps/admin/communications/components/email-template-preview-dialog";
@@ -88,7 +89,18 @@ function isEdited(
   return strip(a) !== strip(b);
 }
 
-export function EmailTemplatesAdminPage() {
+export function EmailTemplatesAdminPage({
+  initial = null,
+}: {
+  /** Templates and notification settings, read on the server; null fetches as before. */
+  initial?: Parameters<typeof applyServerCommunications>[0] | null;
+} = {}) {
+  // Before this screen's mount effect, so `ensureCommunicationsHydrated` finds
+  // every gate settled and the server's copies in the caches.
+  useLayoutEffect(() => {
+    if (initial) applyServerCommunications(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
+  }, []);
   const [mounted, setMounted] = useState(false);
   // Real hydration, not "has this component rendered". The form used to be
   // fully editable over the DEMO SEED that `loadEmailTemplates` plants when the
@@ -413,7 +425,7 @@ export function EmailTemplatesAdminPage() {
             <Button variant="bakery" className="w-full sm:w-auto" onClick={() => void handleCreate()} disabled={hydration !== "ready"}>
               <Plus className="size-4" />
               <span className="sm:hidden">New</span>
-              <span className="hidden sm:inline">New template</span>
+              <span className="hidden sm:inline">New Template</span>
             </Button>
           </div>
         }
@@ -708,6 +720,10 @@ export function EmailTemplatesAdminPage() {
                         <option value="active">Active</option>
                         <option value="draft">Draft</option>
                       </AdminSelect>
+                      <p className="text-xs text-muted-foreground">
+                        Draft keeps your wording off customers while you work on it. The email
+                        still goes out, in the built-in wording.
+                      </p>
                     </div>
                   </div>
 

@@ -24,7 +24,7 @@ export interface CartIssue {
 
 export function validateCartAgainstCatalog(
   items: CartLineItem[],
-  catalog: LandingProduct[]
+  catalog: Pick<LandingProduct, "slug" | "inStock">[]
 ): CartIssue[] {
   const bySlug = new Map(catalog.map((product) => [product.slug, product]));
   const issues: CartIssue[] = [];

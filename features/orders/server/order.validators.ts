@@ -250,6 +250,11 @@ export const deliveryPartnerSchema = z.object({
 
 export const refundNotesSchema = z.object({ notes: z.string() });
 
+/** Saying no to a requested refund — why, for the record and the timeline. */
+export const declineRefundSchema = z.object({
+  reason: z.string().trim().max(300).optional(),
+});
+
 export const refundRequestSchema = z.object({
   reason: z.enum(REFUND_REASONS).optional(),
   reasonDetail: z.string().optional(),

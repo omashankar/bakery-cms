@@ -2,6 +2,8 @@ import { LandingFooter } from "@/apps/website/landing/components/landing-footer"
 import { MaintenanceBanner } from "@/apps/website/components/maintenance-banner";
 import { StorefrontBannerStrip } from "@/apps/website/components/storefront-banner-strip";
 import { StorefrontNavbar } from "@/apps/website/components/storefront-navbar";
+import { FocusedCheckoutHeader } from "@/apps/website/components/focused-checkout-header";
+import { StorefrontFooterSlot, StorefrontTopBar } from "@/apps/website/components/storefront-top-bar";
 import type { StorefrontChrome } from "@/apps/website/lib/storefront-chrome.server";
 import type { MaintenanceState } from "@/features/settings/server/maintenance.server";
 import { AppearanceStyleTag } from "@/components/shared/appearance-style-tag";
@@ -99,8 +101,26 @@ export function StorefrontLayoutShell({
         {/* The same banners the homepage's Promo Banner section draws, above
             the header instead. A shop that wants them in one place only can
             switch this off; see HeaderSettings.showBannerStrip. */}
-        {chrome.showBannerStrip ? <StorefrontBannerStrip live={bannerStrip} /> : null}
-        <StorefrontNavbar chrome={chrome} />
+        {/*
+          On the cart and checkout, only the logo and "Secure checkout" — no
+          offer strip, menu or search to wander off through, as the owner's
+          reference does it. Everywhere else, the full header.
+        */}
+        <StorefrontTopBar
+          focused={
+            <FocusedCheckoutHeader
+              logo={chrome.logo}
+              logoLetter={chrome.logoLetter}
+              siteName={chrome.siteName}
+            />
+          }
+          full={
+            <>
+              {chrome.showBannerStrip ? <StorefrontBannerStrip live={bannerStrip} /> : null}
+              <StorefrontNavbar chrome={chrome} />
+            </>
+          }
+        />
       </div>
       {/*
         A FLOOR UNDER main, SO THE FOOTER IS NOT ON SCREEN WHILE THE PAGE
@@ -145,7 +165,7 @@ export function StorefrontLayoutShell({
       */}
       <main className="min-h-svh flex-1 print:min-h-0">{children}</main>
       <div className="print:hidden">
-        <LandingFooter chrome={chrome} />
+        <StorefrontFooterSlot full={<LandingFooter chrome={chrome} />} siteName={chrome.siteName} />
       </div>
     </div>
   );

@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
-import { openCustomerAuthModal } from "@/apps/website/account/components/customer-auth-modal";
+import { openCustomerAuthModal } from "@/apps/website/account/lib/auth-modal-events";
 import { useHoverMenu } from "@/apps/website/account/hooks/use-hover-menu";
 
 interface GuestLink {
@@ -27,8 +27,9 @@ const guestLinks: GuestLink[] = [
   { label: "Help & Support", icon: LifeBuoy, href: routes.store.contact },
 ];
 
-export function GuestMenu() {
-  const { open, setOpen, hoverProps } = useHoverMenu();
+/** `initialOpen`: mounted by the lazy loader on the hover that asked for it. */
+export function GuestMenu({ initialOpen = false }: { initialOpen?: boolean } = {}) {
+  const { open, setOpen, hoverProps } = useHoverMenu(150, initialOpen);
 
   const login = () => {
     setOpen(false);

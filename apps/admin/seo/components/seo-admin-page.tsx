@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import {
   ExternalLink,
   FileText,
@@ -37,11 +37,14 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { formatRelativeTime } from "@/utils/format";
 import type { GlobalSeoSettings, SeoRouteEntry } from "@/types/seo";
-import { adminShell } from "@/apps/admin/components";
+import { adminShell } from "@/apps/admin/components/admin-shell";
 import { SettingsSectionShell } from "@/apps/admin/settings/components/settings-section-shell";
 import { useHydratedForm } from "@/features/settings/lib/use-hydrated-form";
 import { seoHydration } from "@/features/site-layout/lib/site-layout-api";
-import { ensureSeoHydrated } from "@/features/site-layout/lib/site-layout-hydration";
+import {
+  applyServerSeo,
+  ensureSeoHydrated,
+} from "@/features/site-layout/lib/site-layout-hydration";
 import { SettingsHydrationNotice } from "@/apps/admin/settings/components/settings-field-error";
 import {
   loadSeoStore,
@@ -125,7 +128,17 @@ function SeoRowActions({
   );
 }
 
-export function SeoAdminPage() {
+export function SeoAdminPage({
+  initial = null,
+}: {
+  /** The SEO store and its version, read on the server; null fetches as before. */
+  initial?: Parameters<typeof applyServerSeo>[0] | null;
+} = {}) {
+  // Before the form's own hydration effect, so it finds the gate open.
+  useLayoutEffect(() => {
+    if (initial) applyServerSeo(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
+  }, []);
   // A real hydration state, not a "has this component mounted" flag.
   //
   // `mounted` flipped true in the same synchronous tick as the localStorage
@@ -699,7 +712,7 @@ export function SeoAdminPage() {
                   <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                     {entry.metaDescription}
                   </p>
-                  <p className="mt-2 text-[10px] text-muted-foreground">
+                  <p className="mt-2 text-[11px] text-muted-foreground">
                     {formatRelativeTime(entry.updatedAt)}
                   </p>
                 </li>

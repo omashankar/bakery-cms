@@ -114,6 +114,7 @@ const commerceSchema = new mongoose.Schema(
     platformChargeAmount: { type: Number, default: 0 },
     useZoneBasedDelivery: { type: Boolean, default: false },
     zoneFallbackDeliveryFee: { type: Number, default: 0 },
+    deliverOutsideZones: { type: Boolean, default: true },
     deliveryLeadDays: { type: Number, default: 1 },
     estimatedDeliveryDays: { type: Number, default: 1 },
     deliveryTimeSlots: { type: [String], default: [] },
@@ -150,6 +151,7 @@ const commerceSchema = new mongoose.Schema(
     deliveryInformation: { type: String, default: "" },
     productTrustCards: { type: [mongoose.Schema.Types.Mixed], default: [] },
     checkoutTerms: { type: String, default: "" },
+    cancellationPolicyText: { type: String },
     giftWrapEnabled: { type: Boolean, default: false },
     giftWrapFee: { type: Number, default: 0 },
     giftWrapLabel: { type: String, default: "" },
@@ -195,6 +197,16 @@ const settingsSchema = new mongoose.Schema({
   modules: { type: modulesSchema, default: () => ({}) },
   // Admin-customised white-label wording, e.g. { productWord: "Bouquet" }.
   labelOverrides: { type: mongoose.Schema.Types.Mixed, default: {} },
+  /**
+   * One counter per section, bumped by every save of that section.
+   *
+   * A section save is a whole-section replace built from a browser cache, so a
+   * tab left open since morning saved its morning commerce section over the
+   * delivery fee changed at noon on a phone. A save now names the version it
+   * was composed against and a stale one is refused (409); see
+   * `updateSection`.
+   */
+  sectionVersions: { type: mongoose.Schema.Types.Mixed, default: {} },
 });
 
 applyBaseTransform(settingsSchema);

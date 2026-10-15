@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { hydrateOnce } from "@/lib/hydrate-once";
+import { hydrateOnce, markHydrated } from "@/lib/hydrate-once";
+import type { Inquiry } from "@/types/inquiry";
 
 import { fetchInquiries } from "./inquiries-api";
 import { persistServerInquiries } from "./inquiries-repository";
@@ -16,6 +17,16 @@ import { persistServerInquiries } from "./inquiries-repository";
  * `useIdle(1000)` deferral. `hydrateOnce` makes the layout's later call join
  * this read rather than issue another.
  */
+/**
+ * The enquiries the SERVER read for this page, applied without a request. The
+ * sidebar's "new" badge, the bell and the Inquiries screens all read this
+ * cache, and every admin page fetched it behind the shell.
+ */
+export function applyServerInquiries(inquiries: Inquiry[]): void {
+  persistServerInquiries(inquiries);
+  markHydrated("inquiries");
+}
+
 export function useInquiriesServerSync(): void {
   useEffect(() => {
     void hydrateOnce("inquiries", async () => {

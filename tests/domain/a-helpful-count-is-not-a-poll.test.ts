@@ -13,6 +13,7 @@ import { describe, expect, it, vi } from "vitest";
 
 const repo = vi.hoisted(() => ({
   incrementHelpful: vi.fn<(id: string) => Promise<number | null>>(),
+  incrementUnhelpful: vi.fn<(id: string) => Promise<number | null>>(),
 }));
 
 vi.mock("@/features/reviews/server/review.repository", () => repo);
@@ -25,7 +26,7 @@ vi.mock("@/lib/server/audit/audit-log", () => ({
   requestContext: () => ({ ip: "1.1.1.1", userAgent: "test" }),
 }));
 
-const { markReviewHelpful } = await import("@/features/reviews/server/review.service");
+const { markReviewHelpful, markReviewUnhelpful } = await import("@/features/reviews/server/review.service");
 
 describe("counting a reader who found a review helpful", () => {
   it("returns the count the database settled on", async () => {
@@ -53,5 +54,22 @@ describe("counting a reader who found a review helpful", () => {
     repo.incrementHelpful.mockResolvedValue(0);
 
     await expect(markReviewHelpful("review-1")).resolves.toEqual({ helpfulCount: 0 });
+  });
+});
+
+describe("counting a reader who found a review NOT helpful", () => {
+  it("returns the count the database settled on, from its own counter", async () => {
+    repo.incrementUnhelpful.mockResolvedValue(2);
+    repo.incrementHelpful.mockClear();
+
+    await expect(markReviewUnhelpful("review-1")).resolves.toEqual({ unhelpfulCount: 2 });
+    expect(repo.incrementUnhelpful).toHaveBeenCalledWith("review-1");
+    expect(repo.incrementHelpful).not.toHaveBeenCalled();
+  });
+
+  it("refuses anything the repository would not count, the same way", async () => {
+    repo.incrementUnhelpful.mockResolvedValue(null);
+
+    await expect(markReviewUnhelpful("review-pending")).rejects.toThrow(/not found/i);
   });
 });

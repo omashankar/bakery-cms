@@ -102,20 +102,19 @@ describe.each([
   });
 });
 
-/** The seed itself still belongs to the server, once per shop. */
-describe("the server owns the demo seed", () => {
+/**
+ * And the server does not seed them either.
+ *
+ * It used to, once per shop, behind a flag: 15 subscribers at email.com (a real
+ * provider) and 12 invented enquiries, written to a real shop's database on the
+ * first admin read. "Copy emails" then put strangers into the shop's campaign.
+ */
+describe("the server seeds no demo leads", () => {
   it.each([
-    ["features/inquiries/server/inquiry.service.ts", "inquiries-seeded"],
-    ["features/newsletter/server/newsletter.service.ts", "newsletter-seeded"],
-  ])("%s guards its seed with a flag it actually READS", (file, key) => {
+    "features/inquiries/server/inquiry.service.ts",
+    "features/newsletter/server/newsletter.service.ts",
+  ])("%s inserts nothing on read", (file) => {
     const source = read(file);
-    expect(source).toContain(`key: "${key}"`);
-
-    // The READ, not just the use. `toContain("flag.done")` passes against
-    // `const flag = { done: false }` — the guard is still written, and never
-    // true, so every request re-seeds.
-    expect(source).toMatch(/const flag = await seededFlag\.read\(\);/);
-    expect(source).toMatch(/if \(flag\.done\) return;/);
-    expect(source).toContain("seededFlag.write({ done: true })");
+    expect(source).not.toMatch(/seedIfEmpty|seedInquiries|seedSubscribers|ensureSeeded/);
   });
 });

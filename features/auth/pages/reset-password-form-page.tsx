@@ -5,9 +5,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/lazy-toast";
 import { AuthCard } from "@/features/auth/components/auth-card";
-import { AuthDemoNotice } from "@/features/auth/components/auth-demo-notice";
 import { clearResetFlow, getResetFlow } from "@/features/auth/lib/reset-flow";
 import { resetPasswordRequest } from "@/features/auth/lib/auth-api";
 import { Button } from "@/components/ui/button";
@@ -151,8 +150,6 @@ export function ResetPasswordFormPage() {
           {formState.isSubmitting ? "Updating…" : "Update password"}
         </Button>
       </form>
-
-      <AuthDemoNotice />
     </AuthCard>
   );
 }

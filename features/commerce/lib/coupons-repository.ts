@@ -1,6 +1,6 @@
 import { safeSetItem } from "@/lib/safe-storage";
 import { specialOffers } from "@/constants/landing-data";
-import { couponsHydration, replaceCouponsRequest } from "./commerce-api";
+import { couponsHydration, fetchCoupons, replaceCouponsRequest } from "./commerce-api";
 import { hasExpired } from "@/lib/expiry-date";
 import type { WriteResult } from "@/lib/write-result";
 
@@ -23,6 +23,8 @@ export interface StoredCoupon {
   isActive: boolean;
   usageCount: number;
   createdAt: string;
+  /** When this coupon was last edited; the server keeps a newer copy than a stale save. */
+  updatedAt?: string;
   expiresAt?: string;
   /** The categories it applies to; empty or absent means the whole shop. */
   categoryIds?: string[];
@@ -177,6 +179,13 @@ async function writeCoupons(
 
   lowWriteCoupons(coupons);
   const accepted = await replaceCouponsRequest(coupons, knownIds);
+  // The server keeps a stored row newer than this tab's copy (see `isStaleCopy`),
+  // so after a save the cache is refreshed: a coupon changed on another device
+  // shows its real state here instead of this tab's old one.
+  if (accepted) {
+    const fresh = await fetchCoupons();
+    if (Array.isArray(fresh)) persistServerCoupons(fresh);
+  }
 
   /**
    * Roll back a write the server refused.
@@ -211,6 +220,15 @@ export function persistServerCoupons(coupons: StoredCoupon[]): void {
   lowWriteCoupons(coupons);
 }
 
+/**
+ * The coupons the SERVER read for an admin page — every code, as staff see
+ * them — applied without a request: the cache, then the gate a save waits on.
+ */
+export function applyServerCoupons(coupons: StoredCoupon[]): void {
+  persistServerCoupons(coupons);
+  couponsHydration.markSettled();
+}
+
 export function loadCoupons(): StoredCoupon[] {
   return readCoupons();
 }
@@ -238,6 +256,7 @@ export async function createCoupon(
     code: input.code.trim().toUpperCase(),
     usageCount: 0,
     createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
 
   const coupons = await readHydratedCoupons();
@@ -270,6 +289,7 @@ export async function updateCoupon(
     ...coupons[index],
     ...patch,
     code: nextCode ?? coupons[index].code,
+    updatedAt: new Date().toISOString(),
   };
 
   const knownIds = coupons.map((item) => item.id);
@@ -297,7 +317,11 @@ export async function toggleCouponActive(
   if (index === -1) return { value: null, persisted: false };
 
   const knownIds = coupons.map((item) => item.id);
-  coupons[index] = { ...coupons[index], isActive: !coupons[index].isActive };
+  coupons[index] = {
+    ...coupons[index],
+    isActive: !coupons[index].isActive,
+    updatedAt: new Date().toISOString(),
+  };
   return { value: coupons[index], persisted: await writeCoupons(coupons, knownIds) };
 }
 

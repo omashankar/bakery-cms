@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Loader2, Tag as TagIcon } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/lazy-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -102,9 +102,9 @@ export function CouponInput({
           value={code}
           onChange={(event) => setCode(event.target.value.toUpperCase())}
           placeholder="Coupon code"
-          className="uppercase"
+          className="h-11 uppercase"
         />
-        <Button type="button" variant="outline" onClick={handleApply} disabled={loading}>
+        <Button type="button" variant="outline" className="h-11" onClick={handleApply} disabled={loading}>
           {loading ? <Loader2 className="size-4 animate-spin" /> : "Apply"}
         </Button>
       </div>

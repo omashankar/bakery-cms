@@ -440,6 +440,7 @@ export function PhotoPrintEditor({
               <div className="space-y-2">
                 <Label htmlFor="print-name">Write a name to print on it</Label>
                 <Input
+                  className="h-11"
                   id="print-name"
                   value={draft.name}
                   maxLength={NAME_LIMIT}

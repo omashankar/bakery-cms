@@ -8,24 +8,26 @@ import {
   Pencil,
   ShieldCheck,
   ShoppingBag,
-  Tag,
   Trash2,
   Truck,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/lazy-toast";
 import {
   DELIVERY_LOCATION_UPDATED_EVENT,
   readDeliveryLocation,
 } from "@/features/commerce/lib/delivery-location";
 import { EmptyState } from "@/components/shared/empty-state";
+import { OptimizedImage } from "@/components/shared/optimized-image";
+import { EarliestDelivery } from "@/components/storefront/earliest-delivery";
+import { PincodeCheck } from "@/components/storefront/pincode-check";
 import { QuantityStepper } from "@/components/shared/quantity-stepper";
 import { FrameThumbnail } from "@/components/storefront/frame-thumbnail";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { CheckoutProgress } from "@/apps/website/checkout/components/checkout-progress";
-import { CouponInput } from "@/apps/website/checkout/components/coupon-input";
+import { CartCouponPanel } from "@/apps/website/checkout/components/cart-coupon-panel";
+import { publishCheckoutStep } from "@/apps/website/checkout/lib/checkout-step-store";
 import { applyCouponCode, type AppliedCoupon } from "@/features/orders/lib/coupons";
 import { offersForCart } from "@/features/commerce/lib/coupon-offers";
 import {
@@ -42,7 +44,6 @@ import {
   type CartIssue,
 } from "@/features/orders/lib/cart-validation";
 import { ProductRailSection } from "@/apps/website/components/product-rail-section";
-import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import {
   getCommerceSettings,
@@ -73,7 +74,7 @@ import {
 import { getRecentlyViewedProducts } from "@/features/products/lib/recently-viewed";
 import { addToWishlist } from "@/apps/website/lib/wishlist";
 import { hasCustomerSession } from "@/apps/website/account/lib/customer-session";
-import { openCustomerAuthModal } from "@/apps/website/account/components/customer-auth-modal";
+import { openCustomerAuthModal } from "@/apps/website/account/lib/auth-modal-events";
 import { routes } from "@/constants/routes";
 import { storefrontHeading } from "@/constants/typography";
 import { layoutSpacing } from "@/constants/spacing";
@@ -269,6 +270,12 @@ export function CartPage({ catalog = [] }: CartPageProps) {
    * page’s own trust rows were rewritten to that standard after one of them
    * printed a fallback as a fact under every product in the shop.
    */
+  // The header draws the steps; over an EMPTY cart it should draw none.
+  useEffect(() => {
+    publishCheckoutStep(loaded && items.length === 0 ? { step: 0, hidden: true } : { step: 0 });
+  }, [loaded, items.length]);
+  useEffect(() => () => publishCheckoutStep(null), []);
+
   const promise = loaded ? getDeliveryPromise() : "";
   const freeDeliveryOver = loaded ? getFreeDeliveryThreshold() : 0;
 
@@ -356,10 +363,13 @@ export function CartPage({ catalog = [] }: CartPageProps) {
 
   return (
     <>
-      <StorePageHeader
-        title={itemCount > 0 ? `Shopping Cart (${itemCount})` : "Shopping Cart"}
-        breadcrumbs={[{ label: "Cart" }]}
-      />
+      {/*
+        No breadcrumb: the focused header has the way home and the reference
+        opens its cart on the heading. The visible h1 sits beside the steps
+        once there are lines; until then (loading, or empty) this one is for
+        screen readers only, so nothing appears and then vanishes.
+      */}
+      {itemCount > 0 ? null : <h1 className="sr-only">Shopping Cart</h1>}
 
       {/* `pb-24` on a phone: the sticky checkout bar sits over the last of it. */}
       <section className={cn(layoutSpacing.sectionY, "pb-28 lg:pb-16")}>
@@ -425,39 +435,100 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                 Only here, never in the empty branch: a progress bar over an
                 empty cart implies a checkout that is not happening.
               */}
-              <CheckoutProgress currentStep={0} className="mx-auto max-w-2xl" />
+              {/*
+                The steps are in the header now, as the reference has them;
+                the page opens on its own heading.
+              */}
+              <h1 className="font-heading text-xl font-bold tracking-tight">
+                Shopping Cart ({itemCount})
+              </h1>
 
               <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
               <div className="order-1 space-y-6 lg:order-none lg:col-start-1">
+                {/*
+                  WHERE IT IS GOING, before anything else — the reference's
+                  "Deliver to 324001 / Change pincode" bar. The same check as
+                  the product page, so a customer outside every zone finds
+                  out here and not at the address step.
+                */}
+                <PincodeCheck
+                  inline
+                  title="Enter delivery PIN code:"
+                  className="rounded-xl border border-border bg-card px-4 py-3"
+                />
                 <div className="space-y-4">
                   {items.map((item) => (
-                    <div
-                      key={item.id}
-                      className="rounded-xl border border-border bg-card p-4"
-                    >
-                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="flex min-w-0 gap-4">
-                          <Link
-                            href={routes.store.cake(item.productSlug)}
-                            className="size-20 shrink-0 overflow-hidden rounded-lg border border-border bg-cream-100"
-                          >
-                            {item.image ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={item.image}
-                                alt={item.name}
-                                className="size-full object-cover"
-                                loading="lazy"
-                              />
-                            ) : null}
-                          </Link>
-                          <div className="min-w-0 space-y-1">
-                          <Link
-                            href={routes.store.cake(item.productSlug)}
-                            className="font-medium hover:text-bakery-700"
-                          >
-                            {item.name}
-                          </Link>
+                    /*
+                      LAID OUT LIKE THE REFERENCE'S CART LINE: a picture large
+                      enough to recognise, the name with the price level with
+                      it on the right, the choices under the name, and the
+                      quantity and the actions along the bottom as quiet links.
+                      It was an 80px thumbnail, the price floating mid-row, and
+                      a second ruled row of three outlined buttons — the
+                      heaviest thing on the line was the least-used.
+                    */
+                    <div key={item.id} className="rounded-xl border border-border bg-card p-3 sm:p-4">
+                      <div className="flex gap-3 sm:gap-4">
+                        <Link
+                          href={routes.store.cake(item.productSlug)}
+                          className="size-24 shrink-0 overflow-hidden rounded-lg border border-border bg-cream-100 sm:size-32"
+                        >
+                          {item.image ? (
+                            // At the box's size: a raw <img> fetched the
+                            // 600px product photo for a thumbnail.
+                            <OptimizedImage
+                              src={item.image}
+                              alt={item.name}
+                              width={128}
+                              height={128}
+                              sizes="128px"
+                              className="size-full object-cover"
+                            />
+                          ) : null}
+                        </Link>
+                        <div className="flex min-w-0 flex-1 flex-col gap-1">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <Link
+                                href={routes.store.cake(item.productSlug)}
+                                className="line-clamp-2 font-medium hover:text-bakery-700 sm:text-base"
+                              >
+                                {item.name}
+                              </Link>
+                              {/* The reference's "Estimated Delivery: Today", per line. */}
+                              <p className="text-xs text-muted-foreground">
+                                <EarliestDelivery />
+                              </p>
+                            </div>
+                            <div className="shrink-0 text-right">
+                              <p className="font-semibold sm:text-lg">
+                                {formatCurrency(item.price * item.quantity)}
+                              </p>
+                              {/*
+                                The shop's own compare-at, stamped on the line
+                                when it was added — the cart holds lines rather
+                                than products, and the catalogue it is handed
+                                carries a price already shifted by every default
+                                option, so recomputing here would strike a
+                                different number from the one the customer saw.
+                              */}
+                              {item.compareAtPrice && item.compareAtPrice > item.price ? (
+                                <p className="text-xs text-muted-foreground">
+                                  <span className="line-through">
+                                    {formatCurrency(item.compareAtPrice * item.quantity)}
+                                  </span>{" "}
+                                  <span className="font-medium text-green-700">
+                                    ({Math.round((1 - item.price / item.compareAtPrice) * 100)}% off)
+                                  </span>
+                                </p>
+                              ) : null}
+                              {item.quantity > 1 ? (
+                                <p className="text-xs text-muted-foreground">
+                                  {formatCurrency(item.price)} each
+                                </p>
+                              ) : null}
+                            </div>
+                          </div>
                           {/*
                             One list, so this cannot drift from the invoice
                             again — laid out as a grid rather than joined
@@ -524,91 +595,53 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                               {issuesBySlug.get(item.productSlug)?.message}
                             </p>
                           ) : null}
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap items-center justify-between gap-3 sm:justify-end sm:gap-4">
-                          <QuantityStepper
-                            value={item.quantity}
-                            onChange={(value) => updateCartItemQuantity(item.id, value)}
-                          />
-                          <div className="sm:min-w-28 sm:text-right">
-                            <p className="font-semibold">
-                              {formatCurrency(item.price * item.quantity)}
-                            </p>
-                            {/*
-                              The shop’s own compare-at, stamped on the line when
-                              it was added — the cart holds lines rather than
-                              products, and the catalogue it is handed carries a
-                              price already shifted by every default option, so
-                              recomputing here would strike a different number
-                              from the one the customer was shown.
-                            */}
-                            {item.compareAtPrice && item.compareAtPrice > item.price ? (
-                              <p className="text-xs text-muted-foreground">
-                                <span className="line-through">
-                                  {formatCurrency(item.compareAtPrice * item.quantity)}
-                                </span>{" "}
-                                <span className="font-medium text-bakery-700">
-                                  {Math.round((1 - item.price / item.compareAtPrice) * 100)}% off
-                                </span>
-                              </p>
-                            ) : null}
-                            {item.quantity > 1 ? (
-                              <p className="text-xs text-muted-foreground">
-                                {formatCurrency(item.price)} each
-                              </p>
-                            ) : null}
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => handleRemoveItem(item)}
-                            aria-label="Remove item"
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
-                        {/*
-                          Back to the product page with THIS line’s choices
-                          already made, and adding again replaces it rather than
-                          leaving a near-identical second line behind —
-                          `cartLineId` folds the choices into a line’s identity,
-                          so changing one necessarily makes a new line.
-                        */}
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          render={
-                            <Link
-                              href={`${routes.store.cake(item.productSlug)}?line=${encodeURIComponent(item.id)}`}
+                          <div className="mt-auto flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pt-2">
+                            <QuantityStepper
+                              value={item.quantity}
+                              onChange={(value) => updateCartItemQuantity(item.id, value)}
                             />
-                          }
-                        >
-                          <Pencil className="size-4" />
-                          Edit
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleSaveForLater(item)}
-                        >
-                          <Bookmark className="size-4" />
-                          Save for later
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleMoveToWishlist(item)}
-                        >
-                          <Heart className="size-4" />
-                          Move to wishlist
-                        </Button>
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                              {/*
+                                Back to the product page with THIS line's
+                                choices already made, and adding again replaces
+                                it rather than leaving a near-identical second
+                                line behind.
+                              */}
+                              <Link
+                                href={`${routes.store.cake(item.productSlug)}?line=${encodeURIComponent(item.id)}`}
+                                className="inline-flex items-center gap-1 py-1 text-sm font-medium text-bakery-700 hover:underline"
+                              >
+                                <Pencil className="size-3.5" aria-hidden />
+                                Edit
+                              </Link>
+                              <button
+                                type="button"
+                                onClick={() => handleSaveForLater(item)}
+                                className="inline-flex items-center gap-1 py-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                              >
+                                <Bookmark className="size-3.5" aria-hidden />
+                                Save for later
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleMoveToWishlist(item)}
+                                className="inline-flex items-center gap-1 py-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                              >
+                                <Heart className="size-3.5" aria-hidden />
+                                Move to wishlist
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveItem(item)}
+                                aria-label="Remove item"
+                                className="inline-flex items-center gap-1 py-1 text-sm font-medium text-muted-foreground transition-colors hover:text-destructive"
+                              >
+                                <Trash2 className="size-3.5" aria-hidden />
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -625,29 +658,6 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                   Nothing renders when the shop has no live coupons, which is
                   every install until an owner switches one on.
                 */}
-                {offers.length > 0 ? (
-                  <div className="rounded-xl border border-dashed border-bakery-300 bg-card p-4">
-                    <p className="flex items-center gap-2 text-sm font-semibold text-bakery-700">
-                      <Tag className="size-4" />
-                      Offers you can use
-                    </p>
-                    <ul className="mt-2 space-y-1.5 text-sm text-muted-foreground">
-                      {offers.map((offer) => (
-                        <li key={offer.code} className="flex gap-2">
-                          <span aria-hidden className="text-bakery-700">•</span>
-                          <span>
-                            <span className="font-medium text-foreground">{offer.code}</span>{" "}
-                            — {offer.label}
-                            {offer.shortfall > 0
-                              ? ` · add ${formatCurrency(offer.shortfall)} more to use it`
-                              : ""}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-
                 <div className="rounded-xl border border-border bg-cream-50 p-4">
                   <p className="text-sm font-medium">Order extras</p>
                   {commerce.giftWrapEnabled ? (
@@ -703,20 +713,20 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                   A coupon box of its own here would be a second coupon system
                   on the one screen where the customer decides what to pay.
                 */}
-                <div className="rounded-xl border border-border bg-card p-4">
-                  <p className="mb-3 text-sm font-medium">Have a coupon?</p>
-                  <CouponInput
-                    cart={couponLines}
-                    applied={coupon}
-                    lapsedReason={couponLapsedReason}
-                    onApply={applyCoupon}
-                    onRemove={() => applyCoupon(undefined)}
-                  />
-                </div>
+                <CartCouponPanel
+                  cart={couponLines}
+                  applied={coupon}
+                  lapsedReason={couponLapsedReason}
+                  offers={offers}
+                  onApply={applyCoupon}
+                  onRemove={() => applyCoupon(undefined)}
+                />
                 <OrderSummaryPanel
                   items={items}
                   totals={totals}
                   showEditLink={false}
+                  showItems={false}
+                  discountLabel={validCoupon ? `Coupon (${validCoupon.code})` : undefined}
                   giftWrapLabel={commerce.giftWrapLabel}
                 />
                 {/*
@@ -725,9 +735,9 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                   the past that nobody made — the same rule that had an invented
                   MRP taken out of the repository.
                 */}
-                {savings > 0 ? (
-                  <p className="text-center text-sm font-medium text-bakery-700">
-                    You save {formatCurrency(savings)} on this order
+                {savings + (totals.discount ?? 0) > 0 ? (
+                  <p className="text-center text-sm font-semibold text-green-700">
+                    You save {formatCurrency(savings + (totals.discount ?? 0))} on this order
                   </p>
                 ) : null}
                 {/*
@@ -773,17 +783,19 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                   totals apply. Neither is here when it has not been set.
                 */}
                 {promise || freeDeliveryOver > 0 ? (
-                  <ul className="space-y-2 rounded-xl border border-border bg-cream-50 p-3 text-xs text-muted-foreground">
+                  // Side by side, icon beside two short lines — the reference's
+                  // row under its summary — not a small boxed list.
+                  <ul className="grid grid-cols-2 gap-3 px-1 text-xs text-muted-foreground">
                     {promise ? (
-                      <li className="flex items-start gap-2">
-                        <Truck className="mt-0.5 size-3.5 shrink-0 text-bakery-700" />
-                        <span>{promise}</span>
+                      <li className="flex items-center gap-2">
+                        <Truck className="size-6 shrink-0 text-bakery-700" strokeWidth={1.5} />
+                        <span className="leading-tight">{promise}</span>
                       </li>
                     ) : null}
                     {freeDeliveryOver > 0 ? (
-                      <li className="flex items-start gap-2">
-                        <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-bakery-700" />
-                        <span>
+                      <li className="flex items-center gap-2">
+                        <ShieldCheck className="size-6 shrink-0 text-bakery-700" strokeWidth={1.5} />
+                        <span className="leading-tight">
                           Free delivery on orders over {formatCurrency(freeDeliveryOver)}
                         </span>
                       </li>
@@ -816,7 +828,7 @@ export function CartPage({ catalog = [] }: CartPageProps) {
               <p className="font-semibold">{formatCurrency(totals.total)}</p>
               {savings > 0 ? (
                 <p className="truncate text-xs font-medium text-bakery-700">
-                  You save {formatCurrency(savings)}
+                  You save {formatCurrency(savings + (totals.discount ?? 0))}
                 </p>
               ) : null}
             </div>

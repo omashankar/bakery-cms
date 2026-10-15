@@ -159,13 +159,19 @@ describe("revenue trend bucketing", () => {
     expect(charted).toBe(260);
   });
 
-  it("keeps the 12m window a full 12 months on a month-end day", () => {
-    // Subtracting 11 months from 31 March lands on a day April does not have;
-    // the date used to roll forward to 1 May, silently shortening the window.
+  it("keeps the 12m window twelve months, from the 1st of the first one", () => {
+    // It opened on today's day eleven months back — eleven months, and a first
+    // bar missing the start of its month.
     const mar31 = Date.parse("2026-03-31T12:00:00.000Z");
-
-    expect(getRangeStart("12m", "UTC", mar31)?.toISOString().slice(0, 10)).toBe("2025-04-30");
+    expect(getRangeStart("12m", "UTC", mar31)?.toISOString().slice(0, 10)).toBe("2025-04-01");
     expect(getRevenueTrend([], "12m", "UTC", mar31)).toHaveLength(12);
+
+    const oct5 = Date.parse("2026-10-05T12:00:00.000Z");
+    expect(getRangeStart("12m", "UTC", oct5)?.toISOString().slice(0, 10)).toBe("2025-11-01");
+    // An order on 2 November 2025 is inside "Last 12 months" on 5 October.
+    const nov2 = order({ placedAt: "2025-11-02T10:00:00.000Z" });
+    const charted = getRevenueTrend([nov2], "12m", "UTC", oct5).reduce((s, p) => s + p.orders, 0);
+    expect(charted).toBe(1);
   });
 
   it("excludes cancelled and refunded revenue but still counts the order", () => {
@@ -396,6 +402,28 @@ describe("partial refunds come off revenue", () => {
     expect(product.quantity).toBe(2);
   });
 
+  it("top products ignore a refund that has not settled, like the summary does", () => {
+    // A gateway refund still pending moved no money. The summary kept the
+    // order's revenue while Top Products already showed the cake at a loss.
+    const pending = order({
+      refundRecord: {
+        status: "processing",
+        reason: "customer_request",
+        amount: 100,
+        history: [],
+        gatewayRefunds: [{ id: "rfnd_1", amount: 100, status: "pending" }],
+      },
+    } as unknown as Partial<PlacedOrder>);
+    const [product] = getTopProducts([pending]);
+    expect(product.revenue).toBe(200);
+    expect(getReportsSummary([pending]).revenue).toBe(260);
+  });
+
+  it("the payment mix names an online payment, not a gateway key", () => {
+    const [row] = getPaymentBreakdown([order({ paymentMethod: "razorpay" } as Partial<PlacedOrder>)]);
+    expect(row.label).toBe("Online (Razorpay)");
+  });
+
   it("an unrefunded order's products stay at their gross", () => {
     const [product] = getTopProducts([order()]);
     expect(product.revenue).toBe(200);
@@ -455,7 +483,9 @@ describe("the stats aggregation uses the same definition", () => {
 
   it("subtracts the refunded amount from each order's total", () => {
     expect(fn).toContain("$subtract");
-    expect(fn).toContain('"$refundRecord.amount"');
+    expect(fn).toContain("SETTLED_REFUND_EXPRESSION");
+    // Agreement with settledRefundAmount was checked against Mongo itself ($documents)
+    // on 2026-10-09: none, pending, mixed, cash completed/pending, empty list.
     // The shape that counted a partly-refunded order at its full total.
     expect(fn).not.toMatch(/revenue: \{ \$sum: "\$totals\.total" \}/);
   });

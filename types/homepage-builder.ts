@@ -82,6 +82,11 @@ export type HomepageSectionType =
    */
   | "same-day-countdown"
   /**
+   * The shop's rating, free-delivery threshold and delivery promise, read from
+   * its own reviews and settings — never written into the band.
+   */
+  | "shop-promises"
+  /**
    * The products THIS BROWSER has opened — not content the shop writes.
    *
    * Every other band on this page is the same for everybody. This one is

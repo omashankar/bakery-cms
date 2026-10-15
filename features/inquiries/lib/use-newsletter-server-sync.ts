@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { hydrateOnce } from "@/lib/hydrate-once";
+import { hydrateOnce, markHydrated } from "@/lib/hydrate-once";
+import type { NewsletterSubscriber } from "@/types/inquiry";
 
 import { fetchSubscribers } from "./newsletter-api";
 import { persistServerSubscribers } from "./newsletter-repository";
@@ -23,4 +24,13 @@ export function useNewsletterServerSync(): void {
       if (subscribers) persistServerSubscribers(subscribers);
     });
   }, []);
+}
+
+/**
+ * The subscribers the SERVER read for this page, applied without a request —
+ * the same write (which opens the gate) and the same once-key as the sync above.
+ */
+export function applyServerSubscribers(subscribers: NewsletterSubscriber[]): void {
+  persistServerSubscribers(subscribers);
+  markHydrated("newsletter");
 }

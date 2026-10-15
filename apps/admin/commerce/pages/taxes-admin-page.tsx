@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { reportSettingsWrite } from "@/apps/admin/settings/lib/report-settings-write";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import {
   formatTaxRatePercent,
   retagTaxLabel,
@@ -66,6 +66,10 @@ export function TaxesAdminPage() {
           ...settings,
           deliveryFee: previewDelivery,
           freeDeliveryThreshold: 99999,
+          // The preview's delivery is the number typed beside it. With zone
+          // pricing on and no address, the zone FALLBACK (₹149) was charged
+          // instead, so "Preview delivery 99" showed Delivery ₹149.
+          useZoneBasedDelivery: false,
         },
       }),
     [previewDelivery, previewDiscount, settings]

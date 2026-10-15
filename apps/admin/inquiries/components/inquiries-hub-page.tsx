@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { InquiriesListPage } from "./inquiries-list-page";
 import { NewsletterSubscribersPage } from "./newsletter-subscribers-page";
 import { cn } from "@/lib/utils";

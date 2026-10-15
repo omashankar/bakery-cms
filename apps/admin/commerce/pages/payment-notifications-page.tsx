@@ -12,7 +12,7 @@ import {
   Users,
   XCircle,
 } from "lucide-react";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import {
   CHANNEL_LABELS,
   PAYMENT_NOTIFICATION_TEMPLATES,
@@ -83,7 +83,7 @@ function TemplateRow({ template }: { template: NotificationTemplate }) {
             <p className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {template.event}
               {WIRED_EVENTS.has(template.id) ? null : (
-                <span className="rounded border border-border px-1.5 py-0.5 text-[10px] font-medium normal-case text-muted-foreground">
+                <span className="rounded border border-border px-1.5 py-0.5 text-[11px] font-medium normal-case text-muted-foreground">
                   no sender yet
                 </span>
               )}

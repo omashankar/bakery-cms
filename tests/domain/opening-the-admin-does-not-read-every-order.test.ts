@@ -47,18 +47,22 @@ describe("the hydration the admin layout runs on every entry", () => {
     expect(fetcher, "the notes endpoint is not being used").toContain("/api/customers/meta");
   });
 
-  it("is still what the layout calls", () => {
+  it("is what the command search calls, and the layout no longer does", () => {
     /**
-     * The saving only exists if this is the fetcher on the layout's path. A
-     * cheaper endpoint nobody calls is not a fix.
+     * The saving only exists if this is the fetcher on the path that reads the
+     * notes. Only the command search reads them, so it loads them when it
+     * first opens; the layout loading them on every admin screen was one of
+     * ~34 requests in front of the page the admin actually opened.
      */
     const hook = stripComments(read("apps/admin/commerce/lib/use-customers-server-sync.ts"));
     expect(hook).toContain("fetchCustomerMetaMap");
 
+    const search = stripComments(read("apps/admin/components/admin-command-search.tsx"));
+    expect(search).toContain("useCustomersServerSync()");
+    expect(search).toContain("{everOpened ? <SearchOnlySources /> : null}");
+
     const layout = stripComments(read("layouts/admin-layout.tsx"));
-    expect(layout, "the admin layout no longer hydrates customer notes at all").toContain(
-      "useCustomersServerSync()",
-    );
+    expect(layout).not.toContain("useCustomersServerSync");
   });
 
   it("leaves the full profile fetch alone", () => {

@@ -53,6 +53,12 @@ interface WhatsAppConnectionCardProps {
     enabled: boolean;
     displayName?: string;
   }) => void;
+  /**
+   * The stored status, read on the server with the page; null fetches it.
+   * The parent starts its own copy from the same value, so with this set the
+   * card does not report it up again.
+   */
+  initial?: WhatsAppConnectionStatus | null;
 }
 
 const EMPTY_FORM = {
@@ -62,13 +68,29 @@ const EMPTY_FORM = {
   enabled: false,
 };
 
-export function WhatsAppConnectionCard({ onSynced, onStatus }: WhatsAppConnectionCardProps) {
-  const [status, setStatus] = useState<WhatsAppConnectionStatus | null>(null);
+/** The form for a stored status. The token is never populated: there is nothing to populate it with. */
+function formOf(status: WhatsAppConnectionStatus): typeof EMPTY_FORM {
+  return {
+    phoneNumberId: status.phoneNumberId,
+    businessAccountId: status.businessAccountId,
+    accessToken: "",
+    enabled: status.enabled,
+  };
+}
+
+export function WhatsAppConnectionCard({
+  onSynced,
+  onStatus,
+  initial = null,
+}: WhatsAppConnectionCardProps) {
+  const [status, setStatus] = useState<WhatsAppConnectionStatus | null>(initial);
   // Tri-state, like every other form on this screen: "unavailable" still
   // RENDERS — fields visible, saving refused — because a boolean here blanks
   // the card permanently whenever the read fails.
-  const [hydration, setHydration] = useState<"pending" | "ready" | "unavailable">("pending");
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [hydration, setHydration] = useState<"pending" | "ready" | "unavailable">(
+    initial ? "ready" : "pending",
+  );
+  const [form, setForm] = useState(() => (initial ? formOf(initial) : EMPTY_FORM));
   const [busy, setBusy] = useState<"save" | "verify" | "sync" | null>(null);
   const [account, setAccount] = useState<string | null>(null);
 
@@ -90,6 +112,8 @@ export function WhatsAppConnectionCard({ onSynced, onStatus }: WhatsAppConnectio
   });
 
   useEffect(() => {
+    // The server page read the stored status; the parent started from it too.
+    if (initial) return;
     let cancelled = false;
 
     void fetchWhatsAppConnection().then((loaded) => {
@@ -100,20 +124,15 @@ export function WhatsAppConnectionCard({ onSynced, onStatus }: WhatsAppConnectio
       }
       setStatus(loaded);
       onStatusRef.current?.({ configured: loaded.configured, enabled: loaded.enabled });
-      setForm({
-        phoneNumberId: loaded.phoneNumberId,
-        businessAccountId: loaded.businessAccountId,
-        // Never populated from the server — there is nothing to populate it
-        // with. Blank means "keep the stored token" all the way through.
-        accessToken: "",
-        enabled: loaded.enabled,
-      });
+      // The token stays blank: blank means "keep the stored token" all the way through.
+      setForm(formOf(loaded));
       setHydration("ready");
     });
 
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
   }, []);
 
   async function handleSave() {
@@ -219,7 +238,7 @@ export function WhatsAppConnectionCard({ onSynced, onStatus }: WhatsAppConnectio
         <SettingsFormGate hydration={hydration}>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="wa-phone-number-id">Phone number id</Label>
+              <Label htmlFor="wa-phone-number-id">Phone number ID</Label>
               <Input
                 id="wa-phone-number-id"
                 value={form.phoneNumberId}
@@ -231,7 +250,7 @@ export function WhatsAppConnectionCard({ onSynced, onStatus }: WhatsAppConnectio
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="wa-business-account-id">WhatsApp Business Account id</Label>
+              <Label htmlFor="wa-business-account-id">WhatsApp Business Account ID</Label>
               <Input
                 id="wa-business-account-id"
                 value={form.businessAccountId}

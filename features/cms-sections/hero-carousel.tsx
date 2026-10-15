@@ -307,14 +307,16 @@ function HeroBannerSlideView({
                 </div>
               ) : null}
 
-              <h1
+              {/* h2: every slide has one, and the page's single h1 is the
+                  shop's name, set in StoreHomePage. */}
+              <h2
                 className={cn(
                   reveal,
                   "font-heading text-[1.75rem] font-bold leading-[1.12] tracking-tight slide-in-from-bottom-4 [animation-delay:180ms] sm:text-[2.5rem] lg:text-5xl"
                 )}
               >
                 {slide.headline}
-              </h1>
+              </h2>
 
               {slide.subtext ? (
                 <p

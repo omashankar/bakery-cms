@@ -1,6 +1,6 @@
 import { safeSetItem } from "@/lib/safe-storage";
 import type { AppearanceSettings } from "@/types/appearance";
-import { replaceAppearanceRequest } from "@/features/site-layout/lib/site-layout-api";
+import { replaceAppearanceRequest, onSiteLayoutConflict } from "@/features/site-layout/lib/site-layout-api";
 import type { WriteResult } from "@/lib/write-result";
 import {
   applyAppearanceSettings,
@@ -125,6 +125,10 @@ export function persistServerAppearance(settings: AppearanceSettings): void {
   applyAppearanceSettings(next);
   notifyAppearanceUpdated();
 }
+
+// A save refused because another device saved first puts the server's copy
+// here, so the screen shows it; see `onSiteLayoutConflict`.
+onSiteLayoutConflict("appearance", persistServerAppearance);
 
 /**
  * Reset goes through the same path, and that matters more here than anywhere.

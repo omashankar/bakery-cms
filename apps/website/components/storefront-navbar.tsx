@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
-import { Heart, Menu, Search, ShoppingBag, User, X } from "lucide-react";
+import { Heart, History, Menu, Search, ShoppingBag, User, X } from "lucide-react";
 import { navIcon } from "@/config/nav-icons";
 import { Button } from "@/components/ui/button";
 import { BrandMark } from "@/components/shared/brand-mark";
@@ -13,12 +13,12 @@ import {
   MegaMenu,
   MobileShopLinks,
 } from "@/components/storefront/mega-menu";
+import dynamic from "next/dynamic";
+import { OPEN_AUTH_MODAL_EVENT } from "@/apps/website/account/lib/auth-modal-events";
 import {
-  CustomerAuthModal,
-  OPEN_AUTH_MODAL_EVENT,
-} from "@/apps/website/account/components/customer-auth-modal";
-import { AccountMenu } from "@/apps/website/account/components/account-menu";
-import { GuestMenu } from "@/apps/website/account/components/guest-menu";
+  LazyAccountMenu as AccountMenu,
+  LazyGuestMenu as GuestMenu,
+} from "@/apps/website/account/components/lazy-account-menus";
 import { layoutSpacing } from "@/constants/spacing";
 import { routes } from "@/constants/routes";
 import { getCartItemCount } from "@/features/cart/lib/cart";
@@ -29,6 +29,7 @@ import {
   getCustomerSession,
   hasCustomerSession,
   syncCustomerSession,
+  hasCustomerSessionSettled,
 } from "@/apps/website/account/lib/customer-session";
 import type { StorefrontChrome } from "@/apps/website/lib/storefront-chrome.server";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
@@ -38,7 +39,25 @@ import {
   MIN_SUGGEST_CHARS,
   type ProductSuggestion,
 } from "@/features/products/lib/product-suggestions";
+import {
+  loadRecentSearches,
+  recentSearchesFor,
+  rememberSearch,
+  type RecentSearch,
+} from "@/apps/website/lib/recent-searches";
 import { cn } from "@/lib/utils";
+
+/**
+ * The sign-in modal, loaded the first time it is opened.
+ *
+ * It is a dialog with a form and its validation — none of which a visitor
+ * needs until they press Login — and it was part of every storefront page's
+ * first download.
+ */
+const CustomerAuthModal = dynamic(
+  () => import("@/apps/website/account/components/customer-auth-modal").then((m) => m.CustomerAuthModal),
+  { ssr: false },
+);
 
 /**
  * HOW FAR THE PAGE MOVES BEFORE THE BAND ANSWERS AT ALL.
@@ -126,6 +145,8 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
   const router = useRouter();
   const [term, setTerm] = useState("");
   const [suggestions, setSuggestions] = useState<ProductSuggestion[]>([]);
+  /** Read from the browser when the box is focused, so it is never stale and never in the SSR HTML. */
+  const [recents, setRecents] = useState<RecentSearch[]>([]);
   const [panelOpen, setPanelOpen] = useState(false);
   /** -1 is "nothing highlighted", which is the state Enter must submit in. */
   const [activeRow, setActiveRow] = useState(-1);
@@ -254,9 +275,34 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
   }, [pathname]);
 
   const openSuggestion = (row: ProductSuggestion) => {
+    rememberSearch({ term: row.name, slug: row.slug, category: row.category });
     setPanelOpen(false);
     setPhoneSearchOpen(false);
     router.push(routes.store.cake(row.slug));
+  };
+
+  /*
+    BEFORE A LETTER IS TYPED, WHAT WAS SEARCHED BEFORE — as the reference
+    does it. Below the suggestion threshold the panel lists this browser's
+    recent searches, narrowed to those that begin with what is in the box;
+    from the threshold on it is the shop's products, as it always was.
+  */
+  const typedEnough = term.trim().length >= MIN_SUGGEST_CHARS;
+  const recentRows = typedEnough ? [] : recentSearchesFor(recents, term);
+  const rowCount = typedEnough ? suggestions.length : recentRows.length;
+
+  /** A product picked before goes back to it; a typed word runs the search again. */
+  const recentHref = (entry: RecentSearch) =>
+    entry.slug
+      ? routes.store.cake(entry.slug)
+      : `${routes.store.collections}?q=${encodeURIComponent(entry.term)}`;
+
+  const pickRecent = (entry: RecentSearch) => {
+    rememberSearch(entry);
+    // The box shows the word being searched again, as a typed search does.
+    if (!entry.slug) setTerm(entry.term);
+    setPanelOpen(false);
+    setPhoneSearchOpen(false);
   };
 
   const onSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -283,14 +329,23 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
     if (event.key === "Enter") {
       // ONLY when a row is highlighted. Otherwise the form submits, which is
       // the behaviour everything else in this box depends on.
-      const picked = panelOpen && activeRow >= 0 ? suggestions[activeRow] : undefined;
-      if (!picked) return;
+      if (!panelOpen || activeRow < 0) return;
+      if (typedEnough) {
+        const picked = suggestions[activeRow];
+        if (!picked) return;
+        event.preventDefault();
+        openSuggestion(picked);
+        return;
+      }
+      const recent = recentRows[activeRow];
+      if (!recent) return;
       event.preventDefault();
-      openSuggestion(picked);
+      pickRecent(recent);
+      router.push(recentHref(recent));
       return;
     }
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-    if (suggestions.length === 0) return;
+    if (rowCount === 0) return;
 
     // Prevented so the caret does not jump to either end of the box while
     // the customer is walking the list.
@@ -302,13 +357,13 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
       // Past the last row comes "nothing highlighted", not the first row:
       // Enter there submits the search, which is where a customer walking
       // off the end of six suggestions is trying to get to.
-      if (next >= suggestions.length) return -1;
-      if (next < -1) return suggestions.length - 1;
+      if (next >= rowCount) return -1;
+      if (next < -1) return rowCount - 1;
       return next;
     });
   };
 
-  const suggestionsShowing = panelOpen && suggestions.length > 0;
+  const suggestionsShowing = panelOpen && rowCount > 0;
 
   /**
    * The two rows the navbar renders as something other than a plain link.
@@ -361,6 +416,10 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
   const scrolledRef = useRef(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
+  // Mounted on the first open and kept, so its close animation and its state
+  // survive; never loaded for a visitor who does not sign in.
+  const [authRequested, setAuthRequested] = useState(false);
+  if (authOpen && !authRequested) setAuthRequested(true);
   const [authStep, setAuthStep] = useState<"phone" | "signup">("phone");
 
   useEffect(() => {
@@ -384,7 +443,8 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
      * `syncCustomerSession` dispatches the session event, which the listener
      * below picks up, so there is nothing to set from here.
      */
-    void syncCustomerSession();
+    // Unless the page already brought the answer (StorefrontCacheSeed).
+    if (!hasCustomerSessionSettled()) void syncCustomerSession();
   }, []);
 
   useEffect(() => {
@@ -836,6 +896,8 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
             )}
             ref={searchFormRef}
             role="search"
+            // Not prevented: the form still submits as it always did.
+            onSubmit={() => rememberSearch({ term })}
           >
             {/*
               THE MAGNIFIER SITS ON THE LEFT, AND IS STILL THE SUBMIT.
@@ -890,9 +952,13 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
                 value={term}
                 onChange={(event) => {
                   setTerm(event.target.value);
+                  setActiveRow(-1);
                   setPanelOpen(true);
                 }}
-                onFocus={() => setPanelOpen(true)}
+                onFocus={() => {
+                  setRecents(loadRecentSearches());
+                  setPanelOpen(true);
+                }}
                 onKeyDown={onSearchKeyDown}
                 placeholder={
                   searchPlaceholder ||
@@ -939,7 +1005,32 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
                   aria-label="Search suggestions"
                   className="absolute inset-x-0 top-full z-50 mt-1.5 overflow-hidden rounded-lg border border-border bg-card py-1 shadow-lg"
                 >
-                  {suggestions.map((row, index) => (
+                  {recentRows.map((entry, index) => (
+                    <Link
+                      key={entry.slug ?? `q:${entry.term}`}
+                      id={`${suggestListId}-${index}`}
+                      role="option"
+                      aria-selected={index === activeRow}
+                      href={recentHref(entry)}
+                      onClick={() => pickRecent(entry)}
+                      onMouseEnter={() => setActiveRow(index)}
+                      className={cn(
+                        "flex items-center gap-4 px-4 py-2.5",
+                        index === activeRow && "bg-cream-100",
+                      )}
+                    >
+                      <History aria-hidden className="size-[1.125rem] shrink-0 text-muted-foreground" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm text-foreground">{entry.term}</span>
+                        {entry.category ? (
+                          <span className="block truncate text-xs text-bakery-700">
+                            in {entry.category}
+                          </span>
+                        ) : null}
+                      </span>
+                    </Link>
+                  ))}
+                  {(typedEnough ? suggestions : []).map((row, index) => (
                     <Link
                       key={row.slug}
                       id={`${suggestListId}-${index}`}
@@ -947,6 +1038,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
                       aria-selected={index === activeRow}
                       href={routes.store.cake(row.slug)}
                       onClick={() => {
+                        rememberSearch({ term: row.name, slug: row.slug, category: row.category });
                         setPanelOpen(false);
                         setPhoneSearchOpen(false);
                       }}
@@ -1558,6 +1650,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
         </div>
       ) : null}
     </header>
+    {authRequested ? (
     <CustomerAuthModal
       open={authOpen}
       onOpenChange={setAuthOpen}
@@ -1567,6 +1660,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
         setCustomerName(getCustomerDisplayName());
       }}
     />
+    ) : null}
     </>
   );
 }

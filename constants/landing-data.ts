@@ -93,6 +93,10 @@ export interface LandingProduct {
   shapes?: string[];
   allowsMessage?: boolean;
   allowsPhotoUpload?: boolean;
+  /** See `Product.cancellationClass`. Absent means "standard". */
+  cancellationClass?: "standard" | "made_to_order" | "non_cancellable";
+  /** See `Product.codAllowed`. */
+  codAllowed?: boolean;
   photoFrameShape?: PhotoFrameShapeId;
   weights?: Array<{ label: string; price: number; serves?: string }>;
   /** The shop's own word for the size axis — “Weight”, “Size”, “Length”. */

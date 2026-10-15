@@ -320,6 +320,11 @@ function toCard(product: LandingProduct, modules: ModuleSettings): LandingProduc
     occasions: product.occasions,
     flavours: product.flavours,
     weights: product.weights?.map((tier) => ({ label: tier.label, price: 0 })),
+    // The two per-product toggles, for checkout. Dropped here, every product
+    // looked COD-able and cancellable there: Cash on Delivery was offered on
+    // cakes the server then refused at Place order.
+    cancellationClass: product.cancellationClass,
+    codAllowed: product.codAllowed,
   };
 }
 
@@ -411,6 +416,14 @@ export async function updateProduct(
     ...data,
     ...(await stockForEdit(existing, data, options.stockQuantityLoaded)),
     id,
+    /*
+      THE FORM'S OWN ANSWER, absent included. The form sends no compare-at
+      price when the box is cleared, and the spread above then kept the OLD
+      one — so a compare-at could never be removed, and a product whose
+      compare-at had fallen below its price could not be saved at all while
+      the error told the admin to "Clear it".
+    */
+    compareAtPrice: data.compareAtPrice,
     // `rating` and `reviewCount` are owned by the reviews aggregate, which
     // writes them directly. Letting an edit form carry its stale copy back would
     // undo a moderation decision made since this form was opened.

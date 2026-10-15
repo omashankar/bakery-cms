@@ -220,8 +220,11 @@ describe("the step before it refuses the same way", () => {
     expect(upToWindow, "a missing date no longer takes the customer to the date").toContain(
       'document.getElementById("deliveryDate")?.focus()',
     );
-    expect(handler.slice(0, 2600), "a missing window no longer takes the customer to it").toContain(
-      'document.getElementById("deliveryTime")?.focus()',
+    // Date and window are one field now (it opens the delivery dialog), so a
+    // missing window takes the customer to the same place as a missing date.
+    const at = handler.indexOf("const needsWindow");
+    expect(handler.slice(at, at + 400), "a missing window no longer takes the customer to it").toContain(
+      'document.getElementById("deliveryDate")?.focus()',
     );
   });
 
@@ -234,8 +237,13 @@ describe("the step before it refuses the same way", () => {
       ref and these do not, and why the first attempt at that one silently
       focused nothing.
     */
-    expect(src, "the delivery date stopped being a plain input").toMatch(
-      /<Input\s+id="deliveryDate"/,
+    // The trigger of the delivery dialog carries the id — a real <button>, so
+    // focusing it by id lands on something a customer can press.
+    expect(src, "the delivery field lost the id a refusal focuses").toMatch(
+      /<DeliverySlotPicker\s+id="deliveryDate"/,
+    );
+    expect(read("apps/website/checkout/components/delivery-slot-picker.tsx")).toMatch(
+      /<button\s+id=\{id\}/,
     );
     const terms = from(src, "const onPlaceOrder = async () => {").slice(0, 1200);
     expect(terms, "the consent box went back to being focused by id").not.toContain(

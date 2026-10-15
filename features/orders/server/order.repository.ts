@@ -426,6 +426,43 @@ export interface OrderStatsSummary {
  * quietly wrong. An aggregation has no such ceiling and moves no documents over
  * the wire.
  */
+/** Orders still to be fulfilled, whenever they were placed. */
+export async function countInStatuses(statuses: OrderStatus[]): Promise<number> {
+  await connectDB();
+  return OrderModel.countDocuments({ status: { $in: statuses } });
+}
+
+/**
+ * The SETTLED part of an order's refunds, as a Mongo expression — `settledRefundAmount`
+ * (features/orders/lib/order-overviews.ts) for an aggregation. Kept beside it in
+ * meaning; exported so it can be checked against that function.
+ */
+export const SETTLED_REFUND_EXPRESSION = {
+  $cond: [
+    { $gt: [{ $size: { $ifNull: ["$refundRecord.gatewayRefunds", []] } }, 0] },
+    {
+      $sum: {
+        $map: {
+          input: {
+            $filter: {
+              input: "$refundRecord.gatewayRefunds",
+              cond: { $eq: ["$$this.status", "processed"] },
+            },
+          },
+          in: { $ifNull: ["$$this.amount", 0] },
+        },
+      },
+    },
+    {
+      $cond: [
+        { $eq: ["$refundRecord.status", "completed"] },
+        { $ifNull: ["$refundRecord.amount", 0] },
+        0,
+      ],
+    },
+  ],
+};
+
 export async function stats(): Promise<OrderStatsSummary> {
   await connectDB();
 
@@ -445,11 +482,16 @@ export async function stats(): Promise<OrderStatsSummary> {
         //
         // The transactions aggregation already nets `amount - refundedAmount`;
         // this one did not, so the two screens disagreed about the same money.
+        //
+        // And only refunds that SETTLED — `settledRefundAmount`, in Mongo. The
+        // record's `amount` includes a gateway refund still pending, so this
+        // card dropped by a refund the moment it was requested while Reports
+        // and Payments waited for the money to actually move.
         revenue: {
           $sum: {
             $subtract: [
               { $ifNull: ["$totals.total", 0] },
-              { $ifNull: ["$refundRecord.amount", 0] },
+              SETTLED_REFUND_EXPRESSION,
             ],
           },
         },
@@ -495,11 +537,27 @@ export async function stats(): Promise<OrderStatsSummary> {
   return summary;
 }
 
+/**
+ * Write the named fields. A key present with `undefined` CLEARS that field.
+ *
+ * Mongoose drops undefined values from a `$set`, so "clear the delivery
+ * partner" and "blank the internal notes" were sent as an update of
+ * `updatedAt` alone: the admin was told it was done, the rider's name and phone
+ * stayed on the customer's tracking page, and the old notes came back on the
+ * next load. Every caller names its keys explicitly, so a present-but-undefined
+ * key is always a request to remove, never "leave it".
+ */
 export async function patch(id: string, fields: Partial<PlacedOrder>): Promise<PlacedOrder | null> {
   await connectDB();
+  const set: Record<string, unknown> = { updatedAt: new Date().toISOString() };
+  const unset: Record<string, ""> = {};
+  for (const [key, value] of Object.entries(fields)) {
+    if (value === undefined) unset[key] = "";
+    else set[key] = value;
+  }
   const doc = (await OrderModel.findByIdAndUpdate(
     id,
-    { $set: { ...fields, updatedAt: new Date().toISOString() } },
+    Object.keys(unset).length > 0 ? { $set: set, $unset: unset } : { $set: set },
     { new: true },
   ).lean()) as unknown as Raw | null;
   return doc ? toOrder(doc) : null;
@@ -546,13 +604,31 @@ export async function patch(id: string, fields: Partial<PlacedOrder>): Promise<P
  * The status change IS the guard now. Null means someone else did it, and the
  * caller must do none of the follow-on work.
  */
+/**
+ * `patch`, but only while the order is still in `expectedStatus`. Null when it
+ * has moved on — the caller decided on a status that is no longer there.
+ */
+export async function patchIfStatus(
+  id: string,
+  expectedStatus: OrderStatus,
+  fields: Partial<PlacedOrder>,
+): Promise<PlacedOrder | null> {
+  await connectDB();
+  const doc = (await OrderModel.findOneAndUpdate(
+    { _id: id, status: expectedStatus },
+    { $set: { ...fields, updatedAt: new Date().toISOString() } },
+    { new: true },
+  ).lean()) as unknown as Raw | null;
+  return doc ? toOrder(doc) : null;
+}
+
 export async function cancelIfActive(
   id: string,
   fields: Partial<PlacedOrder>,
 ): Promise<PlacedOrder | null> {
   await connectDB();
   const doc = (await OrderModel.findOneAndUpdate(
-    { _id: id, status: { $nin: ["cancelled", "refunded"] } },
+    { _id: id, status: { $nin: ["cancelled", "refunded", "delivered"] } },
     { $set: { ...fields, updatedAt: new Date().toISOString() } },
     { new: true },
   ).lean()) as unknown as Raw | null;

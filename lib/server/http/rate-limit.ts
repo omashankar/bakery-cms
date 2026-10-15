@@ -12,11 +12,27 @@ interface Bucket {
 
 const buckets = new Map<string, Bucket>();
 
+/**
+ * Expired buckets are dropped as the map grows.
+ *
+ * They were only ever REPLACED, when the same key came back, and the login and
+ * reset routes mint one key per email typed — unauthenticated. A stream of
+ * random addresses grew the map until the process ran out of memory.
+ */
+const SWEEP_AT = 5_000;
+
+function sweep(now: number): void {
+  for (const [key, bucket] of buckets) {
+    if (now > bucket.resetAt) buckets.delete(key);
+  }
+}
+
 export function rateLimit(
   key: string,
   opts: { limit: number; windowMs: number },
 ): void {
   const now = Date.now();
+  if (buckets.size >= SWEEP_AT) sweep(now);
   const bucket = buckets.get(key);
 
   if (!bucket || now > bucket.resetAt) {

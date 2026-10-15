@@ -141,6 +141,16 @@ export async function updatePage(
     if (index === -1) return { next: pages, result: null };
 
     const updated = { ...pages[index], ...patch, id, updatedAt: nowIso() } as CmsPage;
+    // A schedule is removed when the admin clears it (`null`), and when the page
+    // goes live by hand. Publishing early used to leave the date stored, so
+    // unpublishing later found "a draft whose moment has passed" and the next
+    // storefront read put the page straight back up.
+    if (
+      (patch as { scheduledPublishAt?: unknown }).scheduledPublishAt === null ||
+      updated.status === "published"
+    ) {
+      delete updated.scheduledPublishAt;
+    }
     const next = [...pages];
     next[index] = updated;
     return { next, result: updated };

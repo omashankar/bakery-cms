@@ -2,7 +2,8 @@
 
 import { useEffect } from "react";
 
-import { hydrateOnce } from "@/lib/hydrate-once";
+import { hydrateOnce, markHydrated } from "@/lib/hydrate-once";
+import type { ProductReview } from "@/types/review";
 import { fetchReviews, reviewsHydration } from "./reviews-api";
 import { persistServerReviews } from "./reviews-repository";
 
@@ -33,4 +34,14 @@ export function useReviewsServerSync(): void {
       reviewsHydration.markSettled();
     });
   }, []);
+}
+
+/**
+ * The reviews the SERVER read for this page, applied without a request — the
+ * same writes and gate as the sync above. See `applyServerMedia`.
+ */
+export function applyServerReviews(reviews: ProductReview[]): void {
+  persistServerReviews(reviews);
+  reviewsHydration.markSettled();
+  markHydrated("reviews");
 }

@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import type { ServerContentRead } from "@/features/content/lib/content-api";
+import { applyServerTestimonials } from "@/features/content/lib/testimonials-repository";
 import { testimonialsWritable } from "@/features/content/lib/content-api";
 import {
   Archive,
@@ -36,7 +38,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { formatRelativeTime } from "@/utils/format";
 import type { Testimonial } from "@/types/content";
-import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
+import { adminShell } from "@/apps/admin/components/admin-shell";
 import {
   bulkUpdateTestimonialStatus,
   deleteTestimonials,
@@ -93,7 +96,25 @@ function TestimonialRowActions({
   );
 }
 
-export function TestimonialsAdminPage() {
+/** The quote's own marks come off: the page draws them, and a quote typed with
+ *  its own showed doubled (""Great quality…""). */
+function withoutQuotes(text: string): string {
+  return text.trim().replace(/^["“”'‘’]+|["“”'‘’]+$/g, "");
+}
+
+export function TestimonialsAdminPage({
+  initial = null,
+}: {
+  /** Every testimonials and its version, read on the server; null fetches as before. */
+  initial?: ServerContentRead<Testimonial[]> | null;
+} = {}) {
+  // Before this screen's passive effects, so its mount read finds the server's
+  // testimonials — not this browser's old copy or the shipped demo ones — and the
+  // write gate already open.
+  useLayoutEffect(() => {
+    if (initial) applyServerTestimonials(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
+  }, []);
   const [mounted, setMounted] = useState(false);
   const [items, setItems] = useState<Testimonial[]>([]);
   const [filters, setFilters] = useState<TestimonialListFilters>(defaultTestimonialFilters);
@@ -446,7 +467,7 @@ export function TestimonialsAdminPage() {
                       </td>
                       <td className="px-4 py-3">
                         <p className="line-clamp-2 max-w-sm text-muted-foreground">
-                          &ldquo;{item.content}&rdquo;
+                          &ldquo;{withoutQuotes(item.content)}&rdquo;
                         </p>
                       </td>
                       <td className="px-4 py-3">
@@ -528,7 +549,7 @@ export function TestimonialsAdminPage() {
                       />
                     </div>
                     <p className="line-clamp-3 text-sm text-muted-foreground">
-                      &ldquo;{item.content}&rdquo;
+                      &ldquo;{withoutQuotes(item.content)}&rdquo;
                     </p>
                     <div className="flex flex-wrap items-center gap-2">
                       <div className="flex items-center gap-0.5">

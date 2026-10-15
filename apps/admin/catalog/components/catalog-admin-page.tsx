@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { applyServerCatalog } from "@/components/shared/catalog-server-sync";
 import {
   Palette,
   Pencil,
@@ -16,7 +17,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { EmptyState } from "@/components/shared/empty-state";
-import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
+import { PanelLoading } from "@/components/shared/panel-loading";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
+import { adminShell } from "@/apps/admin/components/admin-shell";
 import type { CatalogStore, CatalogTab } from "@/types/catalog";
 import type { WriteResult } from "@/lib/write-result";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +33,7 @@ import {
   deleteDepartments,
   deleteOccasions,
   moveCatalogRow,
+  hasCatalogCache,
   loadCatalogStore,
   resetCatalogStore,
 } from "@/features/catalog/lib/catalog-repository";
@@ -99,7 +103,18 @@ function tabBarFor(
   ];
 }
 
-export function CatalogAdminPage() {
+export function CatalogAdminPage({
+  initial = null,
+}: {
+  /** The taxonomy, read on the server; null waits for the sync as before. */
+  initial?: Partial<CatalogStore> | null;
+} = {}) {
+  // Before this screen's mount effects, so they find the shop's taxonomy and
+  // the status already "ready" — no loading panel, no seed.
+  useLayoutEffect(() => {
+    if (initial) applyServerCatalog(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
+  }, []);
   const labels = useBusinessLabels();
   const [mounted, setMounted] = useState(false);
   const tabs = tabsFor(labels);
@@ -121,9 +136,19 @@ export function CatalogAdminPage() {
    */
   const canWrite = hydration === "ready";
 
+  /*
+    Nothing to show yet: a fresh browser has no cached catalog, so
+    `loadCatalogStore` would answer with the SHIPPED demo taxonomy. That list
+    used to be drawn as though it were the shop's, under a "Loading…" bar —
+    then swapped for the real one five seconds later, the bar removed, and the
+    whole table jumped (CLS 0.244 on a production build). Now the table holds
+    its place with a loading panel until the server answers.
+  */
+  const waiting = !mounted || (hydration === "pending" && !hasCatalogCache());
+
   const store = useMemo(
-    () => (mounted ? loadCatalogStore() : EMPTY_STORE),
-    [mounted, refreshKey]
+    () => (waiting ? EMPTY_STORE : loadCatalogStore()),
+    [waiting, refreshKey]
   );
 
   useEffect(() => {
@@ -429,7 +454,7 @@ export function CatalogAdminPage() {
         ones this software ships with — that was true before and the screen
         showed them as though they were the shop's own, with every button live.
       */}
-      {mounted && hydration !== "ready" ? (
+      {mounted && hydration === "unavailable" ? (
         <p
           className={cn(
             "rounded-lg border px-3 py-2 text-sm",
@@ -470,11 +495,11 @@ export function CatalogAdminPage() {
                 <Badge
                   variant={active ? "secondary" : "outline"}
                   className={cn(
-                    "h-5 min-w-5 justify-center px-1.5 text-[10px]",
+                    "h-5 min-w-5 justify-center px-1.5 text-[11px]",
                     active && "border-transparent bg-primary-foreground/20 text-primary-foreground"
                   )}
                 >
-                  {isThemes ? "Soon" : counts[tab.id as CatalogTab]}
+                  {isThemes ? "Soon" : waiting ? "…" : counts[tab.id as CatalogTab]}
                 </Badge>
               </Button>
             );
@@ -517,7 +542,11 @@ export function CatalogAdminPage() {
           </div>
         ) : null}
 
-        {items.length === 0 ? (
+        {waiting ? (
+          <div className="min-h-[18rem] p-4">
+            <PanelLoading label="Loading this shop's catalog" rows={5} />
+          </div>
+        ) : items.length === 0 ? (
           <EmptyState
             icon={Tags}
             title={`No ${activeTabMeta.label.toLowerCase()} found`}

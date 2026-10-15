@@ -106,11 +106,40 @@ export async function getOrCreateSettings() {
   });
 }
 
-export async function updateSection(section: string, value: unknown) {
+/** A section save composed against a version that is no longer current. */
+export class StaleSectionError extends Error {
+  constructor(readonly section: string) {
+    super("These settings were changed on another device after you opened them.");
+    this.name = "StaleSectionError";
+  }
+}
+
+export async function updateSection(section: string, value: unknown, expectedVersion?: number) {
   // getOrCreate first so the return is always a live (non-null) document, and
   // set-by-path keeps the update strongly scoped to the one section.
   const doc = await getOrCreateSettings();
+
+  // Claim the next version ATOMICALLY before writing: two saves composed from
+  // the same version cannot both pass a read-then-compare. A save that names
+  // no version (an older admin bundle, a server-side restore) is not checked.
+  const path = `sectionVersions.${section}`;
+  const current = Number((doc.get("sectionVersions") as Record<string, number> | undefined)?.[section] ?? 0);
+  if (expectedVersion !== undefined) {
+    const claim = await SettingsModel.updateOne(
+      {
+        _id: doc._id,
+        ...(expectedVersion === 0
+          ? { $or: [{ [path]: { $exists: false } }, { [path]: 0 }] }
+          : { [path]: expectedVersion }),
+      },
+      { $set: { [path]: expectedVersion + 1 } },
+    );
+    if (claim.modifiedCount !== 1) throw new StaleSectionError(section);
+  } else {
+    await SettingsModel.updateOne({ _id: doc._id }, { $set: { [path]: current + 1 } });
+  }
+
   doc.set(section, value);
   await doc.save();
-  return doc;
+  return SettingsModel.findById(doc._id).then((fresh) => fresh ?? doc);
 }

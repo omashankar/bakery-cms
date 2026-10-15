@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
+import { PROBE_ADDRESS } from "./shop-state";
 
 import { probeEmail, signInAsCustomer } from "./sign-in";
+import { bookDeliverySlot } from "./delivery-slot";
 
 /**
  * Can a customer actually pay online?
@@ -50,14 +52,15 @@ test.describe("paying online", () => {
 
     // ---- the address step, exactly as place-an-order does it ----
     await page.getByLabel(/full name/i).fill("E2E Pay Probe");
-    await page.getByLabel(/email/i).fill(customerEmail);
+    // Signed in, so the address step says "Ordering as" instead of asking.
+    await expect(page.getByText(customerEmail, { exact: true })).toBeVisible();
     // EXACT. The address step also carries "Alternate phone (optional)", so
     // a loose /phone/i matches two boxes and the fill refuses to guess.
     await page.getByLabel("Phone", { exact: true }).fill("9000000002");
     await page.getByLabel(/address line 1|address/i).first().fill("2 Probe Lane");
-    await page.getByLabel(/city/i).fill("Mumbai");
-    await page.getByLabel(/state/i).fill("MH");
-    await page.getByLabel(/PIN code/i).fill("400001");
+    await page.getByLabel(/city/i).fill(PROBE_ADDRESS.city);
+    await page.getByLabel(/state/i).fill(PROBE_ADDRESS.state);
+    await page.getByLabel(/PIN code/i).fill(PROBE_ADDRESS.pincode);
 
     await page.getByRole("button", { name: /continue|next/i }).first().click();
 
@@ -66,39 +69,8 @@ test.describe("paying online", () => {
     // Cart → Address → Personalize → Payment. Both are still enforced on the
     // server: the date must be a real calendar day at or after the lead time,
     // and the slot must be one the shop offers.
-    const earliest = new Date();
-    earliest.setDate(earliest.getDate() + 5);
-    const isoDay = [
-      earliest.getFullYear(),
-      String(earliest.getMonth() + 1).padStart(2, "0"),
-      String(earliest.getDate()).padStart(2, "0"),
-    ].join("-");
-    await page.getByLabel(/delivery date/i).fill(isoDay);
-
-    /**
-     * WAIT for a real window, then insist one was chosen.
-     *
-     * This read the options once and selected one only `if (firstReal)` —
-     * so when the shop's slots had not loaded yet, it selected nothing,
-     * pressed Continue anyway, and was correctly refused. The run then sat on
-     * Personalize and reported that checkout offers no online payment, which
-     * blamed the payment switch for a delivery slot that was never picked.
-     */
-    const slot = page.getByLabel(/delivery time/i);
-    await expect
-      .poll(
-        async () =>
-          (await slot.locator("option").allTextContents()).filter(
-            (text) => text && !/select a time/i.test(text),
-          ).length,
-        { message: "the shop offered no delivery window to choose" },
-      )
-      .toBeGreaterThan(0);
-
-    const windows = (await slot.locator("option").allTextContents()).filter(
-      (text) => text && !/select a time/i.test(text),
-    );
-    await slot.selectOption({ label: windows[0] });
+    // One field and a dialog now: day, delivery type, window.
+    await bookDeliverySlot(page);
 
     await page.getByRole("button", { name: /continue|next/i }).first().click();
 
@@ -113,9 +85,17 @@ test.describe("paying online", () => {
     // Cash has to survive too. An earlier shape of this gate hid every method
     // it could not confirm, which would have left a checkout with no way to pay
     // at all.
+    //
+    // Cash is a per-product toggle as well, so a cart of cakes with it off
+    // shows WHY there is no cash option instead. Either is an answer; a cash
+    // method that silently vanished is not. Matched exactly, because the note
+    // contains the words "Cash on Delivery" too.
     await expect(
-      page.getByText(/cash on delivery/i).first(),
-      "cash on delivery disappeared alongside it",
+      page
+        .getByText("Cash on Delivery", { exact: true })
+        .or(page.getByText(/Cash on Delivery isn.t available for/))
+        .first(),
+      "cash on delivery disappeared alongside it, with nothing saying why",
     ).toBeVisible();
 
     await online.click();

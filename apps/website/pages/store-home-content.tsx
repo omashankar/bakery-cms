@@ -1,5 +1,3 @@
-"use client";
-
 import { HomepageSectionRenderer } from "@/features/cms-sections/homepage-section-renderer";
 import { planNewsletterCtaPair } from "@/features/cms-sections/lib/section-utils";
 import { StaggerReveal } from "@/components/shared/scroll-reveal";
@@ -13,6 +11,7 @@ import type { FaqItem, Testimonial } from "@/types/content";
 import type { StorefrontInstagram } from "@/apps/website/lib/storefront-social.server";
 import type { StorefrontLocation } from "@/apps/website/lib/storefront-location.server";
 import type { StorefrontTrust } from "@/apps/website/lib/storefront-trust.server";
+import type { ResolvedLabels } from "@/config/business-labels";
 
 /**
  * Everything the sections need, read on the server.
@@ -53,6 +52,8 @@ interface HomepageSectionData {
    * than the demo constants these replaced.
    */
   trust: StorefrontTrust | null;
+  /** The shop's own wording, read on the server so the HTML says it. */
+  labels?: ResolvedLabels;
 }
 
 interface StoreHomeContentProps extends HomepageSectionData {
@@ -93,7 +94,9 @@ function renderSections(
   // full-width wherever they sat and the published page put them side by side.
   const pair = planNewsletterCtaPair(sections);
 
-  return sections.map((section) => {
+  // A phone's first screen holds the first three bands (measured at 412x823:
+  // the banner strip, the category row and the collage that is the LCP).
+  return sections.map((section, index) => {
     if (pair && section.instanceId === pair.otherId) return null;
 
     if (pair && section.instanceId === pair.anchorId) {
@@ -119,7 +122,12 @@ function renderSections(
     }
 
     return (
-      <HomepageSectionRenderer {...data} key={section.instanceId} section={section} />
+      <HomepageSectionRenderer
+        {...data}
+        key={section.instanceId}
+        section={section}
+        aboveTheFold={index < 3}
+      />
     );
   });
 }

@@ -42,10 +42,25 @@ export function getSiteLayout(key: string) {
   return storeFor(key).read();
 }
 
+/** The stored value and the version a save must carry back. */
+export function getSiteLayoutVersioned(key: string) {
+  return storeFor(key).readVersioned();
+}
+
 export async function replaceSiteLayout(
   key: string,
   value: unknown,
   ctx: { ip: string; userAgent: string; actorId?: string | null; actorEmail?: string },
+  /**
+   * The version this save was composed against.
+   *
+   * These are whole-document replaces built from a browser cache that is
+   * filled once per admin session, so a laptop left open since morning saved
+   * its morning copy over the owner's noon change from a phone — the SEO
+   * "allow indexing" switch, a canonical URL, a header link — and both screens
+   * said "saved". A stale version is refused with a 409 instead.
+   */
+  expectedVersion?: number,
 ) {
   const store = storeFor(key);
   // Read BEFORE the write. This is a whole-value replace, so without the
@@ -54,7 +69,7 @@ export async function replaceSiteLayout(
   // restore, when nobody remembers. Every sibling service logs identifying
   // metadata; this one logged an empty object.
   const before = await store.read();
-  await store.write(value as never);
+  await store.writeVersioned(value as never, expectedVersion);
   await writeAuditLog({
     action: `site-layout.${key}.replace`,
     actorId: ctx.actorId ?? null,

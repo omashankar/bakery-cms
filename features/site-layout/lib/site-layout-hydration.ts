@@ -1,6 +1,12 @@
 "use client";
 
-import { fetchSeoStore, seoHydration } from "./site-layout-api";
+import {
+  fetchSeoStore,
+  rememberSiteLayoutVersion,
+  seoHydration,
+  type ServerSiteLayoutRead,
+} from "./site-layout-api";
+import type { SeoStore } from "@/types/seo";
 import { persistServerSeo } from "@/features/seo/lib/seo-repository";
 
 /**
@@ -34,4 +40,11 @@ export async function ensureSeoHydrated(): Promise<boolean> {
   persistServerSeo(store);
   seoHydration.markSettled();
   return true;
+}
+
+/** The SEO store the SERVER read for an admin page, applied without a request. */
+export function applyServerSeo(read: ServerSiteLayoutRead<SeoStore>): void {
+  rememberSiteLayoutVersion("seo", read.version);
+  persistServerSeo(read.value);
+  seoHydration.markSettled();
 }

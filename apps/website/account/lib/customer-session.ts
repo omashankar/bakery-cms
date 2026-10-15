@@ -1,4 +1,5 @@
 
+import { RECENT_SEARCHES_KEY } from "@/apps/website/lib/recent-searches";
 import { safeSetItem } from "@/lib/safe-storage";
 const CUSTOMER_SESSION_KEY = "bakery-cms-customer-session";
 
@@ -84,31 +85,42 @@ export async function syncCustomerSession(): Promise<CustomerSession | null> {
     const body = (await res.json()) as {
       data?: { email: string; name: string; phone?: string } | null;
     };
-    settled = true;
-
-    if (!body.data) {
-      // The server says nobody. A cache that disagrees is a stale copy, and
-      // leaving it would keep an account menu on screen for a signed-out
-      // browser — and, on a shared device, someone else's name.
-      if (readCache()) clearLocalCustomerData();
-      return null;
-    }
-
-    const current = readCache();
-    const session: CustomerSession = {
-      email: body.data.email,
-      name: body.data.name,
-      phone: body.data.phone,
-      // Kept from the cached copy where we have one; this is display trivia,
-      // not authority.
-      signedInAt: current?.signedInAt ?? new Date().toISOString(),
-    };
-    writeCache(session);
-    return session;
+    return applyServerCustomer(body.data ?? null);
   } catch {
     // Offline: keep showing what we had rather than pretending they signed out.
     return readCache();
   }
+}
+
+/**
+ * The server's answer to "who is signed in", however it arrived — fetched
+ * above, or read by the storefront layout with the page (`StorefrontCacheSeed`).
+ */
+export function applyServerCustomer(
+  data: { email: string; name: string; phone?: string } | null,
+): CustomerSession | null {
+  if (typeof window === "undefined") return null;
+  settled = true;
+
+  if (!data) {
+    // The server says nobody. A cache that disagrees is a stale copy, and
+    // leaving it would keep an account menu on screen for a signed-out
+    // browser — and, on a shared device, someone else's name.
+    if (readCache()) clearLocalCustomerData();
+    return null;
+  }
+
+  const current = readCache();
+  const session: CustomerSession = {
+    email: data.email,
+    name: data.name,
+    phone: data.phone,
+    // Kept from the cached copy where we have one; this is display trivia,
+    // not authority.
+    signedInAt: current?.signedInAt ?? new Date().toISOString(),
+  };
+  writeCache(session);
+  return session;
 }
 
 /** Adopt an identity the server has just confirmed (the sign-in modal). */
@@ -148,6 +160,10 @@ const ORDER_ACCESS_KEY = "bakery-cms-verified-orders";
 
 const CUSTOMER_DEVICE_KEYS = [
   "bakery-cms-customer-addresses",
+  // `ADDRESSES_DIRTY_KEY` in customer-addresses.ts, written out here because
+  // that module imports this one. Left behind, the next person to sign in on
+  // this device would push the previous customer's book into their account.
+  "bakery-cms-customer-addresses-dirty",
   "bakery-cms-cart",
   "bakery-cms-cart-preferences",
   "bakery-cms-saved-for-later",
@@ -160,6 +176,9 @@ const CUSTOMER_DEVICE_KEYS = [
   // reference, and the checkout overlay puts both on screen. The order itself
   // stays in `bakery-cms-orders`, so signing out loses them nothing.
   "bakery-cms-unconfirmed-order",
+  // What was typed into the header search — drawn under the box the moment
+  // the next person at this screen clicks it.
+  RECENT_SEARCHES_KEY,
 ] as const;
 
 /** Wipe this device's copy. Does NOT end the server session — see `signOutCustomer`. */

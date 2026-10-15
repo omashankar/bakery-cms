@@ -172,6 +172,14 @@ export interface CommerceSettings {
   platformChargeAmount: number;
   useZoneBasedDelivery: boolean;
   zoneFallbackDeliveryFee: number;
+  /**
+   * An address no active zone covers: deliver it at `zoneFallbackDeliveryFee`
+   * (true), or do not take the order (false). Only read with zones on.
+   *
+   * Optional because settings saved before it existed do not carry it; a
+   * missing value is `true`, which is what checkout always did.
+   */
+  deliverOutsideZones?: boolean;
   deliveryLeadDays: number;
   estimatedDeliveryDays: number;
   deliveryTimeSlots: string[];
@@ -179,6 +187,11 @@ export interface CommerceSettings {
   deliveryTiers: DeliveryTier[];
   orderNumberPrefix: string;
   checkoutTerms: string;
+  /**
+   * The cancellation policy in the shop's words, shown at checkout beside each
+   * cart line's own rule and copied onto every order placed under it.
+   */
+  cancellationPolicyText: string;
   giftWrapEnabled: boolean;
   giftWrapFee: number;
   giftWrapLabel: string;

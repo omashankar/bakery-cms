@@ -27,7 +27,10 @@ import {
  */
 
 vi.mock("@/features/products/lib/product-catalog", () => ({ getAllProducts: () => [] }));
-vi.mock("@/features/products/lib/products-repository", () => ({ loadProducts: () => [] }));
+vi.mock("@/features/products/lib/products-repository", () => ({
+  loadProducts: () => [],
+  PRODUCTS_UPDATED_EVENT: "bakery-products-updated",
+}));
 vi.mock("@/features/content/lib/banners-repository", () => ({ loadBanners: () => [] }));
 
 const HERO = "https://images.example.com/hero-diwali.jpg";
@@ -69,7 +72,8 @@ describe("where a media file is used", () => {
     ["the header logo", "Header", "Site layout"],
     ["the footer", "Footer", "Site layout"],
     ["an og:image", "SEO", "Site layout"],
-    ["the wedding page layout", "Wedding page layout", "Builder"],
+    ["a category, occasion or collection tile", "Catalog", "Catalog"],
+    ["a product the browser cache has not seen yet", "Products", "Products"],
   ])("finds an image used by %s", (_what, label, context) => {
     setRemoteUsageIndex([
       { label, context, haystack: JSON.stringify({ anything: { nested: HERO } }) },

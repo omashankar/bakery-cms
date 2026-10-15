@@ -34,6 +34,25 @@ import { persistServerCustomCode } from "@/features/settings/lib/custom-code-rep
  * Callable rather than mount-only for the same reason as the other gates: the
  * sync runs from a `[]`-dep effect that never re-runs after an in-app login.
  */
+/**
+ * What the reads below return, as the SERVER made them for an admin page,
+ * applied without a request — the same writes, then the gate.
+ */
+export function applyServerAdminConfig(read: {
+  profile: Record<string, unknown>;
+  gateways: Record<string, unknown>;
+  prefs: Record<string, unknown>;
+  code: { css: string; js: string };
+  account: Record<string, unknown> | null;
+}): void {
+  persistServerAdminProfile(read.profile);
+  persistServerAccount(read.account);
+  persistServerGateways(read.gateways);
+  persistServerNotifPrefs(read.prefs);
+  persistServerCustomCode(read.code);
+  adminConfigHydration.markSettled();
+}
+
 export async function ensureAdminConfigHydrated(): Promise<boolean> {
   if (adminConfigHydration.hasSettled()) return true;
 

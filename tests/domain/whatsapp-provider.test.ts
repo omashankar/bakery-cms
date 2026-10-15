@@ -489,10 +489,13 @@ describe("a shop that was already running", () => {
     // built: a shop running before that gains the sign-in email its customers
     // now receive, and can word it, rather than having it sent from a hardcoded
     // fallback it cannot see.
+    // `refund_failed` joined it: a shop running before it existed gets the
+    // email that tells a customer a refund did not go through.
     expect(restoredSlugs).toEqual([
       "admin_new_order",
       "customer_sign_in",
       "order_cancelled",
+      "refund_failed",
       "refund_processed",
     ]);
     expect(plan.empty).toBe(false);

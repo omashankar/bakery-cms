@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
   MapPin,
@@ -14,13 +14,17 @@ import { toast } from "sonner";
 import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import { DeliveryZoneFormDialog } from "@/apps/admin/commerce/components/delivery-zone-form-dialog";
-import { formatZoneDeliveryTime } from "@/features/commerce/lib/delivery-zone-utils";
+import {
+  describeZoneCoverage,
+  formatZoneDeliveryTime,
+} from "@/features/commerce/lib/delivery-zone-utils";
 import {
   defaultDeliveryZoneFilters,
   type DeliveryZone,
   type DeliveryZoneListFilters,
 } from "@/types/delivery";
 import {
+  applyServerZones,
   deleteDeliveryZones,
   DELIVERY_ZONES_UPDATED_EVENT,
   filterDeliveryZones,
@@ -41,7 +45,8 @@ import {
 import { EmptyState } from "@/components/shared/empty-state";
 import { ListLoading } from "@/components/shared/list-loading";
 import { ListPagination } from "@/components/shared/list-pagination";
-import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
+import { adminShell } from "@/apps/admin/components/admin-shell";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -60,6 +65,8 @@ const EMPTY_STATS = {
 function exportZonesToCsv(zones: DeliveryZone[]): void {
   const headers = [
     "Name",
+    "Covers",
+    "Except",
     "City",
     "Pincode",
     "Charge",
@@ -71,6 +78,8 @@ function exportZonesToCsv(zones: DeliveryZone[]): void {
   ];
   const rows = zones.map((zone) => [
     zone.name,
+    describeZoneCoverage(zone).covers,
+    describeZoneCoverage(zone).except,
     zone.city,
     zone.pincode,
     String(zone.deliveryCharge),
@@ -94,7 +103,18 @@ function exportZonesToCsv(zones: DeliveryZone[]): void {
   URL.revokeObjectURL(url);
 }
 
-export function DeliveryZonesAdminPage() {
+export function DeliveryZonesAdminPage({
+  initial = null,
+}: {
+  /** Every zone, read on the server; null fetches as before. */
+  initial?: DeliveryZone[] | null;
+} = {}) {
+  // Before this screen's mount read, so it finds the shop's zones — not this
+  // browser's old copy or the shipped demo ones — and the save gate open.
+  useLayoutEffect(() => {
+    if (initial) applyServerZones(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
+  }, []);
   const [mounted, setMounted] = useState(false);
   const [zones, setZones] = useState<DeliveryZone[]>([]);
   const [filters, setFilters] = useState<DeliveryZoneListFilters>(defaultDeliveryZoneFilters);
@@ -238,7 +258,7 @@ export function DeliveryZonesAdminPage() {
             <Button variant="bakery" className="w-full sm:w-auto" onClick={openCreate}>
               <Plus className="size-4" />
               <span className="sm:hidden">Add</span>
-              <span className="hidden sm:inline">Add zone</span>
+              <span className="hidden sm:inline">Add Zone</span>
             </Button>
           </div>
         }
@@ -414,10 +434,10 @@ export function DeliveryZonesAdminPage() {
                       />
                     </th>
                     <th className="px-4 py-3 font-medium">Zone</th>
-                    <th className="px-4 py-3 font-medium">City</th>
-                    {/* Zones match a full 6-digit pincode or a prefix — say so, or a
-                        short value like "411" reads as broken data next to "400001". */}
-                    <th className="px-4 py-3 font-medium">Pincode / prefix</th>
+                    {/* WHAT THE ZONE COVERS, in words. It was a City column and a
+                        Pincode column, which said nothing about a zone covering
+                        a state or the whole country, or the PINs it leaves out. */}
+                    <th className="px-4 py-3 font-medium">Covers</th>
                     <th className="px-4 py-3 font-medium">Charge</th>
                     <th className="px-4 py-3 font-medium">Delivery time</th>
                     <th className="px-4 py-3 font-medium">Priority</th>
@@ -440,8 +460,14 @@ export function DeliveryZonesAdminPage() {
                         />
                       </td>
                       <td className="px-4 py-3 font-medium">{zone.name}</td>
-                      <td className="px-4 py-3">{zone.city}</td>
-                      <td className="px-4 py-3 font-mono text-xs">{zone.pincode}</td>
+                      <td className="max-w-xs px-4 py-3">
+                        <p>{describeZoneCoverage(zone).covers}</p>
+                        {describeZoneCoverage(zone).except ? (
+                          <p className="text-xs text-muted-foreground">
+                            Except {describeZoneCoverage(zone).except}
+                          </p>
+                        ) : null}
+                      </td>
                       <td className="px-4 py-3 font-semibold">
                         {formatCurrency(zone.deliveryCharge)}
                       </td>
@@ -496,7 +522,10 @@ export function DeliveryZonesAdminPage() {
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold">{zone.name}</p>
                           <p className="truncate text-xs text-muted-foreground">
-                            {zone.city} · {zone.pincode}
+                            {describeZoneCoverage(zone).covers}
+                            {describeZoneCoverage(zone).except
+                              ? ` · except ${describeZoneCoverage(zone).except}`
+                              : ""}
                           </p>
                         </div>
                         <p className="shrink-0 text-sm font-semibold">

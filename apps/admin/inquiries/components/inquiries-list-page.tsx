@@ -23,7 +23,8 @@ import { ListLoading } from "@/components/shared/list-loading";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { MobileDetailDrawer } from "@/components/shared/mobile-detail-drawer";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
-import { AdminPage, AdminPageHeader, adminShell } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
+import { adminShell } from "@/apps/admin/components/admin-shell";
 import { cn } from "@/lib/utils";
 import type { Inquiry, InquiryStatus, InquiryType } from "@/types/inquiry";
 import { formatDate, formatRelativeTime } from "@/utils/format";
@@ -439,7 +440,7 @@ export function InquiriesListPage({
                           </td>
                           {!fixedType ? (
                             <td className="px-4 py-3">
-                              <Badge variant="outline" className="text-[10px]">
+                              <Badge variant="outline" className="text-[11px]">
                                 {formatInquiryType(inquiry.type)}
                               </Badge>
                             </td>

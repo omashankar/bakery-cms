@@ -106,6 +106,27 @@ export function normaliseTimeSlot(slot: string): string {
     .replace(/\s+/g, " ");
 }
 
+/**
+ * The windows a delivery may be booked in: the chosen SPEED's own, or the
+ * shop-wide list when no speed was chosen (or the shop has none).
+ *
+ * The server only ever checked the shop-wide list. A speed with its own windows
+ * — "Midnight", 11:30 PM – 12:00 AM — offered a window that list does not
+ * contain, so every customer who picked it was refused at the quote with
+ * "That delivery time is not one this shop offers", and the speed could not
+ * be bought at all.
+ */
+export function offeredWindows(
+  commerce: {
+    deliveryTimeSlots?: readonly string[];
+    deliveryTiers?: ReadonlyArray<{ id: string; windows: readonly string[] }>;
+  },
+  tierId: string | undefined,
+): readonly string[] {
+  const tier = tierId ? (commerce.deliveryTiers ?? []).find((t) => t.id === tierId) : undefined;
+  return tier ? tier.windows : (commerce.deliveryTimeSlots ?? []);
+}
+
 export function isOfferedTimeSlot(chosen: string, offered: readonly string[]): boolean {
   const wanted = normaliseTimeSlot(chosen);
   if (!wanted) return true;
@@ -134,8 +155,16 @@ export function timeSlotEndsAt(slot: string): number | null {
   const last = meridiem.at(-1);
   if (last) {
     // 12am is midnight and 12pm is noon: the hour wraps, the half-day does not.
-    const hour = (Number(last[1]) % 12) + (last[3] === "pm" ? 12 : 0);
-    return hour * 60 + Number(last[2]);
+    const toMinutes = (match: RegExpMatchArray) =>
+      ((Number(match[1]) % 12) + (match[3] === "pm" ? 12 : 0)) * 60 + Number(match[2]);
+    const end = toMinutes(last);
+    // A window that ENDS at or past midnight — "11:00 PM – 12:00 AM" — closes
+    // at the end of ITS day, not at its start. Read as 0 it was always
+    // "past", so a midnight delivery could never be booked for tonight and
+    // the server refused it too.
+    const first = meridiem[0];
+    if (meridiem.length > 1 && first && end <= toMinutes(first)) return end + 24 * 60;
+    return end;
   }
 
   // No am/pm anywhere: read it as a 24-hour clock rather than assuming.
@@ -279,6 +308,33 @@ export function sameDayCutoffFor(cutoff: string | undefined, leadDays: number): 
 }
 
 /**
+ * One formatter per zone, kept. The homepage countdown asks for the shop's
+ * clock once a second, and a fresh `Intl.DateTimeFormat` each time was a
+ * measurable slice of a phone's main thread while the page was loading.
+ * Constructing it is also what throws on an unusable zone, so a bad zone is
+ * never cached and still falls through to the visitor's clock below.
+ */
+const shopClockFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function shopClockFormatter(timezone: string): Intl.DateTimeFormat {
+  let formatter = shopClockFormatters.get(timezone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-GB", {
+      timeZone: timezone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    shopClockFormatters.set(timezone, formatter);
+  }
+  return formatter;
+}
+
+/**
  * `new Date()` as the SHOP'S clock reads it, not the visitor's.
  *
  * "14:00" means 14:00 where the shop is. Run on the browser's clock, somebody
@@ -306,16 +362,7 @@ export function sameDayCutoffFor(cutoff: string | undefined, leadDays: number): 
  */
 export function shopClockNow(timezone: string, now: Date = new Date()): Date {
   try {
-    const parts = new Intl.DateTimeFormat("en-GB", {
-      timeZone: timezone,
-      hourCycle: "h23",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    }).formatToParts(now);
+    const parts = shopClockFormatter(timezone).formatToParts(now);
 
     const read = (type: Intl.DateTimeFormatPartTypes) =>
       Number(parts.find((part) => part.type === type)?.value);
@@ -379,15 +426,17 @@ export function countdownParts(
  *
  * A fixed hours/minutes/seconds triple carries a "00" for most of the day: a
  * cell whose entire content is the ABSENCE of a unit, given the same width and
- * the same weight as the ones that mean something. It also puts SECONDS on the
- * page six hours out, where a digit changes 3,600 times before anything a
- * customer can act on has changed at all.
+ * the same weight as the ones that mean something.
  *
- * ONE RULE: drop the leading units that are still zero, then keep at most two.
- * 05:12:09 reads hours and minutes, 00:12:09 reads minutes and seconds, and
- * 00:00:09 reads seconds alone. So the LEADING cell is never "00" — a trailing
- * one still can be, and should: "01 hours 00 minutes" is a reading, where "00
+ * ONE RULE: drop the leading units that are still zero, and keep the rest.
+ * 05:12:09 reads hours, minutes and seconds; 00:12:09 minutes and seconds;
+ * 00:00:09 seconds alone. So the LEADING cell is never "00" — a trailing one
+ * still can be, and should: "01 hours 00 minutes" is a reading, where "00
  * hours" is a unit that is not there.
+ *
+ * SECONDS ALL DAY, at the shop's request (2026-10-13): it wants the clock to
+ * be seen running, as a countdown does. This replaced "keep at most two",
+ * which hid the seconds until the last hour.
  *
  * `timeLeftToday` returns null at or past the cutoff, so `countdownParts` is
  * non-null only while at least one unit is non-zero and `findIndex` cannot
@@ -413,5 +462,32 @@ export function countdownCells(parts: {
     units.findIndex(([, value]) => Number(value) > 0),
     0,
   );
-  return units.slice(lead, lead + 2);
+  return units.slice(lead);
+}
+
+/**
+ * The earliest delivery, in the words a product card says it: "Today",
+ * "Tomorrow", or a short date.
+ *
+ * The shop's lead time, pushed a day when a same-day shop is past its cutoff —
+ * the same two rules checkout enforces, so a card never promises a day the
+ * date picker then refuses. `now` is the SHOP's wall clock (`shopClockNow`).
+ */
+export function earliestDeliveryLabel(leadDays: number, cutoff: string | undefined, now: Date): string {
+  const today = todayAsDateString(now);
+  let date = earliestDeliveryDateString(leadDays, now);
+  const closes = sameDayCutoffFor(cutoff, leadDays);
+  if (date === today && closes && isPastSameDayCutoff(today, closes, now)) {
+    date = addDays(today, 1);
+  }
+  if (date === today) return "Today";
+  if (date === addDays(today, 1)) return "Tomorrow";
+
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString("en-IN", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
 }

@@ -1,9 +1,9 @@
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
+import { readSource } from "../renderer-source";
 
-const source = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+const source = (path: string) => readSource(path);
 
 /** Comments quoting old code are not the code. */
 const code = (path: string) =>

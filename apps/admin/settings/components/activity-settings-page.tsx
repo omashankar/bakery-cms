@@ -14,12 +14,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { AdminPage, AdminPageHeader } from "@/apps/admin/components";
+import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { formatRelativeTime } from "@/utils/format";
 import type { ActivityLog } from "@/types/settings";
+import type { AuditLogEntry } from "@/types/audit";
 import { clearActivityLog, getActivityLog } from "@/features/settings/lib/settings-repository";
 import { fetchAuditLogs } from "@/features/audit/lib/audit-api";
 import { auditToActivity, mergeActivity } from "@/features/audit/lib/audit-activity";
+import { ACTIVITY_AUDIT_LIMIT } from "@/apps/admin/settings/lib/activity-defaults";
 import { ListLoading } from "@/components/shared/list-loading";
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 
@@ -33,7 +35,12 @@ const actionTone: Record<string, string> = {
   received: "bg-secondary text-secondary-foreground",
 };
 
-export function ActivitySettingsPage() {
+export function ActivitySettingsPage({
+  initial = null,
+}: {
+  /** The audit trail's newest rows, read on the server; null fetches as before. */
+  initial?: AuditLogEntry[] | null;
+} = {}) {
   const [mounted, setMounted] = useState(false);
   // Kept apart, because only ONE of them can be cleared.
   //
@@ -43,7 +50,9 @@ export function ActivitySettingsPage() {
   // touch and that reappear on the next load. Clearing also dropped them from
   // the list, so the screen agreed with the lie until someone reloaded.
   const [localEntries, setLocalEntries] = useState<ActivityLog[]>([]);
-  const [serverEntries, setServerEntries] = useState<ActivityLog[]>([]);
+  const [serverEntries, setServerEntries] = useState<ActivityLog[]>(() =>
+    initial ? initial.map(auditToActivity) : [],
+  );
   const [search, setSearch] = useState("");
   const [clearOpen, setClearOpen] = useState(false);
 
@@ -63,13 +72,15 @@ export function ActivitySettingsPage() {
    * round trip, and permanently on a 401 or a 500. That is the log an owner
    * opens to find out who changed something.
    */
-  const [auditLoading, setAuditLoading] = useState(true);
+  const [auditLoading, setAuditLoading] = useState(!initial);
   const [auditFailed, setAuditFailed] = useState(false);
 
   useEffect(() => {
+    // The server already read the trail for this page.
+    if (initial) return;
     let cancelled = false;
     (async () => {
-      const result = await fetchAuditLogs({ limit: 100 });
+      const result = await fetchAuditLogs({ limit: ACTIVITY_AUDIT_LIMIT });
       if (cancelled) return;
       if (result) setServerEntries(result.items.map(auditToActivity));
       setAuditFailed(!result);
@@ -78,6 +89,7 @@ export function ActivitySettingsPage() {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
   }, []);
 
   const entries = useMemo(

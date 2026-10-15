@@ -33,7 +33,8 @@ export type EmailTemplateSlug =
   | "password_reset"
   | "customer_sign_in"
   | "refund_processed"
-  | "admin_new_order";
+  | "admin_new_order"
+  | "refund_failed";
 
 /**
  * Used when the stored template is missing or still a draft.
@@ -94,6 +95,11 @@ const FALLBACKS: Record<EmailTemplateSlug, { subject: string; body: string }> = 
    * template would otherwise mean a cancelled customer hears nothing at all,
    * which is the state this template exists to end.
    */
+  // Says only what has actually happened: no money has reached the customer.
+  refund_failed: {
+    subject: "We could not complete your refund for {{order_number}}",
+    body: "Hi {{customer_name}},\n\nWe tried to refund {{refund_amount}} for order {{order_number}}, but the payment provider could not complete it.\n\nNo money has reached you yet. We are looking into it and will try again or contact you.\n\nQuestions? Email {{store_email}}\n\n— {{store_name}}",
+  },
   order_cancelled: {
     subject: "Your order {{order_number}} has been cancelled",
     body:

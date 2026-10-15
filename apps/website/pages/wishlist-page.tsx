@@ -2,18 +2,22 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Heart } from "lucide-react";
+import { Heart, X } from "lucide-react";
 import { ProductCard } from "@/components/storefront/product-card";
 import { EmptyState } from "@/components/shared/empty-state";
 import { StaggerReveal } from "@/components/shared/scroll-reveal";
 import { Button } from "@/components/ui/button";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
-import { toast } from "sonner";
-import { getWishlistSlugs, pruneWishlist } from "@/apps/website/lib/wishlist";
+import { toast } from "@/lib/lazy-toast";
+import { getWishlistSlugs, pruneWishlist, toggleWishlist } from "@/apps/website/lib/wishlist";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
 import type { LandingProduct } from "@/constants/landing-data";
+
+// Two across on a phone (it was ONE, a full-width card per saved item), up to
+// five on a wide screen, as the reference lays its wishlist out.
+const WISHLIST_GRID = "grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5";
 
 interface WishlistPageProps {
   /** Catalogue fetched on the server; the saved slugs themselves are browser-local. */
@@ -59,22 +63,25 @@ export function WishlistPage({ catalog }: WishlistPageProps) {
 
   return (
     <>
-      <StorePageHeader
-        title="Wishlist"
-        breadcrumbs={[{ label: "Wishlist" }]}
-      />
+      <StorePageHeader title="My Wishlist" breadcrumbs={[{ label: "Wishlist" }]} titleOwnedByPage />
       <section className={layoutSpacing.sectionY}>
         <div className={layoutSpacing.container}>
+          {/*
+            A TITLE YOU CAN SEE, with the count in it — "My Wishlist (9)", as
+            the reference heads the page. The heading was screen-reader only,
+            so the page opened on a grid with nothing saying what it was.
+          */}
+          <h1 className="mb-6 text-center font-heading text-2xl font-bold tracking-tight sm:mb-8 sm:text-3xl">
+            My Wishlist{loaded && cakes.length > 0 ? ` (${cakes.length})` : ""}
+          </h1>
           {!loaded ? (
-            <div className="grid gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-4">
-              {Array.from({ length: 6 }).map((_, i) => (
+            <div className={WISHLIST_GRID}>
+              {Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="overflow-hidden rounded-xl border border-border bg-card">
                   <div className="aspect-square animate-pulse bg-cream-100" />
-                  <div className="space-y-3 p-3.5">
-                    <div className="h-3 w-1/3 animate-pulse rounded bg-cream-100" />
+                  <div className="space-y-2.5 p-2.5">
                     <div className="h-4 w-2/3 animate-pulse rounded bg-cream-100" />
                     <div className="h-5 w-1/2 animate-pulse rounded bg-cream-100" />
-                    <div className="h-10 w-full animate-pulse rounded-lg bg-cream-100" />
                   </div>
                 </div>
               ))}
@@ -92,25 +99,27 @@ export function WishlistPage({ catalog }: WishlistPageProps) {
               }
             />
           ) : (
-            <>
-              <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm text-muted-foreground">
-                  <span className="font-semibold text-foreground">{cakes.length}</span>{" "}
-                  {cakes.length === 1
-                    ? labels.productWord.toLowerCase()
-                    : labels.productWordPlural.toLowerCase()}{" "}
-                  saved
-                </p>
-                <Button variant="outline" size="sm" render={<Link href={routes.store.collections} />}>
-                  Continue Shopping
-                </Button>
-              </div>
-              <StaggerReveal className="grid gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-4">
-                {cakes.map((cake) => (
-                  <ProductCard key={cake.id} cake={cake} />
-                ))}
-              </StaggerReveal>
-            </>
+            <StaggerReveal className={WISHLIST_GRID}>
+              {cakes.map((cake) => (
+                /*
+                  REMOVED BY AN ✕, not by the heart. A heart on a page of
+                  things already hearted asks "save this?" of something saved;
+                  the reference puts a plain ✕ in the corner, which says what
+                  pressing it does.
+                */
+                <div key={cake.id} className="relative">
+                  <ProductCard cake={cake} framed showWishlist={false} />
+                  <button
+                    type="button"
+                    onClick={() => toggleWishlist(cake.slug)}
+                    aria-label={`Remove ${cake.name} from your wishlist`}
+                    className="absolute top-2 right-2 flex size-8 items-center justify-center rounded-full border border-border bg-card/95 text-foreground shadow-sm transition-colors hover:bg-card hover:text-destructive"
+                  >
+                    <X className="size-4" aria-hidden />
+                  </button>
+                </div>
+              ))}
+            </StaggerReveal>
           )}
         </div>
       </section>
