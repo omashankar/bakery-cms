@@ -171,9 +171,12 @@ function render(cake: Product, modules = defaultModuleSettings): {
     container,
     html: container.innerHTML,
     section: (heading: string) => {
-      const found = [...container.querySelectorAll("section")].find((element) =>
-        element.querySelector("h2")?.textContent?.trim().startsWith(heading),
-      );
+      // The INNERMOST match: document order puts an enclosing section first,
+      // and since the product name became the page's <h1> the page's own
+      // section's first <h2> is this heading too.
+      const found = [...container.querySelectorAll("section")]
+        .filter((element) => element.querySelector("h2")?.textContent?.trim().startsWith(heading))
+        .pop();
       if (!found) throw new Error(`no "${heading}" section on the page`);
       return found.textContent ?? "";
     },

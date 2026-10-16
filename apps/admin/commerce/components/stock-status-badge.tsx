@@ -48,7 +48,7 @@ export function StockAlertBadge({ count, className }: StockAlertBadgeProps) {
   return (
     <span
       className={cn(
-        "inline-flex min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 py-0.5 text-[11px] font-bold leading-none text-white",
+        "inline-flex min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 py-0.5 text-[11px] font-bold leading-none text-amber-950",
         className
       )}
     >

@@ -18,9 +18,12 @@ import { cn } from "@/lib/utils";
 export function ClampedTitle({
   text,
   className,
+  as: Heading = "h2",
 }: {
   text: string;
   className?: string;
+  /** `h1` where the name IS the page — the product page. */
+  as?: "h1" | "h2";
 }) {
   const ref = useRef<HTMLHeadingElement>(null);
   const [expanded, setExpanded] = useState(false);
@@ -39,9 +42,9 @@ export function ClampedTitle({
 
   return (
     <div className="relative">
-      <h2 ref={ref} className={cn(className, !expanded && "line-clamp-2")}>
+      <Heading ref={ref} className={cn(className, !expanded && "line-clamp-2")}>
         {text}
-      </h2>
+      </Heading>
       {/*
         At the end of the second line, as in the reference, sitting over the
         clamp's own ellipsis — its background hides that one, so the line

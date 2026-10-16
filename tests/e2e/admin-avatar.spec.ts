@@ -21,41 +21,38 @@ import { adminSession } from "./admin-session";
  * accumulates within one, and two scripts writing the same key is a race about
  * ordering rather than a test about avatars.
  */
-const PHOTO =
-  "data:image/svg+xml;base64," +
-  Buffer.from(
-    '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#7A4D2B"/></svg>',
-  ).toString("base64");
-
-const PROFILE_KEY = "bakery-cms-admin-profile";
-
-/** Seeded before the first paint — the header reads this store in its mount effect. */
-async function seedProfile(
-  page: Parameters<typeof adminSession>[0],
-  profile: { fullName: string; email: string; photoUrl: string },
-) {
-  await page.addInitScript(
-    ([key, value]) => window.localStorage.setItem(key as string, value as string),
-    [PROFILE_KEY, JSON.stringify(profile)],
-  );
-}
-
 test.describe("the admin account menu", () => {
-  test("shows the photo the admin uploaded", async ({ page }) => {
+  /*
+    THE SERVER'S PROFILE, NOT A SEEDED ONE. This used to plant a photo in
+    localStorage and expect the header to show it — but the header is given
+    the profile by the server now, before any browser store is read, so the
+    seed lost to the real photo and the test failed on a header that was
+    working. It checks the stored photo instead, and that it arrives at the
+    size it is drawn: the original was 1.7 MB in a 28px circle on every page.
+  */
+  test("shows the photo the admin uploaded, at the size it is drawn", async ({ page }) => {
     await adminSession(page);
-    await seedProfile(page, {
-      fullName: "Om Suman",
-      email: "sumanom7014106@gmail.com",
-      photoUrl: PHOTO,
-    });
-
     await page.goto("/admin/profile");
 
     const trigger = page.getByLabel("Account menu");
     await expect(trigger).toBeVisible();
 
+    const stored = await page.evaluate(async () => {
+      const body = await (await fetch("/api/admin-config/admin-profile")).json().catch(() => null);
+      const data = body?.data;
+      return String(data?.photoUrl ?? data?.value?.photoUrl ?? "");
+    });
+    test.skip(!stored, "this admin has not uploaded a photo");
+
     const photo = trigger.locator("img");
     await expect(photo, "the uploaded photo never reached the header").toHaveCount(1);
-    await expect(photo).toHaveAttribute("src", PHOTO);
+    const src = (await photo.getAttribute("src")) ?? "";
+    // The same file, whatever was put in front of it.
+    expect(src).toContain(stored.split("/upload/").pop()!);
+    if (stored.includes("res.cloudinary.com")) {
+      expect(src, "the header downloads the full-size original").toMatch(
+        /\/upload\/f_auto,q_auto,w_\d{2},c_limit\//,
+      );
+    }
   });
 });

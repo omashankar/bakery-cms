@@ -596,6 +596,7 @@ export function ProductsListPage({
                         <div className="relative size-11 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
                           {cake.images[0] ? (
                             <SafeImage
+                              width={44}
                               src={cake.images[0]}
                               alt={cake.name}
                               className="object-cover"
@@ -698,6 +699,7 @@ export function ProductsListPage({
                   <div className="relative size-14 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
                     {cake.images[0] ? (
                       <SafeImage
+                        width={56}
                         src={cake.images[0]}
                         alt={cake.name}
                         className="object-cover"

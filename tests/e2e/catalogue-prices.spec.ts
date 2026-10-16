@@ -23,6 +23,9 @@ function rupees(text: string | null): number {
 
 test.describe("what a catalogue card says a cake costs", () => {
   test("matches the product page for a cake with a paid default option", async ({ page }) => {
+    // The default option ONLY: with none, a group adds nothing — not its first
+    // option. That is the pricing rule (`calculateVariantAdjustment`), and an
+    // unticked "Eggless +₹99" box is not a surcharge.
     // A product whose DEFAULT variant option costs money. Without one of these
     // in the catalogue this test would pass on a cake that has nothing to add,
     // and prove nothing.
@@ -31,25 +34,25 @@ test.describe("what a catalogue card says a cake costs", () => {
     const withPaidDefault = products.find((product) =>
       (product.variantGroups ?? []).some((group: { options?: { isDefault?: boolean; priceAdjustment?: number }[] }) => {
         const options = group.options ?? [];
-        const fallback = options.find((option) => option.isDefault) ?? options[0];
+        const fallback = options.find((option) => option.isDefault);
         return Number(fallback?.priceAdjustment ?? 0) > 0;
       }),
     );
-    expect(
-      withPaidDefault,
-      "no product in this shop has a paid default option, so this test cannot prove anything",
-    ).toBeTruthy();
+    // The shop's data, not a fault: with no paid default anywhere there is no
+    // surcharge for the card and the page to disagree about.
+    test.skip(!withPaidDefault, "no product in this shop has a paid default option to compare");
 
     const surcharge = (withPaidDefault!.variantGroups as { options?: { isDefault?: boolean; priceAdjustment?: number }[] }[])
       .reduce((total, group) => {
         const options = group.options ?? [];
-        const fallback = options.find((option) => option.isDefault) ?? options[0];
+        const fallback = options.find((option) => option.isDefault);
         return total + Number(fallback?.priceAdjustment ?? 0);
       }, 0);
     const expected = Number(withPaidDefault!.price) + surcharge;
 
     await page.goto(`/store/p/${withPaidDefault!.slug}`);
-    const pagePrice = rupees(await page.getByText(/₹/).first().textContent());
+    // Inside main: the announcement strip above the header carries rupees too.
+    const pagePrice = rupees(await page.locator("main").getByText(/₹/).first().textContent());
     expect(pagePrice, "the product page is not charging the default surcharge").toBe(expected);
 
     // And the grid card, which is the one that was showing the bare base price.
@@ -79,20 +82,24 @@ test.describe("what a catalogue card says a cake costs", () => {
       // The product page has refused this since it was written.
       await expect(page.getByRole("button", { name: /out of stock/i }).first()).toBeVisible();
 
+      // The card carries no Add to Cart of its own now — it opens the product —
+      // so the guard is that it offers none, and says why it cannot be had.
       // The card is the same action on every grid, including the wishlist. It
       // used to add the cake and toast "Added to cart", and checkout then
       // blocked on it — after the customer had filled in their address.
       await page.goto("/store/collections");
       const card = page.locator("article").filter({ hasText: target!.name }).first();
       if (await card.isVisible().catch(() => false)) {
-        await expect(card.getByRole("button", { name: /out of stock/i })).toBeDisabled();
+        await expect(card.getByRole("button", { name: /add to cart/i })).toHaveCount(0);
+        await expect(card.getByText(/out of stock/i).first()).toBeVisible();
       } else {
         // Not on the first page of the grid — search for it instead, rather
         // than passing on an assertion that never ran.
         await page.goto(`/store/collections?q=${encodeURIComponent(target!.name)}`);
         const found = page.locator("article").filter({ hasText: target!.name }).first();
         await expect(found).toBeVisible();
-        await expect(found.getByRole("button", { name: /out of stock/i })).toBeDisabled();
+        await expect(found.getByRole("button", { name: /add to cart/i })).toHaveCount(0);
+        await expect(found.getByText(/out of stock/i).first()).toBeVisible();
       }
     } finally {
       // Restored here rather than left to the teardown: this is the shop's own

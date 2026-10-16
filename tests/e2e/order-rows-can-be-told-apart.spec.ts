@@ -91,7 +91,9 @@ test.describe("an order whose stored items have no ids", () => {
      * return. Fixing the crash made the page load with a placeholder in every
      * row, which looks deliberate and is not.
      */
-    await expect(page.locator("main img, main [role=img]").first()).toBeVisible();
+    // `:visible` for the same reason as the rows above: the print copy of the
+    // invoice comes first in the DOM and carries the shop logo.
+    await expect(page.locator("main img:visible, main [role=img]:visible").first()).toBeVisible();
 
     /**
      * The crash this page was ACTUALLY dying of, kept in the same test.

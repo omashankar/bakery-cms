@@ -515,6 +515,7 @@ export function BannersAdminPage({
                           <div className="flex items-center gap-3">
                             <div className="relative h-12 w-20 shrink-0 overflow-hidden rounded-md border border-border bg-muted">
                               <SafeImage
+                                width={80}
                                 src={banner.image}
                                 alt={banner.title}
                                 className="object-cover"
@@ -590,6 +591,7 @@ export function BannersAdminPage({
                     <div className="min-w-0 flex-1 space-y-3">
                       <div className="relative aspect-[3/1] overflow-hidden rounded-lg border border-border bg-muted">
                         <SafeImage
+                          width={640}
                           src={banner.image}
                           alt={banner.title}
                           className="object-cover"

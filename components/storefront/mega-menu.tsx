@@ -750,6 +750,7 @@ export function MegaMenu({
                 */}
                 <div className="relative aspect-[4/5] overflow-hidden bg-muted">
                   <SafeImage
+                    width={240}
                     src={featured.image}
                     alt={featured.name}
                     className="transition-transform group-hover/card:scale-[1.02]"

@@ -74,7 +74,7 @@ test("offers the shop's own products while the customer is still typing", async 
     rather than by what it says — a row could print anything.
   */
   for (const row of rows) {
-    expect(row.href, `a row points at ${row.href}`).toMatch(/^\/store\/cakes\/[a-z0-9-]+$/);
+    expect(row.href, `a row points at ${row.href}`).toMatch(/^\/store\/p\/[a-z0-9-]+$/);
     expect(row.text, `a row does not mention what was typed: ${row.text}`).toContain("choc");
   }
 
@@ -111,7 +111,7 @@ test("a row opens that product, and Enter still lands on the results page", asyn
   expect(target, "there was no row to click").toBeTruthy();
 
   await page.locator(ROW).first().click();
-  await page.waitForURL(/\/store\/cakes\//, { timeout: 30_000 });
+  await page.waitForURL(/\/store\/p\//, { timeout: 30_000 });
   expect(page.url(), "clicking a suggestion went somewhere else").toContain(target!);
 
   /* ---- the keyboard ----------------------------------------------------- */
@@ -125,7 +125,7 @@ test("a row opens that product, and Enter still lands on the results page", asyn
     "ArrowDown highlights nothing",
   ).toBe("true");
   await page.press(BOX, "Enter");
-  await page.waitForURL(/\/store\/cakes\//, { timeout: 30_000 });
+  await page.waitForURL(/\/store\/p\//, { timeout: 30_000 });
   expect(page.url(), "Enter on a highlighted row went somewhere else").toContain(highlighted!);
 
   /*

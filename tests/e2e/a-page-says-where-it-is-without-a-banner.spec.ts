@@ -25,9 +25,17 @@ import { expect, test } from "@playwright/test";
  * the suite stayed green, which is the reason this file exists.
  */
 
+/*
+  NOT THE CART. It wears the focused checkout header now — logo, the four
+  steps, "Secure checkout" — and its steps are where it says it is; a store
+  trail there would be a second way out of the checkout, which is what the
+  focused header removed.
+*/
+/** Pages whose single `<h1>` is printed on purpose — see the check below. */
+const DRAWN_ON_PURPOSE = new Set(["Wishlist"]);
+
 const PAGES = [
   ["/store/collections", "Collections"],
-  ["/store/cart", "Cart"],
   ["/store/contact", "Contact"],
   ["/store/faq", "FAQ"],
   ["/store/wishlist", "Wishlist"],
@@ -120,21 +128,27 @@ test("every page keeps its trail and its heading, and none of them wears a banne
       user cannot skim, and neither of them is looking at the layout that was
       tidied. So it is in the document and it draws nothing.
     */
+    /*
+      EXCEPT WHERE THE HEADING SAYS SOMETHING THE TRAIL DOES NOT. The wishlist
+      is titled "My Wishlist (3)" as the reference has it — the count is news
+      the crumb "Wishlist" does not carry — so its one <h1> is drawn.
+    */
     expect(
       seen.headingDrawn,
       `${name}: the heading is printed again at ${seen.headingPx}px`,
-    ).toBe(false);
+    ).toBe(DRAWN_ON_PURPOSE.has(name));
 
     expect(seen.overflow, `${name}: the page scrolls sideways`).toBe(0);
   }
 });
 
-test("and a product still shows its name, even though its heading does not", async ({ page }) => {
+test("and a product page is headed by its name, printed once", async ({ page }) => {
   /*
-    EVERY page now keeps an undrawn `<h1>`, so the first test covers most of
-    this. What only the product page can answer is the other half: the name a
-    customer reads has to still be SOMEWHERE, drawn by the column beside the
-    photograph rather than by the heading.
+    THE PRODUCT PAGE IS THE EXCEPTION TO THE UNDRAWN `<h1>`: it is the one
+    page whose name is printed anyway, beside the photograph. That name was an
+    `<h2>` under a hidden `<h1>` saying the same words, so a screen reader
+    heard the product twice and the title wore a heading size of its own. The
+    drawn name is the `<h1>` now, and the hidden copy is gone.
 
     That is the failure this catches and the one above cannot. "The h1 exists
     and is invisible" is satisfied just as happily by a page that shows the
@@ -162,7 +176,7 @@ test("and a product still shows its name, even though its heading does not", asy
   expect(seen.headingCount, `the product page has ${seen.headingCount} h1 elements`).toBe(1);
   expect(seen.headingText.length, "the product page's h1 is empty").toBeGreaterThan(0);
 
-  /* It is there and it is not drawn — both halves, or this passes either way. */
+  /* It is the name a customer reads, and nothing repeats it as a heading. */
   const drawn = await page.evaluate(() => {
     const h1 = document.querySelector("h1");
     if (!h1) return null;
@@ -170,10 +184,12 @@ test("and a product still shows its name, even though its heading does not", asy
     return { w: Math.round(box.width), h: Math.round(box.height) };
   });
   expect(drawn, "there is no h1 to measure").not.toBeNull();
-  expect(
-    drawn!.h,
-    `the product name is printed twice: the h1 is ${drawn!.w}x${drawn!.h}`,
-  ).toBeLessThanOrEqual(1);
+  expect(drawn!.h, "the product page's h1 is hidden again — the name is drawn as something else").toBeGreaterThan(1);
+  const repeats = await page.evaluate(() => {
+    const name = (document.querySelector("h1")?.textContent ?? "").trim();
+    return [...document.querySelectorAll("h1, h2, h3")].filter((h) => (h.textContent ?? "").trim() === name).length;
+  });
+  expect(repeats, "the product name is a heading twice").toBe(1);
 
   /* …and the name a customer reads is still on the page, drawn by the column. */
   const name = href.split("/").pop()!.split("-")[0]!;

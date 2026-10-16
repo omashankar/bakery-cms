@@ -60,12 +60,11 @@ import { StockStatusBadge } from "@/apps/admin/commerce/components/stock-status-
 import { resolveSaveStatus, type SaveIntent } from "@/lib/publishing/save-status";
 import { formatStatusLabel } from "@/features/products/lib/product-utils";
 import { getInventorySettings } from "@/apps/admin/commerce/lib/inventory-repository";
-import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
 import { useUnsavedChangesGuard } from "@/apps/admin/builders/shared/use-unsaved-changes-guard";
 import { MAX_PRODUCT_PHOTOS } from "@/features/products/lib/product-limits";
 import { loadSeoStore, SEO_UPDATED_EVENT } from "@/features/seo/lib/seo-repository";
 import { getActiveLocale } from "@/features/settings/lib/active-locale";
-import type { ModuleSettings } from "@/types/settings";
+import type { DeliveryTier, ModuleSettings } from "@/types/settings";
 import {
   classForCancellableTick,
   isCancellableClass,
@@ -95,6 +94,8 @@ interface ProductFormPageProps {
   initialCatalog?: Partial<CatalogStore> | null;
   /** The SEO store the search preview reads, and its version. */
   initialSeo?: Parameters<typeof applyServerSeo>[0] | null;
+  /** The shop's delivery speeds and its delivery wording, read on the server. */
+  initialDelivery?: { tiers: DeliveryTier[]; information: string } | null;
 }
 
 /**
@@ -131,6 +132,7 @@ export function ProductFormPage({
   initialProduct = null,
   initialCatalog = null,
   initialSeo = null,
+  initialDelivery = null,
 }: ProductFormPageProps) {
   // Before the mount effects below, so the pickers read the shop's taxonomy
   // and the preview the shop's SEO store, without asking for either.
@@ -235,7 +237,19 @@ export function ProductFormPage({
    * Empty for a shop that has not set any up, and the control below hides
    * itself rather than printing a heading over nothing.
    */
-  const deliveryTiers = getCommerceSettings().deliveryTiers ?? [];
+  /*
+    FROM THE SERVER, NOT READ FROM THE BROWSER DURING RENDER.
+
+    This was `getCommerceSettings().deliveryTiers` in the body. On the server
+    that is the defaults — no speeds — and in a browser that has opened any
+    other admin screen it is the shop's cached settings, so the HTML said one
+    thing and the first client render another: "Can be delivered by" against
+    "Occasions", and React threw the form away and rebuilt it. The page reads
+    them with the product; if that read fails the control hides, as it does
+    for a shop with no speeds, and the product's own ticks are kept.
+  */
+  const deliveryTiers: DeliveryTier[] = initialDelivery?.tiers ?? [];
+  const deliveryInformation = initialDelivery?.information ?? "";
   const productsLower = labels.productWordPlural.toLowerCase();
 
   /**
@@ -1743,7 +1757,7 @@ export function ProductFormPage({
                 <ProductDescriptionBlocksFields
                   value={form.descriptionBlocks ?? []}
                   onChange={(descriptionBlocks) => patchForm({ descriptionBlocks })}
-                  deliveryInformation={getCommerceSettings().deliveryInformation}
+                  deliveryInformation={deliveryInformation}
                 />
               </TabsContent>
 

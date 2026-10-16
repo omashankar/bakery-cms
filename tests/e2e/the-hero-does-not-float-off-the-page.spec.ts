@@ -92,8 +92,19 @@ for (const { name, width, height } of WIDTHS) {
         that mutation survived the first version of this file.
       */
       const picture = heroEl?.querySelector("img") ?? null;
-      const menu = document.querySelector('[data-section-id^="our-menu"]');
-      const tile = menu?.querySelector("a") ?? null;
+      /*
+        WHATEVER THE SHOP PUT UNDER THE HERO, measured to its first drawn box.
+        This was the category strip by name; the shop has since put its
+        promises band between them, and the question — does the hero float
+        away from the page under it — is about the next section, not one
+        particular kind.
+      */
+      const sections = [...document.querySelectorAll("[data-section-id]")];
+      const next = sections[sections.indexOf(heroEl as Element) + 1] ?? null;
+      const tile =
+        [...(next?.querySelectorAll("a, li, h2, img") ?? [])].find(
+          (el) => el.getBoundingClientRect().height > 0,
+        ) ?? null;
 
       const bottom = (el: Element | null) =>
         el ? el.getBoundingClientRect().bottom + window.scrollY : null;
@@ -107,7 +118,7 @@ for (const { name, width, height } of WIDTHS) {
         : null;
     });
 
-    expect(gap, "the hero or the category strip is not on this page").not.toBeNull();
+    expect(gap, "the hero or the section under it is not on this page").not.toBeNull();
     /*
       An upper bound with room in it. 218px was the defect (32 to the dots,
       then 186 past them); 90 is where the three fixes landed at laptop width.

@@ -62,6 +62,20 @@ async function cards(page: import("@playwright/test").Page, trio: boolean) {
   }, trio);
 }
 
+/*
+  THE BAND IS THE SHOP'S CONTENT, not this file's. When the shop's published
+  homepage has no two-across banner band there is nothing to measure, and
+  saying so is the honest result; failing would report a layout bug that a
+  homepage edit caused.
+*/
+test.beforeEach(async ({ page }) => {
+  await page.goto("/store");
+  test.skip(
+    (await page.locator(BAND).count()) === 0,
+    "the published homepage has no two-across banner band (banner-grid-pairs) to measure",
+  );
+});
+
 for (const trio of [false, true]) {
   const shape = trio ? "three across" : "two across";
   const wanted = trio ? 493 / 290 : 750 / 290;

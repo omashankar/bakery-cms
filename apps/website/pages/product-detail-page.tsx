@@ -1150,6 +1150,8 @@ export function ProductDetailPage({
     <>
       <StorePageHeader
         title={cake.name}
+        /* The name under the photo is the page heading; no hidden copy. */
+        titleOwnedByPage
         /*
           HOME › CHOCOLATES › THIS CAKE.
 
@@ -1304,7 +1306,7 @@ export function ProductDetailPage({
                   28 and the price at about 40, and that ordering is the point
                   rather than the exact figures.
                 */}
-                <ClampedTitle text={cake.name} className={storefrontHeading.page} />
+                <ClampedTitle as="h1" text={cake.name} className={storefrontHeading.page} />
                 {/*
                   THE RATING AS A BADGE, and a way to the reviews.
 

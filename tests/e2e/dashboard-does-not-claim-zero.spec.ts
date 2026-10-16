@@ -62,8 +62,13 @@ test("does not report zero revenue, or all clear, before the figures arrive", as
 
   await page.goto("/admin/dashboard");
 
-  // Mid-flight: it must say it is loading, not that the shop earned nothing.
-  await expect(page.getByText(/loading figures/i)).toBeVisible();
+  /*
+    Mid-flight: the shop's REAL figures, not a loading line and not zero. The
+    page reads the analytics on the server now, so the held request is only
+    the refresh behind them; "Loading figures" was the state before that.
+  */
+  await expect(page.getByRole("link", { name: /revenue/i }).first()).toBeVisible();
+  await expect(page.getByText(/loading figures/i)).toHaveCount(0);
 
   const midFlight = await said(page);
   // The side panels read their data synchronously, but `useEffect` runs after
@@ -132,18 +137,26 @@ test("still reports a genuine zero once the figures are in", async ({ page }) =>
   await expect(page.getByText(/figures unavailable/i)).toHaveCount(0);
 });
 
-test("says the figures are unavailable rather than zero when the request fails", async ({
+test("keeps the shop's figures rather than zero when the refresh fails", async ({
   page,
 }) => {
-  // The third state. A failed cold load left every zero standing and disclaimed
-  // them in a caption below — so "Active orders 0 — All clear" sat in confident
-  // green underneath "Figures unavailable — the server did not answer".
+  /*
+    The third state. A failed cold load left every zero standing and disclaimed
+    them in a caption below — so "Active orders 0 — All clear" sat in confident
+    green underneath "Figures unavailable — the server did not answer".
+
+    The figures come with the page now, so a failed REFRESH has real numbers
+    to keep, and keeping them is the answer: dropping them for "unavailable"
+    would hide figures the server already gave. What must still never appear
+    is a zero standing in for them.
+  */
   await adminSession(page);
   await page.route("**/api/orders/analytics**", (route) => route.fulfill({ status: 500 }));
 
   await page.goto("/admin/dashboard");
 
-  await expect(page.getByText(/figures unavailable — the server did not answer/i)).toBeVisible();
+  await expect(page.getByRole("link", { name: /revenue/i }).first()).toBeVisible();
+  await page.waitForTimeout(2000);
   await expect(page.getByText("All clear")).toHaveCount(0);
   await expect(page.getByText(/₹\s*0\.00/)).toHaveCount(0);
   await expect(page.getByText("No sales data yet")).toHaveCount(0);

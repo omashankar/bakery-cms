@@ -301,6 +301,7 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
                 <li key={item.id} className="flex gap-4">
                   <div className="relative size-16 shrink-0 overflow-hidden rounded-lg bg-muted">
                     <SafeImage
+                      width={64}
                       src={item.image}
                       alt={item.name}
                       fill

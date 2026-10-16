@@ -755,7 +755,14 @@ export function HeroCarousel({
                   */
                   inert={i !== index}
                 >
-                  <HeroBannerSlideView slide={slide} priority={i === 0} side={copySide} />
+                  {/*
+                    `i === 1`: the row opens on index 1, the shop's first
+                    slide. Index 0 is the copy of the LAST one, off to the
+                    left — it held the high priority, so the picture nobody
+                    sees was fetched first and the hero, the page's LCP,
+                    waited behind it.
+                  */}
+                  <HeroBannerSlideView slide={slide} priority={i === 1} side={copySide} />
                 </div>
               ))}
             </div>

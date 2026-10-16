@@ -8,14 +8,36 @@ import { expect, test, type Page } from "@playwright/test";
  * no unit test can: that the controls on the page do what they say.
  */
 
+/**
+ * THE FIRST PRODUCT THAT ADDS, and only once the cart has it.
+ *
+ * It took the first card and left for the cart straight after the click. Two
+ * ways that fails a working cart: the shop's first card can be a photo cake,
+ * which rightly refuses Add to Cart until a photo is chosen; and leaving in
+ * the same tick as the click raced the write the cart page reads.
+ */
 async function addFirstProduct(page: Page) {
   await page.goto("/store");
-  const firstProduct = page.locator('a[href^="/store/p/"]').first();
-  await expect(firstProduct).toBeVisible();
-  const href = await firstProduct.getAttribute("href");
-  await page.goto(href!);
+  await expect(page.locator('a[href^="/store/p/"]').first()).toBeVisible();
+  const hrefs = [
+    ...new Set(
+      await page
+        .locator('a[href^="/store/p/"]')
+        .evaluateAll((links) => links.map((link) => link.getAttribute("href") ?? "")),
+    ),
+  ].slice(0, 6);
 
-  await page.getByRole("button", { name: /add to cart/i }).first().click();
+  for (const href of hrefs) {
+    await page.goto(href);
+    await page.getByRole("button", { name: /add to cart/i }).first().click();
+    const added = await expect
+      .poll(() => page.evaluate(() => localStorage.getItem("bakery-cms-cart") ?? "[]"), { timeout: 4000 })
+      .not.toBe("[]")
+      .then(() => true)
+      .catch(() => false);
+    if (added) break;
+  }
+
   await page.goto("/store/cart");
   await expect(page.getByRole("button", { name: /remove item/i }).first()).toBeVisible();
 }

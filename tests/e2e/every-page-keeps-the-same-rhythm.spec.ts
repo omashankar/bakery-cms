@@ -174,7 +174,8 @@ test("and a heading means the same thing on all of them", async ({ page }) => {
     await page.waitForTimeout(2600);
     const rows = await page.evaluate(() =>
       [...document.querySelectorAll("main h2")]
-        .filter((h) => (h.textContent ?? "").trim() && h.getBoundingClientRect().width > 0)
+        // Drawn headings only: an sr-only heading is a 1px box at the browser default size.
+        .filter((h) => (h.textContent ?? "").trim() && h.getBoundingClientRect().width > 1)
         .map((h) => {
           const style = getComputedStyle(h);
           return {
@@ -215,7 +216,8 @@ test("and a panel heading is the same on the page beside it", async ({ page }) =
     await page.waitForTimeout(2600);
     return page.evaluate(() =>
       [...document.querySelectorAll("main h2")]
-        .filter((h) => (h.textContent ?? "").trim() && h.getBoundingClientRect().width > 0)
+        // Drawn headings only: an sr-only heading is a 1px box at the browser default size.
+        .filter((h) => (h.textContent ?? "").trim() && h.getBoundingClientRect().width > 1)
         /* A panel heading sits inside a box with a border of its own. */
         .filter((h) => {
           const box = h.closest("div,aside,section");

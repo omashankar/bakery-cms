@@ -447,6 +447,7 @@ export function TestimonialsAdminPage({
                           <div className="relative size-10 shrink-0 overflow-hidden rounded-full border border-border bg-muted">
                             {item.avatar ? (
                               <SafeImage
+                                width={40}
                                 src={item.avatar}
                                 alt={item.name}
                                 className="object-cover"
@@ -524,6 +525,7 @@ export function TestimonialsAdminPage({
                         <div className="relative size-10 shrink-0 overflow-hidden rounded-full border border-border bg-muted">
                           {item.avatar ? (
                             <SafeImage
+                              width={40}
                               src={item.avatar}
                               alt={item.name}
                               className="object-cover"

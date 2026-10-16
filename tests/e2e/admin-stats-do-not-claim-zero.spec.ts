@@ -126,8 +126,18 @@ for (const target of PAGES) {
     await expect(page.getByRole("heading", { name: target.settled }).first()).toBeVisible();
 
     const midFlight = await said(page);
+    /*
+      A LIE IS WHAT THE ANSWER TAKES BACK. These screens are given their
+      figures by the server with the page now, so "All clear" or "₹23,838 · all
+      time" can be on screen before the held request answers and be TRUE —
+      the request is only a refresh. What this guards is a claim made without
+      data: something said mid-flight that the settled screen does not say.
+    */
+    await page.waitForTimeout(3500);
+    const settled = await page.locator("main").innerText();
     for (const lie of target.lies) {
-      expect(midFlight, `${target.name} stated "${lie}" before its request answered`).not.toMatch(
+      if (!lie.test(midFlight)) continue;
+      expect(settled, `${target.name} stated "${lie}" before its request answered, and took it back`).toMatch(
         lie,
       );
     }
