@@ -192,11 +192,17 @@ describe("the brand on the sign-in screens", () => {
     // under a wordmark the plane said it twice. Suppressing the heading instead
     // left a hole in the hierarchy, so it states the screen's PURPOSE now:
     // content that never duplicates the mark and holds with or without a logo.
+    //
+    // The line is a <p> styled as display text now: the page's <h1> is the
+    // form card's "Sign in", because this plane is hidden on a phone and the
+    // phone page had no heading at all.
     const shell = code(SHELL);
-    const h1 = shell.slice(shell.indexOf("<h1"), shell.indexOf("</h1>"));
-    expect(h1, "the <h1> moved").not.toBe("");
-    expect(h1, "the heading is the shop's name again").not.toContain("{name}");
-    expect(h1.trim().length, "the heading is empty").toBeGreaterThan(20);
+    const start = shell.indexOf('<p className="font-heading text-4xl');
+    const line = shell.slice(start, shell.indexOf("</p>", start));
+    expect(start, "the brand plane's display line moved").toBeGreaterThan(-1);
+    expect(line, "the heading is the shop's name again").not.toContain("{name}");
+    expect(line.trim().length, "the heading is empty").toBeGreaterThan(20);
+    expect(shell, "the plane is a heading again — the card's title is the page's <h1>").not.toContain("<h1");
   });
 
   it("promises features for whatever trade the shop is in", () => {

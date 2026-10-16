@@ -512,6 +512,7 @@ export function ReviewsAdminPage({
                               className="size-20 overflow-hidden rounded-lg border border-border bg-muted"
                             >
                               <SafeImage
+                                width={80}
                                 src={url}
                                 alt=""
                                 className="size-full object-cover"

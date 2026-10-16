@@ -456,6 +456,7 @@ export function InventoryAdminPage({
                           <div className="relative size-10 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
                             {item.image ? (
                               <SafeImage
+                                width={40}
                                 src={item.image}
                                 alt={item.name}
                                 className="object-cover"
@@ -544,6 +545,7 @@ export function InventoryAdminPage({
                     <div className="relative size-12 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
                       {item.image ? (
                         <SafeImage
+                          width={48}
                           src={item.image}
                           alt={item.name}
                           className="object-cover"

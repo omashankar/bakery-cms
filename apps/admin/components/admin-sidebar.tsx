@@ -345,7 +345,7 @@ function NavItem({
             {notificationBadge}
           </span>
         ) : showInventoryBadge ? (
-          <span className="shrink-0 rounded-full bg-amber-500 px-1.5 py-0.5 text-[11px] font-bold leading-none text-white">
+          <span className="shrink-0 rounded-full bg-amber-500 px-1.5 py-0.5 text-[11px] font-bold leading-none text-amber-950">
             {inventoryBadge}
           </span>
         ) : showBadge ? (
@@ -381,7 +381,7 @@ function NavItem({
               {notificationBadge}
             </span>
           ) : showInventoryBadge ? (
-            <span className="shrink-0 rounded-full bg-amber-500 px-1.5 py-0.5 text-[11px] font-bold leading-none text-white">
+            <span className="shrink-0 rounded-full bg-amber-500 px-1.5 py-0.5 text-[11px] font-bold leading-none text-amber-950">
               {inventoryBadge}
             </span>
           ) : showBadge ? (

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { fixBrokenImageUrl } from "@/constants/demo-images";
+import { thumbnailImageUrl } from "@/lib/image-url";
 import { cn } from "@/lib/utils";
 import { ImagePlaceholder } from "./image-placeholder";
 
@@ -22,18 +23,26 @@ interface SafeImageProps {
   alt: string;
   className?: string;
   fill?: boolean;
+  /**
+   * The width it is drawn at, in CSS pixels — when given, the image is asked
+   * for at that size (doubled for retina) instead of as the stored original.
+   * The admin's 40px list thumbnails were downloading 500–1200px originals:
+   * ~80 KB each, and a whole product list of them on a phone.
+   */
+  width?: number;
 }
 
 /** Native img with dead-Unsplash repair — avoids Next image optimizer 404 flash */
-export function SafeImage({ src, alt, className, fill = true }: SafeImageProps) {
+export function SafeImage({ src, alt, className, fill = true, width }: SafeImageProps) {
   const resolvedSrc = useMemo(() => {
     // Not `src ?? ""`: a number or an object from untyped JSON has no `.trim`
     // either, and this component is downstream of Mixed-typed Mongo documents.
     const trimmed = typeof src === "string" ? src.trim() : "";
     if (!trimmed) return "";
     if (trimmed.startsWith("data:") || trimmed.startsWith("blob:")) return trimmed;
-    return fixBrokenImageUrl(trimmed);
-  }, [src]);
+    const fixed = fixBrokenImageUrl(trimmed);
+    return width ? thumbnailImageUrl(fixed, width) : fixed;
+  }, [src, width]);
 
   const [failed, setFailed] = useState(false);
 

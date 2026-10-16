@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AdminNotificationBell } from "@/apps/admin/commerce/components/admin-notification-bell";
 import { routes } from "@/constants/routes";
+import { thumbnailImageUrl } from "@/lib/image-url";
 import { cn } from "@/lib/utils";
 import { AdminBreadcrumbs } from "./admin-breadcrumbs";
 import dynamic from "next/dynamic";
@@ -99,6 +100,8 @@ export function AdminHeader({
   const [displayName, setDisplayName] = useState("Administrator");
   const [email, setEmail] = useState("");
   const [photoUrl, setPhotoUrl] = useState("");
+  // Drawn at 28–36px on every admin page; the stored original was 1.7 MB.
+  const avatarSrc = thumbnailImageUrl(photoUrl, 36);
 
   useEffect(() => {
     /**
@@ -202,7 +205,7 @@ export function AdminHeader({
               >
                 <Avatar className="size-7 ring-1 ring-sidebar-border">
                   {/* The uploaded photo, which had no way to reach this header before. */}
-                  {photoUrl ? <AvatarImage src={photoUrl} alt="" /> : null}
+                  {photoUrl ? <AvatarImage src={avatarSrc} alt="" /> : null}
                   <AvatarFallback className="bg-primary/15 text-[11px] font-semibold text-primary">
                     {initials}
                   </AvatarFallback>
@@ -211,7 +214,7 @@ export function AdminHeader({
               <DropdownMenuContent align="end" className="w-[min(100vw-1rem,15rem)]">
                 <div className="flex items-center gap-3 px-2 py-1.5">
                   <Avatar className="size-9 ring-1 ring-sidebar-border">
-                    {photoUrl ? <AvatarImage src={photoUrl} alt="" /> : null}
+                    {photoUrl ? <AvatarImage src={avatarSrc} alt="" /> : null}
                     <AvatarFallback className="bg-primary/15 text-xs font-semibold text-primary">
                       {initials}
                     </AvatarFallback>

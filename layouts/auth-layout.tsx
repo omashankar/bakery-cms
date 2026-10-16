@@ -157,9 +157,9 @@ export function AuthLayoutShell({
                   right content for the space, it never duplicates the mark, and
                   it holds whether the shop has a logo or only a letter.
                 */}
-                <h1 className="font-heading text-4xl font-bold tracking-tight text-cream-50 xl:text-5xl">
+                <p className="font-heading text-4xl font-bold tracking-tight text-cream-50 xl:text-5xl">
                   Run your shop from one place
-                </h1>
+                </p>
                 <div className="h-px w-12 bg-gold-300" />
                 <p className="text-[15px] leading-relaxed text-cream-200/75">
                   {name

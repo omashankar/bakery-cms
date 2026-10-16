@@ -5,6 +5,8 @@ import { whenAdmin } from "@/lib/server/auth/admin-initial";
 import { getProductById } from "@/features/products/data/products-service";
 import { getCatalog } from "@/features/catalog/server/catalog.service";
 import { readSeoForAdmin } from "@/features/site-layout/server/site-layout.initial";
+import { getSettings } from "@/features/settings/server/settings.service";
+import type { CommerceSettings } from "@/types/settings";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -29,8 +31,14 @@ export default async function Page({ params }: PageProps) {
   const [initialProduct, initial] = await Promise.all([
     whenAdmin(() => getProductById(id)),
     whenAdmin(async () => {
-      const [catalog, seo] = await Promise.all([getCatalog(), readSeoForAdmin()]);
-      return JSON.parse(JSON.stringify({ catalog, seo }));
+      const [catalog, seo, settings] = await Promise.all([getCatalog(), readSeoForAdmin(), getSettings()]);
+      // The delivery speeds and wording the form shows, so its HTML matches its first render.
+      const commerce = (settings as { commerce?: CommerceSettings }).commerce;
+      const delivery = {
+        tiers: commerce?.deliveryTiers ?? [],
+        information: commerce?.deliveryInformation ?? "",
+      };
+      return JSON.parse(JSON.stringify({ catalog, seo, delivery }));
     }),
   ]);
   return (
@@ -40,6 +48,7 @@ export default async function Page({ params }: PageProps) {
       initialProduct={initialProduct}
       initialCatalog={initial?.catalog ?? null}
       initialSeo={initial?.seo ?? null}
+      initialDelivery={initial?.delivery ?? null}
     />
   );
 }

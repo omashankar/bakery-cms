@@ -40,6 +40,7 @@ import {
   MAX_SOURCE_BYTES,
 } from "@/apps/admin/media/lib/use-media-upload";
 import { shrinkImageFile } from "@/lib/images/shrink-image";
+import { thumbnailImageUrl } from "@/lib/image-url";
 
 /** Shown only while hydration is pending, behind the skeleton. */
 const EMPTY_PROFILE: AdminProfile = {
@@ -248,7 +249,7 @@ export function AdminProfilePage({
               <span className="flex size-24 items-center justify-center overflow-hidden rounded-full border-4 border-white/20 bg-white/15 text-2xl font-bold">
                 {form.photoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={form.photoUrl} alt={profile.fullName} className="size-full object-cover" />
+                  <img src={thumbnailImageUrl(form.photoUrl, 96)} alt={profile.fullName} className="size-full object-cover" />
                 ) : (
                   initials(form.fullName || profile.fullName)
                 )}
