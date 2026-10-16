@@ -108,7 +108,9 @@ test.describe("the desktop band", () => {
     const atRest = await boxes(page);
     expect(atRest.band, "there is no nav band on this page at all").not.toBeNull();
     expect(atRest.band!.height, "the band is not the 46px this test is about").toBeGreaterThan(20);
-    expect(atRest.bar!.top).toBe(0);
+    // At the top of the page the bar starts where the header does, which is under
+    // the announcement strip when the shop runs one; scrolled, it is pinned at 0.
+    expect(atRest.bar!.top).toBe(atRest.header!.top);
     const openBand = atRest.band!.height;
     const barHeight = atRest.bar!.height;
     expect(atRest.header!.height).toBe(barHeight + openBand);
@@ -156,6 +158,13 @@ test.describe("the desktop band", () => {
     await page.waitForLoadState("networkidle");
     await page.mouse.move(700, 700);
 
+    /*
+      SETTLED FIRST. Straight after load a dev build is still hydrating, the
+      main thread drops the 200ms of frames, and a band that slides on a
+      production build reads here as one that blinked. Measured both ways.
+    */
+    await page.waitForTimeout(1500);
+
     const openBand = (await boxes(page)).band!.height;
     expect(openBand).toBeGreaterThan(20);
 
@@ -194,7 +203,7 @@ test.describe("the desktop band", () => {
     const top = await boxes(page);
     expect(top.scrollY, "the page is not back at the top").toBe(0);
     expect(top.band!.height, "the band is missing at the top of the page").toBe(openBand);
-    expect(top.bar!.top).toBe(0);
+    expect(top.bar!.top).toBe(top.header!.top);
   });
 
   test("and the clip it slides behind is let go of again", async ({ page }) => {
@@ -267,7 +276,7 @@ test("changes nothing on a phone", async ({ page }) => {
 
   const atRest = await boxes(page);
   expect(atRest.band, "the band is drawn on a phone").toBeNull();
-  expect(atRest.bar!.top).toBe(0);
+  expect(atRest.bar!.top).toBe(atRest.header!.top);
   const phoneBar = atRest.bar!.height;
 
   await wheel(page, 600);

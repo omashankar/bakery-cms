@@ -1,6 +1,7 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 
 import { adminSession } from "./admin-session";
+import { connect } from "./shop-state";
 
 /**
  * What an anonymous request can read.
@@ -51,6 +52,14 @@ test("delivery zones the shop switched off are not handed to visitors", async ({
 test("an admin still sees every zone, including the switched-off ones", async ({ page }) => {
   // The other half: narrowing the public read must not blind the admin screen
   // that exists to manage exactly those records.
+  //
+  // Counted in the DATABASE, not through the API under test: if the admin read
+  // were blinded, asking it whether any zone is off would answer "none" and
+  // skip the very failure this exists to catch.
+  const db = await connect();
+  const switchedOff = await db.collection("deliveryzones").countDocuments({ isActive: false });
+  test.skip(switchedOff === 0, "this shop has no switched-off delivery zone to look for");
+
   await adminSession(page);
 
   const response = await page.request.get("/api/delivery-zones");

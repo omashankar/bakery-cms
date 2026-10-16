@@ -53,12 +53,14 @@ test.describe("a coupon that stops qualifying", () => {
     await addToCart(page, cheap!.slug);
 
     // ---- apply it while the cart qualifies ----
+    // On the cart, where the coupon box lives now: one "Apply Coupons" row that
+    // opens a dialog. Checkout keeps only the notice for a coupon that lapsed.
     await page.goto("/store/cart");
-    await page.getByRole("button", { name: /proceed to checkout/i }).click();
-    await expect(page).toHaveURL(/\/store\/checkout/);
-
-    await page.getByPlaceholder(/coupon code/i).fill(coupon!.code);
-    await page.getByRole("button", { name: /^apply$/i }).click();
+    await page.getByRole("button", { name: /apply coupons/i }).click();
+    const coupons = page.getByRole("dialog");
+    await coupons.getByPlaceholder(/coupon code/i).fill(coupon!.code);
+    // The box's own Apply; each listed offer below it carries one too.
+    await coupons.getByRole("button", { name: /^apply$/i }).first().click();
     await expect(page.getByText(coupon!.code, { exact: false }).first()).toBeVisible();
     await expect(
       page.getByText(/no longer applies/i),
