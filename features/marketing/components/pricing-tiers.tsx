@@ -103,8 +103,8 @@ export function PricingTiers() {
       </div>
 
       <p className="mx-auto mt-8 max-w-2xl text-center text-sm text-muted-foreground">
-        Not sure which one? Start on the smallest. Moving up is a settings change, not a
-        migration — the modules simply switch on.
+        Not sure which one? Start on the smallest. Moving up is not a migration — your
+        products, orders and customers stay exactly where they are.
       </p>
     </>
   );

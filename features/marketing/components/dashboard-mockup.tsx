@@ -29,7 +29,7 @@ const stats = [
   { label: "Revenue", value: "₹4.82L", delta: "+12.4%" },
   { label: "Orders", value: "1,284", delta: "+8.1%" },
   { label: "Customers", value: "3,912", delta: "+5.6%" },
-  { label: "Conversion", value: "4.8%", delta: "+1.2%" },
+  { label: "Avg. order", value: "₹375", delta: "+3.9%" },
 ];
 
 // Bar heights in px (definite values render reliably in any flex context).
@@ -37,36 +37,42 @@ const bars = [42, 58, 46, 72, 63, 88, 70, 96, 82, 108, 94, 120];
 
 const recent = [
   { name: "Truffle Cake", amount: "₹2,450", tone: "bg-[#BFD8B4] text-[#3f6b39]", status: "Paid" },
-  { name: "Wedding Tier", amount: "₹18,900", tone: "bg-[#EBD4A0] text-[#7a5a1e]", status: "Baking" },
+  { name: "Wedding Tier", amount: "₹18,900", tone: "bg-[#EBD4A0] text-[#7a5a1e]", status: "Preparing" },
   { name: "Cheesecake", amount: "₹1,180", tone: "bg-[#BFD8B4] text-[#3f6b39]", status: "Paid" },
-  { name: "Birthday Cake", amount: "₹3,320", tone: "bg-[#CBD9EA] text-[#3d5578]", status: "Shipped" },
+  { name: "Birthday Cake", amount: "₹3,320", tone: "bg-[#CBD9EA] text-[#3d5578]", status: "Delivered" },
 ];
 
 /** Faux Bakery CMS admin dashboard — the hero illustration. Pure CSS. */
 export function DashboardMockup({ className }: { className?: string }) {
   return (
     <div className={cn("@container flex min-h-[420px] w-full bg-[#FCFBF9] text-foreground", className)}>
-      {/* Sidebar */}
-      <aside className="hidden w-[168px] shrink-0 flex-col border-r border-border bg-[#FBFAF8] p-3 @md:flex">
-        <div className="flex items-center gap-2 px-1.5 py-1">
+      {/*
+        Sidebar. Icons only until the frame is wide enough for the labels too:
+        in the hero the frame is ~560px, and a 168px labelled sidebar left the
+        stat tiles and recent orders so little room that they read "CUSTO…",
+        "₹4.8…" and "Truff…".
+      */}
+      <aside className="hidden w-14 shrink-0 flex-col border-r border-border bg-[#FBFAF8] p-2.5 @md:flex @3xl:w-[168px] @3xl:p-3">
+        <div className="flex items-center justify-center gap-2 py-1 @3xl:justify-start @3xl:px-1.5">
           <span className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <CroissantIcon className="size-4" />
           </span>
-          <span className="font-heading text-[13px] font-bold">Bakery CMS</span>
+          <span className="hidden font-heading text-[13px] font-bold @3xl:inline">Bakery CMS</span>
         </div>
         <nav className="mt-4 flex flex-col gap-0.5">
           {nav.map((item) => (
             <span
               key={item.label}
+              title={item.label}
               className={cn(
-                "flex items-center gap-2 rounded-lg px-2.5 py-2 text-[12px] font-medium",
+                "flex items-center justify-center gap-2 rounded-lg py-2 text-[12px] font-medium @3xl:justify-start @3xl:px-2.5",
                 item.active
                   ? "bg-primary/10 text-primary"
                   : "text-muted-foreground"
               )}
             >
               <item.icon className="size-3.5" />
-              {item.label}
+              <span className="hidden @3xl:inline">{item.label}</span>
             </span>
           ))}
         </nav>
@@ -144,15 +150,17 @@ export function DashboardMockup({ className }: { className?: string }) {
           <div className="rounded-xl border border-border bg-card p-3.5">
             <p className="text-[12px] font-semibold">Recent orders</p>
             <div className="mt-3 flex flex-col gap-2.5">
+              {/* Name on its own line: beside the status chip, a one-third
+                  column left room for "W…" and nothing more. */}
               {recent.map((o) => (
-                <div key={o.name} className="flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-[11px] font-medium">{o.name}</p>
+                <div key={o.name} className="min-w-0">
+                  <p className="truncate text-[11px] font-medium">{o.name}</p>
+                  <div className="flex items-center justify-between gap-2">
                     <p className="text-[10px] text-muted-foreground">{o.amount}</p>
+                    <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold", o.tone)}>
+                      {o.status}
+                    </span>
                   </div>
-                  <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold", o.tone)}>
-                    {o.status}
-                  </span>
                 </div>
               ))}
             </div>
