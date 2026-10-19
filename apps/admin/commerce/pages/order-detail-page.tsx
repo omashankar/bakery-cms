@@ -297,10 +297,14 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
           <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
             <h2 className="font-heading text-base font-semibold">Items</h2>
             <ul className="mt-4 space-y-4">
-              {order.items.map((item) => (
+              {order.items.map((item, index) => (
                 <li key={item.id} className="flex gap-4">
                   <div className="relative size-16 shrink-0 overflow-hidden rounded-lg bg-muted">
+                    {/* The first line is in the first screenful, and on a text-light
+                        order it is the largest thing there — Next flags it as a
+                        lazy LCP image. */}
                     <SafeImage
+                      eager={index === 0}
                       width={64}
                       src={item.image}
                       alt={item.name}
