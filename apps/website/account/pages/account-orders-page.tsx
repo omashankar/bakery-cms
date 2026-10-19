@@ -277,7 +277,7 @@ export function AccountOrdersPage() {
         />
       ) : (
         <div className="space-y-4">
-          {paginated.map((order) => (
+          {paginated.map((order, orderIndex) => (
             <div
               key={order.id}
               className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
@@ -334,6 +334,10 @@ export function AccountOrdersPage() {
                                 alt=""
                                 width={64}
                                 height={64}
+                                // The top order's pictures are in the first screenful
+                                // and can be its largest thing; lazy, they wait for
+                                // layout and Next flags the LCP.
+                                loading={orderIndex === 0 ? "eager" : "lazy"}
                                 className="size-full object-cover"
                               />
                             ) : (
