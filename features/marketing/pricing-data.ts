@@ -44,7 +44,7 @@ export const pricingTiers: PricingTier[] = [
       "Email confirmations and invoices",
       "Homepage builder — arrange sections without code",
     ],
-    excludes: ["Wedding enquiry pages", "Photo cakes", "Advanced reports"],
+    excludes: ["Photo cakes", "Reports"],
   },
   {
     name: "Growth",
@@ -53,7 +53,6 @@ export const pricingTiers: PricingTier[] = [
     featured: true,
     includes: [
       "Everything in Starter",
-      "Wedding cake pages with their own builder and enquiry form",
       "Photo cakes — customers upload their own image",
       "Inventory tracking with low-stock alerts",
       "Coupons, offers and delivery zones",
@@ -65,13 +64,12 @@ export const pricingTiers: PricingTier[] = [
   },
   {
     name: "Enterprise",
-    audience: "More than one outlet, or a shop with its own rules.",
+    audience: "A shop with its own brand, domain and rules.",
     price: null,
     includes: [
       "Everything in Growth",
       "White-label — run it as a cake shop, bakery, café or custom retail",
       "Your own domain and mail sender",
-      "Role-based access for staff",
       "Audit trail of every admin action",
       "Security centre with active device management",
       "Backup and restore",

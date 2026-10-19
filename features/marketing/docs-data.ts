@@ -93,7 +93,7 @@ export const docChapters: DocChapter[] = [
       },
       {
         title: "Send the invoice",
-        body: "Every order has an invoice the customer can open, and you can email it to them from the order. The invoice design — logo, address, terms, GST — is set once and applies to all of them.",
+        body: "Every order has an invoice the customer can open, print, or have emailed to them, and you can print it from the order. The invoice design — logo, address, terms, GST — is set once and applies to all of them.",
         where: { label: "Payments → Invoices", href: routes.admin.commerce.invoices },
       },
     ],
@@ -106,7 +106,7 @@ export const docChapters: DocChapter[] = [
     steps: [
       {
         title: "Add a cake",
-        body: "Name, description, photographs, price, category and occasion. Add the sizes and flavours this product comes in; each can carry its own surcharge, and the storefront prices the default combination.",
+        body: "Name, description, photographs, price, category and occasion. Add the sizes this product comes in, each with its own surcharge, and the flavour words customers can filter by; the storefront prices the default size.",
         where: { label: "Cakes → Add", href: routes.admin.cakes.add },
         caution:
           "A cake stays hidden from customers until its status is Published. Draft and archived items are not shown, and not sold.",
@@ -172,12 +172,12 @@ export const docChapters: DocChapter[] = [
       },
       {
         title: "See what is working",
-        body: "Revenue over time, best-selling cakes, repeat customers, which payment methods people use, and which cities order most. Computed over every order, not a sample.",
+        body: "Revenue over time, best-selling cakes, your best customers, which payment methods people use, and which cities order most. Computed over every order, not a sample.",
         where: { label: "Reports", href: routes.admin.reports },
       },
       {
         title: "Answer enquiries",
-        body: "Contact-form messages, wedding enquiries and newsletter signups all land in one place, each with its own status so nothing is answered twice or not at all.",
+        body: "Contact-form messages and newsletter signups land in one place, each with its own status so nothing is answered twice or not at all.",
         where: { label: "Inquiries", href: routes.admin.inquiries.overview },
       },
     ],

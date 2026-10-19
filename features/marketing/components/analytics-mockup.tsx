@@ -5,8 +5,8 @@ const revenuePoints = [28, 34, 30, 42, 46, 40, 54, 60, 56, 70, 66, 82];
 
 const miniStats = [
   { label: "Orders", value: "1,284" },
-  { label: "Visitors", value: "48.2k" },
-  { label: "Conversion", value: "4.8%" },
+  { label: "Avg. order", value: "₹375" },
+  { label: "Items sold", value: "2,310" },
 ];
 
 const topProducts = [
@@ -32,7 +32,7 @@ function buildPath(values: number[], w: number, h: number, close: boolean) {
 
 const CHART_W = 320;
 const CHART_H = 96;
-const RETURNING = 68;
+const PAID_ONLINE = 68;
 const CIRC = 2 * Math.PI * 26;
 
 /** Reports & analytics preview. Pure CSS + inline SVG (no gradients, no libraries). */
@@ -114,12 +114,12 @@ export function AnalyticsMockup({ className }: { className?: string }) {
                 stroke="#7A4D2B"
                 strokeWidth="8"
                 strokeLinecap="round"
-                strokeDasharray={`${(RETURNING / 100) * CIRC} ${CIRC}`}
+                strokeDasharray={`${(PAID_ONLINE / 100) * CIRC} ${CIRC}`}
               />
             </svg>
             <div>
-              <p className="font-heading text-[20px] font-semibold leading-none">{RETURNING}%</p>
-              <p className="mt-1 text-[11px] text-muted-foreground">Returning customers</p>
+              <p className="font-heading text-[20px] font-semibold leading-none">{PAID_ONLINE}%</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">Paid online</p>
             </div>
           </div>
         </div>

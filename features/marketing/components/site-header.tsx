@@ -83,14 +83,11 @@ export function SiteHeader() {
 
         {/* Right actions */}
         <div className="hidden items-center gap-2 lg:flex">
-          <LinkButton href={ctaLinks.admin} variant="ghost">
-            Admin Demo
-          </LinkButton>
           <LinkButton href={ctaLinks.store} variant="secondary">
             View Store
           </LinkButton>
-          <LinkButton href={ctaLinks.getStarted} variant="primary">
-            Get Started
+          <LinkButton href={ctaLinks.demo} variant="primary">
+            Book a Demo
           </LinkButton>
         </div>
 
@@ -119,14 +116,11 @@ export function SiteHeader() {
               />
             ))}
             <div className="mt-3 flex flex-col gap-2">
-              <LinkButton href={ctaLinks.admin} variant="secondary" className="w-full">
-                Admin Demo
-              </LinkButton>
               <LinkButton href={ctaLinks.store} variant="secondary" className="w-full">
                 View Store
               </LinkButton>
-              <LinkButton href={ctaLinks.getStarted} variant="primary" className="w-full">
-                Get Started
+              <LinkButton href={ctaLinks.demo} variant="primary" className="w-full">
+                Book a Demo
               </LinkButton>
             </div>
           </div>

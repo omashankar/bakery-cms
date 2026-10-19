@@ -56,7 +56,7 @@ export function LandingPage() {
         {/* SECTION 2 — Hero                                             */}
         {/* ============================================================ */}
         <section className="relative overflow-hidden">
-          <Container className="grid items-center gap-12 py-16 md:py-24 lg:grid-cols-[1.05fr_1fr] lg:gap-16">
+          <Container className="grid items-center gap-12 py-16 md:py-24 xl:grid-cols-[1.05fr_1fr] xl:gap-16">
             <ScrollReveal className="flex flex-col items-start gap-6">
               <Eyebrow>Complete Bakery Platform</Eyebrow>
               <h1 className="text-balance text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl lg:text-[3.5rem]">
@@ -68,8 +68,8 @@ export function LandingPage() {
                 payments, and marketing from one modern dashboard.
               </p>
               <div className="flex flex-col gap-3 sm:flex-row">
-                <LinkButton href={ctaLinks.admin} variant="primary" size="lg">
-                  Explore Admin
+                <LinkButton href={ctaLinks.demo} variant="primary" size="lg">
+                  Book a Demo
                   <ArrowRightIcon className="size-4 transition-transform group-hover:translate-x-0.5" />
                 </LinkButton>
                 <LinkButton href={ctaLinks.store} variant="secondary" size="lg">
@@ -299,12 +299,9 @@ export function LandingPage() {
         </Section>
 
         {/* ============================================================ */}
-        {/* SECTION 8 — Wedding Builder                                  */}
-
-        {/* ============================================================ */}
         {/* SECTION 9 — Payment System                                   */}
         {/* ============================================================ */}
-        <Section id="payments" className="bg-background">
+        <Section id="payments" className="bg-white">
           <Container>
             <ScrollReveal>
               <SectionHeading
@@ -333,7 +330,7 @@ export function LandingPage() {
         {/* ============================================================ */}
         {/* SECTION 10 — Reports & Analytics                             */}
         {/* ============================================================ */}
-        <Section id="analytics" className="bg-white">
+        <Section id="analytics" className="bg-background">
           <Container>
             <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
               <ScrollReveal className="flex flex-col gap-6">
@@ -367,7 +364,7 @@ export function LandingPage() {
         {/* ============================================================ */}
         {/* SECTION 11 — Why Choose Bakery CMS                           */}
         {/* ============================================================ */}
-        <Section className="bg-background">
+        <Section className="bg-white">
           <Container>
             <ScrollReveal>
               <SectionHeading
@@ -396,7 +393,7 @@ export function LandingPage() {
         {/* ============================================================ */}
         {/* SECTION 12 — Technology                                      */}
         {/* ============================================================ */}
-        <Section className="bg-white !py-16">
+        <Section className="bg-background !py-16">
           <Container>
             <ScrollReveal className="flex flex-col items-center gap-8 text-center">
               <div className="flex flex-col items-center gap-3">
@@ -423,13 +420,13 @@ export function LandingPage() {
         {/* ============================================================ */}
         {/* SECTION 13 — Roadmap                                         */}
         {/* ============================================================ */}
-        <Section id="roadmap" className="bg-background">
+        <Section id="roadmap" className="bg-white">
           <Container>
             <ScrollReveal>
               <SectionHeading
                 eyebrow="Roadmap"
                 title="A platform that keeps getting better"
-                description="Here's what's live today, and what's coming next for your bakery."
+                description="Everything here is live today, and the list keeps growing."
               />
             </ScrollReveal>
             <ScrollReveal delay={80}>
@@ -474,7 +471,7 @@ export function LandingPage() {
         {/* ============================================================ */}
         {/* SECTION 14 — Pricing                                         */}
         {/* ============================================================ */}
-        <Section id="pricing" className="bg-white">
+        <Section id="pricing" className="bg-background">
           <Container className="flex flex-col gap-12">
             <ScrollReveal>
               <SectionHeading
@@ -492,7 +489,7 @@ export function LandingPage() {
         {/* ============================================================ */}
         {/* SECTION 15 — FAQ                                             */}
         {/* ============================================================ */}
-        <Section id="faq" className="bg-background">
+        <Section id="faq" className="bg-white">
           <Container>
             <ScrollReveal>
               <SectionHeading
@@ -510,7 +507,7 @@ export function LandingPage() {
         {/* ============================================================ */}
         {/* SECTION 16 — Call To Action                                  */}
         {/* ============================================================ */}
-        <Section className="bg-white">
+        <Section className="bg-background">
           <Container>
             <ScrollReveal>
               <div className="relative overflow-hidden rounded-[2rem] bg-primary px-6 py-16 text-center shadow-[0_30px_70px_-30px_rgba(74,51,36,0.6)] md:px-16 md:py-20">
@@ -531,17 +528,17 @@ export function LandingPage() {
                     Ready to build your bakery business?
                   </h2>
                   <p className="max-w-xl text-pretty text-[15px] leading-relaxed text-[#EADFD1] md:text-lg">
-                    Explore the live admin and storefront demo, then launch your own modern
-                    bakery platform in minutes.
+                    Look around the live storefront, then book a demo — we will walk you
+                    through the admin and set your shop up.
                   </p>
                   <div className="flex flex-col gap-3 sm:flex-row">
                     <LinkButton
-                      href={ctaLinks.admin}
+                      href={ctaLinks.demo}
                       variant="secondary"
                       size="lg"
                       className="border-transparent bg-white text-[#7A4D2B] hover:bg-[#F6EEE3]"
                     >
-                      Launch Admin
+                      Book a Demo
                       <ArrowRightIcon className="size-4 transition-transform group-hover:translate-x-0.5" />
                     </LinkButton>
                     <LinkButton
@@ -550,7 +547,7 @@ export function LandingPage() {
                       size="lg"
                       className="border border-white/25 text-white hover:bg-white/10"
                     >
-                      Explore Demo
+                      View Store
                     </LinkButton>
                   </div>
                 </div>

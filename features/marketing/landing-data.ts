@@ -14,11 +14,9 @@ import {
   UtensilsCrossedIcon,
   ClipboardCheckIcon,
   ClockIcon,
-  CloudUploadIcon,
   CreditCardIcon,
   DatabaseIcon,
   FileTextIcon,
-  HeartIcon,
   HomeIcon,
   ImageIcon,
   LayoutDashboardIcon,
@@ -79,12 +77,18 @@ export const navLinks: { label: string; href: string; soon?: boolean }[] = [
  * Note the demo links to `/store` are NOT this and should stay: showing the
  * storefront is showing the product running, which is the point.
  */
-export const vendorContact: string | null = null;
+export const vendorContact: string | null =
+  "mailto:sainiwebteams@gmail.com?subject=Bakery%20CMS%20demo";
 
 export const ctaLinks = {
-  admin: routes.admin.dashboard,
+  /**
+   * "Book a demo", not a link into the admin. The admin used to be the primary
+   * call to action, and it opened a login screen with no way past it. Handing
+   * out a demo login is not the answer either: the demo admin works on the live
+   * database, enquiries and customers included. So the admin is shown on a call.
+   */
+  demo: vendorContact ?? `${routes.platform.home}#pricing`,
   store: routes.store.home,
-  getStarted: routes.auth.login,
   homepageBuilder: routes.admin.builders.homepage,
 
   reports: routes.admin.reports,
@@ -173,7 +177,7 @@ export const adminModules: {
   { icon: TicketPercentIcon, title: "Coupons", description: "Discounts and promo campaigns.", status: "Marketing" },
   { icon: BarChart3Icon, title: "Reports", description: "Revenue and performance insights.", status: "Analytics" },
   { icon: PanelsTopLeftIcon, title: "Homepage Builder", description: "Design your site visually.", status: "Drag & drop" },
-  { icon: HeartIcon, title: "Wedding Builder", description: "Dedicated wedding landing pages.", status: "Templates" },
+  { icon: FileTextIcon, title: "Pages", description: "About, policies, and pages of your own.", status: "No code" },
   { icon: ImageIcon, title: "Media Library", description: "A central home for every asset.", status: "Cloud" },
   { icon: SearchIcon, title: "SEO", description: "Metadata, sitemaps, and more.", status: "Optimized" },
   { icon: SettingsIcon, title: "Settings", description: "Configure the whole platform.", status: "Flexible" },
@@ -190,14 +194,14 @@ export const commerceFeatures: {
 }[] = [
   { icon: BoxesIcon, title: "Inventory Management", description: "Keep stock accurate across every product and variant." },
   { icon: MapPinIcon, title: "Delivery Zones", description: "Define exactly where, and when, you deliver." },
-  { icon: TruckIcon, title: "Shipping Rules", description: "Flexible rates by weight, area, or order value." },
-  { icon: CreditCardIcon, title: "Payment Gateways", description: "Razorpay, Stripe, PayPal and more, built in." },
+  { icon: TruckIcon, title: "Shipping Rules", description: "Rates by area, and free delivery over an order value." },
+  { icon: CreditCardIcon, title: "Payment Gateways", description: "Razorpay for UPI, cards, net banking and wallets." },
   { icon: ClockIcon, title: "Order Timeline", description: "Track each order from placed to delivered." },
   { icon: RotateCcwIcon, title: "Refunds", description: "Issue full or partial refunds in a click." },
-  { icon: FileTextIcon, title: "Invoices", description: "Automatic, branded invoices for every order." },
+  { icon: FileTextIcon, title: "Invoices", description: "A branded, printable invoice for every order." },
   { icon: TicketPercentIcon, title: "Coupons", description: "Run discounts, offers, and promo codes." },
   { icon: PercentIcon, title: "Taxes", description: "Configure GST and taxes with confidence." },
-  { icon: BellIcon, title: "Notifications", description: "Keep customers updated at every step." },
+  { icon: BellIcon, title: "Notifications", description: "Email and WhatsApp updates as an order moves." },
   { icon: MailIcon, title: "Email Templates", description: "Beautiful, editable transactional emails." },
   { icon: MessageCircleIcon, title: "WhatsApp Templates", description: "Send order updates straight to WhatsApp." },
 ];
@@ -217,33 +221,16 @@ export const builderCapabilities: { icon: IconType; title: string; description: 
 ];
 
 /* ------------------------------------------------------------------ */
-/* Section 8 — Wedding Builder                                         */
-/* ------------------------------------------------------------------ */
-
-export const weddingBlocks: string[] = [
-  "Hero",
-  "Collections",
-  "Offers",
-  "Testimonials",
-  "Inquiry",
-  "FAQ",
-  "CTA",
-];
-
-/* ------------------------------------------------------------------ */
 /* Section 9 — Payment System                                          */
 /* ------------------------------------------------------------------ */
 
 export const paymentMethods: { icon: IconType; name: string; note: string }[] = [
   { icon: ZapIcon, name: "Razorpay", note: "Instant" },
-  { icon: CreditCardIcon, name: "Stripe", note: "Global" },
-  { icon: WalletIcon, name: "PayPal", note: "Trusted" },
   { icon: TruckIcon, name: "Cash on Delivery", note: "On arrival" },
   { icon: SmartphoneIcon, name: "UPI", note: "1-tap" },
   { icon: CreditCardIcon, name: "Cards", note: "Credit & debit" },
   { icon: ServerIcon, name: "Net Banking", note: "All banks" },
   { icon: WalletIcon, name: "Wallets", note: "Popular apps" },
-  { icon: PercentIcon, name: "EMI", note: "Flexible" },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -253,10 +240,10 @@ export const paymentMethods: { icon: IconType; name: string; note: string }[] = 
 export const reportMetrics: string[] = [
   "Revenue",
   "Orders",
-  "Visitors",
-  "Conversion",
   "Top Products",
-  "Returning Customers",
+  "Top Customers",
+  "Payment Mix",
+  "Top Cities",
 ];
 
 /* ------------------------------------------------------------------ */
@@ -271,7 +258,7 @@ export const whyChoose: { icon: IconType; title: string; description: string }[]
   { icon: SparklesIcon, title: "Modern", description: "A refined, contemporary interface." },
   { icon: LayoutDashboardIcon, title: "Clean UI", description: "Intuitive design your team will love." },
   { icon: PanelsTopLeftIcon, title: "CMS Driven", description: "Every section editable, no code." },
-  { icon: TrendingUpIcon, title: "Scalable", description: "From one shop to many locations." },
+  { icon: TrendingUpIcon, title: "Scalable", description: "From a dozen products to thousands." },
   { icon: ShieldCheckIcon, title: "Secure", description: "Protected data and safe payments." },
 ];
 
@@ -287,7 +274,6 @@ export const techStack: string[] = [
   "Shadcn UI",
   "MongoDB",
   "Node.js",
-  "NestJS",
   "Cloudinary",
   "JWT",
 ];
@@ -304,11 +290,10 @@ export const roadmap: {
 }[] = [
   { icon: MonitorSmartphoneIcon, title: "Storefront Experience", description: "A polished, conversion-ready customer website.", status: "Available" },
   { icon: LayoutDashboardIcon, title: "Business Dashboard", description: "A complete admin to run daily operations.", status: "Available" },
-  { icon: ServerIcon, title: "Open API Access", description: "Connect your tools and automate workflows.", status: "Available" },
+  { icon: MessageCircleIcon, title: "WhatsApp Order Updates", description: "Order messages sent from your own business number.", status: "Available" },
   { icon: DatabaseIcon, title: "Reliable Data Core", description: "Fast, structured storage for catalog and orders.", status: "Available" },
-  { icon: CreditCardIcon, title: "Global Payments", description: "Accept payments from customers anywhere.", status: "Available" },
-  { icon: CloudUploadIcon, title: "One-Click Deployment", description: "Go live on modern, reliable hosting.", status: "Available" },
-  { icon: SmartphoneIcon, title: "Native Mobile Apps", description: "Manage your bakery on the go.", status: "Coming soon" },
+  { icon: CreditCardIcon, title: "Online Payments", description: "UPI, cards, net banking and wallets through Razorpay.", status: "Available" },
+  { icon: MapPinIcon, title: "Delivery Zones & Slots", description: "Deliver by PIN code, on the day and hour customers pick.", status: "Available" },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -345,7 +330,7 @@ export const faqs: { question: string; answer: string }[] = [
   {
     question: "Is my data mine?",
     answer:
-      "Yes. Orders, customers and products live in your own MongoDB database. There is a backup and restore screen in Settings, and nothing is locked to us.",
+      "Yes. Orders, customers and products live in your own MongoDB database, so any MongoDB backup tool can copy them, and nothing is locked to us. Settings also has a backup and restore screen for the shop's setup — layout, templates, delivery zones and coupons.",
   },
   {
     question: "What happens to an order if a payment fails halfway?",
@@ -370,12 +355,12 @@ export const faqs: { question: string; answer: string }[] = [
   {
     question: "Can I customize my website design?",
     answer:
-      "Yes. The built-in Homepage and Wedding builders let you arrange sections, change content and backgrounds, and publish changes instantly with a live preview.",
+      "Yes. The built-in Homepage builder lets you arrange sections, change content and backgrounds, and publish changes instantly with a live preview.",
   },
   {
     question: "Which payment methods are supported?",
     answer:
-      "Razorpay, Stripe, PayPal, UPI, cards, net banking, wallets, cash on delivery, and EMI are all supported out of the box, with automatic invoices and refunds.",
+      "Razorpay — which covers UPI, cards, net banking and wallets — and cash on delivery. Every order gets an invoice, and refunds, full or partial, are issued from the order.",
   },
   {
     question: "Can I manage delivery and shipping?",
@@ -385,7 +370,7 @@ export const faqs: { question: string; answer: string }[] = [
   {
     question: "Is it suitable for wedding and custom cakes?",
     answer:
-      "Yes. A dedicated wedding builder and rich product customization make Bakery CMS ideal for bespoke, celebration, and made-to-order cakes.",
+      "Yes. Wedding cakes are a category like any other, and a product can take sizes, a message for the cake and the customer's own photo — ideal for bespoke, celebration, and made-to-order cakes.",
   },
   {
     question: "Will my store work well on mobile?",
@@ -395,7 +380,7 @@ export const faqs: { question: string; answer: string }[] = [
   {
     question: "How do I get started?",
     answer:
-      "Explore the live admin demo and storefront to see everything in action, then launch your own bakery in minutes. No setup headaches, no credit card required to look around.",
+      "Look around the live storefront, then book a demo and we will walk you through the admin — no credit card required. Going live needs your own database, a Razorpay account and a Cloudinary account; the Documentation walks through the rest.",
   },
 ];
 
@@ -441,7 +426,7 @@ export const footerColumns: {
     heading: "Resources",
     links: [
       { label: "Documentation", href: routes.platform.docs },
-      { label: "Support" },
+      { label: "Support", href: vendorContact ?? undefined },
       { label: "FAQ", href: `${routes.platform.home}#faq` },
       { label: "Roadmap", href: `${routes.platform.home}#roadmap` },
     ],
@@ -450,7 +435,7 @@ export const footerColumns: {
     heading: "Company",
     links: [
       { label: "About" },
-      { label: "Contact" },
+      { label: "Contact", href: vendorContact ?? undefined },
       { label: "Privacy" },
       { label: "Terms" },
     ],
