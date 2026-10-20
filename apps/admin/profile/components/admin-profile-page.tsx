@@ -34,7 +34,7 @@ import { Label } from "@/components/ui/label";
 import { routes } from "@/constants/routes";
 import { formatDate } from "@/utils/format";
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
-import { uploadMediaRequest } from "@/apps/admin/media/lib/media-api";
+import { uploadFailureMessage, uploadMediaRequest } from "@/apps/admin/media/lib/media-api";
 import {
   MAX_INLINE_BYTES,
   MAX_SOURCE_BYTES,
@@ -161,7 +161,7 @@ export function AdminProfilePage({
 
       if (outcome.status === "failed") {
         toast.error("Could not upload that photo", {
-          description: "Your image host refused it. Check the account, then try again.",
+          description: uploadFailureMessage(outcome.reason),
         });
         return;
       }

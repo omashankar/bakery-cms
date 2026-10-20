@@ -6,7 +6,7 @@ import { reportedAsSignedOut, reportWrite } from "@/apps/admin/lib/report-write"
 import { fixBrokenImageUrl } from "@/constants/demo-images";
 import { shrinkImageFile } from "@/lib/images/shrink-image";
 import type { MediaFile } from "@/types/media";
-import { uploadMediaRequest } from "./media-api";
+import { uploadFailureMessage, uploadMediaRequest } from "./media-api";
 import { addMediaFile } from "./media-repository";
 import { useMediaServerSync } from "./use-media-server-sync";
 import { fileNameFromUrl, isPersistableMediaUrl } from "./media-utils";
@@ -148,8 +148,7 @@ export function useMediaUpload({ onAdded }: UseMediaUploadOptions) {
             // the renderer serves a foreign host unoptimised rather than
             // throwing — but the admin has to know the copy did not happen.
             toast.warning("Kept the link, but could not copy the picture", {
-              description:
-                "Your image host refused it. The picture will still show, but it stays on the other site.",
+              description: `${uploadFailureMessage(outcome.reason)} The picture will still show, but it stays on the other site.`,
             });
           }
           // "unconfigured" is not a failure: this shop has no image host, and
@@ -225,7 +224,7 @@ export function useMediaUpload({ onAdded }: UseMediaUploadOptions) {
          */
         if (outcome.status === "failed") {
           toast.error(`Could not upload ${file.name}`, {
-            description: "Your image host refused it. Check the account, then try again.",
+            description: uploadFailureMessage(outcome.reason),
           });
           return false;
         }

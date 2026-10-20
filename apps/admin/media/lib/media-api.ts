@@ -104,28 +104,80 @@ export interface UploadedAsset {
 export type UploadOutcome =
   | { status: "uploaded"; asset: UploadedAsset }
   | { status: "unconfigured" }
-  | { status: "failed" };
+  | { status: "failed"; reason: UploadFailure };
+
+/**
+ * WHY it failed. One "your image host refused it — check the account" used to
+ * cover all of these, so a router that had not resolved api.cloudinary.com
+ * sent the owner to inspect a Cloudinary account that was fine.
+ *
+ * The server says which on the status code — see `uploadError` in
+ * lib/server/media/cloudinary.ts.
+ */
+export type UploadFailure =
+  /** This browser never reached the shop's own server. */
+  | "offline"
+  /** The shop's server could not reach the image host. */
+  | "unreachable"
+  /** The admin session ended, or this account may not upload. */
+  | "signed-out"
+  | "forbidden"
+  /** The request body was too big for the server to read. */
+  | "too-large"
+  /** The image host answered and said no, or the server failed. */
+  | "refused";
+
+function failureFor(status: number): UploadFailure {
+  if (status === 401) return "signed-out";
+  if (status === 403) return "forbidden";
+  if (status === 413) return "too-large";
+  if (status === 504) return "unreachable";
+  return "refused";
+}
+
+/** What each failure tells the admin to DO — the one copy every upload toast reads. */
+export function uploadFailureMessage(reason: UploadFailure): string {
+  switch (reason) {
+    case "offline":
+      return "Could not reach the shop. Check your internet connection, then try again.";
+    case "unreachable":
+      return "Could not reach the image host. Check your internet connection, then try again in a moment.";
+    case "signed-out":
+      return "Your session has ended. Sign in again, then retry.";
+    case "forbidden":
+      return "Your account is not allowed to upload images.";
+    case "too-large":
+      return "That picture is too large to send. Try a smaller one.";
+    case "refused":
+      return "Your image host did not accept it. Check the image host account, then try again.";
+  }
+}
 
 /** Upload an image (data URI, or an https URL for Cloudinary to fetch). */
 export async function uploadMediaRequest(
   source: string,
   folder?: string,
 ): Promise<UploadOutcome> {
+  let res: Response;
   try {
-    const res = await fetch("/api/media/upload", {
+    res = await fetch("/api/media/upload", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ source, folder }),
     });
-    if (!res.ok) {
-      noteAuthStatus(res.status);
-      return { status: "failed" };
-    }
+  } catch {
+    return { status: "failed", reason: "offline" };
+  }
+  if (!res.ok) {
+    noteAuthStatus(res.status);
+    return { status: "failed", reason: failureFor(res.status) };
+  }
+  try {
     const json = (await res.json()) as Envelope<UploadedAsset & { configured: boolean }>;
-    if (!json.success) return { status: "failed" };
+    if (!json.success) return { status: "failed", reason: "refused" };
     if (!json.data?.configured) return { status: "unconfigured" };
     return { status: "uploaded", asset: json.data };
   } catch {
-    return { status: "failed" };
+    return { status: "failed", reason: "refused" };
   }
 }
