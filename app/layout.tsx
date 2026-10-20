@@ -100,6 +100,7 @@ export default async function RootLayout({
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       suppressHydrationWarning
       className={`${inter.variable} ${plusJakarta.variable} ${geistMono.variable} h-full antialiased`}
     >
