@@ -1,5 +1,7 @@
 import { v2 as cloudinary } from "cloudinary";
 
+import { AppError } from "@/lib/server/http/errors";
+
 /**
  * Cloudinary integration for the media library.
  *
@@ -45,26 +47,31 @@ export async function uploadToCloudinary(
   folder = "bakery-cms",
 ): Promise<UploadedAsset> {
   if (!configured) throw new Error("Cloudinary is not configured");
-  const result = await cloudinary.uploader.upload(source, {
-    folder,
-    /**
-     * "image", not "auto".
-     *
-     * Both callers send an image and nothing else — the media library rejects a
-     * file whose type is not image/*, and the photo-cake route sniffs the magic
-     * number before it builds its data URI. "auto" let Cloudinary decide from
-     * the bytes, which turned a source that was never an image into a stored
-     * raw file rather than a refusal.
-     */
-    resource_type: "image",
-    /**
-     * The SDK's own default is a 60s socket timeout (uploader.js:635), and a
-     * remote source means Cloudinary fetches a host WE do not control. A
-     * pasted link to something slow otherwise holds this admin request open for
-     * a minute.
-     */
-    timeout: 20000,
-  });
+  let result;
+  try {
+    result = await cloudinary.uploader.upload(source, {
+      folder,
+      /**
+       * "image", not "auto".
+       *
+       * Both callers send an image and nothing else — the media library rejects a
+       * file whose type is not image/*, and the photo-cake route sniffs the magic
+       * number before it builds its data URI. "auto" let Cloudinary decide from
+       * the bytes, which turned a source that was never an image into a stored
+       * raw file rather than a refusal.
+       */
+      resource_type: "image",
+      /**
+       * The SDK's own default is a 60s socket timeout (uploader.js:635), and a
+       * remote source means Cloudinary fetches a host WE do not control. A
+       * pasted link to something slow otherwise holds this admin request open for
+       * a minute.
+       */
+      timeout: 20000,
+    });
+  } catch (error) {
+    throw uploadError(error);
+  }
   return {
     url: result.secure_url,
     publicId: result.public_id,
@@ -73,6 +80,47 @@ export async function uploadToCloudinary(
     bytes: result.bytes,
     format: result.format,
   };
+}
+
+/** Socket errors that mean the request never reached Cloudinary at all. */
+const UNREACHABLE_CODES = new Set([
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "ETIMEDOUT",
+  "ENETUNREACH",
+  "EHOSTUNREACH",
+]);
+
+/**
+ * WHY AN UPLOAD FAILED, carried on the status code.
+ *
+ * Every failure used to escape as a masked 500, so the admin was told "your
+ * image host refused it — check the account" when the account was fine and
+ * the router's DNS had simply not resolved api.cloudinary.com. The two need
+ * opposite actions: one is "check your internet and try again", the other is
+ * "look at the Cloudinary account".
+ *
+ *   504 — Cloudinary could not be reached (DNS, no route, socket timeout; the
+ *         SDK reports its own timeout as http_code 499).
+ *   502 — Cloudinary answered and said no (bad key, quota, unreadable image).
+ *
+ * Never 401/403, even when Cloudinary sends one: the admin client reads those
+ * as "your session ended" and would sign a working admin out.
+ */
+function uploadError(error: unknown): AppError {
+  const raw = error as { error?: unknown } | null;
+  const inner = (raw?.error ?? raw) as { code?: string; http_code?: number } | null;
+  const unreachable =
+    (inner?.code !== undefined && UNREACHABLE_CODES.has(inner.code)) ||
+    inner?.http_code === 499;
+
+  console.error("[media] Cloudinary upload failed:", inner);
+
+  return unreachable
+    ? new AppError("Could not reach the image host. Please try again in a moment.", 504)
+    : new AppError("The image host did not accept that picture.", 502);
 }
 
 /** Delete an asset by its Cloudinary public id. Best-effort — never throws. */
