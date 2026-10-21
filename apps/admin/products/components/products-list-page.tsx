@@ -300,8 +300,11 @@ export function ProductsListPage({
 
   function categoryName(categoryId: string) {
     // Before mount, the server's names: this browser's catalogue cache is not
-    // readable during the render that has to match the server's HTML.
-    const list = mounted || !initialCategories ? adminCategories() : initialCategories;
+    // readable during the render that has to match the server's HTML. When the
+    // server could not read them (no session, a failed catalogue read while the
+    // products read succeeded) that render has no names at all — falling back
+    // to the cache here printed a name the server's HTML had as "—".
+    const list = mounted ? adminCategories() : (initialCategories ?? []);
     return list.find((item) => item.id === categoryId)?.name ?? "—";
   }
 
