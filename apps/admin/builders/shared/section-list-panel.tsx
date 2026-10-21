@@ -64,6 +64,8 @@ const iconMap: Record<string, LucideIcon> = {
 
 const EDGE_ZONE = 56;
 const MAX_SCROLL_SPEED = 12;
+/** How far the pointer must travel towards an edge before that edge scrolls. */
+const DRAG_SLOP = 8;
 
 export interface BuilderSectionListItem {
   instanceId: string;
@@ -280,6 +282,8 @@ export function SectionListPanel<T extends BuilderSectionListItem>({
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const pointerYRef = useRef<number | null>(null);
+  /** Where the drag began, so auto-scroll can tell which way it is going. */
+  const startYRef = useRef<number | null>(null);
   const draggingRef = useRef(false);
   const rafRef = useRef<number | null>(null);
 
@@ -301,15 +305,25 @@ export function SectionListPanel<T extends BuilderSectionListItem>({
 
     const rect = el.getBoundingClientRect();
     let delta = 0;
+    /*
+      ONLY TOWARDS THE EDGE THE POINTER IS HEADING FOR, and a zone that
+      shrinks with the panel.
 
-    if (y < rect.top + EDGE_ZONE) {
-      const intensity = Math.min(1, Math.max(0, (rect.top + EDGE_ZONE - y) / EDGE_ZONE));
+      At 1280x720 this list is about 300px tall, so two fixed 56px zones were
+      a third of it — and a row grabbed near the bottom started the list
+      scrolling DOWN the moment it was picked up, while the admin was dragging
+      it UP. The row slid out from under the pointer and the drop did nothing:
+      measured, the pointer travelled 176px and the row 39px. Scrolling now
+      waits until the pointer has actually moved towards that edge.
+    */
+    const zone = Math.min(EDGE_ZONE, rect.height * 0.15);
+    const startY = startYRef.current ?? y;
+
+    if (y < rect.top + zone && y < startY - DRAG_SLOP) {
+      const intensity = Math.min(1, Math.max(0, (rect.top + zone - y) / zone));
       delta = -Math.ceil(MAX_SCROLL_SPEED * intensity);
-    } else if (y > rect.bottom - EDGE_ZONE) {
-      const intensity = Math.min(
-        1,
-        Math.max(0, (y - (rect.bottom - EDGE_ZONE)) / EDGE_ZONE)
-      );
+    } else if (y > rect.bottom - zone && y > startY + DRAG_SLOP) {
+      const intensity = Math.min(1, Math.max(0, (y - (rect.bottom - zone)) / zone));
       delta = Math.ceil(MAX_SCROLL_SPEED * intensity);
     }
 
@@ -331,12 +345,14 @@ export function SectionListPanel<T extends BuilderSectionListItem>({
 
       if (!active) {
         pointerYRef.current = null;
+        startYRef.current = null;
         stopAutoScroll();
         return;
       }
 
       if (typeof clientY === "number") {
         pointerYRef.current = clientY;
+        startYRef.current = clientY;
       }
 
       stopAutoScroll();

@@ -80,7 +80,11 @@ describe("the row of the shop's own articles", () => {
     );
 
     expect(body, "BlogCardsSection is gone").not.toBe("");
-    expect(body).toContain("if (posts.length === 0) return null;");
+    // Off the live page either way: `EmptyBandNotice` draws only in the
+    // builder (rendered in an-empty-band-says-so-in-the-builder.test.ts).
+    expect(body).toMatch(
+      /if \(posts\.length === 0\) (?:return null;|\{\s*return \(\s*<EmptyBandNotice)/,
+    );
   });
 
   it("puts its link on the heading line, like every other row on the page", () => {

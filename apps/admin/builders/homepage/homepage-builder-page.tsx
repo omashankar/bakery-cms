@@ -68,7 +68,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { adminCategories } from "@/features/products/lib/catalog-options";
+import {
+  adminCategories,
+  adminCollections,
+  adminOccasions,
+} from "@/features/products/lib/catalog-options";
 import { CATALOG_UPDATED_EVENT } from "@/features/catalog/lib/catalog-repository";
 import { cn } from "@/lib/utils";
 
@@ -119,16 +123,34 @@ export function HomepageBuilderPage() {
    * on this screen was listening for: a shop that added a category found
    * the picker still offering the old list until a full reload.
    */
-  const [categoryOptions, setCategoryOptions] = useState(adminCategories);
+  /*
+    ALL THREE LISTS, because a row of products resolves its slug across all
+    three. Categories alone left a tab saved as the Birthday OCCASION with no
+    matching choice, so the dropdown showed the first category instead — the
+    editor said Chocolate Cakes while the shop drew Birthday.
+  */
+  const readCatalogLists = () => ({
+    categories: adminCategories(),
+    occasions: adminOccasions(),
+    collections: adminCollections(),
+  });
+  const [catalogLists, setCatalogLists] = useState(readCatalogLists);
   useEffect(() => {
-    const sync = () => setCategoryOptions(adminCategories());
+    const sync = () => setCatalogLists(readCatalogLists());
     sync();
     window.addEventListener(CATALOG_UPDATED_EVENT, sync);
     return () => window.removeEventListener(CATALOG_UPDATED_EVENT, sync);
   }, []);
   const optionSources = useMemo(
-    () => ({ categories: categoryOptions }),
-    [categoryOptions],
+    () => ({
+      ...catalogLists,
+      groupNames: {
+        categories: labels.categoryWordPlural,
+        occasions: labels.occasionWordPlural,
+        collections: labels.collectionWordPlural,
+      },
+    }),
+    [catalogLists, labels.categoryWordPlural, labels.occasionWordPlural, labels.collectionWordPlural],
   );
   const resolveEntry = useCallback(
     (type: HomepageSectionType) => {
@@ -198,6 +220,17 @@ export function HomepageBuilderPage() {
    * had never seen. One route now returns exactly what the live page renders.
    */
   const [previewData, setPreviewData] = useState<HomepageRenderData | null>(null);
+  /**
+   * Whether that route failed — so the preview can say so.
+   *
+   * The sections used to be drawn while `previewData` was still null, and the
+   * renderer's browser fallbacks then filled every product row from the local
+   * cache, which on a fresh browser (and on the server pass) is the shipped
+   * DEMO catalogue. The comment above describes exactly that bug; it was
+   * still there for the first second of every visit, and for good if this
+   * request failed. Now nothing is drawn until the shop's own answer is here.
+   */
+  const [previewFailed, setPreviewFailed] = useState(false);
 
   /**
    * Computed over the VISIBLE list in the order the preview panel renders it,
@@ -323,13 +356,12 @@ export function HomepageBuilderPage() {
         // session, and without this the preview would just stay empty while the
         // rest of the screen went on pretending it was signed in.
         noteAuthStatus(res.status);
-        if (!res.ok) return;
+        if (!res.ok) throw new Error(`preview data ${res.status}`);
         const data = (await res.json()) as HomepageRenderData;
         if (!cancelled) setPreviewData(data);
       } catch {
-        // Left null, which the renderer already handles: sections that need
-        // server data say so rather than inventing content. A preview that is
-        // briefly incomplete is better than one that is confidently wrong.
+        // Nothing is drawn without it — see `previewFailed`.
+        if (!cancelled) setPreviewFailed(true);
       }
     })();
     return () => {
@@ -793,6 +825,30 @@ export function HomepageBuilderPage() {
                * cannot click is no better than one that lies.
                */
               if (pair && section.instanceId === pair.otherId) return null;
+
+              /*
+                A PLACE FOR EACH SECTION, NOT A GUESS AT IT, until the shop's
+                own data is here. Keeps `data-section-id` so a click in the
+                list still scrolls to the right spot.
+              */
+              if (!previewData) {
+                return (
+                  <div
+                    key={section.instanceId}
+                    data-section-id={section.instanceId}
+                    onClick={ctx.onSelect}
+                    className={cn(
+                      "m-4 flex h-28 items-center justify-center rounded-xl border border-dashed border-border text-sm text-muted-foreground",
+                      !previewFailed && "animate-pulse bg-muted/40",
+                      ctx.selected && "border-primary",
+                    )}
+                  >
+                    {previewFailed
+                      ? "The preview could not load your shop's data. Reload the page to try again."
+                      : null}
+                  </div>
+                );
+              }
 
               if (pair && section.instanceId === pair.anchorId) {
                 return (

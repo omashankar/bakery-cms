@@ -137,7 +137,12 @@ export interface SectionFieldDef {
   type: SectionFieldType;
   placeholder?: string;
   isImage?: boolean;
-  options?: { label: string; value: string }[];
+  /**
+   * `group` is the heading an option sits under in the dropdown. Only the
+   * resolved catalogue pickers set it, and only when a shop has more than
+   * one list to choose from.
+   */
+  options?: { label: string; value: string; group?: string }[];
   /**
    * Fill `options` from the shop's live data instead of writing them here.
    *
@@ -146,8 +151,15 @@ export interface SectionFieldDef {
    * names a category cannot have its choices written in advance, because the
    * whole point is that the shop invented them. The builder resolves this
    * when it renders the editor.
+   *
+   * `"categories"` is that one list, for a band that reads category data —
+   * a picture, a starting price. `"catalog"` is categories, occasions and
+   * collections together, for a ROW OF PRODUCTS: those resolve a slug across
+   * all three (`buildCategoryRail`), so a picker offering categories alone
+   * could not choose Birthday — and showed a tab saved as one as whichever
+   * category came first.
    */
-  optionsFrom?: "categories";
+  optionsFrom?: "categories" | "catalog";
   /**
    * For `type: "list"` — the columns of one row.
    *

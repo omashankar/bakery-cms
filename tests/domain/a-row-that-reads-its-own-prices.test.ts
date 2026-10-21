@@ -166,7 +166,11 @@ describe("the row that reads its own prices", () => {
   });
 
   it("draws nothing at all when the shop has added no cards", () => {
-    expect(body()).toContain("if (items.length === 0) return null;");
+    // Off the live page either way: `EmptyBandNotice` draws only in the
+    // builder (rendered in an-empty-band-says-so-in-the-builder.test.ts).
+    expect(body()).toMatch(
+      /if \(items\.length === 0\) (?:return null;|\{\s*return \(\s*<EmptyBandNotice)/,
+    );
   });
 
   it("lets the category name the card, so a rename reaches it", () => {

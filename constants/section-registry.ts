@@ -73,6 +73,56 @@ function fillTokens(text: string, labels: RegistryLabels): string {
  */
 export interface RegistryOptionSources {
   categories?: { id: string; name: string; slug: string }[];
+  occasions?: { name: string; slug: string }[];
+  collections?: { name: string; slug: string }[];
+  /** The headings the three lists sit under — the shop's own words for them. */
+  groupNames?: { categories: string; occasions: string; collections: string };
+}
+
+/**
+ * Every slug a row of products can name, from all three lists.
+ *
+ * A slug in two lists is offered ONCE, under the list that wins it — the
+ * order `buildCategoryRail` and /store/collections/<slug> resolve in:
+ * collection, then category, then occasion. Offering the loser too would be
+ * a choice that silently draws the other list's products.
+ *
+ * Headings only when there is more than one list to tell apart; a shop with
+ * categories alone gets a plain dropdown, as before.
+ */
+function catalogOptions(
+  sources?: RegistryOptionSources,
+): NonNullable<SectionFieldDef["options"]> {
+  const claimed = new Set<string>();
+  const take = <R extends { name: string; slug: string }>(rows: R[] | undefined) =>
+    (rows ?? []).filter((row) => {
+      if (!row.slug || claimed.has(row.slug)) return false;
+      claimed.add(row.slug);
+      return true;
+    });
+  // Claimed in resolution order…
+  const collections = take(sources?.collections);
+  const categories = take(sources?.categories);
+  const occasions = take(sources?.occasions);
+  const names = sources?.groupNames ?? {
+    categories: "Categories",
+    occasions: "Occasions",
+    collections: "Collections",
+  };
+  // …and listed in the order a shop thinks of them.
+  const lists = [
+    { group: names.categories, rows: categories },
+    { group: names.occasions, rows: occasions },
+    { group: names.collections, rows: collections },
+  ].filter((list) => list.rows.length > 0);
+  const grouped = lists.length > 1;
+  return lists.flatMap((list) =>
+    list.rows.map((row) => ({
+      label: row.name,
+      value: row.slug,
+      ...(grouped ? { group: list.group } : {}),
+    })),
+  );
 }
 
 /**
@@ -114,6 +164,9 @@ function withResolvedOptions(
             })),
         }
       : {}),
+    ...(field.optionsFrom === "catalog"
+      ? { options: field.options ?? catalogOptions(sources) }
+      : {}),
   };
 }
 
@@ -150,6 +203,14 @@ export interface HomepageSectionRegistryEntry {
   notOffered?: string;
   icon: string;
   defaultBackground: SectionBackground;
+  /**
+   * The Background choices that DO something here. Absent means all of them.
+   *
+   * The hero runs edge to edge, and `SectionShell` ignores a card tone on a
+   * full-bleed band (a card round the hero's picture would be a frame). So
+   * five of its seven choices changed nothing, and the editor offered them.
+   */
+  backgrounds?: SectionBackground[];
   defaultContent: Record<string, string | number | boolean>;
   fields: SectionFieldDef[];
 }
@@ -321,6 +382,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     label: "Hero",
     icon: "Sparkles",
     defaultBackground: "white",
+    backgrounds: ["white", "cream"],
     defaultContent: {
       slides: JSON.stringify(DEFAULT_HERO_SLIDES),
       /*
@@ -460,8 +522,11 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
       they are one band and a click, which is why the reference uses this
       shape more than once on the same page.
 
-      Each tab names a CATEGORY the shop has, picked from its own list — so
-      a plant shop's tabs are its own, not three cake words.
+      Each tab names a CATEGORY, OCCASION OR COLLECTION the shop has, picked
+      from its own lists — so a plant shop's tabs are its own, not three cake
+      words. All three, because the rail behind a tab resolves all three: a
+      tab labelled Birthday is the Birthday occasion, and a picker offering
+      categories alone could not choose it.
 
       Ships with no tabs. An empty band renders nothing.
     */
@@ -545,7 +610,7 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
             key: "categorySlug",
             label: "Shows",
             type: "select",
-            optionsFrom: "categories",
+            optionsFrom: "catalog",
           },
         ],
       },
@@ -1274,10 +1339,11 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
     fields: [
       {
         key: "categorySlug",
-        label: "Category",
+        label: "Shows",
         type: "select",
-        // Filled from the shop's own catalogue when the editor renders.
-        optionsFrom: "categories",
+        // Filled from the shop's own catalogue when the editor renders — all
+        // three lists, because `categoryRails` resolves all three.
+        optionsFrom: "catalog",
       },
       { key: "overline", label: "Overline", type: "text" },
       { key: "title", label: "Title", type: "text" },

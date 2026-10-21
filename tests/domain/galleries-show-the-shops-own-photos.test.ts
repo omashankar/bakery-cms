@@ -84,7 +84,9 @@ describe("every surface that shows photographs", () => {
       expect(
         bodyOf(homepage, component),
         `${component} draws a heading over an empty list`,
-      ).toMatch(/if \(\w+(?:\.length)? === 0\) return null;/);
+        // Off the live page either way: `EmptyBandNotice` draws only in the
+        // builder (rendered in an-empty-band-says-so-in-the-builder.test.ts).
+      ).toMatch(/if \(\w+(?:\.length)? === 0\) (?:return null;|\{\s*return \(\s*<EmptyBandNotice)/);
     }
   });
 
