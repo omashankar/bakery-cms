@@ -385,6 +385,42 @@ export function SectionShell({
  * A white or cream band keeps that grey, which is what the same layout does
  * over its own untinted rows.
  */
+/**
+ * WHAT AN EMPTY BAND DRAWS — in the builder, and nowhere else.
+ *
+ * A band with nothing to show is left off the live page, which is right for a
+ * customer. In the builder it was left off too: nine band types returned
+ * `null`, so a section switched ON drew no element at all — clicking it in the
+ * list scrolled to nothing, and the shop could not tell an empty band from a
+ * broken one. This shop's "Shop by category" was gone from its live homepage
+ * for exactly that reason (no category had a picture yet) and the builder
+ * showed no sign of it.
+ *
+ * The heading stays, so the shop can see WHICH band this is; the line under it
+ * says what the band is waiting for.
+ */
+export function EmptyBandNotice({
+  align,
+  children,
+  ...props
+}: HomepageSectionRendererProps & { align: SectionAlign; children: React.ReactNode }) {
+  if (!props.interactive) return null;
+  const c = props.section.content;
+  return (
+    <SectionShell {...props}>
+      <SectionHeader
+        overline={contentString(c, "overline")}
+        title={contentString(c, "title")}
+        description={contentString(c, "subtitle")}
+        align={align}
+      />
+      <p className="rounded-xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground">
+        {children}
+      </p>
+    </SectionShell>
+  );
+}
+
 export const VIEW_ALL_TONES: Partial<Record<SectionBackground, string>> = {
   "panel-rose": "bg-band-rose-strong",
   "panel-mint": "bg-band-mint-strong",

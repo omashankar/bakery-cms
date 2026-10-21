@@ -17,7 +17,7 @@ import { getHomepageProducts, type HomepageProductSource, getHomepageCategories,
 import { heroCopySideOf, heroSlidesFor, sectionAlignOf } from "./lib/section-utils";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/utils/format";
-import { type HomepageSectionRendererProps, labelsOf, contentString, contentNumber, SectionShell, ViewAllLink, SectionHeadingRow } from "./section-parts";
+import { type HomepageSectionRendererProps, labelsOf, contentString, contentNumber, SectionShell, ViewAllLink, SectionHeadingRow, EmptyBandNotice } from "./section-parts";
 import { ScrollStrip } from "./scroll-strip";
 import { TabbedRailTabs } from "./tabbed-rail-tabs";
 import { BannerStripSection } from "./banner-strip-section";
@@ -235,7 +235,16 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
   const picks = renderableRows(parseListField(c, "picks"));
   const items = categoriesForBand(picks, props, maxCount);
 
-  if (items.length === 0) return null;
+  const words = labelsOf(props).categoryWordPlural.toLowerCase();
+  if (items.length === 0) {
+    return (
+      <EmptyBandNotice {...props} align={align}>
+        {picks.some((row) => String(row.categorySlug ?? "").trim())
+          ? `None of the ${words} picked below is in your catalogue any more, so this band is hidden on the live homepage. Pick again.`
+          : `None of your ${words} has a picture yet, so this band is hidden on the live homepage. Add pictures under Catalog, or pick ${words} below — a pick can carry its own picture.`}
+      </EmptyBandNotice>
+    );
+  }
 
   return (
     /*
@@ -548,7 +557,14 @@ function TabbedRailSection(props: HomepageSectionRendererProps) {
    */
   const source = contentString(c, "source");
 
-  if (tabs.length === 0) return null;
+  if (tabs.length === 0) {
+    return (
+      <EmptyBandNotice {...props} align={align}>
+        No tabs yet, so this band is hidden on the live homepage. Add a tab
+        and choose what it shows.
+      </EmptyBandNotice>
+    );
+  }
 
   /**
    * EVERY TAB'S ROW, drawn here; `TabbedRailTabs` only chooses which shows.
@@ -722,7 +738,14 @@ function BlogCardsSection(props: HomepageSectionRendererProps) {
   const ctaHref = contentString(c, "ctaHref");
   const ctaLabel = contentString(c, "ctaLabel");
 
-  if (posts.length === 0) return null;
+  if (posts.length === 0) {
+    return (
+      <EmptyBandNotice {...props} align={align}>
+        No posts yet, so this band is hidden on the live homepage. Add a post
+        below.
+      </EmptyBandNotice>
+    );
+  }
 
   return (
     <SectionShell {...props}>
@@ -854,7 +877,14 @@ function BannerGridSection(props: HomepageSectionRendererProps) {
   */
   const across = BANNER_ROW[contentString(c, "columns").trim() as keyof typeof BANNER_ROW];
 
-  if (banners.length === 0) return null;
+  if (banners.length === 0) {
+    return (
+      <EmptyBandNotice {...props} align={align}>
+        No banners yet, so this band is hidden on the live homepage. Add a
+        banner with a picture below.
+      </EmptyBandNotice>
+    );
+  }
 
   return (
     <SectionShell {...props}>
@@ -966,7 +996,14 @@ function CategoryPriceCardsSection(props: HomepageSectionRendererProps) {
   const align = sectionAlignOf(c, "center");
   const items = renderableRows(parseListField(c, "items"));
 
-  if (items.length === 0) return null;
+  if (items.length === 0) {
+    return (
+      <EmptyBandNotice {...props} align={align}>
+        No cards yet, so this band is hidden on the live homepage. Add a card
+        and choose what it shows.
+      </EmptyBandNotice>
+    );
+  }
 
   /*
     The shop's own categories, for the NAME on each card. Typing it again
@@ -1132,7 +1169,14 @@ function TileGridSection(props: HomepageSectionRendererProps) {
   */
   const card = contentString(c, "shape").trim() === "card";
 
-  if (tiles.length === 0) return null;
+  if (tiles.length === 0) {
+    return (
+      <EmptyBandNotice {...props} align={align}>
+        No tiles yet, so this band is hidden on the live homepage. Add a tile
+        with a picture and a link.
+      </EmptyBandNotice>
+    );
+  }
 
   /**
    * Two to six per row, clamped.
@@ -1346,7 +1390,14 @@ function WhyUsSection(props: HomepageSectionRendererProps) {
   */
   const strip = contentString(c, "layout").trim() === "strip";
 
-  if (items.length === 0) return null;
+  if (items.length === 0) {
+    return (
+      <EmptyBandNotice {...props} align={align}>
+        No points yet, so this band is hidden on the live homepage. Add one
+        below.
+      </EmptyBandNotice>
+    );
+  }
 
   return (
     <SectionShell {...props}>
@@ -1499,7 +1550,14 @@ function TestimonialsSection(props: HomepageSectionRendererProps) {
    * and an empty grid under it — the shop looked like it had no customers
    * rather than like it had not written this section yet.
    */
-  if (items.length === 0) return null;
+  if (items.length === 0) {
+    return (
+      <EmptyBandNotice {...props} align={align}>
+        No published testimonials, so this band is hidden on the live
+        homepage. Add one under Testimonials.
+      </EmptyBandNotice>
+    );
+  }
 
   return (
     <SectionShell {...props}>

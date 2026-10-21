@@ -65,7 +65,11 @@ describe("the band of finished artwork", () => {
   });
 
   it("draws nothing at all when the shop has added no banners", () => {
-    expect(body()).toContain("if (banners.length === 0) return null;");
+    // Off the live page either way: `EmptyBandNotice` draws only in the
+    // builder (rendered in an-empty-band-says-so-in-the-builder.test.ts).
+    expect(body()).toMatch(
+      /if \(banners\.length === 0\) (?:return null;|\{\s*return \(\s*<EmptyBandNotice)/,
+    );
   });
 
   it("renders the picture and the link, and no card text", () => {

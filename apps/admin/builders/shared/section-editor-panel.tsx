@@ -26,7 +26,9 @@ export interface BuilderEditableSection {
 interface SectionEditorPanelProps<T extends BuilderEditableSection> {
   section: T | null;
   onChange: (section: T) => void;
-  resolveEntry: (type: T["type"]) => { label: string; fields: SectionFieldDef[] } | undefined;
+  resolveEntry: (
+    type: T["type"],
+  ) => { label: string; fields: SectionFieldDef[]; backgrounds?: SectionBackground[] } | undefined;
   /**
    * REQUIRED, so nobody inherits a sentence about somebody else's screen.
    *
@@ -37,6 +39,73 @@ interface SectionEditorPanelProps<T extends BuilderEditableSection> {
    */
   settingsNote: string;
 }
+
+/**
+ * The `<option>`s of a builder dropdown — WHICH NEVER SHOWS A CHOICE NOBODY MADE.
+ *
+ * A `<select>` whose value matches none of its options displays the FIRST
+ * one. So a tab saved as the Birthday occasion, in a picker that listed only
+ * categories, read "Chocolate Cakes" while the shop drew Birthday — and a new
+ * row read as already filled in. Two extra choices close both:
+ *
+ * - nothing saved, and blank is not itself a choice: "Choose…", first;
+ * - something saved that is not in the list: that slug, said plainly, and
+ *   disabled so it cannot be picked back.
+ *
+ * Options carrying a `group` are drawn under their heading, in order.
+ */
+function SelectChoices({
+  options,
+  value,
+}: {
+  options: NonNullable<SectionFieldDef["options"]>;
+  value: string;
+}) {
+  const known = options.some((option) => option.value === value);
+  const groups: { name?: string; options: typeof options }[] = [];
+  for (const option of options) {
+    const last = groups[groups.length - 1];
+    if (last && last.name === option.group) last.options.push(option);
+    else groups.push({ name: option.group, options: [option] });
+  }
+  const draw = (list: typeof options) =>
+    list.map((option) => (
+      <option key={option.value} value={option.value}>
+        {option.label}
+      </option>
+    ));
+
+  return (
+    <>
+      {known ? null : value ? (
+        <option value={value} disabled>
+          “{value}” is not one of these — choose again
+        </option>
+      ) : (
+        <option value="">Choose…</option>
+      )}
+      {groups.map((group, index) =>
+        group.name ? (
+          <optgroup key={`${group.name}-${index}`} label={group.name}>
+            {draw(group.options)}
+          </optgroup>
+        ) : (
+          draw(group.options)
+        ),
+      )}
+    </>
+  );
+}
+
+const BACKGROUND_CHOICES: { label: string; value: SectionBackground }[] = [
+  { label: "White", value: "white" },
+  { label: "Cream", value: "cream" },
+  { label: "Card — neutral", value: "panel" },
+  { label: "Card — rose", value: "panel-rose" },
+  { label: "Card — mint", value: "panel-mint" },
+  { label: "Card — sand", value: "panel-sand" },
+  { label: "Card — sky", value: "panel-sky" },
+];
 
 /** Repeatable editor for the hero carousel's slides (stored as JSON in content). */
 /**
@@ -226,25 +295,13 @@ function ListField({
                     onChange={(event) => updateRow(index, column.key, event.target.value)}
                   >
                     {/*
-                      A BLANK CHOICE, FIRST, AND ONLY WHEN NOTHING IS PICKED.
-
                       A new row starts every column at "", which matches no
                       option — so the browser showed the FIRST category with
                       nothing stored behind it. A shop reads that as a pick it
                       has made, saves, and the band renders nothing for a row
-                      it believes it filled in.
-
-                      It disappears once something is chosen, so it cannot be
-                      picked back by accident.
+                      it believes it filled in. `SelectChoices` says so.
                     */}
-                    {row[column.key] ? null : (
-                      <option value="">Choose…</option>
-                    )}
-                    {(column.options ?? []).map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
+                    <SelectChoices options={column.options ?? []} value={row[column.key] ?? ""} />
                   </select>
                 </div>
               ) : (
@@ -524,19 +581,16 @@ function renderField<T extends BuilderEditableSection>(
   }
 
   if (field.type === "select" && field.options?.length) {
+    const selected = String(value ?? field.options[0]?.value ?? "");
     return (
       <div key={field.key} className="space-y-2">
         <Label htmlFor={field.key}>{field.label}</Label>
         <AdminSelect
           id={field.key}
-          value={String(value ?? field.options[0]?.value ?? "")}
+          value={selected}
           onChange={(event) => updateContent(field.key, event.target.value)}
         >
-          {field.options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
+          <SelectChoices options={field.options} value={selected} />
         </AdminSelect>
       </div>
     );
@@ -663,13 +717,12 @@ export function SectionEditorPanel<T extends BuilderEditableSection>({
                   })
                 }
               >
-                <option value="white">White</option>
-                <option value="cream">Cream</option>
-                <option value="panel">Card — neutral</option>
-                <option value="panel-rose">Card — rose</option>
-                <option value="panel-mint">Card — mint</option>
-                <option value="panel-sand">Card — sand</option>
-                <option value="panel-sky">Card — sky</option>
+                <SelectChoices
+                  value={section.background}
+                  options={BACKGROUND_CHOICES.filter(
+                    (choice) => !entry.backgrounds || entry.backgrounds.includes(choice.value),
+                  )}
+                />
               </AdminSelect>
             </div>
             <p className="text-xs leading-relaxed text-muted-foreground">{settingsNote}</p>

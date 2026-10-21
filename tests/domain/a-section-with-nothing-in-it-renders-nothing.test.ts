@@ -60,12 +60,20 @@ describe("a section with nothing in it", () => {
 
         // It must decide on emptiness BEFORE it returns any markup — a guard
         // after the `return (` is not a guard.
-        const beforeMarkup = body.slice(0, body.indexOf("return ("));
+        const firstReturn = body.indexOf("return (");
+        const beforeMarkup = body.slice(0, firstReturn);
         expect(beforeMarkup, `${name} has no return`).not.toBe("");
+        // The first markup may be the builder-only notice, which draws nothing
+        // on the live page (rendered in an-empty-band-says-so-in-the-builder).
+        const notice = /^\s*<EmptyBandNotice/.test(body.slice(firstReturn + "return (".length));
         expect(
           beforeMarkup,
           `${name} renders its heading before checking whether it has any rows`,
-        ).toMatch(/(length === 0|!\w+\.length|length\s*<\s*1)[\s\S]{0,40}return null/);
+        ).toMatch(
+          notice
+            ? /(length === 0|!\w+\.length|length\s*<\s*1)\)\s*\{\s*$/
+            : /(length === 0|!\w+\.length|length\s*<\s*1)[\s\S]{0,40}return null/,
+        );
       });
     }
   }

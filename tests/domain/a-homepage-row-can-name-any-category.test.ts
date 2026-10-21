@@ -451,7 +451,10 @@ describe("one heading, several tabs, one grid", () => {
 
     expect(section).toContain("cakes.length === 0");
     expect(section).toContain("Nothing here yet.");
-    // But no tabs at all IS nothing to draw.
-    expect(section).toContain("tabs.length === 0) return null");
+    // But no tabs at all IS nothing to draw — on the live page. The builder
+    // says so instead (`EmptyBandNotice` draws only there).
+    expect(section).toMatch(
+      /tabs\.length === 0\) (?:return null|\{\s*return \(\s*<EmptyBandNotice)/,
+    );
   });
 });

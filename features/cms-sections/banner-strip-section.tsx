@@ -6,7 +6,7 @@ import { parseListField, BANNER_STRIP_MAX, renderableRows } from "@/constants/se
 import { sectionAlignOf } from "./lib/section-utils";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
-import { type HomepageSectionRendererProps, contentString, SectionShell, ViewAllLink, SectionHeadingRow } from "./section-parts";
+import { type HomepageSectionRendererProps, contentString, SectionShell, ViewAllLink, SectionHeadingRow, EmptyBandNotice } from "./section-parts";
 
 // A client component: it turns on its own, on a timer, and pauses under the
 // pointer. Only this band ships that code; the rest of the homepage is drawn
@@ -135,7 +135,14 @@ export function BannerStripSection(props: HomepageSectionRendererProps) {
      that no longer exists — the band would go blank with no clue why. */
   const current = count ? index % count : 0;
 
-  if (count === 0) return null;
+  if (count === 0) {
+    return (
+      <EmptyBandNotice {...props} align={align}>
+        No banner with a picture yet, so this band is hidden on the live
+        homepage. Add one below.
+      </EmptyBandNotice>
+    );
+  }
 
   /*
     The same header row as every product band: what this is on the left,
