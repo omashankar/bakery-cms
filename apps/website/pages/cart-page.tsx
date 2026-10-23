@@ -20,6 +20,8 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { OptimizedImage } from "@/components/shared/optimized-image";
 import { EarliestDelivery } from "@/components/storefront/earliest-delivery";
 import { PincodeCheck } from "@/components/storefront/pincode-check";
+import { fetchPincodePlace } from "@/features/commerce/lib/pincode-api";
+import type { PincodePlace } from "@/types/delivery";
 import { QuantityStepper } from "@/components/shared/quantity-stepper";
 import { FrameThumbnail } from "@/components/storefront/frame-thumbnail";
 import { Button } from "@/components/ui/button";
@@ -303,6 +305,21 @@ export function CartPage({ catalog = [] }: CartPageProps) {
     return () => window.removeEventListener(DELIVERY_LOCATION_UPDATED_EVENT, sync);
   }, []);
 
+  // Where that PIN really is (India Post), so a district or state zone prices
+  // this row as the server will at checkout.
+  const [deliveryPlace, setDeliveryPlace] = useState<{ code: string; place: PincodePlace | null } | null>(null);
+  useEffect(() => {
+    if (!deliveryPincode) return;
+    let alive = true;
+    void fetchPincodePlace(deliveryPincode).then((answer) => {
+      if (alive && answer) setDeliveryPlace({ code: deliveryPincode, place: answer.place });
+    });
+    return () => {
+      alive = false;
+    };
+  }, [deliveryPincode]);
+  const place = deliveryPlace?.code === deliveryPincode ? deliveryPlace.place : undefined;
+
   const totals = useMemo(    () =>
       calculateCartTotals({
         items,
@@ -312,10 +329,10 @@ export function CartPage({ catalog = [] }: CartPageProps) {
         giftWrap: preferences.giftWrap,
         // The same basis the checkout uses, so the Delivery row does not
         // move between the two screens.
-        deliveryAddress: deliveryPincode ? { pincode: deliveryPincode } : undefined,
+        deliveryAddress: deliveryPincode ? { pincode: deliveryPincode, place } : undefined,
         commerceOverride: commerce,
       }),
-    [items, validCoupon?.discountAmount, preferences.giftWrap, deliveryPincode, commerce]
+    [items, validCoupon?.discountAmount, preferences.giftWrap, deliveryPincode, place, commerce]
   );
 
   const recentlyViewed = useMemo(

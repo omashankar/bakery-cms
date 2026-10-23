@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MapPin, X } from "lucide-react";
 
 import { DeliveryAnswer } from "@/components/storefront/delivery-answer";
 import { fetchZones } from "@/features/commerce/lib/commerce-api";
+import { fetchPincodePlace } from "@/features/commerce/lib/pincode-api";
 import { loadDeliveryZones } from "@/features/commerce/lib/delivery-zones-repository";
 import { isStorefrontSeeded } from "@/lib/storefront-seed-flag";
 import {
@@ -13,7 +14,7 @@ import {
   saveDeliveryLocation,
   type DeliveryLookup,
 } from "@/features/commerce/lib/delivery-location";
-import { normalizePincode } from "@/features/commerce/lib/delivery-zone-utils";
+import { isFullPincode, normalizePincode } from "@/features/commerce/lib/delivery-zone-utils";
 import type { DeliveryZone } from "@/types/delivery";
 import { cn } from "@/lib/utils";
 import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
@@ -64,6 +65,8 @@ export function PincodeCheck({
 }) {
   const [zones, setZones] = useState<DeliveryZone[] | null>(null);
   const [entered, setEntered] = useState("");
+  // Bumped on every edit, so a check answered after the box changed is dropped.
+  const checkSeq = useRef(0);
   const [result, setResult] = useState<DeliveryLookup | null>(null);
   const [checking, setChecking] = useState(false);
   // Inline only: the field, or the settled "Deliver to 324001 · Change" row.
@@ -106,19 +109,33 @@ export function PincodeCheck({
     if (!inline || !zones || zones.length === 0) return;
     const saved = readDeliveryLocation();
     if (!saved?.pincode) return;
-    const found = lookUpDeliveryPincode(zones, saved.pincode, getCommerceSettings());
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- a browser read, after mount
-    setResult(found);
-    if (found?.served) setEditing(false);
+    let alive = true;
+    // The real place too, so a district zone answers here as checkout will.
+    void fetchPincodePlace(saved.pincode).then((asked) => {
+      if (!alive) return;
+      const found = lookUpDeliveryPincode(zones, saved.pincode, getCommerceSettings(), asked?.place);
+      setResult(found);
+      if (found?.served) setEditing(false);
+    });
+    return () => {
+      alive = false;
+    };
   }, [inline, zones]);
 
   if (zones === null || zones.length === 0) return null;
 
-  const check = () => {
+  const check = async () => {
+    const code = normalizePincode(entered);
+    const seq = ++checkSeq.current;
     setChecking(true);
-    const found = lookUpDeliveryPincode(zones, entered, getCommerceSettings());
-    setResult(found);
+    // India Post's answer: where the PIN is, or that there is no such PIN.
+    // A failed request answers from the zones alone, never "not a PIN".
+    const asked = await fetchPincodePlace(code);
     setChecking(false);
+    // Typed over while the answer was on its way: that answer is not for this box.
+    if (seq !== checkSeq.current) return;
+    const found = lookUpDeliveryPincode(zones, code, getCommerceSettings(), asked?.place);
+    setResult(found);
     if (found?.served) {
       saveDeliveryLocation({ pincode: normalizePincode(entered), label: found.zoneName });
       if (inline) setEditing(false);
@@ -217,7 +234,7 @@ export function PincodeCheck({
         )}
         onSubmit={(event) => {
           event.preventDefault();
-          check();
+          void check();
         }}
       >
         {inline ? null : (
@@ -232,6 +249,7 @@ export function PincodeCheck({
           // The same normalisation every zone rule is matched through, so what
           // the customer sees typed is exactly what gets compared.
           onChange={(event) => {
+            checkSeq.current += 1;
             setEntered(normalizePincode(event.target.value));
             // The old answer belonged to the old code. Left up, it reads as the
             // answer to what is in the box now — and so does a green border.
@@ -280,6 +298,7 @@ export function PincodeCheck({
           <button
             type="button"
             onClick={() => {
+              checkSeq.current += 1;
               setEntered("");
               setResult(null);
             }}
@@ -291,7 +310,8 @@ export function PincodeCheck({
         ) : null}
         <button
           type="submit"
-          disabled={!entered}
+          // Six digits or nothing to check — a prefix used to answer "yes".
+          disabled={!isFullPincode(entered)}
           className={cn(
             "h-full shrink-0 px-6 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50",
             // Inline it is its own outlined button at the row's end, as the

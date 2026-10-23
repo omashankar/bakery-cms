@@ -30,6 +30,17 @@ import { cn } from "@/lib/utils";
  * It renders a plain block and takes no position on where it sits: the product
  * page puts it beside the field, the header's popover under it.
  */
+/** "Talwandi, Kota" — the first area and the district, from India Post. */
+function placeLine(place: DeliveryLookup["place"]): string {
+  if (!place) return "";
+  const district = place.districts[0] ?? "";
+  const named = place.areas.filter((name) => name.toLowerCase() !== district.toLowerCase());
+  // A neighbourhood a customer would say ("Vigyan Nagar"), not a counter's
+  // abbreviation ("P.I.P.").
+  const area = named.find((name) => !name.includes(".")) ?? named[0] ?? "";
+  return [area, district].filter(Boolean).join(", ");
+}
+
 export function DeliveryAnswer({
   result,
   pincode,
@@ -48,14 +59,32 @@ export function DeliveryAnswer({
   if (result === null) return null;
 
   const code = (pincode ?? "").trim();
+  const where = placeLine(result.place);
+
+  if (result.unknownPincode) {
+    return (
+      <div className={cn("flex min-w-0 items-start gap-2 text-sm", className)}>
+        <X className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
+        <div className="min-w-0">
+          <p className="font-medium text-foreground">
+            {code ? code : "This PIN code"} is not a PIN code we can find
+          </p>
+          <p className="text-muted-foreground">Please check the digits and try again.</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!result.served) {
     return (
       <div className={cn("flex min-w-0 items-start gap-2 text-sm", className)}>
         <X className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
-        <p className="font-medium text-foreground">
-          No, we have not covered {code ? code : "this PIN code"} yet
-        </p>
+        <div className="min-w-0">
+          <p className="font-medium text-foreground">
+            No, we have not covered {code ? code : "this PIN code"} yet
+          </p>
+          {where ? <p className="text-muted-foreground">{where}</p> : null}
+        </div>
       </div>
     );
   }
@@ -66,7 +95,12 @@ export function DeliveryAnswer({
     same zone — the separator says so more plainly than three sentences do.
   */
   const facts = [
-    result.zoneName || null,
+    // The real place first — it is what tells a customer the right code was
+    // checked — and the zone's name only when it says something more.
+    where || null,
+    result.zoneName && !where.toLowerCase().includes(result.zoneName.toLowerCase())
+      ? result.zoneName
+      : null,
     result.minDeliveryDays === null
       ? null
       : result.minDeliveryDays <= 0

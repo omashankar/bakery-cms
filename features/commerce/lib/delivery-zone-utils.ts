@@ -1,4 +1,9 @@
-import type { DeliveryZone, DeliveryZoneListFilters, DeliveryZoneMatch } from "@/types/delivery";
+import type {
+  DeliveryZone,
+  DeliveryZoneListFilters,
+  DeliveryZoneMatch,
+  PincodePlace,
+} from "@/types/delivery";
 import { matchStateName, stateForPincode } from "./india-states";
 
 /** What a customer is told when no zone covers them and the shop stops there. */
@@ -9,6 +14,11 @@ export function normalizePincode(value: string): string {
   return value.replace(/\D/g, "").slice(0, 6);
 }
 
+/** A complete Indian PIN code: six digits, never starting with 0. */
+export function isFullPincode(value: string): boolean {
+  return /^[1-9]\d{5}$/.test(value);
+}
+
 export function matchesZonePincode(zonePincode: string, addressPincode: string): boolean {
   const zone = normalizePincode(zonePincode);
   const address = normalizePincode(addressPincode);
@@ -17,8 +27,22 @@ export function matchesZonePincode(zonePincode: string, addressPincode: string):
   return address.startsWith(zone);
 }
 
+const foldName = (name: string) => name.trim().toLowerCase().replace(/\s+/g, " ");
+
 export function matchesZoneCity(zoneCity: string, addressCity: string): boolean {
-  return zoneCity.trim().toLowerCase() === addressCity.trim().toLowerCase();
+  return foldName(zoneCity) === foldName(addressCity);
+}
+
+/**
+ * An address as the zones read it. `place` is what India Post says is at the
+ * PIN (see pincode-directory.ts) — when it is known, the REAL state and
+ * district decide, and what the customer typed in City and State does not.
+ */
+export interface ZoneAddress {
+  city?: string;
+  pincode?: string;
+  state?: string;
+  place?: Pick<PincodePlace, "state" | "districts"> | null;
 }
 
 /** The PIN rules a zone answers to: its list, or the single rule of an older zone. */
@@ -85,26 +109,54 @@ interface ZoneHit {
  * rule is the one the admin wrote deliberately — and the same holds one level
  * up: "all of Rajasthan at ₹150" must not outbid the Kota zone at ₹60.
  *
- * The STATE comes from the PIN code, not the State box the customer typed in
- * (`stateForPincode`); the typed name is only read when there is no PIN.
+ * WHERE THE ADDRESS REALLY IS decides, not what was typed. With the PIN's
+ * place from India Post, the state is that place's state and a city zone
+ * matches on its district(s) — a customer at 400001 who types "Kota" in the
+ * City box is in Mumbai, and used to be charged Kota's rate. Without a place
+ * (a PIN India Post does not list yet), the state comes from the PIN's digits
+ * (`stateForPincode`) and the city from what was typed, as before.
  */
 export function findDeliveryZone(
   zones: DeliveryZone[],
-  address: { city?: string; pincode?: string; state?: string }
+  address: ZoneAddress
 ): DeliveryZoneMatch | null {
-  const pincode = normalizePincode(address.pincode ?? "");
+  return rankDeliveryZones(zones, address)[0] ?? null;
+}
+
+/**
+ * Every active zone that covers the address, the winner first — the order
+ * `findDeliveryZone` picks from. The admin's PIN checker lists the rest as
+ * "also covered by", so an owner can see why one zone beat another.
+ *
+ * A PIN that is not a complete six-digit code is no PIN at all. "32400" is a
+ * customer halfway through typing, not an address — and every prefix rule
+ * matched it, so the product page answered "Yes, we deliver" to five digits.
+ */
+export function rankDeliveryZones(
+  zones: DeliveryZone[],
+  address: ZoneAddress
+): DeliveryZoneMatch[] {
+  const typed = normalizePincode(address.pincode ?? "");
+  const pincode = isFullPincode(typed) ? typed : "";
   const city = address.city?.trim() ?? "";
   // Nothing to go on is not "everywhere": no zone answers an empty address.
-  if (!pincode && !city) return null;
-  const state = (pincode ? stateForPincode(pincode) : null) ?? matchStateName(address.state ?? "");
+  if (!pincode && !city) return [];
+  const place = pincode ? (address.place ?? null) : null;
+  const state =
+    (place ? matchStateName(place.state) : null) ??
+    (pincode ? stateForPincode(pincode) : null) ??
+    matchStateName(address.state ?? "");
+  // The names a city zone may match: the real district(s), or the typed city
+  // when the PIN's place is not known.
+  const cities = place ? place.districts : city ? [city] : [];
 
   const hits: ZoneHit[] = [];
   for (const zone of zones) {
     if (!zone.isActive) continue;
     if (zoneExcludesPincode(zone, pincode)) continue;
     const hit = zone.coverage
-      ? coverageHit(zone, { pincode, city, state })
-      : legacyHit(zone, { pincode, city });
+      ? coverageHit(zone, { pincode, cities, state })
+      : legacyHit(zone, { pincode, cities });
     if (hit) hits.push(hit);
   }
 
@@ -126,14 +178,13 @@ export function findDeliveryZone(
       a.zone.id.localeCompare(b.zone.id),
   );
 
-  const best = hits[0];
-  return best ? { zone: best.zone, matchType: best.matchType } : null;
+  return hits.map((hit) => ({ zone: hit.zone, matchType: hit.matchType }));
 }
 
 /** A zone written with a `coverage`. */
 function coverageHit(
   zone: DeliveryZone,
-  address: { pincode: string; city: string; state: string | null },
+  address: { pincode: string; cities: string[]; state: string | null },
 ): ZoneHit | null {
   switch (zone.coverage) {
     case "pincodes": {
@@ -141,7 +192,7 @@ function coverageHit(
       return length ? { zone, rank: 100 + length, cityAgrees: 0, matchType: "pincode" } : null;
     }
     case "cities":
-      return address.city && zoneCities(zone).some((name) => matchesZoneCity(name, address.city))
+      return anyCityMatches(zoneCities(zone), address.cities)
         ? { zone, rank: 51, cityAgrees: 0, matchType: "city" }
         : null;
     case "states":
@@ -168,7 +219,7 @@ function coverageHit(
  */
 function legacyHit(
   zone: DeliveryZone,
-  address: { pincode: string; city: string },
+  address: { pincode: string; cities: string[] },
 ): ZoneHit | null {
   const rule = normalizePincode(zone.pincode);
   if (rule && address.pincode && matchesZonePincode(rule, address.pincode)) {
@@ -179,14 +230,19 @@ function legacyHit(
     // does. But a loose prefix — "4" typed where "400" was meant — used to annex
     // every neighbouring city outright, beating the zone the admin had actually
     // built for that city.
-    const cityAgrees =
-      address.city && zone.city.trim() ? (matchesZoneCity(zone.city, address.city) ? 1 : 0) : 0;
+    const cityAgrees = anyCityMatches([zone.city], address.cities) ? 1 : 0;
     return { zone, rank: 100 + rule.length, cityAgrees, matchType: "pincode" };
   }
-  if (address.city && matchesZoneCity(zone.city, address.city)) {
+  if (anyCityMatches([zone.city], address.cities)) {
     return { zone, rank: rule ? 50 : 51, cityAgrees: 0, matchType: "city" };
   }
   return null;
+}
+
+function anyCityMatches(zoneNames: string[], addressNames: string[]): boolean {
+  return zoneNames.some(
+    (name) => name.trim() !== "" && addressNames.some((city) => matchesZoneCity(name, city)),
+  );
 }
 
 
@@ -199,13 +255,25 @@ export function filterDeliveryZones(
   return zones.filter((zone) => {
     if (filters.status === "active" && !zone.isActive) return false;
     if (filters.status === "inactive" && zone.isActive) return false;
-    if (filters.city !== "all" && zone.city.toLowerCase() !== filters.city.toLowerCase()) {
+    if (
+      filters.city !== "all" &&
+      !zoneCities(zone).some((city) => matchesZoneCity(city, filters.city))
+    ) {
       return false;
     }
 
     if (!query) return true;
 
-    const haystack = `${zone.name} ${zone.city} ${zone.pincode}`.toLowerCase();
+    // Every place the zone names. It searched `city` and `pincode` alone,
+    // which a zone with a coverage leaves blank — "3240" found nothing.
+    const haystack = [
+      zone.name,
+      ...zoneCities(zone),
+      ...zonePincodeRules(zone),
+      ...(zone.states ?? []),
+    ]
+      .join(" ")
+      .toLowerCase();
     return haystack.includes(query);
   });
 }
@@ -216,8 +284,17 @@ export function countActiveDeliveryZoneFilters(filters: DeliveryZoneListFilters)
   return count;
 }
 
+/**
+ * The cities zones name, one each. It read `zone.city`, which is "" on a PIN
+ * or state zone and "Kota, Bundi" on a cities zone — so a shop with one PIN
+ * zone showed "Cities: 1" and a filter option with no name.
+ */
 export function getUniqueZoneCities(zones: DeliveryZone[]): string[] {
-  return [...new Set(zones.map((zone) => zone.city))].sort((a, b) => a.localeCompare(b));
+  const byKey = new Map<string, string>();
+  for (const city of zones.flatMap(zoneCities)) {
+    if (!byKey.has(city.toLowerCase())) byKey.set(city.toLowerCase(), city);
+  }
+  return [...byKey.values()].sort((a, b) => a.localeCompare(b));
 }
 
 export function formatZoneDeliveryTime(zone: DeliveryZone): string {

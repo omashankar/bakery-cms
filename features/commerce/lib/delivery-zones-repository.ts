@@ -4,6 +4,7 @@ import {
   filterDeliveryZones,
   findDeliveryZone,
   getUniqueZoneCities,
+  type ZoneAddress,
 } from "./delivery-zone-utils";
 import { fetchZones, replaceZonesRequest, zonesHydration } from "./commerce-api";
 import type { WriteResult } from "@/lib/write-result";
@@ -325,21 +326,14 @@ export async function toggleDeliveryZoneActive(
   });
 }
 
-export async function resetDeliveryZones(): Promise<WriteResult<DeliveryZone[]>> {
-  const seeded = seedZones();
-  const result = await mutateZones(seeded, () => ({ next: seeded, value: seeded }));
-  return { value: seeded, persisted: result.persisted };
-}
 
 export function getActiveDeliveryZones(): DeliveryZone[] {
   return loadDeliveryZones().filter((zone) => zone.isActive);
 }
 
-export function resolveDeliveryZoneForAddress(address: {
-  city?: string;
-  pincode?: string;
-  state?: string;
-}): ReturnType<typeof findDeliveryZone> {
+export function resolveDeliveryZoneForAddress(
+  address: ZoneAddress,
+): ReturnType<typeof findDeliveryZone> {
   return findDeliveryZone(loadDeliveryZones(), address);
 }
 

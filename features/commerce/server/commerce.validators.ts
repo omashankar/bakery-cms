@@ -45,6 +45,8 @@ const couponSchema = z
   })
   .passthrough();
 
+const pinRule = z.string().regex(/^[1-9]\d{2,5}$/, "A PIN code or prefix is 3–6 digits, not starting with 0");
+
 const deliveryZoneSchema = z
   .object({
     id: z.string().min(1),
@@ -54,12 +56,12 @@ const deliveryZoneSchema = z
     coverage: z.enum(["country", "states", "cities", "pincodes"]).optional(),
     states: z.array(z.string().trim().min(1).max(80)).max(40).optional(),
     cities: z.array(z.string().trim().min(1).max(80)).max(200).optional(),
-    // Digits only, 1–6 of them: an exact PIN or a prefix.
-    pincodes: z.array(z.string().regex(/^\d{1,6}$/, "A PIN code is 1–6 digits")).max(2000).optional(),
-    excludedPincodes: z
-      .array(z.string().regex(/^\d{1,6}$/, "A PIN code is 1–6 digits"))
-      .max(2000)
-      .optional(),
+    // An exact PIN or a prefix of at least three digits — the form's rule, so
+    // a zone the form refuses cannot arrive by another road. No Indian PIN
+    // starts with 0; a rule that does matches nothing and says it covers
+    // something.
+    pincodes: z.array(pinRule).max(2000).optional(),
+    excludedPincodes: z.array(pinRule).max(2000).optional(),
     radiusKm: z.number().min(0),
     deliveryCharge: z.number().min(0),
     minDeliveryDays: z.number().int().min(0),
@@ -69,7 +71,16 @@ const deliveryZoneSchema = z
     createdAt: z.string(),
     updatedAt: z.string(),
   })
-  .passthrough();
+  .passthrough()
+  // A coverage with nothing chosen covers nothing, while the list says it
+  // covers "PIN codes". Zones from before `coverage` carry none and pass.
+  .refine(
+    (zone) =>
+      (zone.coverage !== "pincodes" || (zone.pincodes?.length ?? 0) > 0) &&
+      (zone.coverage !== "cities" || (zone.cities?.length ?? 0) > 0) &&
+      (zone.coverage !== "states" || (zone.states?.length ?? 0) > 0),
+    { message: "A zone must cover at least one PIN code, city or state" },
+  );
 
 export const couponsArraySchema = z.array(couponSchema);
 

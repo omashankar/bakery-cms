@@ -44,7 +44,14 @@ import { CouponInput } from "@/apps/website/checkout/components/coupon-input";
 import { OrderSummaryPanel } from "@/apps/website/checkout/components/order-summary-panel";
 import { DeliverySlotPicker } from "@/apps/website/checkout/components/delivery-slot-picker";
 import { calculateCartTotals, type CartTotals } from "@/features/orders/lib/cart-totals";
-import { OUTSIDE_ZONES_MESSAGE } from "@/features/commerce/lib/delivery-zone-utils";
+import {
+  isFullPincode,
+  normalizePincode,
+  OUTSIDE_ZONES_MESSAGE,
+} from "@/features/commerce/lib/delivery-zone-utils";
+import { fetchPincodePlace } from "@/features/commerce/lib/pincode-api";
+import { matchStateName } from "@/features/commerce/lib/india-states";
+import type { PincodePlace } from "@/types/delivery";
 import {
   clearCheckoutDraft,
   EMPTY_CHECKOUT_ADDRESS,
@@ -770,6 +777,45 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   const watchedAddressLabel = watch("addressLabel");
 
   /**
+   * WHERE THE PIN REALLY IS, from India Post.
+   *
+   * The server prices delivery from the PIN's real district and state, not
+   * from the City and State boxes — so the preview here asks the same
+   * directory, or a district zone would show one charge and the order carry
+   * another. It also fills City and State in when they are empty, and says
+   * so when a PIN is not one India Post knows.
+   */
+  const typedPin = normalizePincode(watchedPincode ?? "");
+  const fullPin = isFullPincode(typedPin) ? typedPin : "";
+  const [pinPlace, setPinPlace] = useState<{ code: string; place: PincodePlace | null } | null>(null);
+  useEffect(() => {
+    if (!fullPin) return;
+    let alive = true;
+    void fetchPincodePlace(fullPin).then((answer) => {
+      if (!alive || !answer) return;
+      setPinPlace({ code: fullPin, place: answer.place });
+      // Filled in, never typed over: what the customer wrote stays.
+      if (answer.place) {
+        if (!getValues("city")?.trim()) {
+          setValue("city", answer.place.districts[0] ?? "", { shouldValidate: true });
+        }
+        if (!getValues("state")?.trim()) {
+          setValue("state", answer.place.state, { shouldValidate: true });
+        }
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, [fullPin, getValues, setValue]);
+  const pinAnswer = pinPlace && pinPlace.code === fullPin ? pinPlace : null;
+  const pinStateDiffers = Boolean(
+    pinAnswer?.place &&
+      matchStateName(watchedState ?? "") &&
+      matchStateName(watchedState ?? "") !== matchStateName(pinAnswer.place.state),
+  );
+
+  /**
    * THE SHOP'S OWN WORDS, not Birthday / Anniversary / Other.
    *
    * A fixed list is a claim about what this shop sells and who for. These
@@ -899,10 +945,11 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
           city: watchedCity,
           pincode: watchedPincode,
           state: watchedState,
+          place: pinAnswer?.place,
         },
         commerceOverride: commerce,
       }),
-    [items, validCoupon, giftWrap, deliveryTierId, watchedCity, watchedPincode, watchedState, commerce]
+    [items, validCoupon, giftWrap, deliveryTierId, watchedCity, watchedPincode, watchedState, pinAnswer, commerce]
   );
 
   const totals = serverTotals ?? localTotals;
@@ -1775,14 +1822,46 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                           SAID HERE, under the PIN, as soon as it is typed — not
                           as a failed payment. The shop delivers only inside its
                           zones and this address is in none of them; the server
-                          refuses the order for the same reason.
+                          refuses the order for the same reason. Not while the
+                          PIN is half typed: "324" is not an address yet.
                         */}
-                        {totals.deliverable === false ? (
+                        {totals.deliverable === false && fullPin ? (
                           <p role="alert" className="text-xs text-destructive">
                             {OUTSIDE_ZONES_MESSAGE}
                           </p>
                         ) : null}
-                        {commerce.useZoneBasedDelivery && totals.deliveryZoneName ? (
+                        {/*
+                          India Post's answer, so the customer sees the right
+                          code was typed — or is asked to look again. Not a
+                          block: the directory can miss a brand-new PIN, and
+                          a real customer must still be able to order.
+                        */}
+                        {pinAnswer?.place ? (
+                          <p className="text-xs text-muted-foreground">
+                            {[
+                              pinAnswer.place.areas.find((name) => !name.includes(".")),
+                              pinAnswer.place.districts[0],
+                              pinAnswer.place.state,
+                            ]
+                              .filter(Boolean)
+                              .join(", ")}
+                          </p>
+                        ) : null}
+                        {pinAnswer && pinAnswer.place === null ? (
+                          <p role="alert" className="text-xs text-amber-700 dark:text-amber-300">
+                            We couldn&apos;t find {fullPin} in India Post&apos;s list. Please check
+                            the PIN code.
+                          </p>
+                        ) : null}
+                        {pinStateDiffers && pinAnswer?.place ? (
+                          <p role="alert" className="text-xs text-amber-700 dark:text-amber-300">
+                            PIN {fullPin} is in {pinAnswer.place.state} — please check the PIN code
+                            or the state.
+                          </p>
+                        ) : null}
+                        {/* Only for a whole PIN: while it is half typed, the
+                            last quote is for the previous code. */}
+                        {commerce.useZoneBasedDelivery && totals.deliveryZoneName && fullPin ? (
                           <p className="text-xs text-bakery-700">
                             Delivery zone: {totals.deliveryZoneName}
                             {totals.estimatedDeliveryDays

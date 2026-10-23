@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DeliveryAnswer } from "@/components/storefront/delivery-answer";
 import { fetchZones } from "@/features/commerce/lib/commerce-api";
+import { fetchPincodePlace } from "@/features/commerce/lib/pincode-api";
 import { loadDeliveryZones } from "@/features/commerce/lib/delivery-zones-repository";
 import { isStorefrontSeeded } from "@/lib/storefront-seed-flag";
 import {
@@ -18,7 +19,7 @@ import {
   type DeliveryLocation,
   type DeliveryLookup,
 } from "@/features/commerce/lib/delivery-location";
-import { normalizePincode } from "@/features/commerce/lib/delivery-zone-utils";
+import { isFullPincode, normalizePincode } from "@/features/commerce/lib/delivery-zone-utils";
 import type { DeliveryZone } from "@/types/delivery";
 import { cn } from "@/lib/utils";
 import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
@@ -40,6 +41,9 @@ export function DeliveryLocationButton() {
   const [zones, setZones] = useState<DeliveryZone[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<DeliveryLookup | null>(null);
+  const [checking, setChecking] = useState(false);
+  // Bumped on every edit, so a check answered after the box changed is dropped.
+  const checkSeq = useRef(0);
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -97,12 +101,19 @@ export function DeliveryLocationButton() {
     };
   }, [open]);
 
-  const check = () => {
+  const check = async () => {
     if (zones === null) return;
-    const found = lookUpDeliveryPincode(zones, entered, getCommerceSettings());
+    const pincode = normalizePincode(entered);
+    const seq = ++checkSeq.current;
+    setChecking(true);
+    // Where the PIN really is, or that India Post has no such PIN; a failed
+    // request answers from the zones alone.
+    const asked = await fetchPincodePlace(pincode);
+    setChecking(false);
+    if (seq !== checkSeq.current) return;
+    const found = lookUpDeliveryPincode(zones, pincode, getCommerceSettings(), asked?.place);
     setResult(found);
     if (found?.served) {
-      const pincode = normalizePincode(entered);
       saveDeliveryLocation({ pincode, label: found.zoneName });
       setLocation({ pincode, label: found.zoneName });
     }
@@ -148,7 +159,7 @@ export function DeliveryLocationButton() {
             className="mt-3 flex gap-2"
             onSubmit={(event) => {
               event.preventDefault();
-              check();
+              void check();
             }}
           >
             <Input
@@ -156,13 +167,18 @@ export function DeliveryLocationButton() {
               value={entered}
               // The same normalisation every zone rule is matched through, so
               // what the customer sees typed is exactly what gets compared.
-              onChange={(event) => setEntered(normalizePincode(event.target.value))}
+              onChange={(event) => {
+                checkSeq.current += 1;
+                setEntered(normalizePincode(event.target.value));
+                // The old answer was for the old code.
+                setResult(null);
+              }}
               inputMode="numeric"
               autoComplete="postal-code"
               aria-label="PIN code"
               placeholder="PIN code"
             />
-            <Button type="submit" variant="bakery" className="h-11" disabled={!entered || loading}>
+            <Button type="submit" variant="bakery" className="h-11" disabled={!isFullPincode(entered) || loading || checking}>
               Check
             </Button>
           </form>
@@ -177,7 +193,7 @@ export function DeliveryLocationButton() {
             this wording is how two screens come to tell somebody two different
             things about whether an order can reach them.
           */}
-          <DeliveryAnswer result={result} pincode={entered} loading={loading} className="mt-3" />
+          <DeliveryAnswer result={result} pincode={entered} loading={loading || checking} className="mt-3" />
         </div>
       ) : null}
     </div>

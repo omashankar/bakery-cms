@@ -26,6 +26,8 @@ import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import type { CommerceSettings, GeneralSettings, ModuleSettings } from "@/types/settings";
 import type { LandingProduct } from "@/constants/landing-data";
 import type { DeliveryZone } from "@/types/delivery";
+import { lookUpPincode } from "@/features/commerce/server/pincode-directory";
+import { normalizePincode } from "@/features/commerce/lib/delivery-zone-utils";
 
 /**
  * Prices a cart on the SERVER, from the shop's own records.
@@ -463,7 +465,12 @@ export async function priceCart(input: QuoteInput): Promise<CartQuote> {
     discount: applied?.discountAmount ?? 0,
     giftWrap: Boolean(input.giftWrap),
     deliveryTierId: input.deliveryTierId,
-    deliveryAddress: input.deliveryAddress,
+    // Where the PIN really is, from India Post — never from the browser. A
+    // district or state zone is decided by this, not by the typed City/State.
+    deliveryAddress: input.deliveryAddress && {
+      ...input.deliveryAddress,
+      place: lookUpPincode(normalizePincode(input.deliveryAddress.pincode ?? "")),
+    },
     commerceOverride: commerce,
     zonesOverride: (await Promise.resolve(zones)) as DeliveryZone[],
     // Tax rounds to the shop's minor unit. On the server there is no `<html>`

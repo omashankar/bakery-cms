@@ -6,7 +6,6 @@ import {
   MapPin,
   Pencil,
   Plus,
-  RotateCcw,
   Trash2,
   XCircle,
 } from "lucide-react";
@@ -14,6 +13,8 @@ import { toast } from "sonner";
 import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import { DeliveryZoneFormDialog } from "@/apps/admin/commerce/components/delivery-zone-form-dialog";
+import { ZonePinChecker } from "@/apps/admin/commerce/components/zone-pin-checker";
+import type { CommerceSettings } from "@/types/settings";
 import {
   describeZoneCoverage,
   formatZoneDeliveryTime,
@@ -31,7 +32,6 @@ import {
   getDeliveryZoneStats,
   getUniqueZoneCities,
   loadDeliveryZones,
-  resetDeliveryZones,
   toggleDeliveryZoneActive,
 } from "@/features/commerce/lib/delivery-zones-repository";
 import {
@@ -105,9 +105,12 @@ function exportZonesToCsv(zones: DeliveryZone[]): void {
 
 export function DeliveryZonesAdminPage({
   initial = null,
+  pinDirectory = null,
 }: {
   /** Every zone, read on the server; null fetches as before. */
   initial?: DeliveryZone[] | null;
+  /** How fresh India Post's PIN list is — said on screen so a stale one shows. */
+  pinDirectory?: { updated: string; pins: number } | null;
 } = {}) {
   // Before this screen's mount read, so it finds the shop's zones — not this
   // browser's old copy or the shipped demo ones — and the save gate open.
@@ -125,12 +128,13 @@ export function DeliveryZonesAdminPage({
 
   // Whether any of this reaches a customer. The master switch lives on Shipping
   // Rules and is OFF by default, so a zone map built here can be entirely inert.
-  const [zonePricingOn, setZonePricingOn] = useState(false);
+  const [commerce, setCommerce] = useState<CommerceSettings | null>(null);
+  const zonePricingOn = Boolean(commerce?.useZoneBasedDelivery);
 
   useEffect(() => {
     function refresh() {
       setZones(loadDeliveryZones());
-      setZonePricingOn(Boolean(getCommerceSettings().useZoneBasedDelivery));
+      setCommerce(getCommerceSettings());
     }
     refresh();
     setMounted(true);
@@ -205,26 +209,6 @@ export function DeliveryZonesAdminPage({
     });
   }
 
-  async function handleReset() {
-    // "Reset demo" replaces every zone in the DATABASE with the five sample
-    // rows, and those rows then price live checkouts. One unconfirmed click was
-    // all it took to delete a shop's real delivery pricing.
-    const ok = window.confirm(
-      // "all N" overstated it: a save only removes the zones this browser knows
-      // about, so anything created elsewhere since this page loaded survives.
-      `This replaces the ${zones.length} zone${zones.length === 1 ? "" : "s"} shown here with the demo zones.\n\n` +
-        "Live checkout will be priced from the demo zones until you set yours up again. This cannot be undone.",
-    );
-    if (!ok) return;
-
-    const { persisted } = await resetDeliveryZones();
-    setSelectedIds([]);
-    setZones(loadDeliveryZones());
-    reportWrite(persisted, "Delivery zones reset to defaults", {
-      failure: "Could not reset — the server rejected it",
-    });
-  }
-
   function handleExport() {
     const target =
       selectedIds.length > 0
@@ -242,19 +226,17 @@ export function DeliveryZonesAdminPage({
     <AdminPage className="space-y-4 sm:space-y-5">
       <AdminPageHeader
         title="Delivery Zones"
-        description="Manage city and pincode delivery zones."
+        description="Where the shop delivers, what it charges and how fast — by PIN code, city, state or all of India."
         className="gap-3"
         actions={
+          /*
+            A "Reset demo" button stood here. It replaced the shop's zones in
+            the DATABASE with five Mumbai and Pune sample zones, which then
+            priced live checkouts — a Kota shop one click away from charging
+            Mumbai rates and refusing Kota. Behind a confirm, but a confirm is
+            not a reason to offer it on a live shop's delivery map.
+          */
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-            <Button
-              variant="outline"
-              className="w-full sm:w-auto"
-              onClick={() => void handleReset()}
-            >
-              <RotateCcw className="size-4" />
-              <span className="sm:hidden">Reset</span>
-              <span className="hidden sm:inline">Reset demo</span>
-            </Button>
             <Button variant="bakery" className="w-full sm:w-auto" onClick={openCreate}>
               <Plus className="size-4" />
               <span className="sm:hidden">Add</span>
@@ -323,6 +305,10 @@ export function DeliveryZonesAdminPage({
           tone="gold"
         />
       </section>
+
+      {mounted && commerce ? (
+        <ZonePinChecker zones={zones} commerce={commerce} directory={pinDirectory} />
+      ) : null}
 
       <FilterPanel>
         <div className="space-y-3">
@@ -582,6 +568,7 @@ export function DeliveryZonesAdminPage({
         open={formOpen}
         onOpenChange={setFormOpen}
         zone={editingZone}
+        allZones={zones}
         onSaved={() => {
           setSelectedIds([]);
           setZones(loadDeliveryZones());

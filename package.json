@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "pincodes:update": "node --env-file-if-exists=.env.local scripts/build-pincode-directory.mjs --download",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
