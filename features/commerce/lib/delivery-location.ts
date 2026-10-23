@@ -1,7 +1,7 @@
 import { safeRemoveItem, safeSetItem } from "@/lib/safe-storage";
-import type { DeliveryZone } from "@/types/delivery";
+import type { DeliveryZone, PincodePlace } from "@/types/delivery";
 import type { CommerceSettings } from "@/types/settings";
-import { findDeliveryZone, normalizePincode } from "./delivery-zone-utils";
+import { findDeliveryZone, isFullPincode, normalizePincode } from "./delivery-zone-utils";
 
 /**
  * WHERE THE CUSTOMER IS HAVING IT SENT.
@@ -88,6 +88,13 @@ export interface DeliveryLookup {
   minDeliveryDays: number | null;
   /** The zone's own charge, or null when it does not state one. */
   charge: number | null;
+  /**
+   * Where the PIN is, per India Post — "Talwandi, Kota" is how a customer
+   * knows the right code was checked. Absent when it was not looked up.
+   */
+  place?: PincodePlace | null;
+  /** India Post lists no such PIN: a typo, not a place the shop skips. */
+  unknownPincode?: boolean;
 }
 
 /**
@@ -111,16 +118,29 @@ export function lookUpDeliveryPincode(
     CommerceSettings,
     "useZoneBasedDelivery" | "deliverOutsideZones" | "zoneFallbackDeliveryFee" | "deliveryFee"
   >,
+  /**
+   * India Post's answer for the PIN: a place, null for "no such PIN", or
+   * undefined when it could not be asked — then the zones answer from the
+   * digits alone, as checkout would.
+   */
+  place?: PincodePlace | null,
 ): DeliveryLookup | null {
   const pincode = normalizePincode(entered);
-  if (!pincode) return null;
+  // Five digits is still typing, not an answer either way.
+  if (!isFullPincode(pincode)) return null;
+
+  // A code India Post does not list is a typo far more often than a new PIN:
+  // say so, rather than "we deliver" to a place that may not exist.
+  if (place === null) {
+    return { served: false, zoneName: "", minDeliveryDays: null, charge: null, place, unknownPincode: true };
+  }
 
   // Zones off: every address is delivered at the shop's flat fee.
   if (rules && !rules.useZoneBasedDelivery) {
-    return { served: true, zoneName: "", minDeliveryDays: null, charge: rules.deliveryFee };
+    return { served: true, zoneName: "", minDeliveryDays: null, charge: rules.deliveryFee, place };
   }
 
-  const match = findDeliveryZone(zones, { pincode });
+  const match = findDeliveryZone(zones, { pincode, place });
   if (!match) {
     if (rules && rules.deliverOutsideZones !== false) {
       return {
@@ -128,13 +148,15 @@ export function lookUpDeliveryPincode(
         zoneName: "",
         minDeliveryDays: null,
         charge: rules.zoneFallbackDeliveryFee ?? rules.deliveryFee,
+        place,
       };
     }
-    return { served: false, zoneName: "", minDeliveryDays: null, charge: null };
+    return { served: false, zoneName: "", minDeliveryDays: null, charge: null, place };
   }
 
   const { zone } = match;
   return {
+    place,
     served: true,
     zoneName: zone.name?.trim() ?? "",
     /*

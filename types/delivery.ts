@@ -42,6 +42,40 @@ export interface DeliveryZone extends BaseEntity {
 
 export type DeliveryZoneFormData = Omit<DeliveryZone, "id" | "createdAt" | "updatedAt">;
 
+/**
+ * WHAT INDIA POST SAYS IS AT A PIN CODE — its state, the district(s) it lies
+ * in, and the post-office areas inside it. Read on the server from the
+ * directory (features/commerce/server/pincode-directory.ts); a browser gets
+ * it from /api/pincodes.
+ */
+export interface PincodePlace {
+  pincode: string;
+  state: string;
+  /** Usually one; a PIN on a district line lists each. */
+  districts: string[];
+  /** "Talwandi", "Vigyan Nagar" … — for showing, never for matching. */
+  areas: string[];
+}
+
+/** A 3–5 digit PIN prefix, summed up from the real PINs that start with it. */
+export interface PincodePrefixSummary {
+  prefix: string;
+  /** How many real PIN codes start with it — 0 means a typo. */
+  count: number;
+  districts: string[];
+  states: string[];
+}
+
+export type PincodeInfo =
+  | { kind: "pin"; code: string; /** Null: India Post lists no such PIN. */ place: PincodePlace | null }
+  | { kind: "prefix"; code: string; summary: PincodePrefixSummary };
+
+export interface DistrictEntry {
+  name: string;
+  state: string;
+  pins: number;
+}
+
 export interface DeliveryZoneMatch {
   zone: DeliveryZone;
   matchType: "pincode" | "city" | "state" | "country";

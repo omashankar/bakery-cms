@@ -18,18 +18,34 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import {
   describePincodeRule,
-  findDeliveryZone,
   normalizePincode,
   zoneExcludesPincode,
 } from "@/features/commerce/lib/delivery-zone-utils";
-import { INDIAN_STATES, stateForPincode } from "@/features/commerce/lib/india-states";
+import {
+  checkZoneDraft,
+  describeMatch,
+  explainPincode,
+  pincodeRules,
+  readPincodeList,
+  type PincodeEntry,
+} from "@/features/commerce/lib/delivery-zone-validation";
+import { INDIAN_STATES } from "@/features/commerce/lib/india-states";
+import { fetchDistricts, fetchPincodeInfo } from "@/features/commerce/lib/pincode-api";
+import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
+import { formatCurrency } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import {
   createDeliveryZone,
   createEmptyDeliveryZone,
   updateDeliveryZone,
 } from "@/features/commerce/lib/delivery-zones-repository";
-import type { DeliveryZone, DeliveryZoneCoverage, DeliveryZoneFormData } from "@/types/delivery";
+import type {
+  DeliveryZone,
+  DeliveryZoneCoverage,
+  DeliveryZoneFormData,
+  DistrictEntry,
+  PincodeInfo,
+} from "@/types/delivery";
 
 /**
  * Whole days, always.
@@ -52,23 +68,117 @@ interface DeliveryZoneFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   zone?: DeliveryZone | null;
+  /**
+   * Every zone the shop has, so the form can refuse a PIN, city or state that
+   * another live zone already claims, and answer "Try a PIN" across them all.
+   */
+  allZones: DeliveryZone[];
   onSaved?: () => void;
 }
 
 const COVERAGE_CHOICES: { value: DeliveryZoneCoverage; label: string; hint: string }[] = [
   { value: "pincodes", label: "PIN codes / areas", hint: "Chosen PIN codes, or every PIN starting with a few digits" },
-  { value: "cities", label: "Cities", hint: "Every address in the cities you name" },
+  { value: "cities", label: "Districts", hint: "Every PIN in the districts you choose" },
   { value: "states", label: "States", hint: "Whole states, worked out from the PIN code" },
   { value: "country", label: "All of India", hint: "Every PIN code — a catch-all rate" },
 ];
 
-/** "324001, 3240\n324009" → ["324001", "3240", "324009"]: digits only, no repeats. */
-function parsePincodes(text: string): string[] {
-  const rules = text
-    .split(/[\s,;]+/)
-    .map((token) => normalizePincode(token))
-    .filter(Boolean);
-  return [...new Set(rules)];
+/**
+ * Each entry of a PIN box as a chip: the rule and its state, or — in red —
+ * what is wrong with it. The owner sees "3240… Rajasthan" while typing, which
+ * is how a 3420 meant as 3240 gets caught before a customer finds it.
+ */
+function PincodeChips({
+  entries,
+  directory,
+}: {
+  entries: PincodeEntry[];
+  /** India Post's answer per rule, once it has arrived. */
+  directory: Record<string, PincodeInfo>;
+}) {
+  if (entries.length === 0) return null;
+  return (
+    <ul className="flex flex-wrap gap-1.5" aria-label="What these PIN codes mean">
+      {entries.map((entry) => {
+        const info = entry.rule ? directory[entry.rule] : undefined;
+        const unreal =
+          (info?.kind === "pin" && info.place === null) ||
+          (info?.kind === "prefix" && info.summary.count === 0);
+        const bad = Boolean(entry.problem) || unreal;
+        return (
+          <li
+            key={entry.rule || entry.text}
+            title={info?.kind === "pin" && info.place ? info.place.areas.join(", ") : (entry.problem ?? undefined)}
+            className={cn(
+              "rounded-md border px-2 py-0.5 text-xs",
+              bad ? "border-destructive/50 bg-destructive/10 text-destructive" : "border-border bg-muted/60",
+            )}
+          >
+            {entry.problem ? (
+              <>
+                {entry.text} <span className="font-medium">· not valid</span>
+              </>
+            ) : (
+              <>
+                <span className="font-medium">{describePincodeRule(entry.rule)}</span>
+                <span className={bad ? undefined : "text-muted-foreground"}> · {chipDetail(entry, info)}</span>
+              </>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** "Talwandi, Kota" · "10 PINs · Kota" · "no such PIN" — what India Post says. */
+function chipDetail(entry: PincodeEntry, info: PincodeInfo | undefined): string {
+  if (!info) return entry.state ?? "…";
+  if (info.kind === "pin") {
+    if (!info.place) return "no such PIN";
+    const district = info.place.districts[0] ?? "";
+    const area = info.place.areas.find((name) => !name.includes(".") && name !== district);
+    return [area, district].filter(Boolean).join(", ");
+  }
+  const { count, districts } = info.summary;
+  if (count === 0) return "no real PIN starts with this";
+  const where = districts.length <= 2 ? districts.join(", ") : `${districts.slice(0, 2).join(", ")} +${districts.length - 2}`;
+  return `${count} PIN${count === 1 ? "" : "s"} · ${where}`;
+}
+
+/**
+ * Each name in a Districts zone, checked against India Post's list: green with
+ * its state and PIN count, red with a suggestion when no district has it.
+ */
+function DistrictChips({ names, districts }: { names: string[]; districts: DistrictEntry[] | null }) {
+  if (names.length === 0 || !districts) return null;
+  return (
+    <ul className="flex flex-wrap gap-1.5" aria-label="What these districts are">
+      {names.map((name) => {
+        const matches = districts.filter((entry) => entry.name.toLowerCase() === name.trim().toLowerCase());
+        const pins = matches.reduce((sum, entry) => sum + entry.pins, 0);
+        return (
+          <li
+            key={name}
+            className={cn(
+              "rounded-md border px-2 py-0.5 text-xs",
+              matches.length ? "border-border bg-muted/60" : "border-destructive/50 bg-destructive/10 text-destructive",
+            )}
+          >
+            <span className="font-medium">{name}</span>
+            {matches.length ? (
+              <span className="text-muted-foreground">
+                {" "}
+                · {matches.map((entry) => entry.state).join(" / ")} · {pins} PINs
+              </span>
+            ) : (
+              " · not a district"
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
 }
 
 /** "Kota, Bundi\nJaipur" → ["Kota", "Bundi", "Jaipur"], case-insensitively unique. */
@@ -123,18 +233,27 @@ export function DeliveryZoneFormDialog({
   open,
   onOpenChange,
   zone,
+  allZones,
   onSaved,
 }: DeliveryZoneFormDialogProps) {
   const [form, setForm] = useState<DeliveryZoneFormData>(createEmptyDeliveryZone());
   const [draft, setDraft] = useState<CoverageDraft>(() => draftOf(null));
   const [stateQuery, setStateQuery] = useState("");
   const [testPin, setTestPin] = useState("");
+  // Blank fields are only called out once Save is pressed.
+  const [attempted, setAttempted] = useState(false);
+  const [saving, setSaving] = useState(false);
+  // What India Post says about each code typed so far, and every district.
+  const [directory, setDirectory] = useState<Record<string, PincodeInfo>>({});
+  const [districts, setDistricts] = useState<DistrictEntry[] | null>(null);
+  const [districtPick, setDistrictPick] = useState("");
 
   useEffect(() => {
     if (!open) return;
     setDraft(draftOf(zone));
     setStateQuery("");
     setTestPin("");
+    setAttempted(false);
     if (zone) {
       setForm({
         name: zone.name,
@@ -149,7 +268,17 @@ export function DeliveryZoneFormDialog({
       });
       return;
     }
-    setForm(createEmptyDeliveryZone());
+    // A new zone starts from what the shop already charges and promises, not
+    // from fixed numbers: the shop delivers same-day, and a zone that opened
+    // at "1 day" quietly took same-day away from every PIN it covered.
+    const commerce = getCommerceSettings();
+    const minDays = Math.max(0, Math.round(commerce.deliveryLeadDays ?? 0));
+    setForm({
+      ...createEmptyDeliveryZone(),
+      deliveryCharge: commerce.deliveryFee,
+      minDeliveryDays: minDays,
+      estimatedDeliveryDays: Math.max(minDays, Math.round(commerce.estimatedDeliveryDays ?? minDays)),
+    });
   }, [open, zone]);
 
   function patch(patch: Partial<DeliveryZoneFormData>) {
@@ -160,9 +289,44 @@ export function DeliveryZoneFormDialog({
     setDraft((prev) => ({ ...prev, ...patch }));
   }
 
-  const pincodes = parsePincodes(draft.pincodesText);
+  const pincodeEntries = readPincodeList(draft.pincodesText);
+  const excludedEntries = readPincodeList(draft.excludedText);
+  const pincodes = pincodeRules(pincodeEntries);
   const cities = parseCities(draft.citiesText);
-  const excluded = parsePincodes(draft.excludedText);
+  const excluded = pincodeRules(excludedEntries);
+  const others = allZones.filter((other) => other.id !== zone?.id);
+  const testCode = normalizePincode(testPin);
+
+  /*
+    ASK INDIA POST about every code in the form, a moment after typing stops.
+    The chips then say "Talwandi, Kota" or "no such PIN", and the checks below
+    refuse a code no address can have. Remembered across edits, so a code is
+    asked about once.
+  */
+  const codesToAsk = [...pincodes, ...excluded, ...(testCode.length === 6 ? [testCode] : [])]
+    .filter((code) => !(code in directory))
+    .join(",");
+  useEffect(() => {
+    if (!open || !codesToAsk) return;
+    const timer = window.setTimeout(() => {
+      void fetchPincodeInfo(codesToAsk.split(",")).then((found) => {
+        if (found) setDirectory((prev) => ({ ...prev, ...found }));
+      });
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [open, codesToAsk]);
+
+  const wantsDistricts = open && draft.coverage === "cities" && districts === null;
+  useEffect(() => {
+    if (!wantsDistricts) return;
+    let alive = true;
+    void fetchDistricts().then((list) => {
+      if (alive && list) setDistricts(list);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [wantsDistricts]);
 
   /**
    * The zone as it will be saved. Only the chosen coverage's list is kept —
@@ -200,39 +364,54 @@ export function DeliveryZoneFormDialog({
     state.toLowerCase().includes(stateQuery.trim().toLowerCase()),
   );
 
+  const checkWith = (known: Record<string, PincodeInfo>, districtList = districts) =>
+    checkZoneDraft({
+      zone: { ...zoneData, id: zone?.id },
+      pincodeEntries: draft.coverage === "pincodes" ? pincodeEntries : [],
+      excludedEntries,
+      others,
+      directory: known,
+      districts: districtList ?? undefined,
+    });
+  const problems = checkWith(directory);
+  const blocking = [...problems.missing, ...problems.errors];
+  // Wrong things are said as they are typed; blank ones only after Save.
+  const shownErrors = attempted ? blocking : problems.errors;
+
   async function handleSubmit() {
-    if (!form.name.trim()) {
-      toast.error("Give the zone a name");
-      return;
-    }
-    if (draft.coverage === "pincodes" && pincodes.length === 0) {
-      toast.error("Add at least one PIN code or PIN prefix");
-      return;
-    }
-    if (draft.coverage === "cities" && cities.length === 0) {
-      toast.error("Add at least one city");
-      return;
-    }
-    if (draft.coverage === "states" && draft.states.length === 0) {
-      toast.error("Choose at least one state");
-      return;
-    }
+    setAttempted(true);
+    setSaving(true);
+    try {
+      // Save pressed before India Post answered: ask now, so a code that
+      // does not exist cannot slip through on timing.
+      const asked = await fetchPincodeInfo([...pincodes, ...excluded]);
+      const known = asked ? { ...directory, ...asked } : directory;
+      if (asked) setDirectory(known);
+      const districtList =
+        draft.coverage === "cities" ? (districts ?? (await fetchDistricts())) : districts;
+      const final = checkWith(known, districtList);
+      const stop = [...final.missing, ...final.errors];
+      if (stop.length > 0) {
+        toast.error(stop.length === 1 ? stop[0] : `Fix ${stop.length} problems before saving`);
+        return;
+      }
 
-    if (form.minDeliveryDays > form.estimatedDeliveryDays) {
-      toast.error("Minimum delivery time cannot be longer than the estimate");
-      return;
-    }
-
-    if (zone) {
-      const { persisted } = await updateDeliveryZone(zone.id, zoneData);
-      reportWrite(persisted, "Delivery zone updated", {
-        failure: "Could not update the zone — the server rejected it",
-      });
-    } else {
-      const { persisted } = await createDeliveryZone(zoneData);
-      reportWrite(persisted, "Delivery zone created", {
-        failure: "Could not create the zone — the server rejected it",
-      });
+      if (zone) {
+        const { persisted } = await updateDeliveryZone(zone.id, zoneData);
+        reportWrite(persisted, "Delivery zone updated", {
+          failure: "Could not update the zone — the server rejected it",
+        });
+        // Left open on a refusal, with what was typed still in it.
+        if (!persisted) return;
+      } else {
+        const { persisted } = await createDeliveryZone(zoneData);
+        reportWrite(persisted, "Delivery zone created", {
+          failure: "Could not create the zone — the server rejected it",
+        });
+        if (!persisted) return;
+      }
+    } finally {
+      setSaving(false);
     }
 
     onOpenChange(false);
@@ -240,38 +419,63 @@ export function DeliveryZoneFormDialog({
   }
 
   /**
-   * TRY A PIN AGAINST THIS ZONE, before saving it.
+   * TRY A PIN — against this zone AND every other one, before saving.
    *
-   * Prefixes, state boundaries and a "leave out" list interact, and the only
-   * way an owner could find out what a zone actually covered was to place a
-   * test order. This answers from the same `findDeliveryZone` checkout uses,
-   * on the zone exactly as it would be saved.
+   * It used to test the draft on its own, so "324005 is covered by this zone"
+   * was said of a PIN that a narrower zone elsewhere would actually win. This
+   * answers from the same ranking checkout prices from, with the draft in
+   * place of the saved copy, and names the zone that really gets the order.
    */
-  const testCode = normalizePincode(testPin);
   const testAnswer = (() => {
     if (testCode.length !== 6) return null;
     const draftZone: DeliveryZone = {
       ...zoneData,
       id: zone?.id ?? "draft",
+      // Tested as live, so a switched-off draft still answers for its area.
       isActive: true,
       createdAt: "",
       updatedAt: "",
     };
-    const state = stateForPincode(testCode);
-    const where = state ? ` (${state})` : "";
-    if (zoneExcludesPincode(draftZone, testCode)) {
-      return { ok: false, text: `${testCode}${where} is left out of this zone.` };
+    const info = directory[testCode];
+    // Undefined while India Post's answer is on its way: the digits answer.
+    const place = info?.kind === "pin" ? info.place : undefined;
+    const verdict = explainPincode(
+      [draftZone, ...others],
+      testCode,
+      { ...getCommerceSettings(), useZoneBasedDelivery: true },
+      formatCurrency,
+      place,
+    );
+    if (!verdict) {
+      return { ok: false, text: `${testCode} is not a valid PIN code.` };
     }
-    if (draft.coverage === "cities") {
+    if (place === null) {
+      return { ok: false, text: `${testCode} is not a real PIN code — India Post has no such PIN.` };
+    }
+    const where = place
+      ? ` (${[place.areas.find((name) => !name.includes(".")), place.districts[0], place.state].filter(Boolean).join(", ")})`
+      : verdict.state
+        ? ` (${verdict.state})`
+        : "";
+    if (zoneExcludesPincode(draftZone, testCode)) {
       return {
-        ok: null,
-        text: `A city zone matches on the city the customer types, not the PIN — ${testCode}${where} is covered if their address says ${cities.join(" or ") || "one of your cities"}.`,
+        ok: false,
+        text: `${testCode}${where} is left out of this zone. ${verdict.outcome}`,
       };
     }
-    const match = findDeliveryZone([draftZone], { pincode: testCode });
-    return match
-      ? { ok: true, text: `${testCode}${where} is covered by this zone.` }
-      : { ok: false, text: `${testCode}${where} is not in this zone.` };
+    if (verdict.winner?.zone.id === draftZone.id) {
+      return { ok: true, text: `${testCode}${where} is delivered by this zone, through ${describeMatch(verdict.winner)}.` };
+    }
+    if (verdict.winner) {
+      const thisCovers = verdict.alsoCovered.some((match) => match.zone.id === draftZone.id);
+      return {
+        ok: false,
+        text: thisCovers
+          ? `${testCode}${where} is in this zone, but "${verdict.winner.zone.name}" wins it — its rule is narrower.`
+          : `${testCode}${where} is not in this zone — it goes to "${verdict.winner.zone.name}".`,
+      };
+    }
+    return { ok: false, text: `${testCode}${where} is not in this zone. ${verdict.outcome}` };
   })();
 
   return (
@@ -281,8 +485,9 @@ export function DeliveryZoneFormDialog({
           <DialogTitle>{zone ? "Edit delivery zone" : "Add delivery zone"}</DialogTitle>
           <p className="text-sm text-muted-foreground">
             Choose where this zone delivers, what it charges and how long it takes.
-            When zones overlap, the narrowest one wins: a PIN code beats a city, a city
-            beats a state, a state beats all of India.
+            Every PIN code is checked against India Post&apos;s list. When zones overlap, the
+            narrowest one wins: a PIN code beats a district, a district beats a state, a state
+            beats all of India.
           </p>
         </DialogHeader>
 
@@ -336,15 +541,16 @@ export function DeliveryZoneFormDialog({
                 Separate with commas or new lines. A full 6-digit PIN is that one area; fewer
                 digits cover every PIN starting with them — 3240 is 324001 to 324099.
                 {pincodes.length
-                  ? ` ${pincodes.length} ${pincodes.length === 1 ? "rule" : "rules"}: ${pincodes.map(describePincodeRule).join(", ")}.`
+                  ? ` ${pincodes.length} ${pincodes.length === 1 ? "rule" : "rules"}:`
                   : ""}
               </p>
+              <PincodeChips entries={pincodeEntries} directory={directory} />
             </div>
           ) : null}
 
           {draft.coverage === "cities" ? (
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="zone-cities">Cities</Label>
+              <Label htmlFor="zone-cities">Districts</Label>
               <Textarea
                 id="zone-cities"
                 rows={2}
@@ -352,9 +558,42 @@ export function DeliveryZoneFormDialog({
                 onChange={(event) => patchDraft({ citiesText: event.target.value })}
                 placeholder="Kota, Bundi"
               />
+              {/* Picked from India Post's list, so the name is one a PIN can match. */}
+              <div className="flex gap-2">
+                <Input
+                  aria-label="Find a district"
+                  list="zone-district-options"
+                  value={districtPick}
+                  onChange={(event) => setDistrictPick(event.target.value)}
+                  placeholder={districts ? "Find a district…" : "Loading districts…"}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!districtPick.trim()}
+                  onClick={() => {
+                    const name = districtPick.trim();
+                    if (!cities.some((city) => city.toLowerCase() === name.toLowerCase())) {
+                      patchDraft({ citiesText: [...cities, name].join(", ") });
+                    }
+                    setDistrictPick("");
+                  }}
+                >
+                  Add
+                </Button>
+                <datalist id="zone-district-options">
+                  {(districts ?? []).map((entry) => (
+                    <option key={`${entry.name}|${entry.state}`} value={entry.name}>
+                      {entry.state}
+                    </option>
+                  ))}
+                </datalist>
+              </div>
+              <DistrictChips names={cities} districts={districts} />
               <p className="text-xs text-muted-foreground">
-                Matched on the city the customer types at checkout, ignoring capitals. For an
-                exact boundary, use PIN codes instead.
+                Every PIN code India Post puts in these districts — decided from the
+                customer&apos;s PIN, not from what they type as their city. A district is
+                bigger than its city; for the city alone, use PIN codes.
               </p>
             </div>
           ) : null}
@@ -428,8 +667,9 @@ export function DeliveryZoneFormDialog({
             />
             <p className="text-xs text-muted-foreground">
               PIN codes or prefixes this zone does NOT deliver to, even inside what it covers.
-              {excluded.length ? ` Leaving out ${excluded.map(describePincodeRule).join(", ")}.` : ""}
+              {excluded.length ? " Leaving out:" : ""}
             </p>
+            <PincodeChips entries={excludedEntries} directory={directory} />
           </div>
 
           <div className="space-y-2 sm:col-span-2">
@@ -498,6 +738,9 @@ export function DeliveryZoneFormDialog({
               value={form.priority}
               onChange={(event) => patch({ priority: Number(event.target.value) || 0 })}
             />
+            <p className="text-xs text-muted-foreground">
+              Rarely needed — the narrower zone already wins. Higher only breaks a tie.
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="zone-min-days">Min delivery time (days)</Label>
@@ -531,12 +774,39 @@ export function DeliveryZoneFormDialog({
           </label>
         </div>
 
+        {/*
+          WHAT IS WRONG, said before Save rather than after a customer finds
+          it. Errors block the save; warnings are things that will happen as
+          written but may not be what was meant.
+        */}
+        {shownErrors.length > 0 || problems.warnings.length > 0 ? (
+          <div className="space-y-2" aria-live="polite">
+            {shownErrors.length > 0 ? (
+              <ul
+                role="alert"
+                className="space-y-1 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive"
+              >
+                {shownErrors.map((message) => (
+                  <li key={message}>{message}</li>
+                ))}
+              </ul>
+            ) : null}
+            {problems.warnings.length > 0 ? (
+              <ul className="space-y-1 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-900/20 dark:text-amber-200">
+                {problems.warnings.map((message) => (
+                  <li key={message}>{message}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
+
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button variant="bakery" onClick={() => void handleSubmit()}>
-            {zone ? "Save changes" : "Create zone"}
+          <Button variant="bakery" disabled={saving} onClick={() => void handleSubmit()}>
+            {saving ? "Saving…" : zone ? "Save changes" : "Create zone"}
           </Button>
         </DialogFooter>
       </DialogContent>

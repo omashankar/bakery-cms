@@ -5,6 +5,9 @@ import { useEffect, useMemo, useState } from "react";
 import { reportSettingsWrite } from "@/apps/admin/settings/lib/report-settings-write";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { TaxBreakdown } from "@/components/shared/tax-breakdown";
+import { fetchPincodePlace } from "@/features/commerce/lib/pincode-api";
+import { isFullPincode, normalizePincode } from "@/features/commerce/lib/delivery-zone-utils";
+import type { PincodePlace } from "@/types/delivery";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -80,14 +83,29 @@ export function ShippingRulesAdminPage() {
 
   const stats = mounted ? zoneStats : EMPTY_ZONE_STATS;
 
+  // The preview PIN's real place, as checkout prices it (see `priceCart`).
+  const [previewPlace, setPreviewPlace] = useState<{ code: string; place: PincodePlace | null } | null>(null);
+  const previewFullPin = isFullPincode(normalizePincode(previewPincode)) ? normalizePincode(previewPincode) : "";
+  useEffect(() => {
+    if (!previewFullPin) return;
+    let alive = true;
+    void fetchPincodePlace(previewFullPin).then((answer) => {
+      if (alive && answer) setPreviewPlace({ code: previewFullPin, place: answer.place });
+    });
+    return () => {
+      alive = false;
+    };
+  }, [previewFullPin]);
+  const place = previewPlace?.code === previewFullPin ? previewPlace.place : undefined;
+
   const previewTotals = useMemo(
     () =>
       calculateCartTotals({
         items: [SAMPLE_ITEM],
-        deliveryAddress: { city: previewCity, pincode: previewPincode },
+        deliveryAddress: { city: previewCity, pincode: previewPincode, place },
         commerceOverride: settings,
       }),
-    [previewCity, previewPincode, settings]
+    [previewCity, previewPincode, place, settings]
   );
 
   async function handleSave() {

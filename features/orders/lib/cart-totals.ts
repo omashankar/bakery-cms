@@ -45,6 +45,12 @@ export interface CartTotalsInput {
     pincode?: string;
     /** Read only when there is no PIN code to work the state out from. */
     state?: string;
+    /**
+     * What India Post says is at the PIN. The server always fills it in (see
+     * `priceCart`); a browser that has it passes it too, or its preview of a
+     * district zone would disagree with the price the server charges.
+     */
+    place?: import("@/features/commerce/lib/delivery-zone-utils").ZoneAddress["place"];
   };
   commerceOverride?: import("@/types/settings").CommerceSettings;
   /** Delivery zones from the caller — the server passes its own; see below. */
@@ -170,6 +176,7 @@ export function calculateCartTotals({
             city: deliveryAddress?.city,
             pincode: deliveryAddress?.pincode,
             state: deliveryAddress?.state,
+            place: deliveryAddress?.place,
           },
           commerce,
           zonesOverride

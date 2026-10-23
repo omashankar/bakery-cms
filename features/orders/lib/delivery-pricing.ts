@@ -5,6 +5,7 @@ import {
   findDeliveryZone,
   resolveDeliveryZoneForAddress,
 } from "@/features/commerce/lib/delivery-zones-repository";
+import type { ZoneAddress } from "@/features/commerce/lib/delivery-zone-utils";
 import type { DeliveryZone } from "@/types/delivery";
 
 export interface DeliveryQuote {
@@ -29,6 +30,8 @@ export function calculateDeliveryQuote(
     city?: string;
     pincode?: string;
     state?: string;
+    /** What India Post says is at the PIN — see `ZoneAddress`. */
+    place?: ZoneAddress["place"];
   },
   commerceOverride?: CommerceSettings,
   /**
@@ -51,9 +54,10 @@ export function calculateDeliveryQuote(
     };
   }
 
+  const address = { city: input.city, pincode: input.pincode, state: input.state, place: input.place };
   const match = zonesOverride
-    ? findDeliveryZone(zonesOverride, { city: input.city, pincode: input.pincode, state: input.state })
-    : resolveDeliveryZoneForAddress({ city: input.city, pincode: input.pincode, state: input.state });
+    ? findDeliveryZone(zonesOverride, address)
+    : resolveDeliveryZoneForAddress(address);
 
   // Free delivery no longer short-circuits the lookup.
   //
