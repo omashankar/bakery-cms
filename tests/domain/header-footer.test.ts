@@ -378,12 +378,22 @@ describe("the brand mark", () => {
     // come here; rendering a logo into a fixed square is the defect.
     const { withLogo } = branches();
     expect(withLogo).not.toContain("size-9");
-    // No trailing \b: after the `]` of an arbitrary value there is no word
-    // boundary, so `h-[50px]` failed to match while `h-9` passed — the
-    // assertion would have rejected the very form it was widened to allow.
-    expect(withLogo).toMatch(/\bh-(?:\d+|\[[^\]]+\])/);
     expect(withLogo).toContain("w-auto");
-    expect(withLogo).toMatch(/max-w-\[\d+px\]/);
+    // The heights live in a per-place table now (the header's 88px bar draws
+    // it bigger than the footer does), and the image takes its class from it —
+    // so EVERY row of that table must bound the height and cap the width.
+    expect(withLogo).toContain("drawn.className");
+    const table = code(MARK).match(/const LOGO_SIZES = \{([\s\S]*?)\} as const;/)?.[1] ?? "";
+    const rows = [...table.matchAll(/className:\s*"([^"]+)"/g)].map((match) => match[1]);
+    expect(rows.length, "no logo sizes found — the table moved").toBeGreaterThanOrEqual(2);
+    for (const classes of rows) {
+      expect(classes).not.toContain("size-");
+      // No trailing \b: after the `]` of an arbitrary value there is no word
+      // boundary, so `h-[50px]` failed to match while `h-9` passed — the
+      // assertion would have rejected the very form it was widened to allow.
+      expect(classes).toMatch(/(?:^|\s)h-(?:\d+|\[[^\]]+\])/);
+      expect(classes).toMatch(/max-w-(?:\[\d+px\]|full)/);
+    }
   });
 
   it("does not print the shop's name beside a logo that already says it", () => {

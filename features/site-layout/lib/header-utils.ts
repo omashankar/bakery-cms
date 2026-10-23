@@ -1,9 +1,15 @@
 import { storefrontNav } from "@/constants/navigation";
-import type { HeaderNavItem, HeaderSettings } from "@/types/site-layout";
+import type { HeaderInfoBar, HeaderNavItem, HeaderSettings } from "@/types/site-layout";
 
 function nowIso(): string {
   return new Date().toISOString();
 }
+
+/**
+ * Off and empty: the lines on the info bar are the shop's to write, and a
+ * fresh shop has said nothing yet.
+ */
+export const defaultInfoBar: HeaderInfoBar = { show: false, points: [], showPhone: true, location: "" };
 
 export const defaultHeaderSettings: HeaderSettings = {
   /**
@@ -20,6 +26,7 @@ export const defaultHeaderSettings: HeaderSettings = {
   // ON, so no shop loses the strip it has today. See the type's own note for
   // why it is a switch at all.
   showBannerStrip: true,
+  infoBar: defaultInfoBar,
   nav: storefrontNav.map((item, index) => ({
     id: `nav-${index + 1}`,
     label: item.label,

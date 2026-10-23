@@ -15,6 +15,7 @@ import { routes } from "@/constants/routes";
 import { signOutCustomer } from "@/apps/website/account/lib/customer-session";
 import { useHoverMenu } from "@/apps/website/account/hooks/use-hover-menu";
 import { getAccountInitials } from "@/apps/website/account/lib/account-initials";
+import { ACCOUNT_TRIGGER_CLASS } from "./account-trigger-classes";
 
 interface AccountMenuProps {
   name: string;
@@ -54,7 +55,7 @@ export function AccountMenu({ name, phone, onSignOut, initialOpen = false }: Acc
       <DropdownMenuTrigger
         aria-label={`${name}'s account`}
         {...hoverProps}
-        className="flex size-9 items-center justify-center rounded-full bg-bakery-700 text-xs font-bold text-white shadow-sm outline-none transition-premium hover:bg-bakery-800 focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 data-[popup-open]:bg-bakery-800"
+        className={ACCOUNT_TRIGGER_CLASS}
       >
         {getAccountInitials(name)}
       </DropdownMenuTrigger>

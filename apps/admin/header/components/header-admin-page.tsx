@@ -54,6 +54,7 @@ type OfferedAxes = ReturnType<typeof offeredAxes<
   ProductCollection
 >>;
 import type {
+  HeaderInfoBar,
   HeaderNavItem,
   HeaderSettings,
   MegaMenuGroup,
@@ -75,6 +76,7 @@ import {
 } from "@/features/site-layout/lib/header-repository";
 import {
   defaultHeaderSettings,
+  defaultInfoBar,
   getHeaderOverview,
   reorderHeaderNav,
   type HeaderOverview,
@@ -737,6 +739,11 @@ export function HeaderAdminPage({
   });
   const [removeTarget, setRemoveTarget] = useState<HeaderNavItem | null>(null);
 
+  // The info bar, with every field present even on a header saved before it existed.
+  const infoBar = { ...defaultInfoBar, ...settings.infoBar };
+  const patchInfoBar = (patch: Partial<HeaderInfoBar>) =>
+    setSettings((prev) => ({ ...prev, infoBar: { ...defaultInfoBar, ...prev.infoBar, ...patch } }));
+
   /**
    * WHICH ROWS ARE SHOWING THEIR SETTINGS.
    *
@@ -1323,6 +1330,72 @@ export function HeaderAdminPage({
                   }
                   aria-label="Show promo strip"
                 />
+              </div>
+              {/*
+                THE INFO BAR — the brand-coloured line above the logo. Four
+                boxes rather than one text area: a line is short by nature,
+                and a text area split on Enter swallows the new line the
+                moment it is typed.
+              */}
+              <div className="space-y-3 rounded-xl border border-border p-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Show info bar</p>
+                    <p className="text-xs text-muted-foreground">
+                      A thin bar above the logo with your own short lines, your phone and
+                      your place.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={infoBar.show}
+                    onCheckedChange={(checked) => patchInfoBar({ show: checked })}
+                    aria-label="Show info bar"
+                  />
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {[0, 1, 2, 3].map((index) => (
+                    <Input
+                      key={index}
+                      aria-label={`Info bar line ${index + 1}`}
+                      value={infoBar.points[index] ?? ""}
+                      maxLength={40}
+                      disabled={!infoBar.show}
+                      onChange={(e) => {
+                        // Slots, not a list: a blank box keeps its place while
+                        // typing, and the save drops blanks (headerSchema).
+                        const next = [0, 1, 2, 3].map((slot) => infoBar.points[slot] ?? "");
+                        next[index] = e.target.value;
+                        patchInfoBar({ points: next });
+                      }}
+                      placeholder={index === 0 ? "e.g. Same day delivery" : "Optional"}
+                    />
+                  ))}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="info-bar-location">Place</Label>
+                  <Input
+                    id="info-bar-location"
+                    value={infoBar.location}
+                    maxLength={60}
+                    disabled={!infoBar.show}
+                    onChange={(e) => patchInfoBar({ location: e.target.value })}
+                    placeholder="e.g. Kota, Rajasthan"
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Show phone</p>
+                    <p className="text-xs text-muted-foreground">
+                      The number from Settings → Contact.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={infoBar.showPhone}
+                    disabled={!infoBar.show}
+                    onCheckedChange={(checked) => patchInfoBar({ showPhone: checked })}
+                    aria-label="Show phone in the info bar"
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>

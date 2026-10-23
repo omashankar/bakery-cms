@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
-import { Heart, History, Menu, Search, ShoppingBag, User, X } from "lucide-react";
+import { Heart, History, Menu, Search, ShoppingBag, ShoppingCart, User, X } from "lucide-react";
 import { navIcon } from "@/config/nav-icons";
 import { Button } from "@/components/ui/button";
 import { BrandMark } from "@/components/shared/brand-mark";
 import { DeliveryLocationButton } from "./delivery-location-button";
+import { StorefrontInfoBar } from "./storefront-info-bar";
 import {
   drawableGroups,
   MegaMenu,
@@ -62,13 +63,12 @@ const CustomerAuthModal = dynamic(
 /**
  * HOW FAR THE PAGE MOVES BEFORE THE BAND ANSWERS AT ALL.
  *
- * At lg the header is an 88px bar with a 46px category band under it, and
- * about 28px more when the shop has written a utility row — so 200 is past
- * the whole of it either way. Under that the customer is still looking at
+ * At lg the header is a 40px info bar, a 104px bar and a 46px category band
+ * — so 260 is past the whole of it. Under that the customer is still looking at
  * the top of the page, and a band that leaves while they are still at the
  * top reads as something breaking rather than as room being made.
  */
-const BAND_HOLDS_UNTIL = 200;
+const BAND_HOLDS_UNTIL = 260;
 
 /**
  * HOW FAR A SCROLL HAS TO TURN BACK BEFORE THE BAND ANSWERS IT.
@@ -84,8 +84,13 @@ const BAND_HOLDS_UNTIL = 200;
  * anchoring everywhere else. That is the page moving, not the customer, and
  * on its own it can never cross this number. The settling tick in the
  * handler is the other half of that guard, and the deterministic half.
+ *
+ * 64, with room to spare: the 2026-10-23 redesign briefly made the band 61px
+ * against the 48 this was, the page's own move crossed it, and the band hid
+ * and came back by itself — the header visibly shook. A test now holds the
+ * band under this number.
  */
-const BAND_ANSWERS_AFTER = 48;
+const BAND_ANSWERS_AFTER = 64;
 
 /**
  * HOW LONG THE BAND TAKES TO GO, AND THE CLIP THAT TRAVELS WITH IT.
@@ -571,6 +576,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
         setScrolled(wantsShadow);
       }
 
+
       const band = navBandRef.current;
       if (!band) return;
 
@@ -778,6 +784,12 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
       )}
     >
       {/*
+        THE INFO BAR RIDES WITH THE HEADER. It sat above it and scrolled away;
+        the shop asked for it to stay — on scroll it is the category band that
+        steps aside, not this bar (2026-10-23).
+      */}
+      {chrome.infoBar ? <StorefrontInfoBar bar={chrome.infoBar} /> : null}
+      {/*
         `data-header-bar` is read by a test, and that is its whole job.
 
         The guard that proves the category strip sits BELOW this row used to
@@ -802,7 +814,20 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
             header itself on some pages and the page box on others, which put
             the band over the row on one and halfway down the hero on another.
           */
-          "relative flex h-16 items-center justify-between gap-2 lg:h-[88px] lg:gap-4"
+          /*
+            104px from lg, for a logo that can be READ: the shop's badge
+            logo carries its name on a ribbon, and at the old 88px row it
+            was drawn too small for the word under it.
+
+            ONE HEIGHT, WHATEVER THE SCROLL. This row once stepped down to
+            88px as the page scrolled, and the whole page shook: a pinned bar
+            changing height moves everything under it, the browser moves the
+            scroll position to match, and that move fed the band's own
+            hide-on-scroll. The shop saw the header jump. What steps out of
+            the way on scroll is the category band below, and the info bar
+            above simply scrolls off; this row never changes size.
+          */
+          "relative flex h-16 items-center justify-between gap-2 lg:h-[104px] lg:gap-5"
         )}
       >
         {/*
@@ -814,7 +839,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
           href={routes.store.home}
           className="flex min-w-0 max-w-[9rem] shrink-0 items-center gap-2.5 sm:max-w-[12rem] lg:max-w-none"
         >
-          <BrandMark logo={logo} logoLetter={logoLetter} siteName={siteName} />
+          <BrandMark logo={logo} logoLetter={logoLetter} siteName={siteName} size="header" />
         </Link>
 
 
@@ -840,7 +865,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
           else.
         */}
         {chrome.hasDeliveryZones ? (
-          <div className="ml-auto hidden lg:ml-3 lg:block lg:shrink-0">
+          <div className="ml-auto hidden lg:ml-4 lg:block lg:shrink-0">
             <DeliveryLocationButton />
           </div>
         ) : null}
@@ -874,7 +899,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
               unknown length and an icon cluster.
             */
             className={cn(
-              "mx-3 min-w-0 max-w-2xl flex-1 items-center sm:flex lg:mx-6",
+              "mx-3 min-w-0 max-w-3xl flex-1 items-center sm:flex lg:mx-4",
               /*
                 AND ON A PHONE IT IS A BAND UNDER THE ROW, not a box in it.
 
@@ -941,9 +966,9 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
                   setPhoneSearchOpen(true);
                   searchInputRef.current?.focus();
                 }}
-                className="absolute left-1 top-1 flex size-9 items-center justify-center rounded-md text-muted-foreground"
+                className="absolute left-1.5 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground lg:left-2.5"
               >
-                <Search className="size-[1.125rem]" />
+                <Search className="size-[1.125rem] lg:size-5" />
               </button>
               <input
                 type="search"
@@ -980,7 +1005,11 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
                 aria-activedescendant={
                   activeRow >= 0 ? `${suggestListId}-${activeRow}` : undefined
                 }
-                className="h-11 w-full rounded-lg border border-input bg-cream-50 pl-11 pr-3 text-base outline-none md:text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                /*
+                  A PILL, as the shop's header design draws it: round ends,
+                  taller from lg where the row has the room.
+                */
+                className="h-11 w-full rounded-full border border-input bg-cream-50 pl-11 pr-4 text-base outline-none md:text-sm lg:h-12 lg:pl-12 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               />
 
               {/*
@@ -1125,12 +1154,12 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
           <Button
             variant="ghost"
             size="icon-lg"
-            className="relative hidden text-foreground hover:bg-cream-100 hover:text-bakery-700 sm:flex"
+            className="relative hidden text-foreground hover:bg-cream-100 hover:text-bakery-700 sm:flex lg:size-12"
             render={<Link href={routes.store.wishlist} aria-label="Wishlist" />}
           >
-            <Heart className="size-5" />
+            <Heart className="size-5 lg:size-7" strokeWidth={1.75} />
             {wishlistCount > 0 ? (
-              <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-bakery-700 px-1 text-[10px] font-bold text-white ring-2 ring-white">
+              <span className="absolute -top-0.5 -right-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white ring-2 ring-background lg:h-5 lg:min-w-5 lg:text-[11px]">
                 {wishlistCount > 9 ? "9+" : wishlistCount}
               </span>
             ) : null}
@@ -1138,15 +1167,19 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
           <Button
             variant="ghost"
             size="icon-lg"
-            className="relative text-foreground hover:bg-cream-100 hover:text-bakery-700"
+            className="relative text-foreground hover:bg-cream-100 hover:text-bakery-700 lg:size-12"
             render={<Link href={routes.store.cart} aria-label="Shopping cart" />}
           >
-            <ShoppingBag className="size-5" />
-            {cartCount > 0 ? (
-              <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-bakery-700 px-1 text-[10px] font-bold text-white ring-2 ring-white">
-                {cartCount > 9 ? "9+" : cartCount}
-              </span>
-            ) : null}
+            <ShoppingCart className="size-5 lg:size-7" strokeWidth={1.75} />
+            {/*
+              ALWAYS A COUNT, 0 included — the shop's header design shows
+              the badge on an empty cart too, so the cart reads as a cart
+              before anything is in it. Red, as a count is drawn everywhere
+              else a customer shops.
+            */}
+            <span className="absolute -top-0.5 -right-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white ring-2 ring-background lg:h-5 lg:min-w-5 lg:text-[11px]">
+              {cartCount > 9 ? "9+" : cartCount}
+            </span>
           </Button>
           {signedIn ? (
             <div className="ml-1 hidden md:flex">
@@ -1285,7 +1318,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
           `.group`, the pointer would leave the group on its way down, and the
           menu would shut mid-travel.
         */}
-        <div className="flex flex-wrap items-center gap-1 py-1.5">
+        <div className="flex flex-wrap items-center gap-1 py-1.5 xl:gap-2">
         {bandRows.map((item, index) => {
           const isActive =
             pathname === item.href ||
@@ -1337,6 +1370,8 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
                   highlight={item.highlight}
                   icon={item.icon}
                   badge={item.badge}
+                  // The way into the whole catalogue, set apart as a pill.
+                  variant="pill"
                 />
               </div>
             );
@@ -1398,7 +1433,8 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
                     reference's category strip, and what makes eleven rows
                     plus a promoted item fit across the band at all. The
                     transform is CSS: the stored label is still exactly what
-                    the shop typed.
+                    the shop typed. Kept through the 2026-10-23 redesign:
+                    the shop asked for the new shapes, not a new font.
                   */
                   "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium uppercase tracking-[0.08em] transition-premium",
                   // The shop's emphasis beats the route's. A promoted row
@@ -1406,10 +1442,10 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
                   // and it is bolder as well as brand-coloured, because eleven
                   // neighbours at the same weight swallow a colour change.
                   item.highlight
-                    ? "font-semibold text-bakery-700 hover:bg-cream-200"
+                    ? "font-semibold text-bakery-700 hover:text-bakery-900"
                     : isActive
-                      ? "bg-cream-200 text-bakery-700"
-                      : "text-muted-foreground hover:bg-cream-200 hover:text-foreground"
+                      ? "text-bakery-700"
+                      : "text-foreground/80 hover:text-bakery-700"
                 )}
               >
                 {RowIcon ? <RowIcon className="size-4" /> : null}

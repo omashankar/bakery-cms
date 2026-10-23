@@ -105,6 +105,11 @@ export interface StorefrontChrome {
   searchPlaceholder: string;
   /** Draw the promo strip above the header at all. */
   showBannerStrip: boolean;
+  /**
+   * The bar above the logo, resolved: only what the shop wrote, its phone
+   * from Contact, or null when it is off or has nothing in it.
+   */
+  infoBar: { points: string[]; phone: string; location: string } | null;
   /*
     GONE, AT THE SHOP'S REQUEST: the header's call-to-action button, the thin
     row above the bar, and the currency note that was the only thing in it.
@@ -178,6 +183,21 @@ async function hasActiveDeliveryZones(): Promise<boolean> {
   }
 }
 
+/**
+ * The info bar as the storefront draws it: switched on AND holding something.
+ * A bar that is on but empty would be a coloured stripe saying nothing.
+ */
+export function infoBarFrom(
+  stored: HeaderSettings["infoBar"],
+  contactPhone: string,
+): StorefrontChrome["infoBar"] {
+  if (!stored?.show) return null;
+  const points = (stored.points ?? []).map((point) => point.trim()).filter(Boolean).slice(0, 4);
+  const phone = stored.showPhone ? contactPhone.trim() : "";
+  const location = (stored.location ?? "").trim();
+  return points.length || phone || location ? { points, phone, location } : null;
+}
+
 /** The navbar badge falls back to the shop's initial rather than a seeded letter. */
 function firstLetterOf(siteName: string): string {
   return siteName.trim().charAt(0).toUpperCase();
@@ -227,6 +247,8 @@ function fallbackChrome(): StorefrontChrome {
     logoLetter: firstLetterOf(brandInfo.name),
     showSearch: defaultHeaderSettings.showSearch,
     showBannerStrip: defaultHeaderSettings.showBannerStrip ?? true,
+    // Nothing the shop wrote can be read, so nothing is said.
+    infoBar: null,
     searchPlaceholder: "",
     navItems: selectVisibleNavItems(defaultHeaderSettings.nav),
     brand: { name: brandInfo.name, tagline: brandInfo.tagline, description: brandInfo.description },
@@ -399,6 +421,7 @@ export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => 
       searchPlaceholder: (header.searchPlaceholder ?? "").trim(),
       showBannerStrip:
         header.showBannerStrip ?? defaultHeaderSettings.showBannerStrip ?? true,
+      infoBar: infoBarFrom(header.infoBar, contact.phone ?? ""),
       /*
         RESOLVED FIRST, then filtered for visibility.
 

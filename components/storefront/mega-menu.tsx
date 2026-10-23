@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, LayoutGrid } from "lucide-react";
 import type { MegaMenuLink } from "@/constants/storefront-nav";
 import type { MegaMenuGroup } from "@/types/site-layout";
 import { navIcon } from "@/config/nav-icons";
@@ -188,6 +188,12 @@ interface MegaMenuProps {
    * silently is not what this switch asked for.
    */
   menuOnly?: boolean;
+  /**
+   * "pill" — the whole-catalogue menu at the head of the band, in the brand
+   * colour and bolder, with a grid mark ("All Categories"), so the way into
+   * everything stands apart from the single categories — by colour, no fill.
+   */
+  variant?: "row" | "pill";
 }
 
 /**
@@ -326,6 +332,7 @@ export function MegaMenu({
   icon,
   badge,
   menuOnly,
+  variant = "row",
 }: MegaMenuProps) {
   const authored = drawableGroups(groups);
   const fallbackCategories = useFallbackCategories();
@@ -435,21 +442,29 @@ export function MegaMenu({
 
       The transform is CSS, not a change to the stored string — the
       label stays exactly what the shop typed in the Header screen, so
-      nothing about this is lossy.
+      nothing about this is lossy. The type stays as it was when the
+      header was redesigned (2026-10-23): the shop asked for the new
+      shapes and NOT a new font.
 
-      Hover fills to cream-200 rather than cream-100, because the band
-      behind it is cream-100 now and a hover the same colour as its
-      own background is no hover at all.
+      COLOUR ONLY, NO FILL — the shop's call (2026-10-23): a row says it
+      is hovered, open or current by turning the brand colour, and no row
+      ever carries a background. The whole-catalogue row is set apart by
+      its weight, its colour and its grid mark, not by a pill.
     */
     "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium uppercase tracking-[0.08em] transition-premium",
-    highlight
-      ? "font-semibold text-bakery-700 hover:bg-cream-200"
-      : isActive
-        ? "bg-cream-200 text-bakery-700"
-        : "text-muted-foreground hover:bg-cream-200 hover:text-foreground"
+    variant === "pill"
+      ? "font-semibold text-bakery-700 hover:text-bakery-900"
+      : highlight
+        ? "font-semibold text-bakery-700 hover:text-bakery-900"
+        : isActive
+          ? "text-bakery-700"
+          : "text-foreground/80 hover:text-bakery-700 group-hover:text-bakery-700"
   );
   const triggerInner = (
     <>
+      {variant === "pill" && !icon ? (
+        <LayoutGrid aria-hidden="true" className="size-4 shrink-0" />
+      ) : null}
       {rowIcon(icon)}
       {label}
       {badge ? (

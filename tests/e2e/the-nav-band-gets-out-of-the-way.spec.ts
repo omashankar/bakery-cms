@@ -43,6 +43,8 @@ async function boxes(page: import("@playwright/test").Page) {
     return {
       header: rect("header"),
       bar: rect("header [data-header-bar]"),
+      // The shop's info bar rides inside the sticky header, above the bar.
+      info: rect("header [data-info-bar]"),
       band: rect("[data-nav-band]"),
       scrollY: Math.round(window.scrollY),
     };
@@ -110,19 +112,32 @@ test.describe("the desktop band", () => {
     expect(atRest.band!.height, "the band is not the 46px this test is about").toBeGreaterThan(20);
     // At the top of the page the bar starts where the header does, which is under
     // the announcement strip when the shop runs one; scrolled, it is pinned at 0.
-    expect(atRest.bar!.top).toBe(atRest.header!.top);
+    // The info bar, when the shop runs one, sits above the bar inside the
+    // sticky header and stays there; it is the band that steps aside.
+    const infoHeight = atRest.info?.height ?? 0;
+    expect(atRest.bar!.top).toBe(atRest.header!.top + infoHeight);
     const openBand = atRest.band!.height;
     const barHeight = atRest.bar!.height;
-    expect(atRest.header!.height).toBe(barHeight + openBand);
+    expect(atRest.header!.height).toBe(infoHeight + barHeight + openBand);
+    /*
+      UNDER THE DISTANCE A SCROLL MUST TURN BACK BEFORE THE BAND ANSWERS
+      (`BAND_ANSWERS_AFTER`, 64). Hiding the band moves the page by its own
+      height; a band taller than that number lets the page's own move count as
+      the customer turning back, and the band hides and returns by itself. A
+      61px band against a 48px threshold did exactly that on 2026-10-23 and the
+      whole header shook.
+    */
+    expect(openBand, "the band is taller than the scroll it takes to bring it back").toBeLessThan(64);
 
     /* DOWN. The band goes; the bar stays exactly where it was. */
     await wheel(page, 600);
     const down = await boxes(page);
     expect(down.scrollY, "the page did not actually scroll").toBeGreaterThan(400);
     expect(down.band!.height, "the band still has height after scrolling down").toBe(0);
-    expect(down.bar!.top, "the bar left the top of the window").toBe(0);
+    expect(down.info?.top ?? 0, "the info bar scrolled away").toBe(0);
+    expect(down.bar!.top, "the bar left the top of the window").toBe(infoHeight);
     expect(down.bar!.height, "the bar changed size").toBe(barHeight);
-    expect(down.header!.height, "the header did not shed the band's height").toBe(barHeight);
+    expect(down.header!.height, "the header did not shed the band's height").toBe(infoHeight + barHeight);
 
     /* JITTER. A pixel back the other way is not a customer changing their mind. */
     await wheel(page, -1, 300);
@@ -137,8 +152,8 @@ test.describe("the desktop band", () => {
       100,
     );
     expect(up.band!.height, "the band did not come back on the way up").toBe(openBand);
-    expect(up.bar!.top).toBe(0);
-    expect(up.header!.height).toBe(barHeight + openBand);
+    expect(up.bar!.top).toBe(infoHeight);
+    expect(up.header!.height).toBe(infoHeight + barHeight + openBand);
   });
 
   test("slides rather than blinking out, in both directions", async ({ page }) => {
@@ -203,7 +218,7 @@ test.describe("the desktop band", () => {
     const top = await boxes(page);
     expect(top.scrollY, "the page is not back at the top").toBe(0);
     expect(top.band!.height, "the band is missing at the top of the page").toBe(openBand);
-    expect(top.bar!.top).toBe(top.header!.top);
+    expect(top.bar!.top).toBe(top.header!.top + (top.info?.height ?? 0));
   });
 
   test("and the clip it slides behind is let go of again", async ({ page }) => {
@@ -276,14 +291,16 @@ test("changes nothing on a phone", async ({ page }) => {
 
   const atRest = await boxes(page);
   expect(atRest.band, "the band is drawn on a phone").toBeNull();
-  expect(atRest.bar!.top).toBe(atRest.header!.top);
+  // The shop's info bar, when it runs one, stays pinned above the bar.
+  const infoHeight = atRest.info?.height ?? 0;
+  expect(atRest.bar!.top).toBe(atRest.header!.top + infoHeight);
   const phoneBar = atRest.bar!.height;
 
   await wheel(page, 600);
   const down = await boxes(page);
   expect(down.scrollY).toBeGreaterThan(400);
   expect(down.band, "a phone grew a band on scroll").toBeNull();
-  expect(down.bar!.top, "the phone header stopped being pinned").toBe(0);
+  expect(down.bar!.top, "the phone header stopped being pinned").toBe(infoHeight);
   expect(down.bar!.height, "the phone header changed height").toBe(phoneBar);
-  expect(down.header!.height).toBe(phoneBar);
+  expect(down.header!.height).toBe(infoHeight + phoneBar);
 });
