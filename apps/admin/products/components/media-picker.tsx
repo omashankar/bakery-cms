@@ -258,7 +258,7 @@ export function MediaPicker({
                 >
                   <div className="relative aspect-square bg-muted">
                     {/* A preview sized to the tile; onSelect still hands back the stored URL. */}
-                    <SafeImage src={thumbnailImageUrl(file.url, 160)} alt={file.alt || file.name} className="object-cover" />
+                    <SafeImage src={thumbnailImageUrl(file.url, 160)} alt={file.alt || file.name} className="object-contain" />
                   </div>
                   <p className="truncate px-2 py-2 text-xs font-medium">{file.name}</p>
                 </button>
