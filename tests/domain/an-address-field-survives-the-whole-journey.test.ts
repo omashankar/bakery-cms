@@ -134,6 +134,18 @@ describe("one way to write an address down", () => {
     expect(addressLines(ADDRESS)).toContain("Near opposite the water tank");
   });
 
+  it("does not say near twice when the customer already wrote it", () => {
+    // Typed as "Near Shiv Mandir", it printed "Near Near Shiv Mandir" on the
+    // address card, the invoice and the rider's message.
+    for (const landmark of ["Near Shiv Mandir", "near shiv mandir", "Nr. Shiv Mandir", "NR Shiv Mandir"]) {
+      const lines = addressLines({ ...ADDRESS, landmark });
+      expect(lines, landmark).toContain(landmark);
+      expect(lines.join(" | "), landmark).not.toMatch(/near\s+(near|nr)/i);
+    }
+    // A word that merely STARTS with "near" is still a landmark to name.
+    expect(addressLines({ ...ADDRESS, landmark: "Nearby Mall" })).toContain("Near Nearby Mall");
+  });
+
   it("keeps the state, which two outbound messages were dropping", () => {
     /**
      * The shop's new-order alert and the courier's "out for delivery" message
