@@ -1,6 +1,7 @@
 import mongoose, { type InferSchemaType, type Model } from "mongoose";
 
 import { applyBaseTransform } from "./_transform";
+import { defineModel } from "./_define-model";
 
 /**
  * A signed-in device/session. One row per active login, so an admin can review
@@ -35,5 +36,4 @@ applyBaseTransform(sessionSchema);
 export type SessionDoc = InferSchemaType<typeof sessionSchema>;
 
 export const SessionModel: Model<SessionDoc> =
-  (mongoose.models.Session as Model<SessionDoc>) ||
-  mongoose.model<SessionDoc>("Session", sessionSchema);
+  defineModel<SessionDoc>("Session", sessionSchema);

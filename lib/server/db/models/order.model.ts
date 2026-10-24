@@ -1,6 +1,7 @@
 import mongoose, { type Model } from "mongoose";
 
 import type { PlacedOrder } from "@/features/orders/lib/orders";
+import { defineModel } from "./_define-model";
 
 /**
  * Order document. `_id` is the app's own order id (a uuid/string), NOT an
@@ -102,5 +103,4 @@ orderSchema.set("toJSON", {
 export type OrderDoc = { _id: string } & Omit<PlacedOrder, "id">;
 
 export const OrderModel: Model<OrderDoc> =
-  (mongoose.models.Order as Model<OrderDoc>) ||
-  mongoose.model<OrderDoc>("Order", orderSchema);
+  defineModel<OrderDoc>("Order", orderSchema);

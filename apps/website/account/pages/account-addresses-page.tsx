@@ -2,9 +2,28 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import { MapPin, Pencil, Trash2, Plus } from "lucide-react";
+import {
+  Building,
+  Building2,
+  Check,
+  CheckCircle2,
+  Globe,
+  Hash,
+  Home,
+  Landmark,
+  Loader2,
+  Mail,
+  MapIcon,
+  MapPin,
+  Pencil,
+  Phone,
+  PhoneCall,
+  Plus,
+  Trash2,
+  User,
+  X,
+} from "lucide-react";
 import { stateForPincode } from "@/features/commerce/lib/india-states";
-import { formatAddress } from "@/features/orders/lib/address-format";
 import {
   EMPTY_CHECKOUT_ADDRESS,
   type CheckoutAddress,
@@ -21,13 +40,15 @@ import {
   updateSavedAddress,
   type SavedAddress,
 } from "@/apps/website/account/lib/customer-addresses";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
+import { IconInput } from "@/apps/website/account/components/icon-input";
+import { AddressLabelIcon } from "@/apps/website/account/components/address-label-icon";
+import { AddressSummary } from "@/apps/website/account/components/address-summary";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { storefrontHeading } from "@/constants/typography";
+import { ACCOUNT_ACTION, ACCOUNT_CARD_FOOTER } from "@/apps/website/account/lib/account-buttons";
 
 /**
  * The checkout's address, plus the two things only the book has.
@@ -184,30 +205,28 @@ export function AccountAddressesPage() {
   return (
     <>
       {/*
-        ONE COLUMN BESIDE THE MENU: a heading with "Add new address", the form
-        only while adding or editing, and the saved cards two across. The form
+        ONE COLUMN BESIDE THE MENU: the form, only while adding or editing,
+        then the saved cards two across under their own heading. The form
         used to stand open in a 360px third column — a page-long strip of
         fields beside one short card and a lot of nothing.
+
+        THE FORM COMES FIRST, the heading after it. "Saved addresses (1)"
+        sat above the form, so it labelled a blank "Add new address" form
+        and the one saved address was a screen further down, under nothing.
       */}
       <div className="space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-heading text-lg font-bold text-foreground">
-            Saved addresses{addresses.length > 0 ? ` (${addresses.length})` : ""}
-          </h2>
-          {!showForm ? (
-            <Button type="button" variant="outline" className="h-10" onClick={() => setFormOpen(true)}>
-              <Plus className="size-4" aria-hidden />
-              Add new address
-            </Button>
-          ) : null}
-        </div>
         {showForm ? (
-        <div className="h-fit rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
-          <h2 className={cn(storefrontHeading.card, "text-foreground")}>
-            {editingId ? "Edit address" : "Add new address"}
-          </h2>
-          <div className="mt-1 h-px bg-border" />
-          <form className="mt-5 space-y-4" onSubmit={handleSubmit(onSubmit)}>
+        <div className="h-fit overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+          {/* The header band every account card has. */}
+          <header className="border-b border-border bg-cream-50 px-5 py-4 sm:px-6">
+            <h2 className={cn(storefrontHeading.card, "text-foreground")}>
+              {editingId ? "Edit address" : "Add new address"}
+            </h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Where we bring your order, and who to call when we are at the door
+            </p>
+          </header>
+          <form className="space-y-4 p-5 sm:p-6" onSubmit={handleSubmit(onSubmit)}>
             <div className="space-y-2">
               <Label>Label</Label>
               {/*
@@ -229,12 +248,13 @@ export function AccountAddressesPage() {
                         setValue("addressLabel", option);
                       }}
                       className={cn(
-                        "rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                        "flex h-10 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors",
                         active
                           ? "border-bakery-700 bg-bakery-700 text-white"
                           : "border-border bg-card text-foreground hover:border-bakery-700"
                       )}
                     >
+                      <AddressLabelIcon label={option} className="size-4" />
                       {option}
                     </button>
                   );
@@ -243,8 +263,7 @@ export function AccountAddressesPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="fullName">Full name</Label>
-              <Input
-                className="h-11"
+              <IconInput icon={User}
                 id="fullName"
                 autoComplete="name"
                 aria-invalid={formState.errors.fullName ? true : undefined}
@@ -255,12 +274,11 @@ export function AccountAddressesPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input className="h-11" id="email" type="email" {...register("email", { required: true })} />
+                <IconInput icon={Mail} id="email" type="email" {...register("email", { required: true })} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone</Label>
-                <Input
-                  className="h-11"
+                <IconInput icon={Phone}
                   id="phone"
                   type="tel"
                   inputMode="tel"
@@ -277,8 +295,7 @@ export function AccountAddressesPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="addressLine1">Address line 1</Label>
-              <Input
-                className="h-11"
+              <IconInput icon={Home}
                 id="addressLine1"
                 autoComplete="address-line1"
                 placeholder="House no., building, street"
@@ -289,12 +306,11 @@ export function AccountAddressesPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="addressLine2">Address line 2</Label>
-              <Input className="h-11" id="addressLine2" {...register("addressLine2")} />
+              <IconInput icon={Building2} id="addressLine2" {...register("addressLine2")} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="landmark">Landmark</Label>
-              <Input
-                className="h-11"
+              <IconInput icon={Landmark}
                 id="landmark"
                 placeholder="A shop, a turning, anything easy to spot"
                 {...register("landmark")}
@@ -303,11 +319,11 @@ export function AccountAddressesPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="altPhone">Alternate phone</Label>
-                <Input className="h-11" id="altPhone" {...register("altPhone")} />
+                <IconInput icon={PhoneCall} id="altPhone" {...register("altPhone")} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="country">Country</Label>
-                <Input className="h-11" id="country" {...register("country")} />
+                <IconInput icon={Globe} id="country" {...register("country")} />
               </div>
             </div>
             {/*
@@ -316,8 +332,7 @@ export function AccountAddressesPage() {
             */}
             <div className="space-y-2">
               <Label htmlFor="pincode">PIN code</Label>
-              <Input
-                className="h-11"
+              <IconInput icon={Hash}
                 id="pincode"
                 inputMode="numeric"
                 autoComplete="postal-code"
@@ -333,8 +348,7 @@ export function AccountAddressesPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="city">City</Label>
-                <Input
-                  className="h-11"
+                <IconInput icon={Building}
                   id="city"
                   autoComplete="address-level2"
                   aria-invalid={formState.errors.city ? true : undefined}
@@ -344,8 +358,7 @@ export function AccountAddressesPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="state">State</Label>
-                <Input
-                  className="h-11"
+                <IconInput icon={MapIcon}
                   id="state"
                   autoComplete="address-level1"
                   aria-invalid={formState.errors.state ? true : undefined}
@@ -354,32 +367,70 @@ export function AccountAddressesPage() {
                 <FieldError message={formState.errors.state?.message} />
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="isDefault"
-                checked={isDefault}
-                onCheckedChange={(value) => setValue("isDefault", value === true)}
-              />
-              <Label htmlFor="isDefault" className="text-sm font-normal">
-                Set as default address
-              </Label>
-            </div>
-            <div className="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end">
+            {/*
+              The card's closing band, as an order card ends: the default
+              choice on the left where "Need help?" sits there, the save on
+              the right.
+            */}
+            <div className={ACCOUNT_CARD_FOOTER}>
+              <div className="mr-auto flex items-center gap-2">
+                <Checkbox
+                  id="isDefault"
+                  checked={isDefault}
+                  onCheckedChange={(value) => setValue("isDefault", value === true)}
+                />
+                <Label htmlFor="isDefault" className="cursor-pointer text-sm font-normal">
+                  Set as default address
+                </Label>
+              </div>
               {addresses.length > 0 ? (
-                <Button type="button" variant="outline" className="h-11 sm:min-w-28" onClick={cancelEdit}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={cn(ACCOUNT_ACTION, "min-w-28 bg-card")}
+                  onClick={cancelEdit}
+                >
+                  <X className="size-4" aria-hidden />
                   Cancel
                 </Button>
               ) : null}
-              <Button type="submit" variant="bakery" className="h-11 sm:min-w-36" disabled={formState.isSubmitting}>
+              <Button
+                type="submit"
+                variant="bakery"
+                className={cn(ACCOUNT_ACTION, "min-w-32")}
+                disabled={formState.isSubmitting}
+              >
+                {formState.isSubmitting ? (
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                ) : (
+                  <Check className="size-4" aria-hidden />
+                )}
                 {editingId ? "Update address" : "Save address"}
               </Button>
             </div>
           </form>
         </div>
         ) : null}
+        <div className={cn("flex flex-wrap items-center justify-between gap-3", showForm && "pt-2")}>
+          <h2 className="flex items-center gap-2 font-heading text-lg font-bold text-foreground">
+            <MapPin className="size-5 text-bakery-700" aria-hidden />
+            Saved addresses{addresses.length > 0 ? ` (${addresses.length})` : ""}
+          </h2>
+          {!showForm ? (
+            <Button
+              type="button"
+              variant="outline"
+              className={cn(ACCOUNT_ACTION, "bg-card")}
+              onClick={() => setFormOpen(true)}
+            >
+              <Plus className="size-4" aria-hidden />
+              Add new address
+            </Button>
+          ) : null}
+        </div>
         <div className="grid gap-4 md:grid-cols-2">
           {addresses.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border bg-cream-50 p-8 text-center md:col-span-2">
+            <div className="rounded-2xl border border-border bg-card p-8 text-center shadow-sm md:col-span-2">
               <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-cream-100">
                 <MapPin className="size-6 text-bakery-700" />
               </div>
@@ -390,69 +441,69 @@ export function AccountAddressesPage() {
             </div>
           ) : (
             addresses.map((address) => (
-              <div
+              /*
+                THE SAME READ-BACK AS THE CHECKOUT PICKER (AddressSummary),
+                in a plain card with its actions under a hairline. It had a
+                header band and a round mark of its own, and next to the
+                checkout's rows the same address looked like two different
+                ones. `flex-col` with the actions pushed down keeps two cards
+                side by side the same height when one address is longer.
+              */
+              <article
                 key={address.id}
                 className={cn(
-                  "rounded-2xl border bg-card p-5 shadow-sm sm:p-6",
+                  "flex flex-col rounded-2xl border bg-card p-5 shadow-sm transition-shadow hover:shadow-md",
                   address.isDefault ? "border-bakery-700 ring-1 ring-bakery-700/20" : "border-border"
                 )}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="font-heading font-semibold">{address.label}</h3>
-                      {address.isDefault ? <Badge variant="accent">Default</Badge> : null}
-                    </div>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {address.fullName} · {address.phone}
-                    </p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {formatAddress(address)}
-                    </p>
-                  </div>
-                  <div className="flex gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => startEdit(address)}
-                      aria-label="Edit address"
-                    >
-                      <Pencil className="size-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => {
-                        // One tap deleted it, with no way back.
-                        if (!window.confirm(`Remove the ${address.label} address?`)) return;
-                        deleteSavedAddress(address.id);
-                        toast.success("Address removed");
-                        setAddresses(getSavedAddresses());
-                      }}
-                      aria-label="Delete address"
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div>
+                <div className="flex-1 pb-4">
+                  <AddressSummary address={address} />
                 </div>
-                {!address.isDefault ? (
+
+                <div className="-mx-2 flex flex-wrap items-center gap-1 border-t border-border pt-3">
                   <Button
                     type="button"
-                    variant="outline"
-                    size="sm"
-                    className="mt-4"
+                    variant="ghost"
+                    className={cn(ACCOUNT_ACTION, "px-2.5")}
+                    onClick={() => startEdit(address)}
+                    aria-label={`Edit the ${address.label} address`}
+                  >
+                    <Pencil className="size-4" aria-hidden />
+                    Edit
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className={cn(ACCOUNT_ACTION, "px-2.5 text-destructive hover:bg-destructive/10 hover:text-destructive")}
                     onClick={() => {
-                      setDefaultSavedAddress(address.id);
-                      toast.success("Default address updated");
+                      // One tap deleted it, with no way back.
+                      if (!window.confirm(`Remove the ${address.label} address?`)) return;
+                      deleteSavedAddress(address.id);
+                      toast.success("Address removed");
                       setAddresses(getSavedAddresses());
                     }}
+                    aria-label={`Remove the ${address.label} address`}
                   >
-                    Set as default
+                    <Trash2 className="size-4" aria-hidden />
+                    Remove
                   </Button>
-                ) : null}
-              </div>
+                  {!address.isDefault ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className={cn(ACCOUNT_ACTION, "ml-auto px-2.5 text-bakery-700 hover:bg-cream-100 hover:text-bakery-800")}
+                      onClick={() => {
+                        setDefaultSavedAddress(address.id);
+                        toast.success("Default address updated");
+                        setAddresses(getSavedAddresses());
+                      }}
+                    >
+                      <CheckCircle2 className="size-4" aria-hidden />
+                      Set as default
+                    </Button>
+                  ) : null}
+                </div>
+              </article>
             ))
           )}
         </div>

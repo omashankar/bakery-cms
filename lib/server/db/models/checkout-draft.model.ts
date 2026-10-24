@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./_define-model";
 
 /**
  * A priced cart, held by the SERVER between quoting and payment.
@@ -67,5 +68,4 @@ export type CheckoutDraftDoc = mongoose.InferSchemaType<typeof checkoutDraftSche
 };
 
 export const CheckoutDraftModel =
-  (mongoose.models.CheckoutDraft as mongoose.Model<CheckoutDraftDoc>) ||
-  mongoose.model<CheckoutDraftDoc>("CheckoutDraft", checkoutDraftSchema);
+  defineModel<CheckoutDraftDoc>("CheckoutDraft", checkoutDraftSchema);

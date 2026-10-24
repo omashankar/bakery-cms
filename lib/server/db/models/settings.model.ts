@@ -1,6 +1,7 @@
 import mongoose, { type InferSchemaType, type Model } from "mongoose";
 
 import { applyBaseTransform } from "./_transform";
+import { defineModel } from "./_define-model";
 
 /**
  * Store settings — a SINGLETON document (one per install), keyed by `key`.
@@ -214,5 +215,4 @@ applyBaseTransform(settingsSchema);
 export type SettingsDoc = InferSchemaType<typeof settingsSchema>;
 
 export const SettingsModel: Model<SettingsDoc> =
-  (mongoose.models.Settings as Model<SettingsDoc>) ||
-  mongoose.model<SettingsDoc>("Settings", settingsSchema);
+  defineModel<SettingsDoc>("Settings", settingsSchema);

@@ -1,6 +1,7 @@
 import mongoose, { type InferSchemaType, type Model } from "mongoose";
 
 import { applyBaseTransform } from "./_transform";
+import { defineModel } from "./_define-model";
 
 /**
  * Admin/staff user. Storefront customers live in a separate `customers`
@@ -34,5 +35,4 @@ applyBaseTransform(userSchema, ["passwordHash"]);
 export type UserDoc = InferSchemaType<typeof userSchema>;
 
 export const UserModel: Model<UserDoc> =
-  (mongoose.models.User as Model<UserDoc>) ||
-  mongoose.model<UserDoc>("User", userSchema);
+  defineModel<UserDoc>("User", userSchema);

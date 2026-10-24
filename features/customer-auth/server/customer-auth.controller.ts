@@ -6,12 +6,14 @@ import {
 } from "@/lib/server/auth/cookies";
 import { getCustomerAccount, requireCustomer } from "@/lib/server/auth/customer-dal";
 import { signCustomerToken } from "@/lib/server/auth/jwt";
-import { withErrorHandler } from "@/lib/server/http/errors";
+import { AppError, ValidationError, withErrorHandler } from "@/lib/server/http/errors";
 import { rateLimit } from "@/lib/server/http/rate-limit";
 import { ok } from "@/lib/server/http/response";
+import { isCrossSite } from "@/lib/server/http/same-site";
 import { readJson, validate } from "@/lib/server/http/validate";
 import * as orderService from "@/features/orders/server/order.service";
 import { cancelAsCustomer } from "@/features/orders/server/cancellation.service";
+import { rejectUnusableFile } from "@/features/uploads/server/photo-upload.service";
 
 import * as service from "./customer-auth.service";
 import {
@@ -72,12 +74,18 @@ export const verifyCodeController = withErrorHandler(async (request: Request) =>
  */
 export const customerMeController = withErrorHandler(async () => {
   const account = (await getCustomerAccount()) as
-    | { id: string; email: string; name: string; phone: string }
+    | { id: string; email: string; name: string; phone: string; avatarUrl?: string }
     | null;
 
   if (!account) return ok(null, "Not signed in");
   return ok(
-    { id: account.id, email: account.email, name: account.name, phone: account.phone },
+    {
+      id: account.id,
+      email: account.email,
+      name: account.name,
+      phone: account.phone,
+      avatarUrl: account.avatarUrl ?? "",
+    },
     "Signed in",
   );
 });
@@ -91,8 +99,39 @@ export const updateCustomerProfileController = withErrorHandler(async (request: 
   const customer = await requireCustomer();
   const input = validate(updateCustomerProfileSchema, await readJson(request));
 
-  await service.updateProfile(customer.id, input);
-  return ok({ ...customer, ...input }, "Profile updated");
+  // The stored account, not the session echoed back with the input: the
+  // browser caches this reply, and an echo carried no photo.
+  return ok(await service.updateProfile(customer.id, input), "Profile updated");
+});
+
+/**
+ * The customer's own profile photo. Signed in, same-site, and budgeted — each
+ * upload is a Cloudinary write — with the empty and oversized files refused
+ * before the budget is charged, as the photo-cake upload learned to.
+ */
+export const uploadAvatarController = withErrorHandler(async (request: Request) => {
+  if (isCrossSite(request)) {
+    throw new AppError("Photo uploads are only accepted from this shop.", 403);
+  }
+  const customer = await requireCustomer();
+
+  const form = await request.formData().catch(() => null);
+  const file = form?.get("photo");
+  if (!(file instanceof File)) {
+    throw new ValidationError(
+      [{ field: "photo", message: "No photo was received" }],
+      "No photo was received",
+    );
+  }
+  rejectUnusableFile(file);
+  rateLimit(`customer-avatar:${customer.id}`, { limit: 10, windowMs: 60 * 60 * 1000 });
+
+  return ok(await service.setAvatar(customer.id, file), "Photo updated");
+});
+
+export const removeAvatarController = withErrorHandler(async () => {
+  const customer = await requireCustomer();
+  return ok(await service.removeAvatar(customer.id), "Photo removed");
 });
 
 /**

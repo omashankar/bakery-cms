@@ -5,6 +5,12 @@ import { generateOtp, sha256 } from "@/lib/server/auth/hash";
 import { AppError, AuthError } from "@/lib/server/http/errors";
 import { sendTemplatedEmail } from "@/features/communications/server/email.service";
 import * as orderRepo from "@/features/orders/server/order.repository";
+import { readImageFile } from "@/features/uploads/server/photo-upload.service";
+import {
+  deleteFromCloudinary,
+  isCloudinaryConfigured,
+  uploadToCloudinary,
+} from "@/lib/server/media/cloudinary";
 
 import * as repo from "./customer-auth.repository";
 import type {
@@ -39,6 +45,8 @@ export interface CustomerIdentity {
   email: string;
   name: string;
   phone: string;
+  /** "" for no photo: the storefront then draws their initials. */
+  avatarUrl: string;
 }
 
 /**
@@ -197,6 +205,7 @@ export async function verifySignInCode(
       email: existing.email,
       name: existing.name ?? "",
       phone: existing.phone ?? "",
+      avatarUrl: existing.avatarUrl ?? "",
     };
   } else {
     /**
@@ -230,8 +239,57 @@ export async function verifySignInCode(
 export async function updateProfile(
   id: string,
   patch: { name?: string; phone?: string },
-): Promise<void> {
+): Promise<CustomerIdentity> {
   await repo.updateProfile(id, patch);
+  return identityAfterWrite(id);
+}
+
+/** Re-read after a write, so what the browser caches is what was stored. */
+async function identityAfterWrite(id: string): Promise<CustomerIdentity> {
+  const identity = await repo.findIdentity(id);
+  // Deleted between the session check and the write — the same answer
+  // `requireCustomer` gives an account that is gone.
+  if (!identity) throw new AuthError();
+  return identity;
+}
+
+/**
+ * The customer's profile photo: stored on Cloudinary in its own folder, and
+ * the photo it replaces deleted there, so changing it ten times leaves one.
+ *
+ * Not tracked in `photouploads` — that sweep deletes any photo no order or
+ * review claims, which would take every avatar thirty days after upload.
+ */
+export async function setAvatar(id: string, file: File): Promise<CustomerIdentity> {
+  const { buffer, mime } = await readImageFile(file);
+  if (!isCloudinaryConfigured()) {
+    throw new AppError("Profile photos are not set up on this shop yet.", 503);
+  }
+
+  const asset = await uploadToCloudinary(
+    `data:${mime};base64,${buffer.toString("base64")}`,
+    "bakery-cms/avatars",
+  );
+  const previous = await repo.replaceAvatar(id, { url: asset.url, publicId: asset.publicId });
+  const identity = await identityAfterWrite(id);
+  /**
+   * READ BACK BEFORE SAYING YES. A model compiled before these fields existed
+   * drops them from the write without an error, and this answered "Photo
+   * updated" over an account that still had no photo — six uploads, six
+   * orphaned files. Now the new file goes and the customer is told.
+   */
+  if (identity.avatarUrl !== asset.url) {
+    await deleteFromCloudinary(asset.publicId);
+    throw new AppError("Your photo could not be saved. Please try again.", 500);
+  }
+  if (previous && previous !== asset.publicId) await deleteFromCloudinary(previous);
+  return identity;
+}
+
+export async function removeAvatar(id: string): Promise<CustomerIdentity> {
+  const previous = await repo.replaceAvatar(id, null);
+  if (previous) await deleteFromCloudinary(previous);
+  return identityAfterWrite(id);
 }
 
 /**

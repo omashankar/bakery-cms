@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./_define-model";
 
 /**
  * The shop's WhatsApp Business connection — server side, singleton.
@@ -40,5 +41,4 @@ export type WhatsAppConnectionDoc = mongoose.InferSchemaType<
 > & { _id: string };
 
 export const WhatsAppConnectionModel =
-  (mongoose.models.WhatsAppConnection as mongoose.Model<WhatsAppConnectionDoc>) ||
-  mongoose.model<WhatsAppConnectionDoc>("WhatsAppConnection", whatsappConnectionSchema);
+  defineModel<WhatsAppConnectionDoc>("WhatsAppConnection", whatsappConnectionSchema);

@@ -1,6 +1,7 @@
 import mongoose, { type Model } from "mongoose";
 
 import type { Product } from "@/types/product";
+import { defineModel } from "./_define-model";
 
 /**
  * Product document.
@@ -115,5 +116,4 @@ productSchema.set("toJSON", {
 export type ProductDoc = { _id: string } & Omit<Product, "id">;
 
 export const ProductModel: Model<ProductDoc> =
-  (mongoose.models.Product as Model<ProductDoc>) ||
-  mongoose.model<ProductDoc>("Product", productSchema);
+  defineModel<ProductDoc>("Product", productSchema);

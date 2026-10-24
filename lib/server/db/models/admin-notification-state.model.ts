@@ -1,4 +1,5 @@
 import mongoose, { type InferSchemaType, type Model } from "mongoose";
+import { defineModel } from "./_define-model";
 
 /**
  * Which alerts an admin has read, and which they have dismissed — per admin.
@@ -33,8 +34,4 @@ const adminNotificationStateSchema = new mongoose.Schema(
 export type AdminNotificationStateDoc = InferSchemaType<typeof adminNotificationStateSchema>;
 
 export const AdminNotificationStateModel: Model<AdminNotificationStateDoc> =
-  (mongoose.models.AdminNotificationState as Model<AdminNotificationStateDoc>) ||
-  mongoose.model<AdminNotificationStateDoc>(
-    "AdminNotificationState",
-    adminNotificationStateSchema,
-  );
+  defineModel<AdminNotificationStateDoc>("AdminNotificationState", adminNotificationStateSchema);

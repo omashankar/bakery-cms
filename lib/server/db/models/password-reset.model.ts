@@ -1,6 +1,7 @@
 import mongoose, { type InferSchemaType, type Model } from "mongoose";
 
 import { applyBaseTransform } from "./_transform";
+import { defineModel } from "./_define-model";
 
 /**
  * One-time password (OTP) for the forgot -> otp -> reset-password flow.
@@ -22,5 +23,4 @@ applyBaseTransform(passwordResetSchema, ["otpHash"]);
 export type PasswordResetDoc = InferSchemaType<typeof passwordResetSchema>;
 
 export const PasswordResetModel: Model<PasswordResetDoc> =
-  (mongoose.models.PasswordReset as Model<PasswordResetDoc>) ||
-  mongoose.model<PasswordResetDoc>("PasswordReset", passwordResetSchema);
+  defineModel<PasswordResetDoc>("PasswordReset", passwordResetSchema);

@@ -171,7 +171,12 @@ export async function refuseIfStorageIsFull(): Promise<void> {
   );
 }
 
-export async function uploadPhotoCakeImage(file: File): Promise<UploadedPhoto> {
+/**
+ * A customer's file, as an image this shop will store: within the size limit
+ * and a JPEG, PNG or WebP BY ITS BYTES. Shared with the profile photo, which
+ * faces the same file picker and the same "an SVG announcing itself as PNG".
+ */
+export async function readImageFile(file: File): Promise<{ buffer: Buffer; mime: string }> {
   rejectUnusableFile(file);
 
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -185,6 +190,11 @@ export async function uploadPhotoCakeImage(file: File): Promise<UploadedPhoto> {
   if (!mime) {
     throw photoError("That file is not a JPEG, PNG or WebP image.");
   }
+  return { buffer, mime };
+}
+
+export async function uploadPhotoCakeImage(file: File): Promise<UploadedPhoto> {
+  const { buffer, mime } = await readImageFile(file);
 
   if (!isCloudinaryConfigured()) {
     /**

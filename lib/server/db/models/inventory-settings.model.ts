@@ -1,6 +1,7 @@
 import mongoose, { type InferSchemaType, type Model } from "mongoose";
 
 import { applyBaseTransform } from "./_transform";
+import { defineModel } from "./_define-model";
 
 /**
  * Inventory settings — a SINGLETON document. Small config that governs stock
@@ -17,5 +18,4 @@ applyBaseTransform(inventorySettingsSchema);
 export type InventorySettingsDoc = InferSchemaType<typeof inventorySettingsSchema>;
 
 export const InventorySettingsModel: Model<InventorySettingsDoc> =
-  (mongoose.models.InventorySettings as Model<InventorySettingsDoc>) ||
-  mongoose.model<InventorySettingsDoc>("InventorySettings", inventorySettingsSchema);
+  defineModel<InventorySettingsDoc>("InventorySettings", inventorySettingsSchema);

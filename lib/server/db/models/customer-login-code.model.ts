@@ -1,6 +1,7 @@
 import mongoose, { type InferSchemaType, type Model } from "mongoose";
 
 import { applyBaseTransform } from "./_transform";
+import { defineModel } from "./_define-model";
 
 /**
  * A one-time code emailed to a customer so they can sign in.
@@ -35,5 +36,4 @@ applyBaseTransform(customerLoginCodeSchema);
 export type CustomerLoginCodeDoc = InferSchemaType<typeof customerLoginCodeSchema>;
 
 export const CustomerLoginCodeModel: Model<CustomerLoginCodeDoc> =
-  (mongoose.models.CustomerLoginCode as Model<CustomerLoginCodeDoc>) ||
-  mongoose.model<CustomerLoginCodeDoc>("CustomerLoginCode", customerLoginCodeSchema);
+  defineModel<CustomerLoginCodeDoc>("CustomerLoginCode", customerLoginCodeSchema);

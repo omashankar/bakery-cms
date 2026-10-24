@@ -7,6 +7,8 @@ export interface CustomerSession {
   email: string;
   name: string;
   phone?: string;
+  /** Their profile photo; absent or "" draws their initials. */
+  avatarUrl?: string;
   signedInAt: string;
 }
 
@@ -83,7 +85,7 @@ export async function syncCustomerSession(): Promise<CustomerSession | null> {
     if (!res.ok) return readCache();
 
     const body = (await res.json()) as {
-      data?: { email: string; name: string; phone?: string } | null;
+      data?: { email: string; name: string; phone?: string; avatarUrl?: string } | null;
     };
     return applyServerCustomer(body.data ?? null);
   } catch {
@@ -97,7 +99,7 @@ export async function syncCustomerSession(): Promise<CustomerSession | null> {
  * above, or read by the storefront layout with the page (`StorefrontCacheSeed`).
  */
 export function applyServerCustomer(
-  data: { email: string; name: string; phone?: string } | null,
+  data: { email: string; name: string; phone?: string; avatarUrl?: string } | null,
 ): CustomerSession | null {
   if (typeof window === "undefined") return null;
   settled = true;
@@ -115,6 +117,7 @@ export function applyServerCustomer(
     email: data.email,
     name: data.name,
     phone: data.phone,
+    avatarUrl: data.avatarUrl,
     // Kept from the cached copy where we have one; this is display trivia,
     // not authority.
     signedInAt: current?.signedInAt ?? new Date().toISOString(),
@@ -128,6 +131,7 @@ export function adoptCustomerSession(identity: {
   email: string;
   name: string;
   phone?: string;
+  avatarUrl?: string;
 }): CustomerSession {
   const session: CustomerSession = { ...identity, signedInAt: new Date().toISOString() };
   writeCache(session);
@@ -282,10 +286,47 @@ export async function updateCustomerProfile(patch: {
     });
     if (!res.ok) return null;
 
-    const body = (await res.json()) as { data?: { email: string; name: string; phone?: string } };
+    const body = (await res.json()) as {
+      data?: { email: string; name: string; phone?: string; avatarUrl?: string };
+    };
     if (!body.data) return null;
     return adoptCustomerSession(body.data);
   } catch {
     return null;
+  }
+}
+
+/**
+ * Set or remove the customer's profile photo, on the server. Answers the
+ * server's own message on a refusal ("That file is not a JPEG…"), so the toast
+ * can say why rather than "something went wrong".
+ */
+export async function uploadCustomerAvatar(
+  file: File,
+): Promise<{ session: CustomerSession } | { error: string }> {
+  const body = new FormData();
+  body.append("photo", file);
+  return sendAvatar({ method: "POST", body });
+}
+
+export async function removeCustomerAvatar(): Promise<{ session: CustomerSession } | { error: string }> {
+  return sendAvatar({ method: "DELETE" });
+}
+
+async function sendAvatar(
+  init: RequestInit,
+): Promise<{ session: CustomerSession } | { error: string }> {
+  try {
+    const res = await fetch("/api/customer-auth/avatar", { ...init, credentials: "same-origin" });
+    const parsed = (await res.json().catch(() => null)) as {
+      data?: { email: string; name: string; phone?: string; avatarUrl?: string };
+      message?: string;
+    } | null;
+    if (!res.ok || !parsed?.data) {
+      return { error: parsed?.message || "Please check your connection and try again." };
+    }
+    return { session: adoptCustomerSession(parsed.data) };
+  } catch {
+    return { error: "Please check your connection and try again." };
   }
 }

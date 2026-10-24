@@ -1,6 +1,7 @@
 import mongoose, { type Model } from "mongoose";
 
 import { connectDB } from "./mongoose";
+import { defineModel } from "./models/_define-model";
 import type { JsonStore } from "@/lib/server/json-store";
 
 /**
@@ -50,9 +51,7 @@ export class StoreConflictError extends Error {
   }
 }
 
-const CmsStoreModel: Model<CmsStoreShape> =
-  (mongoose.models.CmsStore as Model<CmsStoreShape>) ||
-  mongoose.model<CmsStoreShape>("CmsStore", cmsStoreSchema);
+const CmsStoreModel: Model<CmsStoreShape> = defineModel<CmsStoreShape>("CmsStore", cmsStoreSchema);
 
 /**
  * A cms-store, plus the two operations that make a replace-all write safe.

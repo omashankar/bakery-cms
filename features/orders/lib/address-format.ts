@@ -14,6 +14,13 @@ import type { CheckoutAddress } from "./checkout-draft";
  * Now it means editing this file.
  */
 
+/**
+ * A landmark that already opens with "near" (or "nr"). Only these: "Near
+ * opposite the water tank" is the reading the shop chose for every other
+ * landmark, and only the doubled word is wrong.
+ */
+const SAYS_WHERE = /^(near|nr\.?)(\s|$)/i;
+
 /** Lines to print one under another. Blank fields never produce a blank line. */
 export function addressLines(address: Partial<CheckoutAddress>): string[] {
   const trim = (value?: string) => value?.trim() ?? "";
@@ -24,13 +31,18 @@ export function addressLines(address: Partial<CheckoutAddress>): string[] {
    * On its own a line reading "opposite the water tank" sits among the street
    * lines as though it were one, and a rider reads it as part of the address.
    * Saying what it is costs six characters.
+   *
+   * UNLESS THE CUSTOMER ALREADY SAID IT. Many type "Near Shiv Mandir" into the
+   * box, and the prefix printed "Near Near Shiv Mandir" on the address card,
+   * the invoice and the rider's message.
    */
   const landmark = trim(address.landmark);
+  const saysWhereAlready = SAYS_WHERE.test(landmark);
 
   return [
     trim(address.addressLine1),
     trim(address.addressLine2),
-    landmark ? `Near ${landmark}` : "",
+    landmark ? (saysWhereAlready ? landmark : `Near ${landmark}`) : "",
     // City, state and postcode belong on one line, the way an envelope is
     // written — and the state is here, which is what the two outbound
     // messages were missing.

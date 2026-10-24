@@ -13,6 +13,8 @@ export interface AccountProfile {
   name: string;
   email: string;
   phone: string;
+  /** "" for no photo. */
+  avatarUrl: string;
 }
 
 const AccountContext = createContext<AccountProfile | null>(null);

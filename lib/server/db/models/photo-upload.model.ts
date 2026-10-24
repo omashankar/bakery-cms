@@ -1,6 +1,7 @@
 import mongoose, { type InferSchemaType, type Model } from "mongoose";
 
 import { applyBaseTransform } from "./_transform";
+import { defineModel } from "./_define-model";
 
 /**
  * One customer photo, tracked from the moment it is stored until an order
@@ -46,5 +47,4 @@ applyBaseTransform(photoUploadSchema);
 export type PhotoUploadDoc = InferSchemaType<typeof photoUploadSchema>;
 
 export const PhotoUploadModel: Model<PhotoUploadDoc> =
-  (mongoose.models.PhotoUpload as Model<PhotoUploadDoc>) ||
-  mongoose.model<PhotoUploadDoc>("PhotoUpload", photoUploadSchema);
+  defineModel<PhotoUploadDoc>("PhotoUpload", photoUploadSchema);

@@ -1,6 +1,7 @@
 import mongoose, { type InferSchemaType, type Model } from "mongoose";
 
 import { applyBaseTransform } from "./_transform";
+import { defineModel } from "./_define-model";
 
 /**
  * Refresh token record for rotation + revocation.
@@ -26,5 +27,4 @@ applyBaseTransform(refreshTokenSchema, ["tokenHash"]);
 export type RefreshTokenDoc = InferSchemaType<typeof refreshTokenSchema>;
 
 export const RefreshTokenModel: Model<RefreshTokenDoc> =
-  (mongoose.models.RefreshToken as Model<RefreshTokenDoc>) ||
-  mongoose.model<RefreshTokenDoc>("RefreshToken", refreshTokenSchema);
+  defineModel<RefreshTokenDoc>("RefreshToken", refreshTokenSchema);

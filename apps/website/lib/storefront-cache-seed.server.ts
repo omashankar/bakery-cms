@@ -47,7 +47,9 @@ export async function getStorefrontCacheSeed(
         getCustomerAccount(),
       ]);
 
-    const customer = account as { email?: string; name?: string; phone?: string } | null;
+    const customer = account as
+      | { email?: string; name?: string; phone?: string; avatarUrl?: string }
+      | null;
     return JSON.parse(
       JSON.stringify({
         settings,
@@ -58,7 +60,12 @@ export async function getStorefrontCacheSeed(
         testimonials,
         faqs,
         customer: customer?.email
-          ? { email: customer.email, name: customer.name ?? "", phone: customer.phone ?? "" }
+          ? {
+              email: customer.email,
+              name: customer.name ?? "",
+              phone: customer.phone ?? "",
+              avatarUrl: customer.avatarUrl ?? "",
+            }
           : null,
       }),
     ) as StorefrontCacheSeedData;

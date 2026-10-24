@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./_define-model";
 
 /**
  * Money the shop received that never became an order.
@@ -66,5 +67,4 @@ export type UnclaimedPaymentDoc = mongoose.InferSchemaType<typeof unclaimedPayme
 };
 
 export const UnclaimedPaymentModel =
-  (mongoose.models.UnclaimedPayment as mongoose.Model<UnclaimedPaymentDoc>) ||
-  mongoose.model<UnclaimedPaymentDoc>("UnclaimedPayment", unclaimedPaymentSchema);
+  defineModel<UnclaimedPaymentDoc>("UnclaimedPayment", unclaimedPaymentSchema);

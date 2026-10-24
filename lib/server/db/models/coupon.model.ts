@@ -1,6 +1,7 @@
 import mongoose, { type Model } from "mongoose";
 
 import type { StoredCoupon } from "@/features/commerce/lib/coupons-repository";
+import { defineModel } from "./_define-model";
 
 /**
  * Coupon document. `_id` is the app's coupon id (uuid string), `code` is a
@@ -50,5 +51,4 @@ couponSchema.set("toJSON", {
 export type CouponDoc = { _id: string } & Omit<StoredCoupon, "id">;
 
 export const CouponModel: Model<CouponDoc> =
-  (mongoose.models.Coupon as Model<CouponDoc>) ||
-  mongoose.model<CouponDoc>("Coupon", couponSchema);
+  defineModel<CouponDoc>("Coupon", couponSchema);

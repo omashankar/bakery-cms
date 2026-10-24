@@ -1,6 +1,7 @@
 import mongoose, { type InferSchemaType, type Model } from "mongoose";
 
 import { applyBaseTransform } from "./_transform";
+import { defineModel } from "./_define-model";
 
 /**
  * Catalog — a SINGLETON document (one per install), keyed by `key`. Holds the
@@ -36,5 +37,4 @@ applyBaseTransform(catalogSchema);
 export type CatalogDoc = InferSchemaType<typeof catalogSchema>;
 
 export const CatalogModel: Model<CatalogDoc> =
-  (mongoose.models.Catalog as Model<CatalogDoc>) ||
-  mongoose.model<CatalogDoc>("Catalog", catalogSchema);
+  defineModel<CatalogDoc>("Catalog", catalogSchema);

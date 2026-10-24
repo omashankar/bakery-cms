@@ -12,6 +12,7 @@ import { StorefrontScriptTags } from "@/components/shared/storefront-scripts";
 import type { StorefrontScripts } from "@/features/settings/server/storefront-scripts.server";
 import { cn } from "@/lib/utils";
 import type { Banner } from "@/types/media";
+import type { StorefrontCacheSeedData } from "@/apps/website/components/storefront-cache-seed";
 
 interface StorefrontLayoutShellProps {
   children: React.ReactNode;
@@ -55,6 +56,13 @@ interface StorefrontLayoutShellProps {
    * shop is replaced by the maintenance screen before this renders.
    */
   maintenance: MaintenanceState;
+  /**
+   * Who is signed in, as the server read it with the page — null for nobody,
+   * undefined when the read failed and the browser must find out. Without it
+   * the header painted the guest icon on every load and swapped in the
+   * customer's mark a moment later.
+   */
+  customer?: StorefrontCacheSeedData["customer"];
 }
 
 /** Public bakery website — always light; never follows admin dark mode. */
@@ -66,6 +74,7 @@ export function StorefrontLayoutShell({
   scripts,
   organizationSchema,
   maintenance,
+  customer,
 }: StorefrontLayoutShellProps) {
   return (
     <div
@@ -123,7 +132,7 @@ export function StorefrontLayoutShell({
           full={
             <>
               {chrome.showBannerStrip ? <StorefrontBannerStrip live={bannerStrip} /> : null}
-              <StorefrontNavbar chrome={chrome} />
+              <StorefrontNavbar chrome={chrome} initialCustomer={customer} />
             </>
           }
         />
