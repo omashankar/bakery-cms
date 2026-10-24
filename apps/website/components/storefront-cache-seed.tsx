@@ -28,7 +28,7 @@ export interface StorefrontCacheSeedData {
   banners: Banner[];
   testimonials: Testimonial[];
   faqs: FaqItem[];
-  customer: { email: string; name: string; phone?: string } | null;
+  customer: { email: string; name: string; phone?: string; avatarUrl?: string } | null;
 }
 
 /**

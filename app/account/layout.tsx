@@ -66,6 +66,7 @@ export default async function AccountLayout({
       scripts={scripts}
       organizationSchema={seo.global.organizationSchemaJson}
       maintenance={maintenance}
+      customer={cacheSeed ? cacheSeed.customer : undefined}
     >
       {cacheSeed ? <StorefrontCacheSeed data={cacheSeed} /> : null}
       <AccountShell
@@ -73,6 +74,7 @@ export default async function AccountLayout({
           name: String((account as { name?: string }).name ?? ""),
           email: String((account as { email?: string }).email ?? ""),
           phone: String((account as { phone?: string }).phone ?? ""),
+          avatarUrl: String((account as { avatarUrl?: string }).avatarUrl ?? ""),
         }}
       >
         {children}

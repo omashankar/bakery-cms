@@ -21,10 +21,7 @@ const GuestMenu = dynamic(
   { ssr: false, loading: () => <GuestTrigger /> },
 );
 
-const AccountMenu = dynamic(
-  () => import("./account-menu").then((m) => m.AccountMenu),
-  { ssr: false, loading: () => <AccountTrigger name="" /> },
-);
+type AccountMenuComponent = typeof import("./account-menu").AccountMenu;
 
 function GuestTrigger({ onIntent }: { onIntent?: () => void }) {
   return (
@@ -42,7 +39,15 @@ function GuestTrigger({ onIntent }: { onIntent?: () => void }) {
   );
 }
 
-function AccountTrigger({ name, onIntent }: { name: string; onIntent?: () => void }) {
+function AccountTrigger({
+  name,
+  avatarUrl,
+  onIntent,
+}: {
+  name: string;
+  avatarUrl?: string;
+  onIntent?: () => void;
+}) {
   return (
     <button
       type="button"
@@ -53,7 +58,7 @@ function AccountTrigger({ name, onIntent }: { name: string; onIntent?: () => voi
       onFocus={onIntent}
       onClick={onIntent}
     >
-      <AccountTriggerFace name={name} />
+      <AccountTriggerFace name={name} avatarUrl={avatarUrl} />
     </button>
   );
 }
@@ -64,8 +69,30 @@ export function LazyGuestMenu() {
   return <GuestMenu initialOpen />;
 }
 
-export function LazyAccountMenu(props: { name: string; phone?: string; onSignOut?: () => void }) {
-  const [wanted, setWanted] = useState(false);
-  if (!wanted) return <AccountTrigger name={props.name} onIntent={() => setWanted(true)} />;
-  return <AccountMenu {...props} initialOpen />;
+export function LazyAccountMenu(props: {
+  name: string;
+  phone?: string;
+  avatarUrl?: string;
+  onSignOut?: () => void;
+}) {
+  /*
+    THE STAND-IN STAYS UNTIL THE MENU HAS ARRIVED. This used `next/dynamic`,
+    whose loading placeholder cannot be handed props — it drew the trigger with
+    no name, so every first hover showed "U" (the initials of nobody) and no
+    photo until the menu's code came in. The module is imported here instead,
+    and the real menu replaces this button only once it can.
+  */
+  const [Menu, setMenu] = useState<AccountMenuComponent | null>(null);
+  if (!Menu) {
+    return (
+      <AccountTrigger
+        name={props.name}
+        avatarUrl={props.avatarUrl}
+        onIntent={() =>
+          void import("./account-menu").then((module) => setMenu(() => module.AccountMenu))
+        }
+      />
+    );
+  }
+  return <Menu {...props} initialOpen />;
 }

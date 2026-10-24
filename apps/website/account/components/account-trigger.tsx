@@ -1,6 +1,6 @@
 import { User } from "lucide-react";
 
-import { getAccountInitials } from "@/apps/website/account/lib/account-initials";
+import { AccountAvatarFace } from "./account-avatar";
 
 /**
  * The header's account button, in ONE place.
@@ -17,8 +17,9 @@ import { getAccountInitials } from "@/apps/website/account/lib/account-initials"
  * Hover deepens the circle's own colour, nothing around it.
  */
 export const ACCOUNT_TRIGGER_CLASS =
-  "flex size-10 shrink-0 items-center justify-center rounded-full bg-bakery-700 text-xs font-bold text-white shadow-sm outline-none transition-premium hover:bg-bakery-900 focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 data-[popup-open]:bg-bakery-900 lg:size-11 lg:text-sm";
+  "flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-bakery-700 text-xs font-bold text-white shadow-sm outline-none transition-premium hover:bg-bakery-900 focus-visible:ring-2 focus-visible:ring-gold-400 focus-visible:ring-offset-2 data-[popup-open]:bg-bakery-900";
 
-export function AccountTriggerFace({ name }: { name: string | null }) {
-  return name === null ? <User className="size-5" aria-hidden /> : <>{getAccountInitials(name)}</>;
+export function AccountTriggerFace({ name, avatarUrl }: { name: string | null; avatarUrl?: string }) {
+  if (name === null) return <User className="size-5" aria-hidden />;
+  return <AccountAvatarFace name={name} avatarUrl={avatarUrl} size={36} />;
 }

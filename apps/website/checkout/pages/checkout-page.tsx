@@ -6,9 +6,24 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
   Banknote,
+  Building,
+  Building2,
+  Check,
   CreditCard,
+  Globe,
+  Hash,
+  Home,
+  Landmark,
   Loader2,
+  MapIcon,
+  Phone,
+  PhoneCall,
+  User,
+  X,
 } from "lucide-react";
+import { AddressLabelIcon } from "@/apps/website/account/components/address-label-icon";
+import { IconInput } from "@/apps/website/account/components/icon-input";
+import { ACCOUNT_ACTION, ACCOUNT_CARD_FOOTER } from "@/apps/website/account/lib/account-buttons";
 import { toast } from "@/lib/lazy-toast";
 import {
   getCustomerSession,
@@ -1666,37 +1681,27 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
 
 
                     {addressFormOpen ? (
-                      <div className="space-y-4 rounded-xl border border-border bg-card p-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="text-sm font-medium">
+                      /*
+                        DRAWN LIKE THE ACCOUNT'S ADDRESS FORM — a header band,
+                        fields with their meaning in front of them, and a
+                        closing band of actions — so adding an address here
+                        and in My Profile is visibly the same job. It had a
+                        Cancel at the top as well as the bottom; one is enough.
+                      */
+                      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                        <header className="border-b border-border bg-cream-50 px-5 py-4 sm:px-6">
+                          <p className="font-heading text-base font-semibold text-foreground">
                             {editingAddressId ? "Edit address" : "New delivery address"}
                           </p>
-                          {savedAddresses.length > 0 ? (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setShowAddressForm(false);
-                                setEditingAddressId(null);
-                                const fallback =
-                                  savedAddresses.find((entry) => entry.id === addressChoice) ??
-                                  savedAddresses[0];
-                                if (fallback) {
-                                  setAddressChoice(fallback.id);
-                                  reset(toCheckoutAddress(fallback, accountEmail));
-                                }
-                              }}
-                            >
-                              Cancel
-                            </Button>
-                          ) : null}
-                        </div>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            Where we bring your order, and who to call when we are at the door
+                          </p>
+                        </header>
+                        <div className="space-y-4 p-5 sm:p-6">
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2 sm:col-span-2">
                         <Label htmlFor="fullName">Full name</Label>
-                        <Input
-                          className="h-11"
+                        <IconInput icon={User}
                           id="fullName"
                           aria-required
                           {...register("fullName", { required: "Name is required" })}
@@ -1715,8 +1720,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       */}
                       <div className="space-y-2">
                         <Label htmlFor="phone">Phone</Label>
-                        <Input
-                          className="h-11"
+                        <IconInput icon={Phone}
                           id="phone"
                           aria-required
                           type="tel"
@@ -1739,12 +1743,11 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                           worth.
                         */}
                         <Label htmlFor="altPhone">Alternate phone (optional)</Label>
-                        <Input className="h-11" id="altPhone" type="tel" {...register("altPhone")} />
+                        <IconInput icon={PhoneCall} id="altPhone" type="tel" {...register("altPhone")} />
                       </div>
                       <div className="space-y-2 sm:col-span-2">
                         <Label htmlFor="addressLine1">Address line 1</Label>
-                        <Input
-                          className="h-11"
+                        <IconInput icon={Home}
                           id="addressLine1"
                           aria-required
                           {...register("addressLine1", { required: "Address is required" })}
@@ -1757,7 +1760,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       </div>
                       <div className="space-y-2 sm:col-span-2">
                         <Label htmlFor="addressLine2">Address line 2 (optional)</Label>
-                        <Input className="h-11" id="addressLine2" {...register("addressLine2")} />
+                        <IconInput icon={Building2} id="addressLine2" {...register("addressLine2")} />
                       </div>
                       <div className="space-y-2 sm:col-span-2">
                         {/*
@@ -1767,8 +1770,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                           carries this one.
                         */}
                         <Label htmlFor="landmark">Landmark (optional)</Label>
-                        <Input
-                          className="h-11"
+                        <IconInput icon={Landmark}
                           id="landmark"
                           placeholder="A shop, a turning, anything easy to spot"
                           {...register("landmark")}
@@ -1776,8 +1778,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="city">City</Label>
-                        <Input
-                          className="h-11"
+                        <IconInput icon={Building}
                           id="city"
                           aria-required
                           {...register("city", { required: "City is required" })}
@@ -1790,8 +1791,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="state">State</Label>
-                        <Input
-                          className="h-11"
+                        <IconInput icon={MapIcon}
                           id="state"
                           aria-required
                           {...register("state", { required: "State is required" })}
@@ -1804,8 +1804,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="pincode">PIN code</Label>
-                        <Input
-                          className="h-11"
+                        <IconInput icon={Hash}
                           id="pincode"
                           aria-required
                           {...register("pincode", {
@@ -1881,7 +1880,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                           every country is a list nobody asked for.
                         */}
                         <Label htmlFor="country">Country (optional)</Label>
-                        <Input className="h-11" id="country" {...register("country")} />
+                        <IconInput icon={Globe} id="country" {...register("country")} />
                       </div>
 
                       <div className="space-y-2 sm:col-span-2">
@@ -1926,12 +1925,13 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                                 aria-checked={active}
                                 onClick={() => setValue("addressLabel", option)}
                                 className={cn(
-                                  "rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                                  "flex h-10 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors",
                                   active
                                     ? "border-bakery-700 bg-bakery-700 text-white"
                                     : "border-border bg-card text-foreground hover:border-bakery-700"
                                 )}
                               >
+                                <AddressLabelIcon label={option} className="size-4" />
                                 {option}
                               </button>
                             );
@@ -1952,12 +1952,12 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                           to. With an empty book the form IS the step, and a
                           Cancel that can close it leads nowhere.
                         */}
-                        <div className="flex flex-col-reverse gap-3 border-t border-border pt-4 sm:flex-row sm:justify-end">
+                        <div className={ACCOUNT_CARD_FOOTER}>
                           {savedAddresses.length > 0 ? (
                             <Button
                               type="button"
                               variant="outline"
-                              className="h-11 sm:min-w-32"
+                              className={cn(ACCOUNT_ACTION, "min-w-28 bg-card")}
                               onClick={() => {
                                 setShowAddressForm(false);
                                 setEditingAddressId(null);
@@ -1970,6 +1970,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                                 }
                               }}
                             >
+                              <X className="size-4" aria-hidden />
                               Cancel
                             </Button>
                           ) : null}
@@ -1987,11 +1988,13 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                           <Button
                             type="button"
                             variant="secondary"
-                            className="h-11 sm:min-w-32"
+                            className={cn(ACCOUNT_ACTION, "min-w-32")}
                             onClick={() => void handleSubmit(saveAddressToBook)()}
                           >
+                            <Check className="size-4" aria-hidden />
                             {editingAddressId ? "Save changes" : "Save address"}
                           </Button>
+                        </div>
                         </div>
                       </div>
                     ) : null}

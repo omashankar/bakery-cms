@@ -2,6 +2,7 @@ import { getCustomerAccount } from "@/lib/server/auth/customer-dal";
 import { clientIpFrom } from "@/lib/server/http/client-ip";
 import { AppError, ValidationError, withErrorHandler } from "@/lib/server/http/errors";
 import { rateLimit } from "@/lib/server/http/rate-limit";
+import { isCrossSite } from "@/lib/server/http/same-site";
 import { ok } from "@/lib/server/http/response";
 
 import {
@@ -11,44 +12,6 @@ import {
 } from "./photo-upload.service";
 
 const HOUR = 60 * 60 * 1000;
-
-/**
- * A cross-site POST, refused before anything else happens.
- *
- * `multipart/form-data` is a CORS-SAFELISTED content type, so a form on any
- * other site can post here from a visitor's browser with no preflight and no
- * cooperation from us. Without this the per-IP budget below is decorative:
- * an attacker spends other people's addresses, and the shop's own customers are
- * the ones who hit the limit.
- *
- * `Sec-Fetch-Site` is the reliable signal in modern browsers and is not settable
- * by page script. `Origin` is the fallback for anything that does not send it.
- * Neither is a security boundary against a non-browser client — curl sends
- * whatever it likes — but this endpoint's threat is a page in somebody's tab,
- * and for that it is exact.
- */
-function isCrossSite(request: Request): boolean {
-  const fetchSite = request.headers.get("sec-fetch-site");
-  if (fetchSite) return fetchSite === "cross-site";
-
-  const origin = request.headers.get("origin");
-  /**
-   * NEITHER header is refused, and that is the point of this check.
-   *
-   * It used to answer “not cross-site” here, which is exactly what a script
-   * sends — so the guard stopped a form on another site and waved through the
-   * curl loop it was written for. Every browser sends `Sec-Fetch-Site`, and
-   * every browser sends `Origin` on a POST, so a real customer always carries
-   * one of the two.
-   */
-  if (!origin) return true;
-  const host = request.headers.get("host");
-  try {
-    return Boolean(host) && new URL(origin).host !== host;
-  } catch {
-    return true; // an Origin we cannot parse is not one we trust
-  }
-}
 
 /**
  * A customer's photo, for a photo cake. NO SIGN-IN.

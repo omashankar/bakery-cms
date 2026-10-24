@@ -3,7 +3,20 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { CalendarDays, CreditCard, MapPin, Package } from "lucide-react";
+import {
+  CalendarDays,
+  CreditCard,
+  LifeBuoy,
+  MapPin,
+  Package,
+  ReceiptText,
+  RotateCcw,
+  ShoppingBag,
+  Truck,
+  XCircle,
+} from "lucide-react";
+import { ACCOUNT_ACTION, ACCOUNT_EMPTY_CARD } from "@/apps/website/account/lib/account-buttons";
+import { cn } from "@/lib/utils";
 import { toast } from "@/lib/lazy-toast";
 import { AccountOrderStatusBadge } from "@/apps/website/account/components/account-order-status-badge";
 import { useAccountProfile } from "@/apps/website/account/components/account-context";
@@ -258,8 +271,10 @@ export function AccountOrdersPage() {
           icon={Package}
           title="We could not load your orders"
           description="Something went wrong reaching the store. Your orders are safe — please try again."
+          className={ACCOUNT_EMPTY_CARD}
           action={
-            <Button variant="bakery" onClick={() => router.refresh()}>
+            <Button variant="bakery" className={ACCOUNT_ACTION} onClick={() => router.refresh()}>
+              <RotateCcw className="size-4" aria-hidden />
               Try again
             </Button>
           }
@@ -269,182 +284,230 @@ export function AccountOrdersPage() {
           icon={Package}
           title="No orders yet"
           description="When you place an order, it will appear here."
+          className={ACCOUNT_EMPTY_CARD}
           action={
-            <Button variant="bakery" render={<Link href={routes.store.collections} />}>
+            <Button
+              variant="bakery"
+              className={ACCOUNT_ACTION}
+              render={<Link href={routes.store.collections} />}
+            >
+              <ShoppingBag className="size-4" aria-hidden />
               Browse {labels.productWordPlural.toLowerCase()}
             </Button>
           }
         />
       ) : (
         <div className="space-y-4">
-          {paginated.map((order, orderIndex) => (
-            <div
+          {paginated.map((order, orderIndex) => {
+            const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
+            return (
+            <article
               key={order.id}
-              className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
+              className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md"
             >
-              {/* Header */}
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-cream-50 px-5 py-4 sm:px-6">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-bakery-700 text-white">
-                    <Package className="size-4" />
-                  </span>
-                  <div>
+              {/*
+                THE HEADER ANSWERS "WHICH ORDER, AND WHERE IS IT": the number
+                with its status beside it, when it was placed, and what it
+                came to. The total sat in the body, floating level with the
+                first item, where it read as that item's price.
+              */}
+              <header className="flex items-start justify-between gap-4 border-b border-border bg-cream-50 px-5 py-4 sm:px-6">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
                     <h2 className="font-heading text-base font-bold text-foreground">
                       {order.orderNumber}
                     </h2>
-                    <p className="text-xs text-muted-foreground">
-                      Placed on {formatDate(order.placedAt)}
-                    </p>
+                    <AccountOrderStatusBadge status={order.status} />
                   </div>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Placed on {formatDate(order.placedAt)} · {itemCount} item
+                    {itemCount === 1 ? "" : "s"}
+                  </p>
                 </div>
-                <AccountOrderStatusBadge status={order.status} />
-              </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-xs text-muted-foreground">Total</p>
+                  <p className="text-lg leading-tight font-bold text-foreground">
+                    {formatCurrency(order.totals.total)}
+                  </p>
+                </div>
+              </header>
 
-              {/* Body */}
               {/*
-                THREE BANDS, the same in every card: what was bought and what
-                it cost; when, where and how it was paid, full width; then
-                what can be done. The strip used to share a row with the
-                buttons, so its width changed with how many there were and
-                no two cards lined up.
+                THREE BANDS, the same in every card: what was bought; when,
+                where and how it was paid, full width; then what can be done.
+                The strip used to share a row with the buttons, so its width
+                changed with how many there were and no two cards lined up.
               */}
               <div className="space-y-4 px-5 py-5 sm:px-6">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0 flex-1 space-y-4">
-                  {/*
-                    WHAT WAS ORDERED, WITH ITS PICTURE — the photo the line was
-                    placed with, which is stored on the order itself, so it is
-                    the cake they bought even if the product's photos have
-                    changed since. Name and picture lead to the product.
-                  */}
-                  <ul className="space-y-3">
-                    {order.items.slice(0, 3).map((item) => {
-                      const choices = cartLineChoices(item);
-                      return (
-                        <li key={item.id} className="flex items-center gap-3">
+                {/*
+                  WHAT WAS ORDERED, WITH ITS PICTURE — the photo the line was
+                  placed with, which is stored on the order itself, so it is
+                  the cake they bought even if the product's photos have
+                  changed since. Name and picture lead to the product.
+                */}
+                <ul className="divide-y divide-border">
+                  {order.items.slice(0, 3).map((item) => {
+                    const choices = cartLineChoices(item);
+                    return (
+                      <li key={item.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                        <Link
+                          href={routes.store.product(item.productSlug)}
+                          className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted"
+                          aria-hidden="true"
+                          tabIndex={-1}
+                        >
+                          {item.image ? (
+                            <OptimizedImage
+                              src={item.image}
+                              alt=""
+                              width={64}
+                              height={64}
+                              // The top order's pictures are in the first screenful
+                              // and can be its largest thing; lazy, they wait for
+                              // layout and Next flags the LCP.
+                              loading={orderIndex === 0 ? "eager" : "lazy"}
+                              className="size-full object-cover"
+                            />
+                          ) : (
+                            <Package className="size-6 text-muted-foreground" />
+                          )}
+                        </Link>
+                        <div className="min-w-0 flex-1 text-sm">
                           <Link
                             href={routes.store.product(item.productSlug)}
-                            className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted"
-                            aria-hidden="true"
-                            tabIndex={-1}
+                            className="line-clamp-2 font-medium text-foreground hover:text-bakery-700"
                           >
-                            {item.image ? (
-                              <OptimizedImage
-                                src={item.image}
-                                alt=""
-                                width={64}
-                                height={64}
-                                // The top order's pictures are in the first screenful
-                                // and can be its largest thing; lazy, they wait for
-                                // layout and Next flags the LCP.
-                                loading={orderIndex === 0 ? "eager" : "lazy"}
-                                className="size-full object-cover"
-                              />
-                            ) : (
-                              <Package className="size-6 text-muted-foreground" />
-                            )}
+                            {item.name}
                           </Link>
-                          <div className="min-w-0 text-sm">
-                            <Link
-                              href={routes.store.product(item.productSlug)}
-                              className="line-clamp-2 font-medium text-foreground hover:underline"
-                            >
-                              {item.name}
-                            </Link>
-                            {/*
-                              The customer's own record of what they ordered:
-                              size, flavour and every option they were charged
-                              for, so two orders of one product can be told
-                              apart.
-                            */}
-                            <p className="mt-0.5 text-xs text-muted-foreground">
-                              Qty {item.quantity}
-                              {choices.length > 0 ? ` · ${choices.join(" · ")}` : ""}
-                            </p>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  {order.items.length > 3 ? (
-                    <p className="text-sm font-medium text-bakery-700">
-                      +{order.items.length - 3} more item
-                      {order.items.length - 3 === 1 ? "" : "s"}
-                    </p>
-                  ) : null}
-
-                  {/*
-                    WHEN, WHERE AND HOW IT WAS PAID — the three things a
-                    customer opens this page to check, all on the order already.
-                  */}
-
-                </div>
-
-                <div className="shrink-0 text-right">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Order total</p>
-                    <p className="text-lg font-bold text-foreground">
-                      {formatCurrency(order.totals.total)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <dl className="grid gap-2 rounded-xl bg-muted/60 px-4 py-3 text-xs sm:grid-cols-3">
-                <div className="flex items-start gap-2">
-                  <CalendarDays aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                  <div>
-                    <dt className="text-muted-foreground">{deliveryLabel(order)}</dt>
-                    <dd className="font-medium text-foreground">{deliveryWhen(order)}</dd>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2">
-                  <MapPin aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                  <div className="min-w-0">
-                    <dt className="text-muted-foreground">Deliver to</dt>
-                    <dd className="truncate font-medium text-foreground">
-                      {[order.address.fullName, order.address.city, order.address.pincode]
-                        .filter(Boolean)
-                        .join(", ")}
-                    </dd>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2">
-                  <CreditCard aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                  <div>
-                    <dt className="text-muted-foreground">Payment</dt>
-                    <dd className="font-medium text-foreground">{paymentText(order)}</dd>
-                  </div>
-                </div>
-              </dl>
-              <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  render={<Link href={routes.store.orderDetail(order.orderNumber)} />}
-                >
-                  {/*
-                    Nothing is left to track on an order that has arrived
-                    or been called off; it is the details that are wanted.
-                  */}
-                  {FINAL_STATUSES.has(order.status) ? "View details" : "Track order"}
-                </Button>
-                <Button
-                  variant="bakery"
-                  size="sm"
-                  onClick={() => handleReorder(order.orderNumber)}
-                >
-                  Reorder
-                </Button>
-                {/* Only while the order can still be cancelled. */}
-                {canCancel(order) ? (
-                  <Button variant="ghost" size="sm" onClick={() => setCancelling(order)}>
-                    Cancel order
-                  </Button>
+                          {/*
+                            The customer's own record of what they ordered:
+                            size, flavour and every option they were charged
+                            for, so two orders of one product can be told
+                            apart.
+                          */}
+                          <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                            Qty {item.quantity}
+                            {choices.length > 0 ? ` · ${choices.join(" · ")}` : ""}
+                          </p>
+                        </div>
+                        <p className="shrink-0 text-sm font-semibold text-foreground">
+                          {formatCurrency(item.price * item.quantity)}
+                        </p>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {order.items.length > 3 ? (
+                  <p className="text-sm font-medium text-bakery-700">
+                    +{order.items.length - 3} more item
+                    {order.items.length - 3 === 1 ? "" : "s"}
+                  </p>
                 ) : null}
+
+                {/*
+                  WHEN, WHERE AND HOW IT WAS PAID — the three things a
+                  customer opens this page to check, all on the order already.
+                */}
+                <dl className="grid gap-3 rounded-xl border border-border bg-cream-50/60 px-4 py-3 text-xs sm:grid-cols-3 sm:gap-4">
+                  <div className="flex items-start gap-2.5">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-card text-bakery-700 shadow-sm">
+                      <CalendarDays aria-hidden="true" className="size-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <dt className="text-muted-foreground">{deliveryLabel(order)}</dt>
+                      <dd className="font-medium text-foreground">{deliveryWhen(order)}</dd>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-card text-bakery-700 shadow-sm">
+                      <MapPin aria-hidden="true" className="size-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <dt className="text-muted-foreground">Deliver to</dt>
+                      <dd className="truncate font-medium text-foreground">
+                        {[order.address.fullName, order.address.city, order.address.pincode]
+                          .filter(Boolean)
+                          .join(", ")}
+                      </dd>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-card text-bakery-700 shadow-sm">
+                      <CreditCard aria-hidden="true" className="size-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <dt className="text-muted-foreground">Payment</dt>
+                      <dd className="font-medium text-foreground">{paymentText(order)}</dd>
+                    </div>
+                  </div>
+                </dl>
               </div>
-              </div>
-            </div>
-          ))}
+
+              {/*
+                The band every account card ends with: help and, while it is
+                allowed, cancelling on the left; the order's own next steps
+                on the right, at the account pages' one button size.
+              */}
+              <footer className="flex flex-wrap items-center gap-2 border-t border-border bg-cream-50/70 px-5 py-3 sm:px-6">
+                <div className="mr-auto flex flex-wrap items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    className={cn(ACCOUNT_ACTION, "px-3 text-muted-foreground")}
+                    render={<Link href={routes.store.contact} />}
+                  >
+                    <LifeBuoy className="size-4" aria-hidden />
+                    Need help?
+                  </Button>
+                  {/* Only while the order can still be cancelled. */}
+                  {canCancel(order) ? (
+                    <Button
+                      variant="ghost"
+                      onClick={() => setCancelling(order)}
+                      className={cn(
+                        ACCOUNT_ACTION,
+                        "px-3 text-destructive hover:bg-destructive/10 hover:text-destructive",
+                      )}
+                    >
+                      <XCircle className="size-4" aria-hidden />
+                      Cancel order
+                    </Button>
+                  ) : null}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    className={cn(ACCOUNT_ACTION, "bg-card")}
+                    render={<Link href={routes.store.orderDetail(order.orderNumber)} />}
+                  >
+                    {/*
+                      Nothing is left to track on an order that has arrived
+                      or been called off; it is the details that are wanted.
+                    */}
+                    {FINAL_STATUSES.has(order.status) ? (
+                      <>
+                        <ReceiptText className="size-4" aria-hidden />
+                        View details
+                      </>
+                    ) : (
+                      <>
+                        <Truck className="size-4" aria-hidden />
+                        Track order
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="bakery"
+                    className={ACCOUNT_ACTION}
+                    onClick={() => handleReorder(order.orderNumber)}
+                  >
+                    <RotateCcw className="size-4" aria-hidden />
+                    Reorder
+                  </Button>
+                </div>
+              </footer>
+            </article>
+            );
+          })}
           {orders.length > PAGE_SIZE ? (
             <ListPagination
               currentPage={currentPage}

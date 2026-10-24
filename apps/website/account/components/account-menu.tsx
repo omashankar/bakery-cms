@@ -15,11 +15,13 @@ import { routes } from "@/constants/routes";
 import { signOutCustomer } from "@/apps/website/account/lib/customer-session";
 import { useHoverMenu } from "@/apps/website/account/hooks/use-hover-menu";
 import { getAccountInitials } from "@/apps/website/account/lib/account-initials";
+import { AccountAvatarFace } from "./account-avatar";
 import { ACCOUNT_TRIGGER_CLASS, AccountTriggerFace } from "./account-trigger";
 
 interface AccountMenuProps {
   name: string;
   phone?: string;
+  avatarUrl?: string;
   onSignOut?: () => void;
   /** Mounted by the lazy loader on the hover that asked for it. */
   initialOpen?: boolean;
@@ -33,7 +35,7 @@ const menuLinks = [
   { href: routes.account.addresses, label: "Addresses", icon: MapPin },
 ] as const;
 
-export function AccountMenu({ name, phone, onSignOut, initialOpen = false }: AccountMenuProps) {
+export function AccountMenu({ name, phone, avatarUrl, onSignOut, initialOpen = false }: AccountMenuProps) {
   const router = useRouter();
   const { open, setOpen, hoverProps } = useHoverMenu(150, initialOpen);
 
@@ -57,7 +59,7 @@ export function AccountMenu({ name, phone, onSignOut, initialOpen = false }: Acc
         {...hoverProps}
         className={ACCOUNT_TRIGGER_CLASS}
       >
-        <AccountTriggerFace name={name} />
+        <AccountTriggerFace name={name} avatarUrl={avatarUrl} />
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
@@ -66,8 +68,8 @@ export function AccountMenu({ name, phone, onSignOut, initialOpen = false }: Acc
         className="w-60 rounded-2xl p-1.5 ring-border"
       >
         <div className="flex items-center gap-3 rounded-xl bg-cream-100 px-3 py-2.5">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-bakery-700 text-xs font-bold text-white">
-            {getAccountInitials(name)}
+          <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-bakery-700 text-xs font-bold text-white">
+            <AccountAvatarFace name={name} avatarUrl={avatarUrl} size={36} />
           </div>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-foreground">{name}</p>

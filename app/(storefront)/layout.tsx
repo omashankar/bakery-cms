@@ -70,6 +70,7 @@ export default async function StorefrontLayout({
       scripts={scripts}
       organizationSchema={seo.global.organizationSchemaJson}
       maintenance={maintenance}
+      customer={cacheSeed ? cacheSeed.customer : undefined}
     >
       {cacheSeed ? <StorefrontCacheSeed data={cacheSeed} /> : null}
       {children}

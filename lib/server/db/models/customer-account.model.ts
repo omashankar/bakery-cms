@@ -1,6 +1,7 @@
 import mongoose, { type InferSchemaType, type Model } from "mongoose";
 
 import { applyBaseTransform } from "./_transform";
+import { defineModel } from "./_define-model";
 
 /**
  * A customer who can sign in and see their own orders.
@@ -23,6 +24,13 @@ const customerAccountSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, index: true },
     name: { type: String, default: "" },
     phone: { type: String, default: "" },
+    /**
+     * Their profile photo on Cloudinary, and the asset id that deletes it when
+     * they change or remove it. Kept out of `photouploads`: that collection's
+     * sweep deletes any photo no order claims, and nothing orders an avatar.
+     */
+    avatarUrl: { type: String, default: "" },
+    avatarPublicId: { type: String, default: "" },
     /** When they last proved control of this address. */
     emailVerifiedAt: { type: Date, default: null },
     lastLoginAt: { type: Date, default: null },
@@ -53,5 +61,4 @@ applyBaseTransform(customerAccountSchema);
 export type CustomerAccountDoc = InferSchemaType<typeof customerAccountSchema>;
 
 export const CustomerAccountModel: Model<CustomerAccountDoc> =
-  (mongoose.models.CustomerAccount as Model<CustomerAccountDoc>) ||
-  mongoose.model<CustomerAccountDoc>("CustomerAccount", customerAccountSchema);
+  defineModel<CustomerAccountDoc>("CustomerAccount", customerAccountSchema);

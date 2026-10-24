@@ -33,6 +33,7 @@ import {
   hasCustomerSessionSettled,
 } from "@/apps/website/account/lib/customer-session";
 import type { StorefrontChrome } from "@/apps/website/lib/storefront-chrome.server";
+import type { StorefrontCacheSeedData } from "@/apps/website/components/storefront-cache-seed";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { useBodyScrollLock } from "@/hooks/use-body-scroll-lock";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
@@ -118,9 +119,11 @@ const BAND_CLIP_MS = BAND_SLIDE_MS + 60;
 
 interface StorefrontNavbarProps {
   chrome: StorefrontChrome;
+  /** The server's answer to "who is signed in": null for nobody, undefined for unknown. */
+  initialCustomer?: StorefrontCacheSeedData["customer"];
 }
 
-export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
+export function StorefrontNavbar({ chrome, initialCustomer }: StorefrontNavbarProps) {
   // Read on the server from MongoDB (see StorefrontChrome) — so the HTML already
   // carries the admin's real store name / logo / nav, no defaults-then-swap flash.
   const [siteName] = useState(chrome.siteName);
@@ -405,9 +408,23 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
     .filter((item) => !navRowOpensNothing(item));
   const [cartCount, setCartCount] = useState(0);
   const [wishlistCount, setWishlistCount] = useState(0);
-  const [signedIn, setSignedIn] = useState(false);
-  const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
+  /*
+    THE ACCOUNT MARK IN THE FIRST PAINT, from the server's read of the cookie.
+    These started empty and were filled from localStorage after mount, so the
+    header drew the guest icon on every load and swapped the customer's
+    initials or photo in a moment later. Same naming rule as
+    `getCustomerDisplayName`.
+  */
+  const [signedIn, setSignedIn] = useState(Boolean(initialCustomer));
+  const [customerName, setCustomerName] = useState(
+    initialCustomer
+      ? initialCustomer.name || initialCustomer.email.split("@")[0] || "Customer"
+      : "",
+  );
+  const [customerPhone, setCustomerPhone] = useState(initialCustomer?.phone ?? "");
+  const [customerAvatar, setCustomerAvatar] = useState(initialCustomer?.avatarUrl ?? "");
+  // Fixed at mount: whether the page brought that answer, for the effect below.
+  const customerFromServer = useRef(initialCustomer !== undefined);
   const [scrolled, setScrolled] = useState(false);
   /*
     THE HANDLES THE SCROLL EFFECT WRITES THROUGH.
@@ -432,9 +449,16 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
     // only the client-only cart, wishlist and customer session are read here.
     setCartCount(getCartItemCount());
     setWishlistCount(getWishlistCount());
-    setSignedIn(hasCustomerSession());
-    setCustomerName(getCustomerDisplayName());
-    setCustomerPhone(getCustomerSession()?.phone ?? "");
+    // Only when the page did not bring the answer. This effect runs before
+    // StorefrontCacheSeed has written the session, so on a first visit the
+    // browser's copy is still empty and would put the guest icon back; the
+    // seed's session event refreshes these through the listener below.
+    if (!customerFromServer.current) {
+      setSignedIn(hasCustomerSession());
+      setCustomerName(getCustomerDisplayName());
+      setCustomerPhone(getCustomerSession()?.phone ?? "");
+      setCustomerAvatar(getCustomerSession()?.avatarUrl ?? "");
+    }
 
     /**
      * Ask the SERVER who is signed in.
@@ -459,6 +483,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
       setSignedIn(hasCustomerSession());
       setCustomerName(getCustomerDisplayName());
       setCustomerPhone(getCustomerSession()?.phone ?? "");
+      setCustomerAvatar(getCustomerSession()?.avatarUrl ?? "");
     };
     window.addEventListener("storage", refreshCounts);
     window.addEventListener("bakery-cart-updated", refreshCounts);
@@ -1120,7 +1145,8 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
           </form>
         ) : null}
 
-        <div className="flex items-center gap-1 sm:gap-1.5">
+        {/* Tight: three round marks read as one cluster, not three islands. */}
+        <div className="flex items-center gap-0.5 sm:gap-1">
           {showSearch ? (
             <Button
               variant="ghost"
@@ -1154,7 +1180,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
           <Button
             variant="ghost"
             size="icon-lg"
-            className="relative hidden text-foreground hover:bg-cream-100 hover:text-bakery-700 sm:flex lg:size-11"
+            className="relative hidden text-foreground hover:bg-cream-100 hover:text-bakery-700 sm:flex lg:size-10"
             render={<Link href={routes.store.wishlist} aria-label="Wishlist" />}
           >
             <Heart className="size-5 lg:size-6" strokeWidth={1.75} />
@@ -1167,7 +1193,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
           <Button
             variant="ghost"
             size="icon-lg"
-            className="relative text-foreground hover:bg-cream-100 hover:text-bakery-700 lg:size-11"
+            className="relative text-foreground hover:bg-cream-100 hover:text-bakery-700 lg:size-10"
             render={<Link href={routes.store.cart} aria-label="Shopping cart" />}
           >
             <ShoppingCart className="size-5 lg:size-6" strokeWidth={1.75} />
@@ -1186,10 +1212,12 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
               <AccountMenu
                 name={customerName}
                 phone={customerPhone}
+                avatarUrl={customerAvatar}
                 onSignOut={() => {
                   setSignedIn(false);
                   setCustomerName("");
                   setCustomerPhone("");
+                  setCustomerAvatar("");
                 }}
               />
             </div>
