@@ -470,7 +470,7 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                 */}
                 <PincodeCheck
                   inline
-                  title="Enter delivery PIN code:"
+                  title="Check delivery to your area"
                   className="rounded-xl border border-border bg-card px-4 py-3"
                 />
                 <div className="space-y-4">

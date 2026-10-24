@@ -185,6 +185,163 @@ export function PincodeCheck({
     );
   }
 
+  /*
+    ONE CONTROL, NOT TWO BOXES WITH A GAP.
+
+    It was an `<Input>` and a `<Button>` side by side, each with its own
+    border and rounding and four pixels of nothing between them — which
+    reads as a field and, separately, a button that happens to sit near it.
+    The shop pointed at its reference twice: there the button is joined to
+    the field, sharing one outline, so the pair reads as the single question
+    it is. The cart's row is joined the same way now: as a grey field and a
+    separate outlined button it read as two loose controls in an empty card.
+
+    Built here rather than with `<Input>` and `<Button>`: both carry their
+    own border, radius and focus ring, and stripping those off through
+    `className` is a fight with the design system that the next person to
+    touch either component loses. The focus ring moves to the GROUP, via
+    `focus-within`, so tabbing into the field still lights the whole control
+    the way every other input on this page lights itself.
+  */
+  const field = (
+    <form
+      className={cn(
+        "flex w-full min-w-0 overflow-hidden rounded-md border bg-card",
+        inline ? "h-11" : "h-12",
+        outline,
+      )}
+      onSubmit={(event) => {
+        event.preventDefault();
+        void check();
+      }}
+    >
+      {inline ? null : (
+        <MapPin
+          className="ml-3 size-4 shrink-0 self-center text-muted-foreground"
+          aria-hidden="true"
+        />
+      )}
+      <input
+        type="text"
+        value={entered}
+        // The same normalisation every zone rule is matched through, so what
+        // the customer sees typed is exactly what gets compared.
+        onChange={(event) => {
+          checkSeq.current += 1;
+          setEntered(normalizePincode(event.target.value));
+          // The old answer belonged to the old code. Left up, it reads as the
+          // answer to what is in the box now — and so does a green border.
+          setResult(null);
+        }}
+        inputMode="numeric"
+        autoComplete="postal-code"
+        aria-label="PIN code"
+        // Short enough to read whole at 390px; it was cut to "check deliv…".
+        placeholder="Enter delivery PIN code"
+        /*
+          `size={1}`, AND IT IS NOT ABOUT THE RENDERED WIDTH — the CSS below
+          sets that. `size` sets an input's INTRINSIC width, and its default
+          of 20 characters made this field's min-content about 211px. The
+          column it sits in is a GRID item, whose automatic minimum is its
+          own min-content, so the column refused to go narrower than
+          28 (the icon) + 211 + 93 (the Check button) = 332 — and at a 320px
+          window, where the track is 288, it simply overhung by 44 and gave
+          the whole page a sideways scrollbar.
+
+          `min-w-0` on the input does not cure that: it lets the input shrink
+          as a FLEX item, which is why the field itself was never the thing
+          overflowing, while the column's min-content was still computed from
+          the same twenty characters. Measured: 28px of sideways scroll at
+          320 with this absent, 0 with it, and no change at all at 375 and
+          above, where the track was already wider than 332.
+        */
+        size={1}
+        className={cn(
+          "h-full min-w-0 flex-1 bg-transparent px-2.5 text-base outline-none md:text-sm placeholder:text-muted-foreground",
+          inline && "pl-3",
+        )}
+      />
+      {/*
+        A WAY OUT OF A WRONG CODE, which the field did not have. Six digits
+        typed by thumb are six digits to delete by thumb, and a customer who
+        got a red border has every reason to want the box empty at once.
+
+        `type="button"`, or it submits the form it sits inside — the default
+        for a button in a form is submit, and the bug that produces is a
+        clear that checks the code it has just erased.
+      */}
+      {entered ? (
+        <button
+          type="button"
+          onClick={() => {
+            checkSeq.current += 1;
+            setEntered("");
+            setResult(null);
+          }}
+          aria-label="Clear PIN code"
+          className="mr-1 shrink-0 self-center rounded-full p-1 text-muted-foreground"
+        >
+          <X className="size-4" />
+        </button>
+      ) : null}
+      <button
+        type="submit"
+        // Six digits or nothing to check — a prefix used to answer "yes".
+        disabled={!isFullPincode(entered)}
+        className={cn(
+          "h-full shrink-0 px-6 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50",
+          // Inline it is an outlined segment, not a filled block: filled, it
+          // looked disabled until a code was typed in.
+          inline
+            ? "border-l border-input text-bakery-700 hover:bg-bakery-50"
+            : "bg-bakery-700 text-white",
+        )}
+      >
+        Check
+      </button>
+    </form>
+  );
+
+  const answer = <DeliveryAnswer result={result} pincode={entered} loading={checking} />;
+
+  if (inline) {
+    return (
+      /*
+        THE QUESTION ON THE LEFT, THE FIELD ON THE RIGHT, and the answer takes
+        the question's place.
+
+        It was a label, a field and a separate button in a row with half the
+        card empty after them, and the answer added a line under the field — so
+        the card changed height on every check and nothing in it lined up with
+        the cart line below. Now the two halves fill the row the way the cart
+        line's name and price do, and the left half always holds two lines (the
+        prompt, or the answer and its place), so the card holds still while the
+        customer checks.
+      */
+      <div
+        className={cn(
+          "flex w-full min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6",
+          className,
+        )}
+      >
+        <div className="flex min-h-10 min-w-0 items-center sm:flex-1" aria-live="polite">
+          {result !== null || checking ? (
+            answer
+          ) : (
+            <div className="flex min-w-0 items-start gap-2 text-sm">
+              <MapPin className="mt-0.5 size-4 shrink-0 text-bakery-700" aria-hidden="true" />
+              <div className="min-w-0">
+                <p className="font-medium text-foreground">{title}</p>
+                <p className="text-muted-foreground">See if we deliver to you before you order</p>
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="w-full shrink-0 sm:w-80">{field}</div>
+      </div>
+    );
+  }
+
   return (
     /*
       THE FIELD IS AS WIDE AS EVERY OTHER CONTROL IN THIS COLUMN, and the
@@ -202,130 +359,8 @@ export function PincodeCheck({
       others leaves nothing to its right to put an answer in.
     */
     <div className={cn("flex w-full min-w-0 flex-col gap-2", className)}>
-      <div className={cn(inline && "flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4")}>
-      {title ? (
-        <p className="flex shrink-0 items-center gap-2 text-sm font-medium text-foreground">
-          {inline ? <MapPin className="size-4 text-bakery-700" aria-hidden="true" /> : null}
-          {title}
-        </p>
-      ) : null}
-      {/*
-        ONE CONTROL, NOT TWO BOXES WITH A GAP.
-
-        It was an `<Input>` and a `<Button>` side by side, each with its own
-        border and rounding and four pixels of nothing between them — which
-        reads as a field and, separately, a button that happens to sit near it.
-        The shop pointed at its reference twice: there the button is joined to
-        the field, sharing one outline, so the pair reads as the single question
-        it is.
-
-        Built here rather than with `<Input>` and `<Button>`: both carry their
-        own border, radius and focus ring, and stripping those off through
-        `className` is a fight with the design system that the next person to
-        touch either component loses. The focus ring moves to the GROUP, via
-        `focus-within`, so tabbing into the field still lights the whole control
-        the way every other input on this page lights itself.
-      */}
-      <form
-        className={cn(
-          "flex w-full min-w-0 overflow-hidden rounded-md border",
-          inline ? "h-11 shrink-0 gap-2 border-transparent bg-transparent sm:flex-1" : "h-12 bg-card",
-          inline ? null : outline,
-        )}
-        onSubmit={(event) => {
-          event.preventDefault();
-          void check();
-        }}
-      >
-        {inline ? null : (
-          <MapPin
-            className="ml-3 size-4 shrink-0 self-center text-muted-foreground"
-            aria-hidden="true"
-          />
-        )}
-        <input
-          type="text"
-          value={entered}
-          // The same normalisation every zone rule is matched through, so what
-          // the customer sees typed is exactly what gets compared.
-          onChange={(event) => {
-            checkSeq.current += 1;
-            setEntered(normalizePincode(event.target.value));
-            // The old answer belonged to the old code. Left up, it reads as the
-            // answer to what is in the box now — and so does a green border.
-            setResult(null);
-          }}
-          inputMode="numeric"
-          autoComplete="postal-code"
-          aria-label="PIN code"
-          // Short enough to read whole at 390px; it was cut to "check deliv…".
-          placeholder="Enter delivery PIN code"
-          /*
-            `size={1}`, AND IT IS NOT ABOUT THE RENDERED WIDTH — the CSS below
-            sets that. `size` sets an input's INTRINSIC width, and its default
-            of 20 characters made this field's min-content about 211px. The
-            column it sits in is a GRID item, whose automatic minimum is its
-            own min-content, so the column refused to go narrower than
-            28 (the icon) + 211 + 93 (the Check button) = 332 — and at a 320px
-            window, where the track is 288, it simply overhung by 44 and gave
-            the whole page a sideways scrollbar.
-
-            `min-w-0` on the input does not cure that: it lets the input shrink
-            as a FLEX item, which is why the field itself was never the thing
-            overflowing, while the column's min-content was still computed from
-            the same twenty characters. Measured: 28px of sideways scroll at
-            320 with this absent, 0 with it, and no change at all at 375 and
-            above, where the track was already wider than 332.
-          */
-          size={1}
-          className={cn(
-            "h-full min-w-0 flex-1 px-2.5 text-base outline-none md:text-sm placeholder:text-muted-foreground",
-            inline
-              ? cn("rounded-md border bg-muted/60 px-3", outline)
-              : "bg-transparent",
-          )}
-        />
-        {/*
-          A WAY OUT OF A WRONG CODE, which the field did not have. Six digits
-          typed by thumb are six digits to delete by thumb, and a customer who
-          got a red border has every reason to want the box empty at once.
-
-          `type="button"`, or it submits the form it sits inside — the default
-          for a button in a form is submit, and the bug that produces is a
-          clear that checks the code it has just erased.
-        */}
-        {entered ? (
-          <button
-            type="button"
-            onClick={() => {
-              checkSeq.current += 1;
-              setEntered("");
-              setResult(null);
-            }}
-            aria-label="Clear PIN code"
-            className="mr-1 shrink-0 self-center rounded-full p-1 text-muted-foreground"
-          >
-            <X className="size-4" />
-          </button>
-        ) : null}
-        <button
-          type="submit"
-          // Six digits or nothing to check — a prefix used to answer "yes".
-          disabled={!isFullPincode(entered)}
-          className={cn(
-            "h-full shrink-0 px-6 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50",
-            // Inline it is its own outlined button at the row's end, as the
-            // reference's — a filled block that looked disabled until typed in.
-            inline
-              ? "rounded-md border border-bakery-700 text-bakery-700 hover:bg-bakery-50"
-              : "bg-bakery-700 text-white",
-          )}
-        >
-          Check
-        </button>
-      </form>
-      </div>
-
+      {title ? <p className="text-sm font-medium text-foreground">{title}</p> : null}
+      {field}
       {/*
         UNDER THE FIELD, because the field is now level with every other
         control in this column and has nothing to its right. It still must not
@@ -333,11 +368,7 @@ export function PincodeCheck({
         for should not move while they read — so the gap below is reserved by
         the row spacing rather than created by the answer.
       */}
-      <DeliveryAnswer
-        result={result}
-        pincode={entered}
-        loading={checking}
-      />
+      {answer}
     </div>
   );
 }
