@@ -16,6 +16,10 @@
 # next.js
 /.next/
 /.next-prod/
+# Any other build dir (NEXT_DIST_DIR=.next-<name>). Tailwind scans every file
+# git does not ignore, so an unignored build's binary cache leaked a broken
+# class into globals.css and the dev server stopped compiling CSS.
+/.next-*/
 /out/
 
 # production
