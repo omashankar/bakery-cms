@@ -15,7 +15,7 @@ import { routes } from "@/constants/routes";
 import { signOutCustomer } from "@/apps/website/account/lib/customer-session";
 import { useHoverMenu } from "@/apps/website/account/hooks/use-hover-menu";
 import { getAccountInitials } from "@/apps/website/account/lib/account-initials";
-import { ACCOUNT_TRIGGER_CLASS } from "./account-trigger-classes";
+import { ACCOUNT_TRIGGER_CLASS, AccountTriggerFace } from "./account-trigger";
 
 interface AccountMenuProps {
   name: string;
@@ -57,7 +57,7 @@ export function AccountMenu({ name, phone, onSignOut, initialOpen = false }: Acc
         {...hoverProps}
         className={ACCOUNT_TRIGGER_CLASS}
       >
-        {getAccountInitials(name)}
+        <AccountTriggerFace name={name} />
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
@@ -83,7 +83,7 @@ export function AccountMenu({ name, phone, onSignOut, initialOpen = false }: Acc
           <DropdownMenuItem
             key={item.href}
             render={<Link href={item.href} />}
-            className="gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-foreground focus:bg-cream-100 focus:text-bakery-700"
+            className="gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-foreground focus:bg-transparent focus:text-bakery-700"
           >
             <item.icon className="size-4 text-muted-foreground" />
             {item.label}
@@ -95,7 +95,8 @@ export function AccountMenu({ name, phone, onSignOut, initialOpen = false }: Acc
         <DropdownMenuItem
           variant="destructive"
           onClick={() => void handleLogout()}
-          className="gap-2.5 rounded-lg px-3 py-2 text-sm font-medium"
+          // Colour only, like every row above it: no tint behind Logout either.
+          className="gap-2.5 rounded-lg px-3 py-2 text-sm font-medium data-[variant=destructive]:focus:bg-transparent"
         >
           <LogOut className="size-4" />
           Logout

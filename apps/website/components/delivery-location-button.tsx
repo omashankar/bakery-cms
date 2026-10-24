@@ -132,7 +132,7 @@ export function DeliveryLocationButton() {
           lightest step, so a shop that picks another accent colour gets this
           in its own tint. Taller from lg, level with the search box beside it.
         */
-        className="flex max-w-[15rem] items-center gap-2 rounded-full border border-gold-200 bg-gold-50 px-3.5 py-2 text-left text-sm transition-premium hover:border-gold-300 lg:h-12 lg:gap-2.5 lg:px-5"
+        className="flex max-w-[15rem] items-center gap-2 rounded-full border border-gold-200 bg-gold-50 px-3.5 py-2 text-left text-sm transition-premium hover:border-gold-300 lg:h-11 lg:gap-2.5 lg:px-5"
       >
         <MapPin className="size-4 shrink-0 fill-bakery-700 text-gold-50 lg:size-5" />
         {/*

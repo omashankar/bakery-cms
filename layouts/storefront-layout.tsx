@@ -3,7 +3,11 @@ import { MaintenanceBanner } from "@/apps/website/components/maintenance-banner"
 import { StorefrontBannerStrip } from "@/apps/website/components/storefront-banner-strip";
 import { StorefrontNavbar } from "@/apps/website/components/storefront-navbar";
 import { FocusedCheckoutHeader } from "@/apps/website/components/focused-checkout-header";
-import { StorefrontFooterSlot, StorefrontTopBar } from "@/apps/website/components/storefront-top-bar";
+import {
+  CART_EMPTY_MARK_SCRIPT,
+  StorefrontFooterSlot,
+  StorefrontTopBar,
+} from "@/apps/website/components/storefront-top-bar";
 import type { StorefrontChrome } from "@/apps/website/lib/storefront-chrome.server";
 import type { MaintenanceState } from "@/features/settings/server/maintenance.server";
 import { AppearanceStyleTag } from "@/components/shared/appearance-style-tag";
@@ -104,14 +108,19 @@ export function StorefrontLayoutShell({
         {/*
           On the cart and checkout, only the logo and "Secure checkout" — no
           offer strip, menu or search to wander off through, as the owner's
-          reference does it. Everywhere else, the full header.
+          reference does it. Everywhere else, the full header — an EMPTY cart
+          included, which has nothing to pay for (see StorefrontTopBar).
         */}
+        {/* Before the header, so the cart page's first frame shows the right
+            one; see CART_EMPTY_MARK_SCRIPT. */}
+        <script dangerouslySetInnerHTML={{ __html: CART_EMPTY_MARK_SCRIPT }} />
         <StorefrontTopBar
           focused={
             <FocusedCheckoutHeader
               logo={chrome.logo}
               logoLetter={chrome.logoLetter}
               siteName={chrome.siteName}
+              infoBar={chrome.infoBar}
             />
           }
           full={

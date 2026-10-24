@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
 import { openCustomerAuthModal } from "@/apps/website/account/lib/auth-modal-events";
 import { useHoverMenu } from "@/apps/website/account/hooks/use-hover-menu";
-import { GUEST_ICON_CLASS, GUEST_TRIGGER_CLASS } from "./account-trigger-classes";
+import { ACCOUNT_TRIGGER_CLASS, AccountTriggerFace } from "./account-trigger";
 
 interface GuestLink {
   label: string;
@@ -47,14 +47,14 @@ export function GuestMenu({ initialOpen = false }: { initialOpen?: boolean } = {
         aria-label="Login"
         {...hoverProps}
         /*
-          A ROUND MARK, the same circle a signed-in customer's initials sit
-          in — the shop's header design draws one person icon there for
-          everybody. Its name stays "Login" (the aria-label above), which is
-          what a screen reader says and what the tests press.
+          The same round mark a signed-in customer's initials sit in, with
+          "Login" beside it from lg — see AccountTriggerFace. Its name stays
+          "Login" (the aria-label above), which is what a screen reader says
+          and what the tests press.
         */
-        className={GUEST_TRIGGER_CLASS}
+        className={ACCOUNT_TRIGGER_CLASS}
       >
-        <User className={GUEST_ICON_CLASS} />
+        <AccountTriggerFace name={null} />
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
@@ -86,7 +86,7 @@ export function GuestMenu({ initialOpen = false }: { initialOpen?: boolean } = {
               <DropdownMenuItem
                 key={item.label}
                 onClick={login}
-                className="gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-foreground focus:bg-cream-100 focus:text-bakery-700"
+                className="gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-foreground focus:bg-transparent focus:text-bakery-700"
               >
                 <item.icon className="size-4 text-muted-foreground" />
                 {item.label}
@@ -95,7 +95,7 @@ export function GuestMenu({ initialOpen = false }: { initialOpen?: boolean } = {
               <DropdownMenuItem
                 key={item.label}
                 render={<Link href={item.href!} />}
-                className="gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-foreground focus:bg-cream-100 focus:text-bakery-700"
+                className="gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-foreground focus:bg-transparent focus:text-bakery-700"
               >
                 <item.icon className="size-4 text-muted-foreground" />
                 {item.label}

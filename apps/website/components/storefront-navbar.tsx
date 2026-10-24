@@ -63,7 +63,7 @@ const CustomerAuthModal = dynamic(
 /**
  * HOW FAR THE PAGE MOVES BEFORE THE BAND ANSWERS AT ALL.
  *
- * At lg the header is a 40px info bar, a 104px bar and a 46px category band
+ * At lg the header is a 40px info bar, an 84px bar and a 46px category band
  * — so 260 is past the whole of it. Under that the customer is still looking at
  * the top of the page, and a band that leaves while they are still at the
  * top reads as something breaking rather than as room being made.
@@ -815,9 +815,9 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
             the band over the row on one and halfway down the hero on another.
           */
           /*
-            104px from lg, for a logo that can be READ: the shop's badge
-            logo carries its name on a ribbon, and at the old 88px row it
-            was drawn too small for the word under it.
+            84px from lg, with the logo at 64px — the cart header's size.
+            It was 104px with an 88px logo, and the shop found it too big
+            beside the cart page's header (2026-10-24).
 
             ONE HEIGHT, WHATEVER THE SCROLL. This row once stepped down to
             88px as the page scrolled, and the whole page shook: a pinned bar
@@ -827,7 +827,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
             the way on scroll is the category band below, and the info bar
             above simply scrolls off; this row never changes size.
           */
-          "relative flex h-16 items-center justify-between gap-2 lg:h-[104px] lg:gap-5"
+          "relative flex h-16 items-center justify-between gap-2 lg:h-[84px] lg:gap-5"
         )}
       >
         {/*
@@ -1009,7 +1009,7 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
                   A PILL, as the shop's header design draws it: round ends,
                   taller from lg where the row has the room.
                 */
-                className="h-11 w-full rounded-full border border-input bg-cream-50 pl-11 pr-4 text-base outline-none md:text-sm lg:h-12 lg:pl-12 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="h-11 w-full rounded-full border border-input bg-cream-50 pl-11 pr-4 text-base outline-none md:text-sm lg:pl-12 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               />
 
               {/*
@@ -1154,10 +1154,10 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
           <Button
             variant="ghost"
             size="icon-lg"
-            className="relative hidden text-foreground hover:bg-cream-100 hover:text-bakery-700 sm:flex lg:size-12"
+            className="relative hidden text-foreground hover:bg-cream-100 hover:text-bakery-700 sm:flex lg:size-11"
             render={<Link href={routes.store.wishlist} aria-label="Wishlist" />}
           >
-            <Heart className="size-5 lg:size-7" strokeWidth={1.75} />
+            <Heart className="size-5 lg:size-6" strokeWidth={1.75} />
             {wishlistCount > 0 ? (
               <span className="absolute -top-0.5 -right-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white ring-2 ring-background lg:h-5 lg:min-w-5 lg:text-[11px]">
                 {wishlistCount > 9 ? "9+" : wishlistCount}
@@ -1167,10 +1167,10 @@ export function StorefrontNavbar({ chrome }: StorefrontNavbarProps) {
           <Button
             variant="ghost"
             size="icon-lg"
-            className="relative text-foreground hover:bg-cream-100 hover:text-bakery-700 lg:size-12"
+            className="relative text-foreground hover:bg-cream-100 hover:text-bakery-700 lg:size-11"
             render={<Link href={routes.store.cart} aria-label="Shopping cart" />}
           >
-            <ShoppingCart className="size-5 lg:size-7" strokeWidth={1.75} />
+            <ShoppingCart className="size-5 lg:size-6" strokeWidth={1.75} />
             {/*
               ALWAYS A COUNT, 0 included — the shop's header design shows
               the badge on an empty cart too, so the cart reads as a cart

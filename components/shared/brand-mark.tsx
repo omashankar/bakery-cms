@@ -11,22 +11,26 @@ interface BrandMarkProps {
   /** The shop's name — the visible text beside the badge, and the logo's alt. */
   siteName: string;
   /**
-   * "header" — the storefront's main bar, which is 104px tall on a desktop and
+   * "header" — the storefront's main bar, which is 84px tall on a desktop and
    * gives the logo room to be read. At the 50px every other place uses, a 3:1
    * wordmark came out 150px wide and its small line ("BAKERY") was a smudge.
    */
-  size?: "default" | "header" | "footer";
+  size?: "default" | "header" | "footer" | "checkout";
 }
 
 /** The logo's drawn height and width cap, and the height asked of the CDN. */
 const LOGO_SIZES = {
-  // 48px on a phone (the row is 64px), 52 from sm, 88 in the 104px desktop
-  // bar. `max-w-full` keeps it inside the link's own cap on a narrow phone,
-  // where the cart and menu button share the row.
-  header: { className: "h-12 max-w-full sm:h-[52px] lg:h-[88px] lg:max-w-[280px]", height: 88 },
+  // 48px on a phone (the row is 64px), 52 from sm, 64 in the 84px desktop
+  // bar — the cart header's size, which the shop preferred to the 88px it was
+  // (2026-10-24). `max-w-full` keeps it inside the link's own cap on a narrow
+  // phone, where the cart and menu button share the row.
+  header: { className: "h-12 max-w-full sm:h-[52px] lg:h-16 lg:max-w-[220px]", height: 64 },
   // The footer has room the checkout header does not; at 50px the badge
   // logo's ribbon lettering could not be read there.
   footer: { className: "h-16 max-w-[220px] lg:h-20 lg:max-w-[260px]", height: 80 },
+  // The cart and checkout header: smaller than the shop header's 88px, so the
+  // steps beside it keep their room, and readable rather than a 50px blot.
+  checkout: { className: "h-12 max-w-[150px] md:h-16 md:max-w-[200px]", height: 64 },
   default: { className: "h-[50px] max-w-[200px]", height: 50 },
 } as const;
 

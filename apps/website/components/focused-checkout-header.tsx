@@ -10,6 +10,8 @@ import { OPEN_AUTH_MODAL_EVENT } from "@/apps/website/account/lib/auth-modal-eve
 import { CheckoutProgress } from "@/apps/website/checkout/components/checkout-progress";
 import { useCheckoutStep } from "@/apps/website/checkout/lib/checkout-step-store";
 import { BrandMark } from "@/components/shared/brand-mark";
+import { StorefrontInfoBar } from "@/apps/website/components/storefront-info-bar";
+import type { StorefrontChrome } from "@/apps/website/lib/storefront-chrome.server";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
 import { cn } from "@/lib/utils";
@@ -34,10 +36,17 @@ export function FocusedCheckoutHeader({
   logo,
   logoLetter,
   siteName,
+  infoBar = null,
 }: {
   logo: string;
   logoLetter: string;
   siteName: string;
+  /**
+   * The shop's info bar, the same one every other page opens with — so the
+   * cart reads as the same shop, and the phone is there for a customer who
+   * gets stuck paying. Null when the shop runs none.
+   */
+  infoBar?: StorefrontChrome["infoBar"];
 }) {
   const [authOpen, setAuthOpen] = useState(false);
   const [authRequested, setAuthRequested] = useState(false);
@@ -62,6 +71,7 @@ export function FocusedCheckoutHeader({
         two-row bar pinned over a 844px screen is a lot of glass.
       */}
       <header className="border-b border-border bg-background/95 backdrop-blur md:sticky md:top-0 md:z-50">
+        {infoBar ? <StorefrontInfoBar bar={infoBar} /> : null}
         <div
           className={cn(
             layoutSpacing.container,
@@ -72,7 +82,7 @@ export function FocusedCheckoutHeader({
             href={routes.store.home}
             className="flex min-w-0 max-w-[10rem] shrink-0 items-center gap-2.5 sm:max-w-[14rem]"
           >
-            <BrandMark logo={logo} logoLetter={logoLetter} siteName={siteName} />
+            <BrandMark logo={logo} logoLetter={logoLetter} siteName={siteName} size="checkout" />
           </Link>
           {/*
             THE STEPS IN THE HEADER, where the reference has them — the page
@@ -80,6 +90,9 @@ export function FocusedCheckoutHeader({
             step it is on; until it does, the path says (cart, or checkout's
             first step), so the server render already shows the right one.
           */}
+          {/* An empty cart never shows this header now (StorefrontTopBar
+              swaps in the full one), so `hidden` is only the moment before
+              that swap. */}
           {current?.hidden ? <span className="hidden md:block" /> : (
           <CheckoutProgress
             currentStep={current?.step ?? (onCheckout ? 1 : 0)}

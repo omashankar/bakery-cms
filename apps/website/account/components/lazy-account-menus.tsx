@@ -2,13 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useState } from "react";
-import { User } from "lucide-react";
-import { getAccountInitials } from "@/apps/website/account/lib/account-initials";
-import {
-  ACCOUNT_TRIGGER_CLASS,
-  GUEST_ICON_CLASS,
-  GUEST_TRIGGER_CLASS,
-} from "./account-trigger-classes";
+import { ACCOUNT_TRIGGER_CLASS, AccountTriggerFace } from "./account-trigger";
 
 /**
  * The navbar's account menus, loaded when someone reaches for them.
@@ -38,12 +32,12 @@ function GuestTrigger({ onIntent }: { onIntent?: () => void }) {
       type="button"
       aria-label="Login"
       aria-haspopup="menu"
-      className={GUEST_TRIGGER_CLASS}
+      className={ACCOUNT_TRIGGER_CLASS}
       onPointerEnter={onIntent}
       onFocus={onIntent}
       onClick={onIntent}
     >
-      <User className={GUEST_ICON_CLASS} />
+      <AccountTriggerFace name={null} />
     </button>
   );
 }
@@ -59,7 +53,7 @@ function AccountTrigger({ name, onIntent }: { name: string; onIntent?: () => voi
       onFocus={onIntent}
       onClick={onIntent}
     >
-      {name ? getAccountInitials(name) : null}
+      <AccountTriggerFace name={name} />
     </button>
   );
 }
