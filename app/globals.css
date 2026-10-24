@@ -646,3 +646,21 @@ html[data-mod-photo="0"] [data-gate-photo] {
     font-size: max(1rem, 1em);
   }
 }
+
+/*
+  THE CART PAGE'S TWO HEADERS, before it has read the cart.
+
+  The cart lives in localStorage, so the server sends both headers (and both
+  footers) for /store/cart, and a script in the storefront layout marks
+  <html data-cart-empty> before the first paint. An empty cart shows the full
+  chrome, anything else the checkout chrome; with no mark at all (storage
+  blocked) the checkout chrome shows, as it always did. Once React has read
+  the cart only one is rendered and these rules match nothing.
+
+  Unlayered on purpose: they must beat the `contents` utility on the same
+  wrappers, and an unlayered rule outranks every layered one.
+*/
+html[data-cart-empty="1"] [data-cart-chrome="focused"],
+html:not([data-cart-empty="1"]) [data-cart-chrome="full"] {
+  display: none;
+}

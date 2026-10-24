@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDown, Heart, LifeBuoy, Package, User } from "lucide-react";
+import { Heart, LifeBuoy, Package, User } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
 import { openCustomerAuthModal } from "@/apps/website/account/lib/auth-modal-events";
 import { useHoverMenu } from "@/apps/website/account/hooks/use-hover-menu";
+import { ACCOUNT_TRIGGER_CLASS, AccountTriggerFace } from "./account-trigger";
 
 interface GuestLink {
   label: string;
@@ -45,11 +46,15 @@ export function GuestMenu({ initialOpen = false }: { initialOpen?: boolean } = {
       <DropdownMenuTrigger
         aria-label="Login"
         {...hoverProps}
-        className="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium text-foreground outline-none transition-premium hover:bg-cream-100 hover:text-bakery-700 focus-visible:ring-2 focus-visible:ring-gold data-[popup-open]:bg-cream-100 data-[popup-open]:text-bakery-700"
+        /*
+          The same round mark a signed-in customer's initials sit in, with
+          "Login" beside it from lg — see AccountTriggerFace. Its name stays
+          "Login" (the aria-label above), which is what a screen reader says
+          and what the tests press.
+        */
+        className={ACCOUNT_TRIGGER_CLASS}
       >
-        <User className="size-[18px]" />
-        Login
-        <ChevronDown className="size-3.5 transition-transform data-[popup-open]:rotate-180" />
+        <AccountTriggerFace name={null} />
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
@@ -81,7 +86,7 @@ export function GuestMenu({ initialOpen = false }: { initialOpen?: boolean } = {
               <DropdownMenuItem
                 key={item.label}
                 onClick={login}
-                className="gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-foreground focus:bg-cream-100 focus:text-bakery-700"
+                className="gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-foreground focus:bg-transparent focus:text-bakery-700"
               >
                 <item.icon className="size-4 text-muted-foreground" />
                 {item.label}
@@ -90,7 +95,7 @@ export function GuestMenu({ initialOpen = false }: { initialOpen?: boolean } = {
               <DropdownMenuItem
                 key={item.label}
                 render={<Link href={item.href!} />}
-                className="gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-foreground focus:bg-cream-100 focus:text-bakery-700"
+                className="gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-foreground focus:bg-transparent focus:text-bakery-700"
               >
                 <item.icon className="size-4 text-muted-foreground" />
                 {item.label}

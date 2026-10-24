@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MapPin, Pencil, X } from "lucide-react";
+import { ChevronDown, MapPin, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -127,9 +127,14 @@ export function DeliveryLocationButton() {
         type="button"
         onClick={() => (open ? setOpen(false) : openPanel())}
         aria-expanded={open}
-        className="flex max-w-[13rem] items-center gap-2 rounded-full border border-input bg-cream-50 px-3 py-2 text-left text-sm transition-premium hover:border-bakery-300"
+        /*
+          A TINTED PILL, as the shop's header design has it — the accent's
+          lightest step, so a shop that picks another accent colour gets this
+          in its own tint. Taller from lg, level with the search box beside it.
+        */
+        className="flex max-w-[15rem] items-center gap-2 rounded-full border border-gold-200 bg-gold-50 px-3.5 py-2 text-left text-sm transition-premium hover:border-gold-300 lg:h-11 lg:gap-2.5 lg:px-5"
       >
-        <MapPin className="size-4 shrink-0 text-bakery-700" />
+        <MapPin className="size-4 shrink-0 fill-bakery-700 text-gold-50 lg:size-5" />
         {/*
           The zone's own name when there is one, and a plain prompt when there
           is not. The prompt is interface wording — it names the control, not a
@@ -138,7 +143,9 @@ export function DeliveryLocationButton() {
         <span className={cn("truncate", chosen ? "font-medium text-foreground" : "text-muted-foreground")}>
           {chosen ? `Deliver to ${chosen}` : "Delivery location"}
         </span>
-        <Pencil className="size-3.5 shrink-0 text-muted-foreground" />
+        <ChevronDown
+          className={cn("size-4 shrink-0 text-foreground transition-transform", open && "rotate-180")}
+        />
       </button>
 
       {open ? (

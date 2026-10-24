@@ -179,8 +179,28 @@ export interface HeaderSettings {
    * in the section that was always meant to carry them.
    */
   showBannerStrip?: boolean;
+  /**
+   * The thin brand-coloured bar above the logo: a few short lines on the
+   * left ("Freshly Baked", "Same Day Delivery") and the shop's phone and
+   * place on the right — the shape the shop sent on 2026-10-23.
+   *
+   * NOT the row that went away. That one held a currency note nobody asked
+   * for; this one holds only what the shop writes here, and the phone from
+   * its own Contact settings. Off, or with nothing in it, it draws nothing.
+   */
+  infoBar?: HeaderInfoBar;
   nav: HeaderNavItem[];
   updatedAt: string;
+}
+
+export interface HeaderInfoBar {
+  show: boolean;
+  /** The shop's own short lines, shown in order with dividers. */
+  points: string[];
+  /** Read from Settings → Contact; this only says whether to show it. */
+  showPhone: boolean;
+  /** "Kota, Rajasthan" — free text, blank for none. */
+  location: string;
 }
 
 export interface FooterLinkItem {

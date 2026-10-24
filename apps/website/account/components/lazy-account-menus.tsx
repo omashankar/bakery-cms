@@ -2,8 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useState } from "react";
-import { ChevronDown, User } from "lucide-react";
-import { getAccountInitials } from "@/apps/website/account/lib/account-initials";
+import { ACCOUNT_TRIGGER_CLASS, AccountTriggerFace } from "./account-trigger";
 
 /**
  * The navbar's account menus, loaded when someone reaches for them.
@@ -27,26 +26,18 @@ const AccountMenu = dynamic(
   { ssr: false, loading: () => <AccountTrigger name="" /> },
 );
 
-const GUEST_TRIGGER =
-  "flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium text-foreground outline-none transition-premium hover:bg-cream-100 hover:text-bakery-700 focus-visible:ring-2 focus-visible:ring-gold";
-
-const ACCOUNT_TRIGGER =
-  "flex size-9 items-center justify-center rounded-full bg-bakery-700 text-xs font-bold text-white shadow-sm outline-none transition-premium hover:bg-bakery-800 focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2";
-
 function GuestTrigger({ onIntent }: { onIntent?: () => void }) {
   return (
     <button
       type="button"
       aria-label="Login"
       aria-haspopup="menu"
-      className={GUEST_TRIGGER}
+      className={ACCOUNT_TRIGGER_CLASS}
       onPointerEnter={onIntent}
       onFocus={onIntent}
       onClick={onIntent}
     >
-      <User className="size-[18px]" />
-      Login
-      <ChevronDown className="size-3.5" />
+      <AccountTriggerFace name={null} />
     </button>
   );
 }
@@ -57,12 +48,12 @@ function AccountTrigger({ name, onIntent }: { name: string; onIntent?: () => voi
       type="button"
       aria-label={name ? `${name}'s account` : "Your account"}
       aria-haspopup="menu"
-      className={ACCOUNT_TRIGGER}
+      className={ACCOUNT_TRIGGER_CLASS}
       onPointerEnter={onIntent}
       onFocus={onIntent}
       onClick={onIntent}
     >
-      {name ? getAccountInitials(name) : null}
+      <AccountTriggerFace name={name} />
     </button>
   );
 }

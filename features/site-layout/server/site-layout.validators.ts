@@ -208,6 +208,19 @@ export const headerSchema = z
       it in.
     */
     showBannerStrip: z.boolean().optional(),
+    // Short lines in a one-line bar: a few, each short enough to fit.
+    infoBar: z
+      .object({
+        show: z.boolean(),
+        // The form keeps four slots; a blank one is dropped, not refused.
+        points: z
+          .array(z.string().trim().max(40))
+          .max(4)
+          .transform((points) => points.filter(Boolean)),
+        showPhone: z.boolean(),
+        location: z.string().trim().max(60),
+      })
+      .optional(),
   })
   .passthrough()
   /*

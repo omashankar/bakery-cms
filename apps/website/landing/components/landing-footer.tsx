@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Clock, Gift, Mail, MapPin, Phone, ShieldCheck, Truck } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
 import { BrandMark } from "@/components/shared/brand-mark";
 import { SocialMark } from "@/components/shared/social-mark";
 import { routes } from "@/constants/routes";
@@ -11,6 +10,13 @@ import { cn } from "@/lib/utils";
 interface LandingFooterProps {
   chrome: StorefrontChrome;
 }
+
+/**
+ * Every column heading, with a short accent rule under it — one class so
+ * the shop's own columns, Contact and Opening Hours cannot drift apart.
+ */
+const FOOTER_HEADING =
+  "relative pb-2.5 text-sm font-semibold text-foreground after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-8 after:rounded-full after:bg-gold-300";
 
 export function LandingFooter({ chrome }: LandingFooterProps) {
   // Read on the server from MongoDB (see StorefrontChrome) — the footer now
@@ -54,7 +60,7 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
           </ul>
         </div>
       ) : null}
-      <div className={cn(layoutSpacing.container, "py-14")}>
+      <div className={cn(layoutSpacing.container, "py-12 lg:py-14")}>
         <div className="grid gap-10 lg:grid-cols-[1fr_3fr]">
           <div className="space-y-4">
             {/* The same mark the header renders. This used to be its own copy
@@ -66,6 +72,7 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
                 logo={chrome.logo}
                 logoLetter={chrome.logoLetter}
                 siteName={brandInfo.name}
+                size="footer"
               />
             </Link>
             {/*
@@ -93,7 +100,8 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
                     aria-label={social.label}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex size-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-premium hover:border-bakery-300 hover:text-bakery-700"
+                    // Round, like every button in the header above it.
+                    className="flex size-10 items-center justify-center rounded-full border border-border bg-card text-muted-foreground transition-premium hover:border-bakery-700 hover:bg-bakery-700 hover:text-white"
                   >
                     <SocialMark platform={social.platform} />
                   </a>
@@ -116,7 +124,7 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
               {/* h2, not h4: the footer is its own landmark, and an h4 straight after
                   the page's h2s skipped a level — Lighthouse's heading-order on
                   every storefront page. The classes keep the look. */}
-              <h2 className="text-sm font-semibold text-foreground">{column.title}</h2>
+              <h2 className={FOOTER_HEADING}>{column.title}</h2>
               <ul className="space-y-1">
                 {column.links.map((link) => (
                   <li
@@ -155,7 +163,7 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
           {footerSettings.showContact &&
           (contactInfo.address || contactInfo.phone || contactInfo.email) ? (
             <div className="col-span-2 space-y-4 sm:col-span-1">
-              <h2 className="text-sm font-semibold text-foreground">Contact</h2>
+              <h2 className={FOOTER_HEADING}>Contact</h2>
               {/*
                 A row per detail the shop actually publishes. These used to
                 render unconditionally against a `|| defaultContact.*` read, so
@@ -253,7 +261,7 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
           */}
           {footerSettings.showHours && businessHours.length > 0 ? (
             <div className="col-span-2 space-y-4 sm:col-span-1">
-              <h2 className="text-sm font-semibold text-foreground">Opening Hours</h2>
+              <h2 className={FOOTER_HEADING}>Opening Hours</h2>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {businessHours.map((item, index) => (
                   // Index, not the day: these rows are admin-typed, and two rows
@@ -275,9 +283,15 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
         </div>
 
         {/* Location map intentionally omitted here — it lives on the Contact page. */}
+      </div>
 
-        <Separator className="my-8" />
-
+      {/*
+        THE COPYRIGHT LINE ON THE BRAND COLOUR, edge to edge — the same bar the
+        header opens the page with, so the page is closed the way it is
+        opened (2026-10-23). It was a hairline and a grey line of small print.
+      */}
+      <div className="bg-bakery-800 text-white/85">
+        <div className={cn(layoutSpacing.container, "py-4")}>
         {/*
           No "Powered by" credit and no "Admin Login" link.
 
@@ -289,9 +303,10 @@ export function LandingFooter({ chrome }: LandingFooterProps) {
           line; the admin is a bookmark, not shop chrome.
         */}
         <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs">
             © {new Date().getFullYear()} {brandInfo.name}. {footerSettings.copyrightSuffix}
           </p>
+        </div>
         </div>
       </div>
     </footer>
