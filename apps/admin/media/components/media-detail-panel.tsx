@@ -98,7 +98,7 @@ export function MediaDetailPanel({ file, onUpdate, onDelete }: MediaDetailPanelP
           <MediaThumbnail
             src={current.url}
             alt={current.alt || current.name}
-            className="object-cover"
+            className="object-contain"
             sizes="320px"
           />
         </div>

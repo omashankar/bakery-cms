@@ -126,7 +126,7 @@ function DuplicateRow({
   return (
     <div className="flex items-center gap-3 rounded-lg bg-muted/30 p-2">
       <div className="relative size-10 overflow-hidden rounded-md border border-border bg-muted">
-        <MediaThumbnail src={file.url} alt={file.name} className="object-cover" sizes="40px" />
+        <MediaThumbnail src={file.url} alt={file.name} className="object-contain" sizes="40px" />
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{file.name}</p>

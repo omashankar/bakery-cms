@@ -55,6 +55,7 @@ import { MediaThumbnail } from "./media-thumbnail";
 import { MediaToolsDialog } from "./media-tools-dialog";
 import { MediaUploadDialog } from "./media-upload-dialog";
 import { useMediaUsageSync } from "../lib/use-media-usage-sync";
+import { isUsageIndexReady } from "../lib/media-usage";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { adminShell } from "@/apps/admin/components/admin-shell";
 import { applyServerMedia, useMediaServerSync } from "@/apps/admin/media/lib/use-media-server-sync";
@@ -112,7 +113,10 @@ export function MediaLibraryPage({
    * dialog’s "still checking" caveat are all on this screen — so this is where
    * it belongs. The retry/completeness behaviour inside the hook is unchanged.
    */
-  useMediaUsageSync();
+  // Changes each time the usage index is filled; every usage-derived value
+  // below lists it, or it is counted once before the index exists and kept.
+  const usageVersion = useMediaUsageSync();
+  const usageKnown = usageVersion > 0 && isUsageIndexReady();
 
   const [files, setFiles] = useState<MediaFile[]>([]);
   const [folders, setFolders] = useState<ReturnType<typeof loadMediaFolders>>([]);
@@ -132,14 +136,23 @@ export function MediaLibraryPage({
     inUse?: boolean;
   } | null>(null);
 
-  const filtered = useMemo(() => filterMedia(files, filters), [files, filters]);
+  const filtered = useMemo(
+    () => filterMedia(files, filters),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- usage is module state; the version says it moved
+    [files, filters, usageVersion],
+  );
   const stats = useMemo(
     () => (ready ? getMediaStats(files) : EMPTY_STATS),
-    [files, ready]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- usage is module state; the version says it moved
+    [files, ready, usageVersion]
   );
   const availableTags = useMemo(() => collectMediaTags(files), [files]);
   const duplicateGroups = useMemo(() => findDuplicateMediaGroups(files), [files]);
-  const unusedCount = useMemo(() => getUnusedMediaFiles(files).length, [files]);
+  const unusedCount = useMemo(
+    () => getUnusedMediaFiles(files).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- usage is module state; the version says it moved
+    [files, usageVersion],
+  );
   const folderCounts = useMemo(() => {
     const counts: Record<string, number> = { all: files.length };
     for (const folder of folders) {
@@ -298,11 +311,16 @@ export function MediaLibraryPage({
         >
           <DashboardStatCard
             title="Unused"
-            value={stats.unused}
-            change={stats.unused > 0 ? "Not referenced" : "All in use"}
-            changeTone={stats.unused > 0 ? "warning" : "positive"}
+            /*
+              Not a number until every place a file can be used has been
+              read: before that every file counts as unused, and a card
+              saying "98 — Not referenced" over a live logo invites a delete.
+            */
+            value={usageKnown ? stats.unused : "…"}
+            change={!usageKnown ? "Checking usage…" : stats.unused > 0 ? "Not referenced" : "All in use"}
+            changeTone={!usageKnown ? "neutral" : stats.unused > 0 ? "warning" : "positive"}
             icon={Trash2}
-            tone={stats.unused > 0 ? "gold" : "neutral"}
+            tone={usageKnown && stats.unused > 0 ? "gold" : "neutral"}
           />
         </button>
       </section>
@@ -548,10 +566,15 @@ export function MediaLibraryPage({
                         />
                       </div>
                       <div className="relative aspect-square bg-muted">
+                        {/* The WHOLE picture, letterboxed. `object-cover`
+                            cropped a 1920x550 banner to its middle square,
+                            and the owner could not tell one banner from the
+                            next. The same fit is used in the list, the
+                            details panel, the tools dialog and the picker. */}
                         <MediaThumbnail
                           src={file.url}
                           alt={file.alt || file.name}
-                          className="object-cover"
+                          className="object-contain"
                           sizes="200px"
                         />
                       </div>
@@ -597,7 +620,7 @@ export function MediaLibraryPage({
                       <MediaThumbnail
                         src={file.url}
                         alt={file.alt || file.name}
-                        className="object-cover"
+                        className="object-contain"
                         sizes="48px"
                       />
                     </div>

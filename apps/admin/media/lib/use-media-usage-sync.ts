@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { setRemoteUsageIndex } from "./media-usage";
 import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
@@ -41,6 +41,14 @@ interface Source {
  * destroyed the Cloudinary file under a live product.
  */
 const SOURCES: Source[] = [
+  /*
+    THE SHOP'S LOGO AND FAVICON live in Settings → General, and nothing here
+    read Settings — so the logo every page of the shop draws was counted as
+    unused and offered for deletion. Banners are read from the server too:
+    the check above this list reads this browser's banner cache only.
+  */
+  { label: "Settings (logo, favicon)", context: "Settings", url: "/api/settings" },
+  { label: "Banners", context: "Banner", url: "/api/content/banners" },
   { label: "Homepage layout", context: "Builder", url: "/api/homepage-sections" },
   { label: "Catalog", context: "Catalog", url: "/api/catalog" },
   { label: "Products", context: "Products", url: "/api/products" },
@@ -68,7 +76,17 @@ async function loadSource(source: Source): Promise<string | null> {
 const RETRY_BASE_MS = 4000;
 const MAX_RETRIES = 3;
 
-export function useMediaUsageSync(): void {
+/**
+ * Returns a number that changes every time the index is filled.
+ *
+ * The index is module state, and setting it told nobody: the library counted
+ * "Unused" while the requests were still out — every file, since nothing was
+ * known yet — memoised that on its file list, and kept showing it for good.
+ * The shop's live logo and banners sat under "Unused 98 — Not referenced".
+ * Anything that reads usage puts this in its dependencies.
+ */
+export function useMediaUsageSync(): number {
+  const [version, setVersion] = useState(0);
   useEffect(() => {
     let cancelled = false;
     let retry: ReturnType<typeof setTimeout> | undefined;
@@ -102,6 +120,7 @@ export function useMediaUsageSync(): void {
           })),
         complete,
       );
+      setVersion((value) => value + 1);
 
       // An incomplete index is not a permanent state to sit in: the admin is
       // held at "Still checking" until it resolves, so keep trying.
@@ -119,4 +138,5 @@ export function useMediaUsageSync(): void {
       if (retry !== undefined) clearTimeout(retry);
     };
   }, []);
+  return version;
 }
