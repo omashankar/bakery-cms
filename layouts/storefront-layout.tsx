@@ -3,11 +3,8 @@ import { MaintenanceBanner } from "@/apps/website/components/maintenance-banner"
 import { StorefrontBannerStrip } from "@/apps/website/components/storefront-banner-strip";
 import { StorefrontNavbar } from "@/apps/website/components/storefront-navbar";
 import { FocusedCheckoutHeader } from "@/apps/website/components/focused-checkout-header";
-import {
-  CART_EMPTY_MARK_SCRIPT,
-  StorefrontFooterSlot,
-  StorefrontTopBar,
-} from "@/apps/website/components/storefront-top-bar";
+import { StorefrontFooterSlot, StorefrontTopBar } from "@/apps/website/components/storefront-top-bar";
+import { CartBlockingScript } from "@/components/cart-blocking-script";
 import type { StorefrontChrome } from "@/apps/website/lib/storefront-chrome.server";
 import type { MaintenanceState } from "@/features/settings/server/maintenance.server";
 import { AppearanceStyleTag } from "@/components/shared/appearance-style-tag";
@@ -112,8 +109,8 @@ export function StorefrontLayoutShell({
           included, which has nothing to pay for (see StorefrontTopBar).
         */}
         {/* Before the header, so the cart page's first frame shows the right
-            one; see CART_EMPTY_MARK_SCRIPT. */}
-        <script dangerouslySetInnerHTML={{ __html: CART_EMPTY_MARK_SCRIPT }} />
+            one; see CART_EMPTY_MARK_SCRIPT and CartBlockingScript. */}
+        <CartBlockingScript />
         <StorefrontTopBar
           focused={
             <FocusedCheckoutHeader
