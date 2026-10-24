@@ -1,6 +1,7 @@
 import mongoose, { type InferSchemaType, type Model } from "mongoose";
 
 import { applyBaseTransform } from "./_transform";
+import { defineModel } from "./_define-model";
 
 /**
  * Stock adjustment audit trail — one row per stock change (manual adjustment,
@@ -33,5 +34,4 @@ stockHistorySchema.index({ cakeId: 1, createdAt: -1 });
 export type StockHistoryDoc = InferSchemaType<typeof stockHistorySchema>;
 
 export const StockHistoryModel: Model<StockHistoryDoc> =
-  (mongoose.models.StockHistory as Model<StockHistoryDoc>) ||
-  mongoose.model<StockHistoryDoc>("StockHistory", stockHistorySchema);
+  defineModel<StockHistoryDoc>("StockHistory", stockHistorySchema);

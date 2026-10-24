@@ -1,6 +1,7 @@
 import mongoose, { type Model } from "mongoose";
 
 import type { DeliveryZone } from "@/types/delivery";
+import { defineModel } from "./_define-model";
 
 /**
  * Delivery zone document. `_id` is the app's zone id. Determines delivery
@@ -44,5 +45,4 @@ deliveryZoneSchema.set("toJSON", {
 export type DeliveryZoneDoc = { _id: string } & Omit<DeliveryZone, "id">;
 
 export const DeliveryZoneModel: Model<DeliveryZoneDoc> =
-  (mongoose.models.DeliveryZone as Model<DeliveryZoneDoc>) ||
-  mongoose.model<DeliveryZoneDoc>("DeliveryZone", deliveryZoneSchema);
+  defineModel<DeliveryZoneDoc>("DeliveryZone", deliveryZoneSchema);

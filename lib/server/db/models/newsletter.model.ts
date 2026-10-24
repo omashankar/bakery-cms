@@ -1,6 +1,7 @@
 import mongoose, { type Model } from "mongoose";
 
 import type { NewsletterSubscriber } from "@/types/inquiry";
+import { defineModel } from "./_define-model";
 
 /**
  * Newsletter subscriber. `_id` is the app's own id (string). `email` is uniquely
@@ -36,5 +37,4 @@ newsletterSchema.index({ createdAt: -1 });
 export type NewsletterDoc = { _id: string } & Omit<NewsletterSubscriber, "id">;
 
 export const NewsletterModel: Model<NewsletterDoc> =
-  (mongoose.models.Newsletter as Model<NewsletterDoc>) ||
-  mongoose.model<NewsletterDoc>("Newsletter", newsletterSchema);
+  defineModel<NewsletterDoc>("Newsletter", newsletterSchema);

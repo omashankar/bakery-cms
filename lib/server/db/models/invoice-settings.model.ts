@@ -1,6 +1,7 @@
 import mongoose, { type InferSchemaType, type Model } from "mongoose";
 
 import { applyBaseTransform } from "./_transform";
+import { defineModel } from "./_define-model";
 
 /**
  * Invoice settings — a SINGLETON document. Company identity + which sections to
@@ -37,5 +38,4 @@ applyBaseTransform(invoiceSettingsSchema);
 export type InvoiceSettingsDoc = InferSchemaType<typeof invoiceSettingsSchema>;
 
 export const InvoiceSettingsModel: Model<InvoiceSettingsDoc> =
-  (mongoose.models.InvoiceSettings as Model<InvoiceSettingsDoc>) ||
-  mongoose.model<InvoiceSettingsDoc>("InvoiceSettings", invoiceSettingsSchema);
+  defineModel<InvoiceSettingsDoc>("InvoiceSettings", invoiceSettingsSchema);

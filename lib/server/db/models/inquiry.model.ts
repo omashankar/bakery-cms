@@ -1,6 +1,7 @@
 import mongoose, { type Model } from "mongoose";
 
 import type { Inquiry } from "@/types/inquiry";
+import { defineModel } from "./_define-model";
 
 /**
  * Inquiry document. `_id` is the app's own inquiry id (string), NOT an ObjectId,
@@ -57,5 +58,4 @@ inquirySchema.index({ createdAt: -1 });
 export type InquiryDoc = { _id: string } & Omit<Inquiry, "id">;
 
 export const InquiryModel: Model<InquiryDoc> =
-  (mongoose.models.Inquiry as Model<InquiryDoc>) ||
-  mongoose.model<InquiryDoc>("Inquiry", inquirySchema);
+  defineModel<InquiryDoc>("Inquiry", inquirySchema);

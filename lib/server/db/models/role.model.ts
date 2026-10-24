@@ -1,6 +1,7 @@
 import mongoose, { type InferSchemaType, type Model } from "mongoose";
 
 import { applyBaseTransform } from "./_transform";
+import { defineModel } from "./_define-model";
 
 /**
  * Role + its permission scopes. Seeded from types/permissions.ts (Owner,
@@ -20,5 +21,4 @@ applyBaseTransform(roleSchema);
 export type RoleDoc = InferSchemaType<typeof roleSchema>;
 
 export const RoleModel: Model<RoleDoc> =
-  (mongoose.models.Role as Model<RoleDoc>) ||
-  mongoose.model<RoleDoc>("Role", roleSchema);
+  defineModel<RoleDoc>("Role", roleSchema);

@@ -1,6 +1,7 @@
 import mongoose, { type Model } from "mongoose";
 
 import type { ProductReview } from "@/types/review";
+import { defineModel } from "./_define-model";
 
 /**
  * Product review. `_id` is the app's own id (string). `productSlug` and `status`
@@ -62,5 +63,4 @@ reviewSchema.index({ createdAt: -1 });
 export type ReviewDoc = { _id: string } & Omit<ProductReview, "id">;
 
 export const ReviewModel: Model<ReviewDoc> =
-  (mongoose.models.Review as Model<ReviewDoc>) ||
-  mongoose.model<ReviewDoc>("Review", reviewSchema);
+  defineModel<ReviewDoc>("Review", reviewSchema);

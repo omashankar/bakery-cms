@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { defineModel } from "./_define-model";
 
 /**
  * Payment gateway secrets, server-side.
@@ -42,5 +43,4 @@ export type GatewayCredentialDoc = mongoose.InferSchemaType<typeof gatewayCreden
 };
 
 export const GatewayCredentialModel =
-  (mongoose.models.GatewayCredential as mongoose.Model<GatewayCredentialDoc>) ||
-  mongoose.model<GatewayCredentialDoc>("GatewayCredential", gatewayCredentialSchema);
+  defineModel<GatewayCredentialDoc>("GatewayCredential", gatewayCredentialSchema);

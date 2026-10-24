@@ -1,6 +1,7 @@
 import mongoose, { type InferSchemaType, type Model } from "mongoose";
 
 import { applyBaseTransform } from "./_transform";
+import { defineModel } from "./_define-model";
 
 /**
  * Audit trail for every meaningful admin action (login, logout, create, update,
@@ -42,5 +43,4 @@ applyBaseTransform(auditLogSchema);
 export type AuditLogDoc = InferSchemaType<typeof auditLogSchema>;
 
 export const AuditLogModel: Model<AuditLogDoc> =
-  (mongoose.models.AuditLog as Model<AuditLogDoc>) ||
-  mongoose.model<AuditLogDoc>("AuditLog", auditLogSchema);
+  defineModel<AuditLogDoc>("AuditLog", auditLogSchema);

@@ -1,6 +1,7 @@
 import mongoose, { type InferSchemaType, type Model } from "mongoose";
 
 import { applyBaseTransform } from "./_transform";
+import { defineModel } from "./_define-model";
 
 /**
  * Admin-managed customer metadata, keyed by email. The customer record itself
@@ -21,5 +22,4 @@ applyBaseTransform(customerMetaSchema);
 export type CustomerMetaDoc = InferSchemaType<typeof customerMetaSchema>;
 
 export const CustomerMetaModel: Model<CustomerMetaDoc> =
-  (mongoose.models.CustomerMeta as Model<CustomerMetaDoc>) ||
-  mongoose.model<CustomerMetaDoc>("CustomerMeta", customerMetaSchema);
+  defineModel<CustomerMetaDoc>("CustomerMeta", customerMetaSchema);
