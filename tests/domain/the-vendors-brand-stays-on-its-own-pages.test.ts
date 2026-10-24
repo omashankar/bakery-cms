@@ -194,10 +194,10 @@ describe("the brand on the sign-in screens", () => {
     // content that never duplicates the mark and holds with or without a logo.
     //
     // The line is a <p> styled as display text now: the page's <h1> is the
-    // form card's "Sign in", because this plane is hidden on a phone and the
+    // form card's title, because this plane is hidden on a phone and the
     // phone page had no heading at all.
     const shell = code(SHELL);
-    const start = shell.indexOf('<p className="font-heading text-4xl');
+    const start = shell.indexOf('<p className="font-heading text-[2.75rem]');
     const line = shell.slice(start, shell.indexOf("</p>", start));
     expect(start, "the brand plane's display line moved").toBeGreaterThan(-1);
     expect(line, "the heading is the shop's name again").not.toContain("{name}");

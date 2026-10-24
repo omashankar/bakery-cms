@@ -77,8 +77,8 @@ export function LoginFormPage() {
 
   return (
     <AuthCard
-      title="Sign in"
-      description="Enter your staff credentials to open the bakery dashboard."
+      title="Welcome back"
+      description="Sign in with your staff account to open the dashboard."
       footer={
         <div className="flex flex-col items-center gap-3 text-center">
           <Link
