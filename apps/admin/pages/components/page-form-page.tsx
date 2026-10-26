@@ -453,6 +453,8 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
                   <PhotoField
                     id="page-hero"
                     label="Hero image"
+                    // The About page draws it in a 4:3 frame (cms-page-view.tsx).
+                    hint="1200 x 900 — 4:3"
                     value={form.heroImage ?? ""}
                     onChange={(next) => patch({ heroImage: next })}
                     placeholder="https://images.unsplash.com/..."
@@ -852,6 +854,8 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
                 <PhotoField
                   id="meta-og-image"
                   label="Open Graph image"
+                  hint="1200 x 630 — the picture WhatsApp and Facebook show when a link is shared"
+                  fit="contain"
                   value={form.seo?.ogImage ?? ""}
                   onChange={(next) =>
                     patch({ seo: { ...form.seo, ogImage: next } })

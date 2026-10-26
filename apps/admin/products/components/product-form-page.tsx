@@ -1775,6 +1775,10 @@ export function ProductFormPage({
                     <PhotoField
                       id={index === 0 ? "imageUrl" : `imageUrl-${index}`}
                       label={index === 0 ? "Main photo" : `Photo ${index + 1}`}
+                      // Every product picture is drawn square: cards, the
+                      // gallery (up to 654px, so 1200 holds on a 2x screen),
+                      // the cart. Uploads are shrunk to a 1600px long edge.
+                      hint={index === 0 ? "1200 x 1200 — square, subject in the middle" : undefined}
                       aspect="square"
                       value={url}
                       onChange={(next) => setPhotoSlot(index, next)}

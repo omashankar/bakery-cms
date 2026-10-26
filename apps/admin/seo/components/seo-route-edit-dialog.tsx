@@ -214,7 +214,9 @@ export function SeoRouteEditDialog({
               <PhotoField
                 id="seo-og-image"
                 label="Open Graph image"
+                hint="1200 x 630 — the picture WhatsApp and Facebook show when a link is shared"
                 aspect="wide"
+                fit="contain"
                 value={form.ogImage}
                 onChange={(url) => setForm((prev) => ({ ...prev, ogImage: url }))}
               />

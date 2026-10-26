@@ -161,6 +161,7 @@ export function TestimonialFormDialog({
             <PhotoField
               id="testimonial-avatar"
               label="Avatar"
+              hint="200 x 200 — square, shown as a circle"
               aspect="square"
               value={form.avatar}
               onChange={(url) => patch({ avatar: url })}

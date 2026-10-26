@@ -508,7 +508,9 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
             label: "Picture (leave blank for the category's own)",
             type: "url",
             isImage: true,
-            hint: "600 x 450",
+            // The tile is square (aspect-square in OurMenuSection). It said
+            // 600 x 450, so a picture exported to the letter lost a quarter.
+            hint: "600 x 600 — square",
           },
         ],
       },
@@ -819,7 +821,10 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
             label: "Banner picture",
             type: "url",
             isImage: true,
-            hint: "2 across: 750 x 290 · 3 across: 490 x 290 · Mixed: 1100 x 1000 wide, 800 x 1200 narrow",
+            // The same ratios as the boxes (750/290, 493/290, 11/10, 2/3), at
+            // a size that holds up below lg, where an even row stacks one
+            // banner across a tablet ~990px wide.
+            hint: "2 across: 1500 x 580 · 3 across: 1020 x 600 · Mixed: 1100 x 1000 wide, 800 x 1200 narrow",
           },
           { key: "label", label: "What it says (for screen readers)", type: "text" },
           { key: "href", label: "Link", type: "url" },
@@ -1028,7 +1033,10 @@ export const HOMEPAGE_SECTION_REGISTRY: HomepageSectionRegistryEntry[] = [
             label: "Picture for phones",
             type: "url",
             isImage: true,
-            hint: "760 x 200 for a Strip, 760 x 400 for a Banner — optional",
+            // Same 3.8:1 and 1.9:1 as before, larger: the phone picture shows
+            // everywhere below lg, where a tablet draws it ~990px wide and a
+            // 760px file came out soft.
+            hint: "1140 x 300 for a Strip, 1140 x 600 for a Banner — optional; shown below 1024px wide",
           },
           { key: "label", label: "What it says (for screen readers)", type: "text" },
           { key: "href", label: "Link", type: "url" },
