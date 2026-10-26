@@ -121,3 +121,27 @@ export function listDistricts(): DistrictEntry[] {
     .sort((a, b) => a.name.localeCompare(b.name) || a.state.localeCompare(b.state));
   return districtList;
 }
+
+/** District index → its PINs, built once, on first use. */
+let pinsByDistrict: Map<number, string[]> | null = null;
+
+/**
+ * Every PIN in a district, as places. Two states can each have a district of
+ * the same name (Bilaspur, Aurangabad), so the state picks which one.
+ */
+export function placesInDistrict(name: string, state: string): PincodePlace[] {
+  if (!pinsByDistrict) {
+    pinsByDistrict = new Map();
+    for (const [pin, [, districts]] of Object.entries(data.pins)) {
+      for (const i of Array.isArray(districts) ? districts : [districts]) {
+        const list = pinsByDistrict.get(i) ?? [];
+        list.push(pin);
+        pinsByDistrict.set(i, list);
+      }
+    }
+  }
+  const index = data.districts.findIndex(
+    ([districtName, stateIndex]) => districtName === name && data.states[stateIndex] === state,
+  );
+  return (pinsByDistrict.get(index) ?? []).map((pin) => placeOf(pin, data.pins[pin]));
+}

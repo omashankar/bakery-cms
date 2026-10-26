@@ -513,6 +513,8 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
     setValue,
     watch,
     getValues,
+    setError,
+    setFocus,
     formState,
   } = useForm<CheckoutAddress>({
     defaultValues: getCheckoutDraft().address,
@@ -1387,7 +1389,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
     // Everything downstream — the amount charged and the prices stored on the
     // order — comes from that draft rather than from anything computed here.
     setPlacing(true);
-    const { quote, error: quoteError } = await requestCartQuote({
+    const { quote, error: quoteError, field: quoteField } = await requestCartQuote({
       items,
       couponCode: validCoupon?.code,
       giftWrap,
@@ -1403,6 +1405,15 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
 
     if (!quote) {
       setPlacing(false);
+      // Said under the PIN, where it can be fixed: "Borkheda is in PIN
+      // 324002…" is no use as a toast that fades before the box is found.
+      // Not the outside-zones refusal: that line is under the PIN already.
+      if (quoteField === "pincode" && quoteError && quoteError !== OUTSIDE_ZONES_MESSAGE) {
+        setError("pincode", { type: "server", message: quoteError });
+        setFocus("pincode");
+        toast.error("Please check the PIN code", { description: quoteError });
+        return;
+      }
       toast.error("Could not price your order", {
         description: quoteError ?? "Please refresh and try again.",
       });
