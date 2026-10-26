@@ -1,6 +1,6 @@
 "use client";
 
-import { OptimizedImage } from "@/components/shared/optimized-image";
+import { ArtDirectedImage } from "@/components/shared/optimized-image";
 import Link from "next/link";
 import { parseListField, BANNER_STRIP_MAX, renderableRows } from "@/constants/section-list-fields";
 import { sectionAlignOf } from "./lib/section-utils";
@@ -216,33 +216,32 @@ export function BannerStripSection(props: HomepageSectionRendererProps) {
           */
           const phone = banner.mobileImage?.trim();
           const alt = banner.label ?? "";
+          /*
+            ONE <picture>, so only the picture on screen is downloaded. Two
+            `fill` images toggled with `lg:hidden` / `hidden lg:block` put
+            both on the wire — `display: none` does not stop a fetch — and
+            the hidden one made next/image warn that a 100vw image was not
+            rendered at full width (it was rendered at zero).
+
+            The words are pixels inside the picture, so the alt is the only
+            thing a screen reader has. Empty when the shop has not written
+            one — an invented description of a picture nobody here has seen
+            is worse than silence.
+
+            Desktop `sizes` is NOT 100vw: the strip sits in the content
+            column, which stops at 1376px; below 1440 the column is nearly
+            the whole window.
+          */
           const picture = (
-            <>
-              <OptimizedImage
-                fill
-                sizes="100vw"
-                src={phone || banner.image || ""}
-                alt={alt}
-                className={cn(
-                  "lg:hidden",
-                  phone ? "object-cover" : "object-contain",
-                )}
-              />
-              {/*
-                The words are pixels inside the picture, so the alt is the
-                only thing a screen reader has. Empty when the shop has not
-                written one — an invented description of a picture nobody
-                here has seen is worse than silence. It goes on BOTH, and
-                only one of the two is ever displayed.
-              */}
-              <OptimizedImage
-                src={banner.image ?? ""}
-                alt={alt}
-                fill
-                sizes="100vw"
-                className="hidden lg:block object-cover"
-              />
-            </>
+            <ArtDirectedImage
+              wide={banner.image}
+              narrow={phone}
+              breakpoint={1024}
+              wideSizes="(min-width: 1440px) 1376px, 100vw"
+              narrowSizes="100vw"
+              alt={alt}
+              className={phone ? "object-cover" : "object-contain lg:object-cover"}
+            />
           );
           /*
             Every banner is in the DOM, stacked, and only the current one is

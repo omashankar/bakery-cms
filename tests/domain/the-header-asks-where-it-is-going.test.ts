@@ -211,7 +211,8 @@ describe("the category tiles", () => {
    * that fails on class ORDER is testing the author's typing.
    */
   const tileClasses = () => {
-    const found = strip().match(/"group flex w-\[5\.5rem\][^"]*"/);
+    // 96px on a phone since the names were measured to fit there (it was 5.5rem).
+    const found = strip().match(/"group flex w-24 [^"]*"/);
     expect(found, "the category tile is gone").toBeTruthy();
     return found![0];
   };

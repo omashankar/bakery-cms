@@ -86,12 +86,21 @@ export function BrandMark({ logo, logoLetter, siteName, size = "default" }: Bran
     );
   }
 
+  /*
+    THE FALLBACK HAS TO FIT THE ROW THE LOGO WAS SIZED FOR. Every caller caps
+    its link (144px on a phone in the header), and with no shrink rule the
+    badge was squeezed and the name broke one word per line — three lines in a
+    64px bar, spilling over the page. It shows whenever the logo cannot load,
+    which on a phone with a poor connection is exactly when the shop most
+    needs to look intact. So: the badge keeps its size, and the name takes at
+    most two tight lines.
+  */
   return (
     <>
-      <div className="flex size-9 items-center justify-center rounded-xl bg-bakery-700 shadow-sm">
+      <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-bakery-700 shadow-sm">
         <span className="font-heading text-sm font-bold text-white">{letter}</span>
       </div>
-      <span className="font-heading text-lg font-bold tracking-tight text-foreground">
+      <span className="line-clamp-2 min-w-0 font-heading text-sm leading-tight font-bold tracking-tight text-foreground sm:text-lg">
         {siteName}
       </span>
     </>

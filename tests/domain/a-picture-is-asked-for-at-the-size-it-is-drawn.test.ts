@@ -82,7 +82,14 @@ describe("every picture the storefront draws", () => {
         `sizes={wide ? "…" : "…"}` — looking for the `sizes=` prefix finds
         neither, which is how the first draft of this case failed.
       */
-      ["the banner grid's wide tile", '"(min-width: 1024px) 34vw, 50vw"'],
+      /*
+        A wide tile with no wide partner takes a phone's whole row (so a
+        narrow tile beside it cannot leave a hole), and asks for 100vw there.
+      */
+      [
+        "the banner grid's wide tile",
+        '`(min-width: 1024px) 34vw, ${fullOnPhone.has(index) ? "100vw" : "50vw"}`',
+      ],
       ["the banner grid's narrow tile", '"(min-width: 1024px) 20vw, 50vw"'],
       ["the category price cards", 'sizes="(min-width: 1024px) 25vw, 50vw"'],
       [
@@ -101,12 +108,22 @@ describe("every picture the storefront draws", () => {
     }
   });
 
-  it("and the banner strip, which really is the whole width", () => {
+  it("and the banner strip, which is the content column's width", () => {
     /*
-      NOT AN EXCEPTION TO THE RULE ABOVE — it is a full-bleed band, so 100vw
-      is the measurement and not a missing one. Named here so that reading
-      `100vw` in this file is never a sign that somebody skipped the work.
+      THE STRIP IS NOT FULL-BLEED. It sits in the content column, measured at
+      1328px in a 1440px window, and the column stops at 1376px. Its phone
+      picture (below lg) is the window's width less the gutters, so 100vw is
+      the measurement there; the desktop picture says where it stops, or a
+      wide monitor fetches a file twice the width it draws and Next warns
+      that the image "is not rendered at full viewport width".
     */
-    expect(src.match(/sizes="100vw"/g) ?? [], "the strip's two artworks").toHaveLength(2);
+    // ONE picture element, so only the one on screen is fetched: two toggled
+    // `fill` images downloaded the hidden copy of every banner as well.
+    expect(src, "the strip draws two toggled images again").toContain("<ArtDirectedImage");
+    expect(src.match(/sizes="100vw"/g) ?? [], "a band asks for the whole window").toHaveLength(0);
+    expect(src, "the strip's phone picture").toContain('narrowSizes="100vw"');
+    expect(src, "the strip's desktop picture asks for the whole window again").toContain(
+      'wideSizes="(min-width: 1440px) 1376px, 100vw"',
+    );
   });
 });

@@ -438,6 +438,7 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                   title="Recently viewed"
                   description="Pick up where you left off."
                   cakes={recentlyViewed.slice(0, 4)}
+                  firstEager
                 />
               ) : null}
             </div>
@@ -474,7 +475,7 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                   className="rounded-xl border border-border bg-card px-4 py-3"
                 />
                 <div className="space-y-4">
-                  {items.map((item) => (
+                  {items.map((item, index) => (
                     /*
                       LAID OUT LIKE THE REFERENCE'S CART LINE: a picture large
                       enough to recognise, the name with the price level with
@@ -499,6 +500,11 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                               width={128}
                               height={128}
                               sizes="128px"
+                              // The first line's photo is the cart page's LCP at
+                              // every width (next/image said so); lazy, it waited
+                              // for layout before it was even requested.
+                              loading={index === 0 ? "eager" : "lazy"}
+                              fetchPriority={index === 0 ? "high" : "auto"}
                               className="size-full object-cover"
                             />
                           ) : null}
@@ -720,6 +726,7 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                     title="Recently viewed"
                     description="You might also want to add these."
                     cakes={recentlyViewed.slice(0, 4)}
+                    firstEager
                   />
                 ) : null}
               </div>

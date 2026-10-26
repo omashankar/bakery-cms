@@ -181,7 +181,12 @@ export function ProductGallery({ images, productName, badge }: ProductGalleryPro
             // no fetchpriority; this does.
             loading="eager"
             fetchPriority="high"
-            sizes="(max-width: 1024px) 100vw, 45vw"
+            // MEASURED on the page, 360–1920: full width on a phone, a fixed
+            // 414px from sm to lg, 45vw from lg, and 654px once the container
+            // stops growing at 1440. It read "(max-width: 1024px) 100vw, 45vw",
+            // which matched lg itself and asked a tablet for a 1920px file to
+            // draw 414px.
+            sizes="(min-width: 1440px) 654px, (min-width: 1024px) 45vw, (min-width: 640px) 414px, 100vw"
             className="object-cover"
           />
           {/*

@@ -102,7 +102,8 @@ describe("the category tiles under the hero", () => {
    * that fails on class ORDER is testing the author's typing.
    */
   const tileClasses = () => {
-    const found = strip().match(/"group flex w-\[5\.5rem\][^"]*"/);
+    // 96px on a phone since the names were measured to fit there (it was 5.5rem).
+    const found = strip().match(/"group flex w-24 [^"]*"/);
     expect(found, "the category tile is gone").toBeTruthy();
     return found![0];
   };
@@ -195,15 +196,25 @@ describe("the category tiles under the hero", () => {
       the caption — a window before it found the image box every time, and
       the assertion then failed on a tile that was perfectly correct.
     */
+    /*
+      THE ROOM IS ON A WRAPPER, NOT ON THE CLAMPED LINE. Padding inside a
+      `line-clamp` box is still inside its overflow, so a three-line name
+      ("Black Forest Cakes" on a phone) showed its third line through the
+      bottom padding under the ellipsis.
+    */
     const name = body.match(
-      /<p className="([^"]+)">\s*\{category\.name\}/,
+      /<div className="([^"]+)">\s*<p className="([^"]+)">\s*\{category\.name\}/,
     );
-    expect(name, "the category name is no longer its own line").toBeTruthy();
+    expect(name, "the category name is no longer its own padded line").toBeTruthy();
 
-    const classes = name![1];
+    const [, room, line] = name!;
 
-    expect(classes, "the name has no side padding").toMatch(/\bpx-\d/);
-    expect(classes, "the name has no room above it").toMatch(/\bpt-\d/);
-    expect(classes, "the name sits on the card's bottom edge").toMatch(/\bpb-\d/);
+    expect(room, "the name has no side padding").toMatch(/\bpx-\d/);
+    expect(room, "the name has no room above it").toMatch(/\bpt-\d/);
+    expect(room, "the name sits on the card's bottom edge").toMatch(/\bpb-\d/);
+    expect(line, "the name is no longer held to two lines").toMatch(/\bline-clamp-2\b/);
+    expect(line, "padding is back on the clamped line, where it shows the third").not.toMatch(
+      /\b(?:p|py|pt|pb)-\d/,
+    );
   });
 });
