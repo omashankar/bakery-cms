@@ -27,6 +27,7 @@ import type { CommerceSettings, GeneralSettings, ModuleSettings } from "@/types/
 import type { LandingProduct } from "@/constants/landing-data";
 import type { DeliveryZone } from "@/types/delivery";
 import { lookUpPincode } from "@/features/commerce/server/pincode-directory";
+import { addressPincodeConflict } from "@/features/commerce/server/address-pincode-check";
 import { normalizePincode } from "@/features/commerce/lib/delivery-zone-utils";
 
 /**
@@ -67,7 +68,18 @@ export interface QuoteInput {
   giftWrap?: boolean;
   /** WHICH speed, never its price. See `CartTotalsInput.deliveryTierId`. */
   deliveryTierId?: string;
-  deliveryAddress?: { city?: string; pincode?: string; state?: string };
+  /**
+   * The street lines come only with a whole address, at checkout — and only
+   * then is it checked against its PIN. The running total and the product
+   * page's check send a PIN alone.
+   */
+  deliveryAddress?: {
+    city?: string;
+    pincode?: string;
+    state?: string;
+    addressLine1?: string;
+    addressLine2?: string;
+  };
 }
 
 export interface QuotedLine extends QuoteLineInput {
@@ -137,6 +149,20 @@ export class OutsideDeliveryZonesError extends Error {
   constructor(readonly pincode: string) {
     super(`No delivery zone covers ${pincode || "this address"}`);
     this.name = "OutsideDeliveryZonesError";
+  }
+}
+
+/**
+ * The address names somewhere its PIN is not — Borkheda at Sangod's PIN.
+ *
+ * The zone and its price come from the PIN, so the order would be priced for
+ * one place and driven to another. The owner chose to refuse it (2026-10-26).
+ * The message says which part disagrees, for the customer to correct.
+ */
+export class AddressPincodeMismatchError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AddressPincodeMismatchError";
   }
 }
 
@@ -480,6 +506,11 @@ export async function priceCart(input: QuoteInput): Promise<CartQuote> {
 
   if (totals.deliverable === false) {
     throw new OutsideDeliveryZonesError(input.deliveryAddress?.pincode ?? "");
+  }
+
+  if (input.deliveryAddress?.addressLine1) {
+    const conflict = addressPincodeConflict(input.deliveryAddress);
+    if (conflict) throw new AddressPincodeMismatchError(conflict);
   }
 
   return {

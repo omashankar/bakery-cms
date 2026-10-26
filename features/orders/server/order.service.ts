@@ -37,6 +37,7 @@ import {
   priceCart,
   UndeliverableAtSpeedError,
   OutsideDeliveryZonesError,
+  AddressPincodeMismatchError,
   UnknownProductError,
   UnknownWeightError,
 } from "@/features/checkout/server/pricing.server";
@@ -182,7 +183,13 @@ async function repriceForPlacement(input: PlaceOrderInput) {
       couponCode,
       giftWrap: Number((input.totals as { giftWrapFee?: unknown } | undefined)?.giftWrapFee) > 0,
       deliveryAddress: input.address
-        ? { city: input.address.city, pincode: input.address.pincode, state: input.address.state }
+        ? {
+            city: input.address.city,
+            pincode: input.address.pincode,
+            state: input.address.state,
+            addressLine1: input.address.addressLine1,
+            addressLine2: input.address.addressLine2,
+          }
         : undefined,
     });
 
@@ -207,6 +214,9 @@ async function repriceForPlacement(input: PlaceOrderInput) {
     }
     if (error instanceof OutsideDeliveryZonesError) {
       throw new AppError(OUTSIDE_ZONES_MESSAGE, 409);
+    }
+    if (error instanceof AddressPincodeMismatchError) {
+      throw new AppError(error.message, 409);
     }
     throw error;
   }

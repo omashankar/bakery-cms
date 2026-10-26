@@ -53,7 +53,11 @@ export interface PincodePlace {
   state: string;
   /** Usually one; a PIN on a district line lists each. */
   districts: string[];
-  /** "Talwandi", "Vigyan Nagar" … — for showing, never for matching. */
+  /**
+   * "Talwandi", "Vigyan Nagar" … — at most five, towns first. For showing, and
+   * for checking a street against its PIN (address-pincode-check.ts); never
+   * for choosing a zone.
+   */
   areas: string[];
 }
 

@@ -9,6 +9,7 @@ import {
   priceCart,
   UndeliverableAtSpeedError,
   OutsideDeliveryZonesError,
+  AddressPincodeMismatchError,
   UnknownProductError,
   UnknownWeightError,
 } from "./pricing.server";
@@ -88,7 +89,14 @@ export const quoteCartController = withErrorHandler(async (request: Request) => 
   // the zone. `deliveryAddress` only stands alone before the customer has
   // entered one, which is the running-total case it exists for.
   const pricingAddress = input.address
-    ? { city: input.address.city, pincode: input.address.pincode, state: input.address.state }
+    ? {
+        city: input.address.city,
+        pincode: input.address.pincode,
+        state: input.address.state,
+        // So the street can be checked against the PIN that prices it.
+        addressLine1: input.address.addressLine1,
+        addressLine2: input.address.addressLine2,
+      }
     : input.deliveryAddress;
 
   try {
@@ -240,6 +248,9 @@ export const quoteCartController = withErrorHandler(async (request: Request) => 
       throw new AppError(OUTSIDE_ZONES_MESSAGE, 409, [
         { field: "pincode", message: error.message },
       ]);
+    }
+    if (error instanceof AddressPincodeMismatchError) {
+      throw new AppError(error.message, 409, [{ field: "pincode", message: error.message }]);
     }
     throw error;
   }

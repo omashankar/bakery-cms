@@ -57,6 +57,8 @@ export interface QuoteOutcome {
   quote: CartQuoteResponse | null;
   /** A message worth showing the customer — closed shop, item gone, offline. */
   error?: string;
+  /** The address box the error is about, when it is about one ("pincode"). */
+  field?: string;
 }
 
 export async function requestCartQuote(input: QuoteRequest): Promise<QuoteOutcome> {
@@ -92,11 +94,20 @@ export async function requestCartQuote(input: QuoteRequest): Promise<QuoteOutcom
     });
 
     const body = (await res.json().catch(() => null)) as
-      | { success?: boolean; data?: CartQuoteResponse; message?: string }
+      | {
+          success?: boolean;
+          data?: CartQuoteResponse;
+          message?: string;
+          errors?: { field?: string }[] | null;
+        }
       | null;
 
     if (!res.ok || !body?.success || !body.data) {
-      return { quote: null, error: body?.message ?? "Could not price your cart." };
+      return {
+        quote: null,
+        error: body?.message ?? "Could not price your cart.",
+        field: body?.errors?.[0]?.field,
+      };
     }
     return { quote: body.data };
   } catch {
