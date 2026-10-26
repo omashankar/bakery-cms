@@ -411,13 +411,20 @@ export function GeneralSettingsPage() {
               * These two were bare URL boxes with no picker of any kind, which
               * made the shop's own logo and favicon the HARDEST images in the
               * admin to set — you had to host the file somewhere yourself and
-              * type its address. They are square because a mark is.
+              * type its address. The favicon is square because a browser tab
+              * draws it square; the logo is previewed wide and whole, because
+              * the storefront draws it at its own shape.
               */}
             <div className="space-y-2">
               <PhotoField
                 id="logo"
                 label="Logo"
-                aspect="square"
+                // Drawn at its own shape, 64px tall in the header and 80 in the
+                // footer (brand-mark.tsx), so a square cover preview cut a
+                // wordmark to its middle.
+                hint="A wide logo on a transparent background, at least 160px tall — e.g. 600 x 200 PNG or SVG"
+                aspect="wide"
+                fit="contain"
                 value={settings.logo}
                 onChange={(url) => edit((prev) => ({ ...prev, logo: url }))}
                 placeholder="/images/logo.svg"
@@ -430,7 +437,9 @@ export function GeneralSettingsPage() {
             <PhotoField
               id="favicon"
               label="Favicon"
+              hint="512 x 512 — square PNG"
               aspect="square"
+              fit="contain"
               value={settings.favicon}
               onChange={(url) => edit((prev) => ({ ...prev, favicon: url }))}
               placeholder="/favicon.ico"

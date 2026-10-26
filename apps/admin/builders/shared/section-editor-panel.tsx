@@ -248,6 +248,14 @@ function ListField({
                   hint={column.hint}
                   value={row[column.key] ?? ""}
                   onChange={(next) => updateRow(index, column.key, next)}
+                  /*
+                    WHOLE, NOT CROPPED. These pictures are drawn square, 4:3,
+                    2:3, 3.8:1 or 12:1 depending on the band, and the default
+                    16:9 cover preview cut each one to a shape it never has on
+                    the site. Shown whole, the admin can check the file
+                    against the size written above it.
+                  */
+                  fit="contain"
                 />
               ) : column.type === "boolean" ? (
                 /*
@@ -485,9 +493,16 @@ function SlidesField({
             4.8:1 banner down to its middle in the very control used to upload
             it, so the admin could not see what a customer would get.
           */}
+          {/*
+            THE SIZE TO EXPORT. The hero's box is 3:1 from lg and 2:1 from sm
+            whenever the slide has a headline or a phone image
+            (hero-carousel.tsx); without either it shows whole at its own
+            shape. 1500 because uploads are shrunk to a 1600px long edge.
+          */}
           <PhotoField
             id={`slide-${index}-image`}
             label="Slide image"
+            hint="1500 x 500 — 3:1. Tablets show the middle two-thirds when the slide has a headline or a phone image, so keep the words in the middle."
             value={slide.imageUrl ?? ""}
             onChange={(next) => updateSlide(index, { imageUrl: next })}
             aspect="wide"
@@ -496,6 +511,8 @@ function SlidesField({
           <PhotoField
             id={`slide-${index}-mobile-image`}
             label="Phone image (optional)"
+            // Drawn in the hero's 4:3 phone box (aspect-[4/3] below sm).
+            hint="1200 x 900 — 4:3"
             value={slide.mobileImageUrl ?? ""}
             onChange={(next) => updateSlide(index, { mobileImageUrl: next })}
             fit="contain"

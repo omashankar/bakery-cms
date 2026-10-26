@@ -347,7 +347,9 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
               with no padding, the picture reaches the card's own corners,
               and without it the square would square them off.
             */
-            className="group flex w-[5.5rem] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-border/70 bg-cream-100 bg-gradient-to-b from-card to-bakery-100 shadow-xs transition-shadow hover:shadow-md sm:w-auto"
+            // 96px on a phone (it was 88): two-word names like "Black Forest"
+            // fit one line instead of breaking a three-word name over three.
+            className="group flex w-24 shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-border/70 bg-cream-100 bg-gradient-to-b from-card to-bakery-100 shadow-xs transition-shadow hover:shadow-md sm:w-auto"
           >
             {/*
               A SQUARE, not a circle.
@@ -374,7 +376,7 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
                     225px, so the browser was asked for a source under half
                     the painted width and every tablet got soft tiles.
                   */
-                  sizes="(min-width: 1024px) 160px, (min-width: 640px) 25vw, 88px"
+                  sizes="(min-width: 1024px) 160px, (min-width: 640px) 25vw, 96px"
                   loading={props.aboveTheFold && index < 4 ? "eager" : "lazy"}
                 />
               ) : null}
@@ -386,9 +388,17 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
             */}
             {/* Bold and a size up, as the reference sets it: the name is the tile's
                 only words, so it can carry weight without competing. */}
-            <p className="line-clamp-2 px-2 pt-2.5 pb-3 text-center text-[13px] font-bold text-foreground sm:text-base">
-              {category.name}
-            </p>
+            {/*
+              THE PADDING IS ON A WRAPPER, not on the clamped line. Padding
+              inside a `line-clamp` box is still inside its overflow, so the
+              third line of a long name ("Black Forest Cakes" on a phone)
+              showed through the bottom padding under the ellipsis.
+            */}
+            <div className="px-1.5 pt-2.5 pb-3 sm:px-2">
+              <p className="line-clamp-2 text-center text-[13px] font-bold text-foreground sm:text-base">
+                {category.name}
+              </p>
+            </div>
           </Link>
         ))}
       </div>
@@ -877,6 +887,31 @@ function BannerGridSection(props: HomepageSectionRendererProps) {
   */
   const across = BANNER_ROW[contentString(c, "columns").trim() as keyof typeof BANNER_ROW];
 
+  /*
+    BELOW lg THE COLLAGE IS TWO ACROSS, and a wide tile (11:10) beside a
+    narrow one (2:3) left a hole the height of the difference under the wide
+    one — this shop's three wide tiles put the third next to the first
+    narrow tile, and a phone showed ~200px of nothing under "Photo Frames".
+
+    So a wide tile that would start a phone row without another wide tile
+    to pair with takes the whole row. Two wides still pair up; the narrow
+    tiles still pair up; nothing changes from lg, where the 15-column grid
+    places them.
+  */
+  const fullOnPhone = new Set<number>();
+  if (!across) {
+    let column = 0;
+    banners.forEach((banner, index) => {
+      const wide = rowFlag(banner.wide);
+      const next = banners[index + 1];
+      if (wide && column === 0 && !(next && rowFlag(next.wide))) {
+        fullOnPhone.add(index);
+        return;
+      }
+      column = (column + 1) % 2;
+    });
+  }
+
   if (banners.length === 0) {
     return (
       <EmptyBandNotice {...props} align={align}>
@@ -917,7 +952,7 @@ function BannerGridSection(props: HomepageSectionRendererProps) {
             across
               ? across.box
               : wide
-                ? "aspect-[11/10] lg:col-span-5"
+                ? cn("aspect-[11/10] lg:col-span-5", fullOnPhone.has(index) && "col-span-2")
                 : "aspect-[2/3] lg:col-span-3",
           );
           const picture = (
@@ -932,7 +967,11 @@ function BannerGridSection(props: HomepageSectionRendererProps) {
                 column, which is the 445px and 259px measured on this shop.
                 Below lg the grid is two across.
               */
-              sizes={wide ? "(min-width: 1024px) 34vw, 50vw" : "(min-width: 1024px) 20vw, 50vw"}
+              sizes={
+                wide
+                  ? `(min-width: 1024px) 34vw, ${fullOnPhone.has(index) ? "100vw" : "50vw"}`
+                  : "(min-width: 1024px) 20vw, 50vw"
+              }
               // The first row is on a phone's first screen; see `aboveTheFold`.
               loading={props.aboveTheFold && index < 2 ? "eager" : "lazy"}
               fetchPriority={props.aboveTheFold && index === 0 ? "high" : "auto"}

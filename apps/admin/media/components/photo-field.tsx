@@ -135,27 +135,38 @@ export function PhotoField({
     if (!isUploading) inputRef.current?.click();
   }
 
+  /*
+    A WHOLE PICTURE IS DRAWN AT ITS OWN SHAPE. In a fixed 16:9 box a 12:1
+    strip banner came out an 18px sliver of pale pink on the grey backdrop,
+    and the field looked empty with a picture in it. With the box following
+    the picture, the admin sees exactly what they uploaded, edge to edge.
+  */
+  const natural = fit === "contain" && Boolean(trimmed) && !isUploading;
+
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <label htmlFor={id} className="text-sm font-medium">
+      {/*
+        The size hint takes the full width UNDER the label row. Beside the
+        Advanced button it was squeezed into a column a few words wide and a
+        three-part size broke over four lines.
+      */}
+      <div>
+        <div className="flex items-center justify-between gap-2">
+          <label htmlFor={id} className="min-w-0 text-sm font-medium">
             {label}
           </label>
-          {hint ? (
-            <p className="text-xs text-muted-foreground">{hint}</p>
-          ) : null}
+          <button
+            type="button"
+            className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            onClick={() => setAdvancedChoice(!showAdvanced)}
+            aria-expanded={showAdvanced}
+            aria-controls={`${id}-advanced`}
+          >
+            Advanced
+            <ChevronDown className={cn("size-3 transition-transform", showAdvanced && "rotate-180")} />
+          </button>
         </div>
-        <button
-          type="button"
-          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-          onClick={() => setAdvancedChoice(!showAdvanced)}
-          aria-expanded={showAdvanced}
-          aria-controls={`${id}-advanced`}
-        >
-          Advanced
-          <ChevronDown className={cn("size-3 transition-transform", showAdvanced && "rotate-180")} />
-        </button>
+        {hint ? <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p> : null}
       </div>
 
       {/*
@@ -188,7 +199,7 @@ export function PhotoField({
         }}
         className={cn(
           "relative w-full overflow-hidden rounded-xl border-2 border-dashed transition-colors",
-          ASPECT[aspect],
+          natural ? "block min-h-12" : ASPECT[aspect],
           isDragging
             ? "border-primary bg-primary/10"
             : "border-border bg-muted/40 hover:border-primary/40 hover:bg-muted",
@@ -199,12 +210,13 @@ export function PhotoField({
             // A preview, sized for the field; the value it edits is still the stored URL.
             src={thumbnailImageUrl(trimmed, 480)}
             alt={label}
+            fill={!natural}
             /*
-              SafeImage bakes `object-cover` into its own class list, so this
-              only wins because `cn` runs them through tailwind-merge and the
-              later one takes the conflict.
+              SafeImage bakes `object-cover` into its own class list when it
+              fills, so `object-contain` there only wins because `cn` runs them
+              through tailwind-merge and the later one takes the conflict.
             */
-            className={fit === "contain" ? "object-contain" : "object-cover"}
+            className={natural ? "block h-auto max-h-72 w-full object-contain" : "object-cover"}
           />
         ) : null}
 

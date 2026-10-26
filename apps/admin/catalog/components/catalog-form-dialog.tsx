@@ -477,6 +477,10 @@ export function CatalogFormDialog({
               <PhotoField
                 id="catalog-image"
                 label="Image"
+                // A square tile in the menu strip; the mega-menu's featured
+                // card draws the same file at 4:5, trimming the sides.
+                hint="800 x 800 — square, subject in the middle"
+                aspect="square"
                 value={image}
                 onChange={setImage}
               />

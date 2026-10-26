@@ -303,7 +303,10 @@ export function InvoiceDesignPanel() {
               <PhotoField
                 id="invoice-logo"
                 label="Logo"
-                aspect="square"
+                // Drawn 56px tall at its own shape, up to 220px wide.
+                hint="A wide logo, at least 112px tall — e.g. 440 x 112, transparent background"
+                aspect="wide"
+                fit="contain"
                 value={settings.logoUrl}
                 onChange={(url) => patch({ logoUrl: url })}
                 placeholder="/images/logo.svg"

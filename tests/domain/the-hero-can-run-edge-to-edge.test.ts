@@ -819,7 +819,11 @@ describe("what the admin sees of the artwork before it publishes", () => {
     const photoField = read("apps/admin/media/components/photo-field.tsx");
 
     expect(photoField).toMatch(/fit\?: "cover" \| "contain"/);
-    expect(photoField).toMatch(/fit === "contain" \? "object-contain" : "object-cover"/);
+    // "contain" draws the picture at its own shape: it stops filling a fixed
+    // box (where a 12:1 strip was an 18px sliver) and is drawn whole.
+    expect(photoField).toMatch(/const natural = fit === "contain" &&/);
+    expect(photoField).toMatch(/fill=\{!natural\}/);
+    expect(photoField).toMatch(/natural \? "[^"]*\bobject-contain\b[^"]*" : "object-cover"/);
     // And the default is unchanged, so every other field in the admin keeps
     // the thumbnail crop it was designed around.
     expect(photoField).toMatch(/fit = "cover"/);

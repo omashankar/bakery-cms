@@ -69,7 +69,8 @@ describe("a band of banners, two or three across", () => {
       ?.itemFields?.find((f) => f.isImage);
 
     expect(picture, "the picture field is gone").toBeTruthy();
-    for (const size of ["750 x 290", "490 x 290", "1100 x 1000", "800 x 1200"]) {
+    // The ratios are pinned against the boxes in a-picture-guideline-matches-its-box.
+    for (const size of ["1500 x 580", "1020 x 600", "1100 x 1000", "800 x 1200"]) {
       expect(
         picture!.hint ?? "",
         `the editor does not say what to export for ${size}`,

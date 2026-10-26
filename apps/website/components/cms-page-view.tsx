@@ -169,7 +169,9 @@ function AboutTemplate({ page, preview }: { page: CmsPage; preview: boolean }) {
                       alt={page.title}
                       fill
                       className="object-cover"
-                      sizes="(max-width: 1024px) 100vw, 45vw"
+                      // Two columns from lg; below it the frame stops at
+                      // max-w-lg (512px). `max-width: 1024px` matched lg itself.
+                      sizes="(min-width: 1024px) 45vw, (min-width: 544px) 512px, 100vw"
                       // The first thing under the page title, so on a phone it
                       // is the largest paint — lazy, it was not even requested
                       // until layout, and the page's LCP waited 3s for it.

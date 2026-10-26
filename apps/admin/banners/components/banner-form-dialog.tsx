@@ -190,7 +190,10 @@ export function BannerFormDialog({
             <PhotoField
               id="banner-image"
               label="Image"
-              aspect="wide"
+              // The strip above the header draws it as a 32px square beside
+              // the title (storefront-banner-strip.tsx).
+              hint="128 x 128 — square; shown as a small icon beside the title"
+              aspect="square"
               value={form.image}
               onChange={(url) => patchForm({ image: url })}
             />

@@ -163,8 +163,10 @@ describe("the strip that turns over", () => {
       the band's own tint looks unfinished, which is the honest state for a
       picture that has not been exported yet.
     */
+    // One <img> now (ArtDirectedImage), so the desktop's cover is a breakpoint
+    // class on the same element rather than a second image.
     expect(body()).toContain(
-      'phone ? "object-cover" : "object-contain"',
+      'phone ? "object-cover" : "object-contain lg:object-cover"',
     );
   });
 

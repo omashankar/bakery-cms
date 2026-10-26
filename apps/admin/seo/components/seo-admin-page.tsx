@@ -410,7 +410,9 @@ export function SeoAdminPage({
             <PhotoField
               id="default-og"
               label="Default OG image"
+              hint="1200 x 630 — the picture WhatsApp and Facebook show when a link is shared"
               aspect="wide"
+              fit="contain"
               value={global.defaultOgImage}
               onChange={(url) => editGlobal((prev) => ({ ...prev, defaultOgImage: url }))}
             />
