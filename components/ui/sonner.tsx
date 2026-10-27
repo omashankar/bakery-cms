@@ -4,29 +4,29 @@ import { useTheme } from "@/components/providers/theme-provider"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
 
-const Toaster = ({ ...props }: ToasterProps) => {
+/**
+ * One card for every message, coloured by what it says.
+ *
+ * Every toast was the same white box — "Signed in" and "Payment failed"
+ * looked alike. The colours, the accent edge and the icon disc are in
+ * globals.css (`[data-sonner-toast][data-type=…]`), keyed on the type sonner
+ * already stamps on each toast, so `toast.success` / `.error` / `.warning` /
+ * `.info` callers change nothing.
+ */
+const Toaster = ({ toastOptions, ...props }: ToasterProps) => {
   const { resolvedTheme = "light" } = useTheme()
 
   return (
     <Sonner
       theme={resolvedTheme as ToasterProps["theme"]}
       className="toaster group"
+      closeButton
       icons={{
-        success: (
-          <CircleCheckIcon className="size-4" />
-        ),
-        info: (
-          <InfoIcon className="size-4" />
-        ),
-        warning: (
-          <TriangleAlertIcon className="size-4" />
-        ),
-        error: (
-          <OctagonXIcon className="size-4" />
-        ),
-        loading: (
-          <Loader2Icon className="size-4 animate-spin" />
-        ),
+        success: <CircleCheckIcon />,
+        info: <InfoIcon />,
+        warning: <TriangleAlertIcon />,
+        error: <OctagonXIcon />,
+        loading: <Loader2Icon className="animate-spin" />,
       }}
       style={
         {
@@ -34,14 +34,18 @@ const Toaster = ({ ...props }: ToasterProps) => {
           "--normal-text": "var(--popover-foreground)",
           "--normal-border": "var(--border)",
           "--border-radius": "var(--radius)",
+          "--width": "380px",
         } as React.CSSProperties
       }
+      {...props}
+      // Merged, not replaced: a caller's options used to drop these.
       toastOptions={{
+        ...toastOptions,
         classNames: {
-          toast: "cn-toast",
+          ...toastOptions?.classNames,
+          toast: ["cn-toast", toastOptions?.classNames?.toast].filter(Boolean).join(" "),
         },
       }}
-      {...props}
     />
   )
 }
