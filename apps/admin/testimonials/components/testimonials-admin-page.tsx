@@ -36,7 +36,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { formatRelativeTime } from "@/utils/format";
 import type { Testimonial } from "@/types/content";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { adminShell } from "@/apps/admin/components/admin-shell";
@@ -56,6 +55,7 @@ import {
 } from "@/features/content/lib/testimonial-utils";
 import { DeleteTestimonialDialog } from "./delete-testimonial-dialog";
 import { TestimonialFormDialog } from "./testimonial-form-dialog";
+import { RelativeTime } from "@/components/shared/relative-time";
 
 const PAGE_SIZE = 10;
 
@@ -492,7 +492,7 @@ export function TestimonialsAdminPage({
                         </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                        {formatRelativeTime(item.updatedAt)}
+                        <RelativeTime date={item.updatedAt} />
                       </td>
                       <td className="px-4 py-3">
                         <TestimonialRowActions

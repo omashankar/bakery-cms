@@ -8,11 +8,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PanelLoading } from "@/components/shared/panel-loading";
 import { routes } from "@/constants/routes";
 import { getRecentInquiries } from "@/features/inquiries/lib/inquiries-repository";
-import { formatRelativeTime } from "@/utils/format";
 import { formatInquiryType } from "@/features/inquiries/lib/inquiry-utils";
 import { InquiryStatusBadge } from "@/apps/admin/inquiries/components/inquiry-status-badge";
 import type { Inquiry } from "@/types/inquiry";
 import { subscribeToAdminData } from "@/apps/admin/lib/admin-data-events";
+import { RelativeTime } from "@/components/shared/relative-time";
 
 export function DashboardInquiriesPanel() {
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
@@ -71,7 +71,7 @@ export function DashboardInquiriesPanel() {
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{inquiry.name}</p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {formatInquiryType(inquiry.type)} · {formatRelativeTime(inquiry.createdAt)}
+                    {formatInquiryType(inquiry.type)} · <RelativeTime date={inquiry.createdAt} />
                   </p>
                 </div>
                 <InquiryStatusBadge status={inquiry.status} />

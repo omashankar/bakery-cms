@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { routes } from "@/constants/routes";
 import { cn } from "@/lib/utils";
-import { formatCurrency, formatRelativeTime } from "@/utils/format";
+import { formatCurrency } from "@/utils/format";
 import {
   exportReportsCsv,
   getReportsSummary,
@@ -35,6 +35,7 @@ import {
 import { ORDERS_UPDATED_EVENT, isOrdersCacheRefill } from "@/features/orders/lib/orders";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { DEFAULT_REPORT_RANGE } from "../lib/reports-defaults";
+import { RelativeTime } from "@/components/shared/relative-time";
 
 const rangeOptions: Array<{ value: ReportDateRange; label: string }> = [
   { value: "7d", label: "Last 7 days" },
@@ -706,7 +707,7 @@ export function ReportsPage({
                             className="py-2.5 pr-3 whitespace-nowrap text-muted-foreground"
                             suppressHydrationWarning
                           >
-                            {formatRelativeTime(order.placedAt)}
+                            <RelativeTime date={order.placedAt} />
                           </td>
                           <td className="py-2.5 text-right font-semibold">
                             {formatCurrency(order.totals.total)}
@@ -732,7 +733,7 @@ export function ReportsPage({
                             className="truncate text-xs text-muted-foreground"
                             suppressHydrationWarning
                           >
-                            {order.address.fullName} · {formatRelativeTime(order.placedAt)}
+                            {order.address.fullName} · <RelativeTime date={order.placedAt} />
                           </p>
                           <div className="mt-1.5">
                             <AdminOrderStatusBadge status={order.status} />

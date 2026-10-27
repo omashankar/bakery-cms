@@ -36,7 +36,8 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { routes } from "@/constants/routes";
-import { formatCurrency, formatRelativeTime } from "@/utils/format";
+import { formatCurrency } from "@/utils/format";
+import { RelativeTime } from "@/components/shared/relative-time";
 
 const PAGE_SIZE = 10;
 
@@ -290,7 +291,7 @@ export function CustomersListPage({
                         {formatCurrency(customer.totalSpent)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                        {formatRelativeTime(customer.lastOrderAt)}
+                        <RelativeTime date={customer.lastOrderAt} />
                       </td>
                     </tr>
                   ))}
@@ -311,7 +312,7 @@ export function CustomersListPage({
                         {customer.name}
                       </p>
                       <p className="truncate text-xs text-muted-foreground">
-                        {customer.email} · {formatRelativeTime(customer.lastOrderAt)}
+                        {customer.email} · <RelativeTime date={customer.lastOrderAt} />
                       </p>
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">
                         <CustomerSegmentBadge segment={customer.segment} />

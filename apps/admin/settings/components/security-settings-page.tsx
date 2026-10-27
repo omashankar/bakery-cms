@@ -35,7 +35,6 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SIGN_OUT_FAILED, signOutOfThisDevice } from "@/features/auth/lib/sign-out";
 import { routes } from "@/constants/routes";
-import { formatRelativeTime } from "@/utils/format";
 import type { SecuritySettings } from "@/types/settings";
 import type {
   ActiveSession,
@@ -65,6 +64,7 @@ import { SettingsHydrationNotice } from "./settings-field-error";
 import { useSettingsSection } from "@/features/settings/lib/use-settings-section";
 import { securityCenterHydration } from "@/features/settings/lib/security-center-api";
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
+import { RelativeTime } from "@/components/shared/relative-time";
 
 type SecurityTab = "policies" | "history" | "failed" | "sessions" | "devices";
 
@@ -452,7 +452,7 @@ export function SecuritySettingsPage() {
                       <p className="text-xs text-muted-foreground">IP {entry.ipAddress || "unknown"}</p>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {formatRelativeTime(entry.timestamp)}
+                      <RelativeTime date={entry.timestamp} />
                     </p>
                   </div>
                 ))
@@ -497,7 +497,7 @@ export function SecuritySettingsPage() {
                       <p className="text-xs text-muted-foreground">IP {entry.ipAddress || "unknown"}</p>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {formatRelativeTime(entry.timestamp)}
+                      <RelativeTime date={entry.timestamp} />
                     </p>
                   </div>
                 ))
@@ -551,7 +551,7 @@ export function SecuritySettingsPage() {
                         {session.email} · IP {session.ipAddress || "unknown"}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Last active {formatRelativeTime(session.lastActiveAt)}
+                        Last active <RelativeTime date={session.lastActiveAt} />
                       </p>
                     </div>
                     {!session.isCurrent ? (
@@ -605,7 +605,7 @@ export function SecuritySettingsPage() {
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        IP {device.ipAddress || "unknown"} · Last seen {formatRelativeTime(device.lastSeenAt)}
+                        IP {device.ipAddress || "unknown"} · Last seen <RelativeTime date={device.lastSeenAt} />
                       </p>
                     </div>
                     <Button

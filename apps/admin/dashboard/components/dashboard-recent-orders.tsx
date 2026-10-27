@@ -9,12 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PanelLoading } from "@/components/shared/panel-loading";
 import { routes } from "@/constants/routes";
 import type { PlacedOrder } from "@/features/orders/lib/orders";
-import { formatCurrency, formatRelativeTime } from "@/utils/format";
+import { formatCurrency } from "@/utils/format";
 import { getRecentOrders } from "../lib/dashboard-data";
 import { DASHBOARD_RECENT_ORDERS } from "../lib/dashboard-defaults";
 import { hasOrdersSyncSettled } from "@/features/orders/lib/orders";
 import { subscribeToAdminData } from "@/apps/admin/lib/admin-data-events";
 import { useOrdersServerSync } from "@/features/orders/lib/use-orders-server-sync";
+import { RelativeTime } from "@/components/shared/relative-time";
 
 export function DashboardRecentOrders({
   initial = null,
@@ -108,7 +109,7 @@ export function DashboardRecentOrders({
                       className="mt-0.5 truncate text-xs text-muted-foreground"
                       suppressHydrationWarning
                     >
-                      {order.address.fullName} · {formatRelativeTime(order.placedAt)}
+                      {order.address.fullName} · <RelativeTime date={order.placedAt} />
                     </p>
                   </div>
                   <p className="shrink-0 text-sm font-semibold">

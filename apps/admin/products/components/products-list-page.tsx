@@ -39,7 +39,7 @@ import { deriveStockStatus } from "@/features/inventory/lib/inventory-utils";
 import { getInventorySettings } from "@/apps/admin/commerce/lib/inventory-repository";
 import { routes } from "@/constants/routes";
 import type { Product as CakeEntity, EntityStatus } from "@/types";
-import { formatCurrency, formatRelativeTime } from "@/utils/format";
+import { formatCurrency } from "@/utils/format";
 import { adminCategories } from "@/features/products/lib/catalog-options";
 import { categoriesOf } from "@/features/products/lib/products-repository";
 import {
@@ -61,6 +61,7 @@ import {
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { AdminSelect } from "./admin-field";
 import { DeleteProductDialog } from "./delete-product-dialog";
+import { RelativeTime } from "@/components/shared/relative-time";
 
 const PAGE_SIZE = 10;
 
@@ -646,7 +647,7 @@ export function ProductsListPage({
                       </Badge>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                      {formatRelativeTime(cake.updatedAt)}
+                      <RelativeTime date={cake.updatedAt} />
                     </td>
                     <td className="px-4 py-3">
                       <DropdownMenu>

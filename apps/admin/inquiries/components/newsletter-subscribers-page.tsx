@@ -27,7 +27,6 @@ import { ListPagination } from "@/components/shared/list-pagination";
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { adminShell } from "@/apps/admin/components/admin-shell";
-import { formatRelativeTime } from "@/utils/format";
 import type { NewsletterSubscriber } from "@/types/inquiry";
 import {
   defaultNewsletterFilters,
@@ -44,6 +43,7 @@ import {
   applyServerSubscribers,
   useNewsletterServerSync,
 } from "@/features/inquiries/lib/use-newsletter-server-sync";
+import { RelativeTime } from "@/components/shared/relative-time";
 
 const PAGE_SIZE = 12;
 
@@ -345,7 +345,7 @@ export function NewsletterSubscribersPage({
                     <p className="truncate text-sm font-medium">{subscriber.email}</p>
                     <p className="truncate text-xs text-muted-foreground">
                       {subscriber.source ?? "Website"} ·{" "}
-                      {formatRelativeTime(subscriber.createdAt)}
+                      <RelativeTime date={subscriber.createdAt} />
                     </p>
                   </div>
                   <Badge variant={subscriber.isActive ? "success" : "outline"}>

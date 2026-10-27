@@ -35,7 +35,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { formatRelativeTime } from "@/utils/format";
 import type { FaqItem } from "@/types/content";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { adminShell } from "@/apps/admin/components/admin-shell";
@@ -53,6 +52,7 @@ import {
 } from "@/features/content/lib/faq-utils";
 import { DeleteFaqDialog } from "./delete-faq-dialog";
 import { FaqFormDialog } from "./faq-form-dialog";
+import { RelativeTime } from "@/components/shared/relative-time";
 
 const PAGE_SIZE = 10;
 
@@ -463,7 +463,7 @@ export function FaqAdminPage({
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">{item.sortOrder}</td>
                       <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                        {formatRelativeTime(item.updatedAt)}
+                        <RelativeTime date={item.updatedAt} />
                       </td>
                       <td className="px-4 py-3">
                         <FaqRowActions
@@ -513,7 +513,7 @@ export function FaqAdminPage({
                         {formatFaqStatus(item.status)}
                       </Badge>
                       <span className="text-xs text-muted-foreground">
-                        {formatRelativeTime(item.updatedAt)}
+                        <RelativeTime date={item.updatedAt} />
                       </span>
                     </div>
                   </div>

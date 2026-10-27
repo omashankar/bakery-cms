@@ -31,7 +31,6 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { routes } from "@/constants/routes";
-import { formatRelativeTime } from "@/utils/format";
 import type { ProductReview, ProductReviewFormData, ProductReviewOverview } from "@/types/review";
 import {
   approveReviews,
@@ -59,6 +58,7 @@ import { ReviewStatusBadge } from "../components/review-status-badge";
 import { reviewsHydration } from "@/features/reviews/lib/reviews-api";
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
+import { RelativeTime } from "@/components/shared/relative-time";
 
 const PAGE_SIZE = 10;
 
@@ -472,7 +472,7 @@ export function ReviewsAdminPage({
                           </Badge>
                         ) : null}
                         <span className="text-xs text-muted-foreground">
-                          {formatRelativeTime(review.createdAt)}
+                          <RelativeTime date={review.createdAt} />
                         </span>
                       </div>
 

@@ -27,7 +27,7 @@ import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { adminShell } from "@/apps/admin/components/admin-shell";
 import { cn } from "@/lib/utils";
 import type { Inquiry, InquiryStatus, InquiryType } from "@/types/inquiry";
-import { formatDate, formatRelativeTime } from "@/utils/format";
+import { formatDate } from "@/utils/format";
 import { type FiguresState } from "@/components/shared/panel-loading";
 import {
   deleteInquiries,
@@ -47,6 +47,7 @@ import { InquiryDetailPanel } from "./inquiry-detail-panel";
 import { InquiryStatusBadge } from "./inquiry-status-badge";
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 import { useInquiriesServerSync } from "@/features/inquiries/lib/use-inquiries-server-sync";
+import { RelativeTime } from "@/components/shared/relative-time";
 
 const PAGE_SIZE = 10;
 
@@ -453,7 +454,7 @@ export function InquiriesListPage({
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                             <span title={formatDate(inquiry.createdAt)}>
-                              {formatRelativeTime(inquiry.createdAt)}
+                              <RelativeTime date={inquiry.createdAt} />
                             </span>
                           </td>
                         </tr>
@@ -484,7 +485,7 @@ export function InquiriesListPage({
                               </p>
                               <p className="truncate text-xs text-muted-foreground">
                                 {formatInquiryType(inquiry.type)} ·{" "}
-                                {formatRelativeTime(inquiry.createdAt)}
+                                <RelativeTime date={inquiry.createdAt} />
                               </p>
                             </div>
                             <InquiryStatusBadge status={inquiry.status} />
