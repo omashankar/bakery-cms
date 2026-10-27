@@ -49,10 +49,11 @@ import { ListPagination } from "@/components/shared/list-pagination";
 import { routes } from "@/constants/routes";
 import { cn } from "@/lib/utils";
 import { settledRefundAmount } from "@/features/orders/lib/order-overviews";
-import { formatCurrency, formatRelativeTime } from "@/utils/format";
+import { formatCurrency } from "@/utils/format";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 import { reportedAsSignedOut, reportedAsSignedOutOnRead } from "@/apps/admin/lib/report-write";
+import { RelativeTime } from "@/components/shared/relative-time";
 
 const PAGE_SIZE = 8;
 /** Matches the server's max page size — one request, no client-side paging loop. */
@@ -117,7 +118,7 @@ function RefundCaseDetail({
             </div>
             <div className="min-w-0">
               <p className="text-[11px] text-muted-foreground">Placed</p>
-              <p className="mt-0.5">{formatRelativeTime(order.placedAt)}</p>
+              <p className="mt-0.5"><RelativeTime date={order.placedAt} /></p>
             </div>
             {order.refundReference ? (
               <div className="min-w-0">
@@ -624,7 +625,7 @@ export function RefundCenterAdminPage({
                           {order.orderNumber}
                         </p>
                         <p className="truncate text-xs text-muted-foreground">
-                          {order.address.fullName} · {formatRelativeTime(order.placedAt)}
+                          {order.address.fullName} · <RelativeTime date={order.placedAt} />
                         </p>
                       </div>
                       <div className="shrink-0 text-right">

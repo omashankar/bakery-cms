@@ -35,7 +35,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { formatRelativeTime } from "@/utils/format";
 import type { GlobalSeoSettings, SeoRouteEntry } from "@/types/seo";
 import { adminShell } from "@/apps/admin/components/admin-shell";
 import { SettingsSectionShell } from "@/apps/admin/settings/components/settings-section-shell";
@@ -67,6 +66,7 @@ import {
   type SeoRouteListFilters,
 } from "@/features/seo/lib/seo-metadata";
 import { SeoRouteEditDialog } from "./seo-route-edit-dialog";
+import { RelativeTime } from "@/components/shared/relative-time";
 
 const EMPTY_OVERVIEW: SeoOverview = {
   total: 0,
@@ -671,7 +671,7 @@ export function SeoAdminPage({
                           </Badge>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                          {formatRelativeTime(entry.updatedAt)}
+                          <RelativeTime date={entry.updatedAt} />
                         </td>
                         <td className="px-4 py-3">
                           <SeoRowActions
@@ -715,7 +715,7 @@ export function SeoAdminPage({
                     {entry.metaDescription}
                   </p>
                   <p className="mt-2 text-[11px] text-muted-foreground">
-                    {formatRelativeTime(entry.updatedAt)}
+                    <RelativeTime date={entry.updatedAt} />
                   </p>
                 </li>
               ))}

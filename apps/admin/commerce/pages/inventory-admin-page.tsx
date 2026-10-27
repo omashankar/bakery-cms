@@ -55,11 +55,11 @@ import { inventoryHydration } from "@/apps/admin/commerce/lib/inventory-api";
 import { ensureInventoryHydrated } from "@/apps/admin/commerce/lib/use-inventory-server-sync";
 import { SettingsFormGate, SettingsHydrationNotice } from "@/apps/admin/settings/components/settings-field-error";
 import { routes } from "@/constants/routes";
-import { formatRelativeTime } from "@/utils/format";
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 import { applyServerProducts, useProductCacheSync } from "@/features/products/data/use-product-cache-sync";
 import type { Product } from "@/types/product";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
+import { RelativeTime } from "@/components/shared/relative-time";
 
 const PAGE_SIZE = 10;
 
@@ -365,7 +365,7 @@ export function InventoryAdminPage({
                       </p>
                     </div>
                     <span className="shrink-0 text-xs text-muted-foreground">
-                      {formatRelativeTime(entry.createdAt)}
+                      <RelativeTime date={entry.createdAt} />
                     </span>
                   </li>
                 ))}
@@ -490,7 +490,7 @@ export function InventoryAdminPage({
                         </Badge>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                        {formatRelativeTime(item.updatedAt)}
+                        <RelativeTime date={item.updatedAt} />
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1.5">

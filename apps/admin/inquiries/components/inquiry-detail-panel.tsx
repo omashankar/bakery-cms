@@ -5,12 +5,13 @@ import { toast } from "sonner";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { formatDate, formatRelativeTime } from "@/utils/format";
+import { formatDate } from "@/utils/format";
 import type { Inquiry, InquiryStatus } from "@/types/inquiry";
 import { updateInquiry } from "@/features/inquiries/lib/inquiries-repository";
 import { formatInquiryType } from "@/features/inquiries/lib/inquiry-utils";
 import { InquiryStatusBadge } from "./inquiry-status-badge";
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
+import { RelativeTime } from "@/components/shared/relative-time";
 
 interface InquiryDetailPanelProps {
   inquiry: Inquiry | null;
@@ -85,7 +86,7 @@ export function InquiryDetailPanel({
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">{current.name}</p>
             <p className="text-xs text-muted-foreground">
-              {formatInquiryType(current.type)} · {formatRelativeTime(current.createdAt)}
+              {formatInquiryType(current.type)} · <RelativeTime date={current.createdAt} />
             </p>
           </div>
           <InquiryStatusBadge status={current.status} />

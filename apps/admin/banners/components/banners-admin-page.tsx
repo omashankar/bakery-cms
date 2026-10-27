@@ -46,7 +46,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
-import { formatRelativeTime } from "@/utils/format";
 import type { Banner } from "@/types/media";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { adminShell } from "@/apps/admin/components/admin-shell";
@@ -71,6 +70,7 @@ import {
 } from "@/features/content/lib/banners-utils";
 import { BannerFormDialog } from "./banner-form-dialog";
 import { DeleteBannerDialog } from "./delete-banner-dialog";
+import { RelativeTime } from "@/components/shared/relative-time";
 
 const PAGE_SIZE = 10;
 
@@ -557,7 +557,7 @@ export function BannersAdminPage({
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">{banner.priority}</td>
                         <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                          {formatRelativeTime(banner.updatedAt)}
+                          <RelativeTime date={banner.updatedAt} />
                         </td>
                         <td className="px-4 py-3">
                           <BannerRowActions
@@ -639,7 +639,7 @@ export function BannersAdminPage({
                           <span className="text-xs text-muted-foreground">Visible</span>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          {formatRelativeTime(banner.updatedAt)}
+                          <RelativeTime date={banner.updatedAt} />
                         </p>
                       </div>
                     </div>

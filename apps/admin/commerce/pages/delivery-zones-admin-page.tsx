@@ -51,7 +51,8 @@ import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-s
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { formatCurrency, formatRelativeTime } from "@/utils/format";
+import { formatCurrency } from "@/utils/format";
+import { RelativeTime } from "@/components/shared/relative-time";
 
 const PAGE_SIZE = 10;
 
@@ -479,7 +480,7 @@ export function DeliveryZonesAdminPage({
                         />
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                        {formatRelativeTime(zone.updatedAt)}
+                        <RelativeTime date={zone.updatedAt} />
                       </td>
                       <td className="px-4 py-3">
                         <Button size="sm" variant="outline" onClick={() => openEdit(zone)}>

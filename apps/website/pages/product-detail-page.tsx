@@ -103,7 +103,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
-import { formatCurrency, formatRelativeTime, groupIndian } from "@/utils/format";
+import { formatCurrency, groupIndian } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/lazy-toast";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
@@ -117,6 +117,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DetailSection } from "@/components/storefront/detail-section";
 import { ClampedTitle } from "@/components/storefront/clamped-title";
 import { OptionButton, OptionGroup } from "@/components/storefront/option-group";
+import { RelativeTime } from "@/components/shared/relative-time";
 
 /**
  * The photo editor, loaded when a customer opens it.
@@ -2232,7 +2233,7 @@ export function ProductDetailPage({
                                     </span>
                                   </p>
                                   <span className="shrink-0 text-xs text-muted-foreground">
-                                    {formatRelativeTime(review.date)}
+                                    <RelativeTime date={review.date} />
                                   </span>
                                 </div>
                                 {review.isFeatured ? (
@@ -2442,9 +2443,12 @@ export function ProductDetailPage({
                             </p>
                             <p className="mt-2 text-xs text-muted-foreground">
                               Asked by {question.name}
-                              {question.answeredAt
-                                ? ` · answered ${formatRelativeTime(question.answeredAt)}`
-                                : ""}
+                              {question.answeredAt ? (
+                                <>
+                                  {" · answered "}
+                                  <RelativeTime date={question.answeredAt} />
+                                </>
+                              ) : null}
                             </p>
                           </article>
                         ))}

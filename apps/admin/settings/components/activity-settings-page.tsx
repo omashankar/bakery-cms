@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
-import { formatRelativeTime } from "@/utils/format";
 import type { ActivityLog } from "@/types/settings";
 import type { AuditLogEntry } from "@/types/audit";
 import { clearActivityLog, getActivityLog } from "@/features/settings/lib/settings-repository";
@@ -24,6 +23,7 @@ import { auditToActivity, mergeActivity } from "@/features/audit/lib/audit-activ
 import { ACTIVITY_AUDIT_LIMIT } from "@/apps/admin/settings/lib/activity-defaults";
 import { ListLoading } from "@/components/shared/list-loading";
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
+import { RelativeTime } from "@/components/shared/relative-time";
 
 const actionTone: Record<string, string> = {
   published: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
@@ -210,7 +210,7 @@ export function ActivitySettingsPage({
                       ) : null}
                     </div>
                     <div className="text-right text-xs text-muted-foreground">
-                      <p>{formatRelativeTime(entry.timestamp)}</p>
+                      <p><RelativeTime date={entry.timestamp} /></p>
                       <p>{entry.userId}</p>
                     </div>
                   </div>

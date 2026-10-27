@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PanelLoading } from "@/components/shared/panel-loading";
 import { routes } from "@/constants/routes";
-import { formatRelativeTime } from "@/utils/format";
 import { fetchAuditLogs } from "@/features/audit/lib/audit-api";
 import { auditToActivity } from "@/features/audit/lib/audit-activity";
 import type { AuditLogEntry } from "@/types/audit";
@@ -17,6 +16,7 @@ import {
   getDashboardActivities,
   type DashboardActivityItem,
 } from "../lib/dashboard-data";
+import { RelativeTime } from "@/components/shared/relative-time";
 
 export function DashboardActivityFeed({
   initial = null,
@@ -100,7 +100,7 @@ export function DashboardActivityFeed({
                     className="mt-0.5 text-[11px] capitalize text-muted-foreground"
                     suppressHydrationWarning
                   >
-                    {activity.entity} · {formatRelativeTime(activity.timestamp)}
+                    {activity.entity} · <RelativeTime date={activity.timestamp} />
                   </p>
                 </div>
               </li>

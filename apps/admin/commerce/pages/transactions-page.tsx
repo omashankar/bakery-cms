@@ -29,9 +29,10 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { formatCurrency, formatRelativeTime } from "@/utils/format";
+import { formatCurrency } from "@/utils/format";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { reportedAsSignedOut, reportedAsSignedOutOnRead } from "@/apps/admin/lib/report-write";
+import { RelativeTime } from "@/components/shared/relative-time";
 
 const PAGE_SIZE = 12;
 /** Matches the server's max page size — one request, no client-side paging loop. */
@@ -347,7 +348,7 @@ export function TransactionsPage({
                           <PaymentStatusBadge status={t.status} />
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                          {formatRelativeTime(t.createdAt)}
+                          <RelativeTime date={t.createdAt} />
                         </td>
                       </tr>
                     );
@@ -377,7 +378,7 @@ export function TransactionsPage({
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <PaymentStatusBadge status={t.status} />
                         <span className="text-xs text-muted-foreground">
-                          {t.gatewayName} · {formatRelativeTime(t.createdAt)}
+                          {t.gatewayName} · <RelativeTime date={t.createdAt} />
                         </span>
                       </div>
                     </button>

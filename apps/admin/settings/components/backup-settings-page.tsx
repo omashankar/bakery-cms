@@ -24,7 +24,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
-import { formatRelativeTime } from "@/utils/format";
 import type { BackupSnapshot } from "@/types/backup";
 import { knownStorageKeys } from "@/features/settings/lib/settings-utils";
 import {
@@ -40,6 +39,7 @@ import {
   serverBackedKeys,
 } from "../lib/backup-repository";
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
+import { RelativeTime } from "@/components/shared/relative-time";
 
 export function BackupSettingsPage() {
   // An export copies these browser caches verbatim, so they must hold the
@@ -373,7 +373,7 @@ export function BackupSettingsPage() {
                       <div className="min-w-0 space-y-1">
                         <p className="text-sm font-medium">{snapshot.label}</p>
                         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                          <span>{formatRelativeTime(snapshot.createdAt)}</span>
+                          <span><RelativeTime date={snapshot.createdAt} /></span>
                           <span>·</span>
                           <span>{snapshot.keyCount} keys</span>
                           <span>·</span>

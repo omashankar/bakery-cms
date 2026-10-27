@@ -54,9 +54,10 @@ import type { PlacedOrder } from "@/features/orders/lib/orders";
 import { fetchInvoicesPage } from "@/features/orders/lib/orders-api";
 import { routes } from "@/constants/routes";
 import { cn } from "@/lib/utils";
-import { formatCurrency, formatRelativeTime } from "@/utils/format";
+import { formatCurrency } from "@/utils/format";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import type { InvoiceSettings } from "@/types/invoice";
+import { RelativeTime } from "@/components/shared/relative-time";
 
 const PAGE_SIZE = 10;
 /** Matches the server's max page size — one request, no client-side paging loop. */
@@ -567,7 +568,7 @@ export function InvoicesAdminPage({
                             {formatCurrency(order.totals.total)}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                            {formatRelativeTime(order.placedAt)}
+                            <RelativeTime date={order.placedAt} />
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex flex-wrap gap-2">
@@ -629,7 +630,7 @@ export function InvoicesAdminPage({
                                 </p>
                                 <p className="truncate text-xs text-muted-foreground">
                                   {order.address.fullName} ·{" "}
-                                  {formatRelativeTime(order.placedAt)}
+                                  <RelativeTime date={order.placedAt} />
                                 </p>
                               </div>
                               <p className="shrink-0 text-sm font-semibold">

@@ -44,9 +44,10 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ListPagination } from "@/components/shared/list-pagination";
 import { routes } from "@/constants/routes";
 import { cn } from "@/lib/utils";
-import { formatCurrency, formatRelativeTime } from "@/utils/format";
+import { formatCurrency } from "@/utils/format";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
+import { RelativeTime } from "@/components/shared/relative-time";
 
 const PAGE_SIZE = 10;
 /** Matches the server's max page size — one request, no client-side paging loop. */
@@ -736,7 +737,7 @@ export function OrdersListPage({ initial = null }: OrdersListPageProps = {}) {
                         className="cursor-pointer px-4 py-3 text-muted-foreground"
                         onClick={() => router.push(routes.admin.orders.detail(order.id))}
                       >
-                        {formatRelativeTime(order.placedAt)}
+                        <RelativeTime date={order.placedAt} />
                       </td>
                     </tr>
                   ))}
@@ -765,7 +766,7 @@ export function OrdersListPage({ initial = null }: OrdersListPageProps = {}) {
                             {order.orderNumber}
                           </p>
                           <p className="truncate text-xs text-muted-foreground">
-                            {order.address.fullName} · {formatRelativeTime(order.placedAt)}
+                            {order.address.fullName} · <RelativeTime date={order.placedAt} />
                           </p>
                         </div>
                         <p className="shrink-0 text-sm font-semibold">

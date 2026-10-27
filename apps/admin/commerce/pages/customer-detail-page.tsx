@@ -28,9 +28,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { routes } from "@/constants/routes";
-import { formatCurrency, formatDate, formatRelativeTime } from "@/utils/format";
+import { formatCurrency, formatDate } from "@/utils/format";
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
+import { RelativeTime } from "@/components/shared/relative-time";
 
 interface CustomerDetailPageProps {
   customerId: string;
@@ -358,7 +359,7 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
                           Used {address.usedCount} time{address.usedCount === 1 ? "" : "s"} · Last{" "}
-                          {formatRelativeTime(address.lastUsedAt)}
+                          <RelativeTime date={address.lastUsedAt} />
                         </p>
                       </div>
                     </div>
@@ -391,7 +392,7 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
                         <p className="mt-0.5 text-sm text-muted-foreground">{item.description}</p>
                       ) : null}
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {formatRelativeTime(item.at)}
+                        <RelativeTime date={item.at} />
                       </p>
                     </div>
                   </div>

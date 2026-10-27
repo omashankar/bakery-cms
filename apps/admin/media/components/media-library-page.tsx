@@ -27,7 +27,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import { formatRelativeTime } from "@/utils/format";
 import type { MediaFile, MediaFolder } from "@/types/media";
 import {
   bulkMoveMediaToFolder,
@@ -60,6 +59,7 @@ import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { adminShell } from "@/apps/admin/components/admin-shell";
 import { applyServerMedia, useMediaServerSync } from "@/apps/admin/media/lib/use-media-server-sync";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
+import { RelativeTime } from "@/components/shared/relative-time";
 
 const PAGE_SIZE = 12;
 
@@ -581,7 +581,7 @@ export function MediaLibraryPage({
                       <div className="space-y-1 p-3">
                         <p className="truncate text-sm font-medium">{file.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {formatFileSize(file.size)} · {formatRelativeTime(file.createdAt)}
+                          {formatFileSize(file.size)} · <RelativeTime date={file.createdAt} />
                         </p>
                       </div>
                     </button>
@@ -627,7 +627,7 @@ export function MediaLibraryPage({
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{file.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {formatFileSize(file.size)} · {formatRelativeTime(file.createdAt)}
+                        {formatFileSize(file.size)} · <RelativeTime date={file.createdAt} />
                       </p>
                     </div>
                     <Badge variant="outline" className="capitalize">

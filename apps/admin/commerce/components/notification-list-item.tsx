@@ -4,11 +4,11 @@ import Link from "next/link";
 import type { AdminNotification } from "@/types/notification";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { formatRelativeTime } from "@/utils/format";
 import {
   NotificationTypeBadge,
   NotificationTypeIcon,
 } from "./notification-type-badge";
+import { RelativeTime } from "@/components/shared/relative-time";
 
 interface NotificationListItemProps {
   notification: AdminNotification;
@@ -97,7 +97,7 @@ export function NotificationListItem({
           <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">{notification.message}</p>
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
             <p className="text-xs text-muted-foreground">
-              {formatRelativeTime(notification.createdAt)}
+              <RelativeTime date={notification.createdAt} />
             </p>
             {!compact ? (
               <span className="sm:hidden">

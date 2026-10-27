@@ -35,7 +35,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { routes } from "@/constants/routes";
-import { formatRelativeTime } from "@/utils/format";
 import type { CmsPage } from "@/types/content";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { adminShell } from "@/apps/admin/components/admin-shell";
@@ -56,6 +55,7 @@ import {
   type PageOverview,
 } from "@/features/content/lib/pages-utils";
 import { DeletePageDialog } from "./delete-page-dialog";
+import { RelativeTime } from "@/components/shared/relative-time";
 
 function PageRowActions({
   item,
@@ -467,7 +467,7 @@ export function PagesListPage({
                         </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                        {formatRelativeTime(item.updatedAt)}
+                        <RelativeTime date={item.updatedAt} />
                       </td>
                       <td className="px-4 py-3">
                         <PageRowActions
@@ -518,7 +518,7 @@ export function PagesListPage({
                       {item.isSystem ? <Badge variant="secondary">System</Badge> : null}
                     </div>
                     <p className="mt-2 text-xs text-muted-foreground">
-                      Updated {formatRelativeTime(item.updatedAt)}
+                      Updated <RelativeTime date={item.updatedAt} />
                     </p>
                   </div>
                 </div>
