@@ -67,6 +67,17 @@ Admin → Settings → SMTP:
 Abhi configured hai. Server par bhi wahi `CLOUDINARY_*` values **build se
 pehle** set honi chahiye, warna upload ki hui photos khaali dikhengi.
 
+## 7b. Map par delivery area — muft, koi key nahi
+
+Checkout par customer map par apne ghar ka pin lagata hai. Order tabhi hota
+hai jab pin kisi delivery area ke andar ho. Map OpenStreetMap ka hai: muft,
+na key, na billing.
+- Admin → Delivery Zones mein har zone ka **area map par banao** (dukaan se
+  km, ya boundary). PIN wale purane zone ab kuch tay nahi karte — **bina area
+  ke koi order nahi hoga.**
+- `.env` mein `MAP_CONTACT_EMAIL` apna email daal do (OpenStreetMap ka niyam).
+- Dukaan bahut busy ho jaaye to apna map server — [map-setup.md](map-setup.md).
+
 ## 8. Pehla owner (sirf naye database par)
 
 ```

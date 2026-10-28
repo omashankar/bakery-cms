@@ -1,6 +1,6 @@
 import { ok } from "@/lib/server/http/response";
 import { ValidationError, withErrorHandler } from "@/lib/server/http/errors";
-import { describePincodeCode, listDistricts } from "./pincode-directory";
+import { describePincodeCode, listDistricts, suggestPincodes } from "./pincode-directory";
 import { validate, readJson } from "@/lib/server/http/validate";
 import { getSession, requireRole } from "@/lib/server/auth/dal";
 import { requestContext } from "@/lib/server/audit/audit-log";
@@ -76,11 +76,22 @@ const DIRECTORY_CACHE = { "Cache-Control": "public, max-age=86400, s-maxage=8640
  *
  *   ?codes=324005,3240  → { "324005": { kind: "pin", place }, "3240": { kind: "prefix", summary } }
  *   ?districts=1        → every district, its state and PIN count
+ *   ?prefix=3240        → the first ten real PINs starting with it, with their places
  */
 export const getPincodesController = withErrorHandler(async (request: Request) => {
   const params = new URL(request.url).searchParams;
   if (params.get("districts")) {
     return ok(listDistricts(), "Districts", { headers: DIRECTORY_CACHE });
+  }
+
+  // The PINs a half-typed code could be, for the list under the box as the
+  // customer types — "3240" → 324001 Kota, 324002 Kota … — from India Post.
+  const prefix = params.get("prefix");
+  if (prefix !== null) {
+    if (!/^[1-9]\d{2,5}$/.test(prefix)) {
+      throw new ValidationError([{ field: "prefix", message: "A PIN prefix is 3–6 digits, not starting with 0" }]);
+    }
+    return ok(suggestPincodes(prefix), "PIN codes", { headers: DIRECTORY_CACHE });
   }
 
   const codes = [...new Set((params.get("codes") ?? "").split(",").map((code) => code.trim()).filter(Boolean))];

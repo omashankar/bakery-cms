@@ -107,6 +107,17 @@ export function describePincodeCode(code: string): PincodeInfo {
   };
 }
 
+/**
+ * The real PINs a half-typed code could be, lowest first — the list under a
+ * PIN box as the customer types. "3240" → 324001 Kota, 324002 Kota …; a code
+ * no PIN starts with gives none, which is how a typo shows itself.
+ */
+export function suggestPincodes(prefix: string, limit = 10): PincodePlace[] {
+  return pinsStartingWith(prefix)
+    .slice(0, limit)
+    .map((pin) => lookUpPincode(pin)!);
+}
+
 let districtList: DistrictEntry[] | null = null;
 
 /** Every district, with its state and how many PIN codes it has. */

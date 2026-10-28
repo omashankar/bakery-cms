@@ -42,7 +42,7 @@ const SAMPLE_ITEM = {
   quantity: 1,
 };
 
-const EMPTY_ZONE_STATS = { total: 0, active: 0, inactive: 0, cities: 0 };
+const EMPTY_ZONE_STATS = { total: 0, active: 0, inactive: 0, needsArea: 0 };
 
 export function ShippingRulesAdminPage() {
   // The shared section form — same reasoning as the Taxes screen. The
@@ -102,7 +102,14 @@ export function ShippingRulesAdminPage() {
     () =>
       calculateCartTotals({
         items: [SAMPLE_ITEM],
-        deliveryAddress: { city: previewCity, pincode: previewPincode, place },
+        // The PIN's district and state price a whole-district or state zone; a
+        // drawn area needs a pin, which the Delivery map's "tap anywhere" checks.
+        deliveryAddress: {
+          city: previewCity,
+          pincode: previewPincode,
+          place,
+          region: place ? { state: place.state, districts: place.districts } : null,
+        },
         commerceOverride: settings,
       }),
     [previewCity, previewPincode, place, settings]

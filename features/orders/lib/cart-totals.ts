@@ -51,6 +51,10 @@ export interface CartTotalsInput {
      * district zone would disagree with the price the server charges.
      */
     place?: import("@/features/commerce/lib/delivery-zone-utils").ZoneAddress["place"];
+    /** The customer's pin on the map — what decides the zone. */
+    location?: import("@/types/delivery").LatLng;
+    /** The pin's district and state — see `findDeliveryZoneForPin`. */
+    region?: import("@/features/commerce/lib/delivery-area").PinRegion | null;
   };
   commerceOverride?: import("@/types/settings").CommerceSettings;
   /** Delivery zones from the caller — the server passes its own; see below. */
@@ -104,6 +108,14 @@ export interface CartTotals {
    * is in none of them — see `DeliveryQuote.deliverable`. Absent means yes.
    */
   deliverable?: boolean;
+  /** The zone that priced the delivery, so the order can name it after a rename. */
+  deliveryZoneId?: string;
+  /**
+   * What the SERVER found at the customer's map pin — set by `priceCart` only,
+   * after checking it, so the order and the admin can rely on it. Absent on a
+   * shop without zones, and on orders placed before pins existed.
+   */
+  deliveryPin?: import("@/types/delivery").DeliveryPinVerification;
 }
 
 function getCommerceConfig() {
@@ -177,6 +189,8 @@ export function calculateCartTotals({
             pincode: deliveryAddress?.pincode,
             state: deliveryAddress?.state,
             place: deliveryAddress?.place,
+            location: deliveryAddress?.location,
+            region: deliveryAddress?.region,
           },
           commerce,
           zonesOverride
@@ -224,6 +238,7 @@ export function calculateCartTotals({
     total,
     itemCount,
     deliveryZoneName: deliveryQuote.zoneName,
+    deliveryZoneId: deliveryQuote.zoneId,
     estimatedDeliveryDays: deliveryQuote.estimatedDeliveryDays,
     deliveryMinDays: deliveryQuote.minDeliveryDays,
     deliverable: deliveryQuote.deliverable,

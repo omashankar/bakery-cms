@@ -22,7 +22,8 @@ export interface CheckoutDraft {
   totals: CartQuote["totals"];
   coupon: CartQuote["coupon"];
   giftWrap: boolean;
-  deliveryAddress: { city?: string; pincode?: string } | null;
+  /** What the quote was priced for: the zone came from `location`, the map pin. */
+  deliveryAddress: { city?: string; pincode?: string; state?: string; location?: { lat: number; lng: number } } | null;
   /** The rest of the order intent, present once the customer has an address. */
   address: Record<string, string> | null;
   deliverySlot: { date?: string; timeSlot?: string } | null;
@@ -53,8 +54,8 @@ export async function createDraft(
   quote: CartQuote,
   context: {
     giftWrap: boolean;
-    deliveryAddress?: { city?: string; pincode?: string };
-    address?: Record<string, string>;
+    deliveryAddress?: { city?: string; pincode?: string; state?: string; location?: { lat: number; lng: number } };
+    address?: Record<string, unknown>;
     deliverySlot?: { date?: string; timeSlot?: string };
     orderNotes?: string;
     personalisation?: Record<string, unknown>;

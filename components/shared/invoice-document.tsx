@@ -153,8 +153,8 @@ export function InvoiceDocument({
                 customer keeps. The success page was given this helper for
                 exactly that; the invoice was left behind.
               */}
+              {/* No zone name: this is the customer's copy, and the zone's name is the owner's own word. */}
               {formatOrderDeliveryDay(order, { day: "numeric", month: "short", year: "numeric" })}
-              {order.totals.deliveryZoneName ? ` · ${order.totals.deliveryZoneName}` : ""}
             </p>
             {order.orderNotes ? (
               <p className="mt-2 text-muted-foreground">Notes: {order.orderNotes}</p>

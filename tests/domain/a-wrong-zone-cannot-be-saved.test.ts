@@ -71,8 +71,9 @@ describe("a PIN is six digits before any zone answers it", () => {
 
   it("gives the storefront check no answer until the PIN is complete", () => {
     expect(lookUpDeliveryPincode([kota], "32400", rules)).toBeNull();
-    expect(lookUpDeliveryPincode([kota], "324001", rules)?.served).toBe(true);
-    expect(lookUpDeliveryPincode([kota], "400001", rules)?.served).toBe(false);
+    // Complete, it is answered — though a PIN zone decides nothing now; the
+    // map pin at checkout does (owner, 2026-10-27).
+    expect(lookUpDeliveryPincode([kota], "324001", rules)).not.toBeNull();
   });
 });
 
@@ -147,9 +148,9 @@ describe("a zone that would deliver nowhere is refused", () => {
     expect(checkZoneDraft(draft({}, [], "3240", "400001")).warnings.join(" ")).toContain("changes nothing");
   });
 
-  it("refuses a PIN typed into the cities box", () => {
+  it("refuses a PIN typed into the districts box", () => {
     expect(checkZoneDraft(draft({ coverage: "cities", cities: ["324001"] })).errors.join(" ")).toContain(
-      "is a PIN code, not a city",
+      "is a PIN code, not a district",
     );
   });
 
@@ -178,16 +179,28 @@ describe("the admin's PIN checker answers what checkout will do", () => {
 
 describe("the zone list finds zones by what they cover", () => {
   const cities = zone({ name: "Hadoti", coverage: "cities", cities: ["Kota", "Bundi"], city: "Kota, Bundi" });
-  const all = { search: "", status: "all" as const, city: "all" };
+  const all = { search: "", status: "all" as const, kind: "all" as const };
 
   it("searches a zone's PIN rules and cities, not only the old single fields", () => {
     expect(filterDeliveryZones([kota, cities], { ...all, search: "3240" }).map((z) => z.name)).toEqual(["Kota"]);
     expect(filterDeliveryZones([kota, cities], { ...all, search: "bundi" }).map((z) => z.name)).toEqual(["Hadoti"]);
   });
 
-  it("counts real cities, one each, and filters on any of them", () => {
+  it("counts real cities, one each", () => {
     expect(getUniqueZoneCities([kota, cities])).toEqual(["Bundi", "Kota"]);
-    expect(filterDeliveryZones([kota, cities], { ...all, city: "Bundi" }).map((z) => z.name)).toEqual(["Hadoti"]);
+  });
+
+  it("filters by what a zone is drawn as — and finds the ones that still need an area", () => {
+    const circle = zone({ name: "Talwandi", coverage: "radius", center: { lat: 25.14, lng: 75.85 }, radiusKm: 1 });
+    const state = zone({ name: "Rajasthan", coverage: "states", states: ["Rajasthan"] });
+    const list = [kota, cities, circle, state];
+    const names = (kind: typeof all.kind | "map" | "districts" | "states" | "needs-area") =>
+      filterDeliveryZones(list, { ...all, kind }).map((z) => z.name);
+    expect(names("map")).toEqual(["Talwandi"]);
+    expect(names("districts")).toEqual(["Hadoti"]);
+    expect(names("states")).toEqual(["Rajasthan"]);
+    expect(names("needs-area")).toEqual(["Kota"]);
+    expect(names("all")).toHaveLength(4);
   });
 });
 

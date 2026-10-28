@@ -1,14 +1,18 @@
 import type {
   DeliveryZone,
+  DeliveryZoneKindFilter,
   DeliveryZoneListFilters,
   DeliveryZoneMatch,
   PincodePlace,
 } from "@/types/delivery";
 import { matchStateName, stateForPincode } from "./india-states";
 
-/** What a customer is told when no zone covers them and the shop stops there. */
+/**
+ * What a customer is told when no zone holds their map pin and the shop stops
+ * there. About the LOCATION, not the PIN: the pin decides now.
+ */
 export const OUTSIDE_ZONES_MESSAGE =
-  "Sorry, we don't deliver to this PIN code yet. Please try another delivery address.";
+  "This location is outside our delivery area. Please select an eligible delivery address.";
 
 export function normalizePincode(value: string): string {
   return value.replace(/\D/g, "").slice(0, 6);
@@ -255,12 +259,7 @@ export function filterDeliveryZones(
   return zones.filter((zone) => {
     if (filters.status === "active" && !zone.isActive) return false;
     if (filters.status === "inactive" && zone.isActive) return false;
-    if (
-      filters.city !== "all" &&
-      !zoneCities(zone).some((city) => matchesZoneCity(city, filters.city))
-    ) {
-      return false;
-    }
+    if (filters.kind !== "all" && zoneKind(zone) !== filters.kind) return false;
 
     if (!query) return true;
 
@@ -280,8 +279,16 @@ export function filterDeliveryZones(
 
 export function countActiveDeliveryZoneFilters(filters: DeliveryZoneListFilters): number {
   let count = 0;
-  if (filters.city !== "all") count += 1;
+  if (filters.kind !== "all") count += 1;
   return count;
+}
+
+/** What a zone is drawn as — see `DeliveryZoneKindFilter`. */
+export function zoneKind(zone: DeliveryZone): Exclude<DeliveryZoneKindFilter, "all"> {
+  if (zone.coverage === "radius" || zone.coverage === "polygon" || zone.coverage === "areas") return "map";
+  if (zone.coverage === "cities") return "districts";
+  if (zone.coverage === "states") return "states";
+  return "needs-area";
 }
 
 /**
@@ -341,12 +348,31 @@ export function describeZoneCoverage(zone: DeliveryZone): { covers: string; exce
   const except = excluded.length ? listed(excluded.map(describePincodeRule), 4) : "";
 
   switch (zone.coverage) {
+    case "radius":
+      return {
+        covers: zone.center
+          ? `${zone.radiusKm} km around ${zone.center.lat.toFixed(4)}, ${zone.center.lng.toFixed(4)}`
+          : "Circle — no centre yet",
+        except: "",
+      };
+    case "polygon": {
+      const corners = zone.polygon?.length ?? 0;
+      return { covers: corners >= 3 ? `Drawn area · ${corners} corners` : "Drawn area — not finished", except: "" };
+    }
+    case "areas": {
+      const shapes = zone.areas ?? [];
+      if (shapes.length === 1) return describeZoneCoverage({ ...zone, ...(shapes[0].kind === "radius" ? { coverage: "radius", center: shapes[0].center, radiusKm: shapes[0].radiusKm } : { coverage: "polygon", polygon: shapes[0].polygon }) });
+      const circles = shapes.filter((shape) => shape.kind === "radius").length;
+      const boundaries = shapes.length - circles;
+      const parts = [circles ? `${circles} circle${circles === 1 ? "" : "s"}` : "", boundaries ? `${boundaries} boundar${boundaries === 1 ? "y" : "ies"}` : ""].filter(Boolean);
+      return { covers: shapes.length ? `${shapes.length} map areas · ${parts.join(", ")}` : "Map areas — none yet", except: "" };
+    }
     case "country":
       return { covers: "All of India", except };
     case "states":
       return { covers: `States: ${listed(zone.states ?? [], 3) || "none chosen"}`, except };
     case "cities":
-      return { covers: `Cities: ${listed(zoneCities(zone), 3) || "none chosen"}`, except };
+      return { covers: `Districts: ${listed(zoneCities(zone), 3) || "none chosen"}`, except };
     case "pincodes":
       return {
         covers: `PIN codes: ${listed(zonePincodeRules(zone).map(describePincodeRule), 4) || "none chosen"}`,

@@ -15,11 +15,36 @@ const deliveryZoneSchema = new mongoose.Schema(
     pincode: { type: String, default: "" },
     // What the zone covers; absent on zones written before it existed, which
     // keep their single city/pincode rule. See `DeliveryZoneCoverage`.
-    coverage: { type: String, enum: ["country", "states", "cities", "pincodes"] },
+    coverage: { type: String, enum: ["country", "states", "cities", "pincodes", "radius", "polygon", "areas"] },
     states: { type: [String], default: undefined },
     cities: { type: [String], default: undefined },
     pincodes: { type: [String], default: undefined },
     excludedPincodes: { type: [String], default: undefined },
+    // The map area: a circle round `center`, or a drawn boundary. `_id: false`
+    // so a corner is a point, not a document.
+    center: {
+      type: new mongoose.Schema({ lat: Number, lng: Number }, { _id: false }),
+      default: undefined,
+    },
+    polygon: {
+      type: [new mongoose.Schema({ lat: Number, lng: Number }, { _id: false })],
+      default: undefined,
+    },
+    // Several circles and boundaries in one zone (coverage "areas").
+    areas: {
+      type: [
+        new mongoose.Schema(
+          {
+            kind: { type: String, enum: ["radius", "polygon"], required: true },
+            center: { type: new mongoose.Schema({ lat: Number, lng: Number }, { _id: false }), default: undefined },
+            radiusKm: { type: Number, default: undefined },
+            polygon: { type: [new mongoose.Schema({ lat: Number, lng: Number }, { _id: false })], default: undefined },
+          },
+          { _id: false },
+        ),
+      ],
+      default: undefined,
+    },
     radiusKm: { type: Number, default: 0 },
     deliveryCharge: { type: Number, default: 0 },
     minDeliveryDays: { type: Number, default: 0 },

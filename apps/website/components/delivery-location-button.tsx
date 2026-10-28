@@ -1,50 +1,59 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, MapPin, X } from "lucide-react";
+import dynamic from "next/dynamic";
+import { MapPin, Pencil } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { DeliveryAnswer } from "@/components/storefront/delivery-answer";
 import { fetchZones } from "@/features/commerce/lib/commerce-api";
-import { fetchPincodePlace } from "@/features/commerce/lib/pincode-api";
 import { loadDeliveryZones } from "@/features/commerce/lib/delivery-zones-repository";
 import { isStorefrontSeeded } from "@/lib/storefront-seed-flag";
 import {
   DELIVERY_LOCATION_UPDATED_EVENT,
   deliveryLocationLabel,
-  lookUpDeliveryPincode,
   readDeliveryLocation,
-  saveDeliveryLocation,
   type DeliveryLocation,
-  type DeliveryLookup,
 } from "@/features/commerce/lib/delivery-location";
-import { isFullPincode, normalizePincode } from "@/features/commerce/lib/delivery-zone-utils";
 import type { DeliveryZone } from "@/types/delivery";
-import { cn } from "@/lib/utils";
-import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
+
+/**
+ * The window itself, fetched the first time the button is pressed. The header
+ * is on every page of the shop and most visitors never open this; its search,
+ * dialog and answers have no business in every page's JavaScript.
+ */
+const DeliveryLocationModal = dynamic(() => import("./delivery-location-modal"), { ssr: false });
+
+/**
+ * India's flag, drawn — a flag emoji is two letters on Windows, not a flag.
+ * The shop delivers in India only, which is all the "IND" beside it says.
+ */
+function IndiaFlag({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 30 20" aria-hidden className={className}>
+      <rect width="30" height="20" fill="#fff" />
+      <rect width="30" height="6.67" fill="#FF9933" />
+      <rect y="13.33" width="30" height="6.67" fill="#138808" />
+      <circle cx="15" cy="10" r="2.6" fill="none" stroke="#000080" strokeWidth="0.6" />
+      <circle cx="15" cy="10" r="0.6" fill="#000080" />
+    </svg>
+  );
+}
 
 /**
  * WHERE AM I HAVING THIS SENT — in the header, where the reference puts it.
  *
- * Every word this renders about coverage, speed or cost is read out of the
- * shop's own Delivery Zones. It states nothing of its own: an unmatched pincode
- * says only that no zone covers it, a matched one repeats that zone's name, its
- * own minimum days and its own charge, and a shop with no zones at all never
- * mounts this at all — see `hasDeliveryZones`, which is the difference between
- * "we do not deliver there" and "nobody has said yet".
+ * A pill naming the customer's own place ("Deliver to Kota 324005"), or
+ * "Choose Delivery Location" until they have one. Pressing it opens Select
+ * Delivery Location: an area or a PIN in one box, or the phone's location, or
+ * a saved address — see `DeliveryLocationModal`. Every word about coverage,
+ * cost or speed comes from the shop's own zones; a shop with none never
+ * mounts this at all — see `hasDeliveryZones`.
  */
 export function DeliveryLocationButton() {
   const [open, setOpen] = useState(false);
   const [location, setLocation] = useState<DeliveryLocation | null>(null);
-  const [entered, setEntered] = useState("");
   const [zones, setZones] = useState<DeliveryZone[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<DeliveryLookup | null>(null);
-  const [checking, setChecking] = useState(false);
-  // Bumped on every edit, so a check answered after the box changed is dropped.
-  const checkSeq = useRef(0);
-  const panelRef = useRef<HTMLDivElement>(null);
+  // One read even when the button is pressed twice before the first lands.
+  const loading = useRef(false);
 
   useEffect(() => {
     const sync = () => setLocation(readDeliveryLocation());
@@ -58,151 +67,62 @@ export function DeliveryLocationButton() {
   }, []);
 
   /**
-   * The zone list is fetched when the panel OPENS, not on mount.
-   *
-   * This component sits in the header of every storefront page. Fetching on
-   * mount would put one extra request on every page load of every visit, for
-   * a control most visitors never touch — the list is only needed the moment
-   * somebody actually types a PIN code.
-   *
-   * In the handler rather than in an effect keyed on `open`, because the
-   * effect version sets state synchronously during the effect — a cascading
-   * render this repo's lint rules reject, and here an avoidable one: opening
-   * the panel is an event, and an event is where the work belongs.
+   * The zone list is read when the window OPENS, not on mount: one extra
+   * request on every page load, for a control most visitors never touch, is
+   * not worth it. In the handler, not an effect keyed on `open` — opening is
+   * an event, and an event is where the work belongs.
    */
-  const openPanel = () => {
+  const openWindow = () => {
     setOpen(true);
-    if (zones !== null || loading) return;
-    setLoading(true);
+    if (zones !== null || loading.current) return;
+    loading.current = true;
     // The zones the page brought with it (StorefrontCacheSeed), or a request.
     const read = isStorefrontSeeded() ? Promise.resolve(loadDeliveryZones()) : fetchZones();
     void read
       .then((rows) => setZones(rows ?? []))
-      // An empty list on failure, not a retry loop: the panel then says it
-      // found no covering zone, which is what it knows, instead of claiming
-      // the shop does not deliver there, which it does not.
       .catch(() => setZones([]))
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    const onPointerDown = (event: MouseEvent) => {
-      if (!panelRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("mousedown", onPointerDown);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("mousedown", onPointerDown);
-    };
-  }, [open]);
-
-  const check = async () => {
-    if (zones === null) return;
-    const pincode = normalizePincode(entered);
-    const seq = ++checkSeq.current;
-    setChecking(true);
-    // Where the PIN really is, or that India Post has no such PIN; a failed
-    // request answers from the zones alone.
-    const asked = await fetchPincodePlace(pincode);
-    setChecking(false);
-    if (seq !== checkSeq.current) return;
-    const found = lookUpDeliveryPincode(zones, pincode, getCommerceSettings(), asked?.place);
-    setResult(found);
-    if (found?.served) {
-      saveDeliveryLocation({ pincode, label: found.zoneName });
-      setLocation({ pincode, label: found.zoneName });
-    }
+      .finally(() => {
+        loading.current = false;
+      });
   };
 
   const chosen = deliveryLocationLabel(location);
 
   return (
-    <div className="relative" ref={panelRef}>
+    <div className="relative">
       <button
         type="button"
-        onClick={() => (open ? setOpen(false) : openPanel())}
+        onClick={openWindow}
+        aria-haspopup="dialog"
         aria-expanded={open}
         /*
-          A TINTED PILL, as the shop's header design has it — the accent's
-          lightest step, so a shop that picks another accent colour gets this
-          in its own tint. Taller from lg, level with the search box beside it.
+          A TINTED PILL, laid out as the reference shop's header has it: the flag
+          and country, a rule, the pin, the place, a pencil to change it. The
+          tint runs between the shop's own lightest steps, so a shop that picks
+          other colours gets this in its own. Level with the search box from lg.
         */
-        className="flex max-w-[15rem] items-center gap-2 rounded-full border border-gold-200 bg-gold-50 px-3.5 py-2 text-left text-sm transition-premium hover:border-gold-300 lg:h-11 lg:gap-2.5 lg:px-5"
+        className="group flex max-w-full items-center rounded-full border border-gold-200 bg-gradient-to-r from-gold-50 to-bakery-50 text-left text-sm shadow-sm transition-premium hover:border-gold-300 hover:shadow lg:h-11 lg:max-w-[22rem]"
       >
-        <MapPin className="size-4 shrink-0 fill-bakery-700 text-gold-50 lg:size-5" />
-        {/*
-          The zone's own name when there is one, and a plain prompt when there
-          is not. The prompt is interface wording — it names the control, not a
-          place the shop delivers to.
-        */}
-        <span className={cn("truncate", chosen ? "font-medium text-foreground" : "text-muted-foreground")}>
-          {chosen ? `Deliver to ${chosen}` : "Delivery location"}
+        <span className="flex shrink-0 items-center gap-1.5 border-r border-gold-200 py-2 pr-2.5 pl-3.5 lg:pr-3 lg:pl-4">
+          <IndiaFlag className="h-3.5 w-5 rounded-[2px] shadow-[0_0_0_0.5px_rgb(0_0_0/0.15)]" />
+          <span className="text-xs font-semibold text-foreground lg:text-sm">IND</span>
         </span>
-        <ChevronDown
-          className={cn("size-4 shrink-0 text-foreground transition-transform", open && "rotate-180")}
-        />
+        <span className="flex min-w-0 items-center gap-1.5 py-2 pr-3.5 pl-2.5 lg:gap-2 lg:pr-4 lg:pl-3">
+          <MapPin className="size-4 shrink-0 fill-bakery-700 text-gold-50 lg:size-5" aria-hidden />
+        {/*
+          The customer's own place when they chose one ("Kota 324005"), and a
+          plain prompt when not. Never the shop's zone name: "Deliver to
+          sangod" was the owner's word, and outlived the zone it named.
+        */}
+          <span className="truncate font-semibold text-foreground">
+            {chosen ? `Deliver to ${chosen}` : "Choose Delivery Location"}
+          </span>
+          <Pencil className="size-3.5 shrink-0 text-foreground/60 transition-colors group-hover:text-foreground" aria-hidden />
+        </span>
       </button>
 
-      {open ? (
-        <div className="absolute top-full right-0 z-50 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-border bg-popover p-4 shadow-md">
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-sm font-semibold text-foreground">Check your PIN code</p>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              aria-label="Close"
-              className="-mt-1 -mr-1 rounded-md p-1 text-muted-foreground hover:bg-cream-100 hover:text-foreground"
-            >
-              <X className="size-4" />
-            </button>
-          </div>
-
-          <form
-            className="mt-3 flex gap-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void check();
-            }}
-          >
-            <Input
-              className="h-11"
-              value={entered}
-              // The same normalisation every zone rule is matched through, so
-              // what the customer sees typed is exactly what gets compared.
-              onChange={(event) => {
-                checkSeq.current += 1;
-                setEntered(normalizePincode(event.target.value));
-                // The old answer was for the old code.
-                setResult(null);
-              }}
-              inputMode="numeric"
-              autoComplete="postal-code"
-              aria-label="PIN code"
-              placeholder="PIN code"
-            />
-            <Button type="submit" variant="bakery" className="h-11" disabled={!isFullPincode(entered) || loading || checking}>
-              Check
-            </Button>
-          </form>
-
-          {/*
-            THE SAME ANSWER THE PRODUCT PAGE GIVES, from the same component.
-
-            All of this — the three facts read off the matched zone, and the
-            careful "no delivery area covers this PIN code yet" for a miss —
-            used to be written out here. The product page now asks the same
-            question in the same place a customer decides, and a second copy of
-            this wording is how two screens come to tell somebody two different
-            things about whether an order can reach them.
-          */}
-          <DeliveryAnswer result={result} pincode={entered} loading={loading || checking} className="mt-3" />
-        </div>
-      ) : null}
+      {/* Mounted fresh on each open, so it reads the session and the book as they are now. */}
+      {open && zones !== null ? <DeliveryLocationModal open onOpenChange={setOpen} zones={zones} /> : null}
     </div>
   );
 }

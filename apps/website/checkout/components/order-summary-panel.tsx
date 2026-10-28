@@ -154,12 +154,10 @@ export function OrderSummaryPanel({
         <TaxBreakdown values={breakdown} bigTotal={!placed} />
       </div>
 
-      {totals.deliveryZoneName ? (
+      {/* The days, never the zone's name — that is the owner's own word ("sangod", "₹40 areas"). */}
+      {totals.deliveryZoneName && totals.estimatedDeliveryDays ? (
         <p className="mt-3 text-xs text-muted-foreground">
-          Delivery zone: <span className="font-medium text-foreground">{totals.deliveryZoneName}</span>
-          {totals.estimatedDeliveryDays
-            ? ` · Estimated ${totals.estimatedDeliveryDays} day(s)`
-            : ""}
+          Estimated delivery: {totals.estimatedDeliveryDays} day(s)
         </p>
       ) : null}
 

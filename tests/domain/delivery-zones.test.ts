@@ -153,13 +153,15 @@ describe("the zones reach the total the server actually charges", () => {
   // never forwarded it. Testing the quote function alone passes either way —
   // which is why this has to go through the totals helper, the way the server
   // pricing path does.
-  const zones = [zone({ id: "blr", city: "Bengaluru", pincode: "5600", deliveryCharge: 49 })];
+  // A map area now: the customer's pin, not their PIN, picks the zone.
+  const zones = [zone({ id: "blr", coverage: "radius", center: { lat: 12.9716, lng: 77.5946 }, radiusKm: 10, deliveryCharge: 49 })];
+  const koramangala = { lat: 12.9352, lng: 77.6245 };
   const items = [{ productSlug: "cake", name: "Cake", price: 500, quantity: 1 }];
 
   it("forwards zonesOverride from cart totals to the zone lookup", () => {
     const totals = calculateCartTotals({
       items: items as never,
-      deliveryAddress: { city: "Bengaluru", pincode: "560034" },
+      deliveryAddress: { city: "Bengaluru", pincode: "560034", location: koramangala },
       commerceOverride: commerce(),
       zonesOverride: zones,
     });
@@ -171,7 +173,7 @@ describe("the zones reach the total the server actually charges", () => {
   it("does not silently fall back to the flat or fallback fee when zones are given", () => {
     const totals = calculateCartTotals({
       items: items as never,
-      deliveryAddress: { city: "Bengaluru", pincode: "560034" },
+      deliveryAddress: { city: "Bengaluru", pincode: "560034", location: koramangala },
       commerceOverride: commerce(),
       zonesOverride: zones,
     });
@@ -316,11 +318,20 @@ describe("a save the server refuses", () => {
 });
 
 describe("what the customer is charged", () => {
-  const zones = [zone({ id: "blr", city: "Bengaluru", pincode: "5600", deliveryCharge: 49 })];
+  const zones = [zone({ id: "blr", coverage: "radius", center: { lat: 12.9716, lng: 77.5946 }, radiusKm: 10, deliveryCharge: 49 })];
+  const koramangala = { lat: 12.9352, lng: 77.6245 };
+
+  it("matches no zone from a PIN alone — the map pin decides", () => {
+    const quote = calculateDeliveryQuote({ subtotal: 500, city: "Bengaluru", pincode: "560034" }, commerce(), [
+      zone({ id: "pin", coverage: "pincodes", pincodes: ["560034"], deliveryCharge: 20 }),
+    ]);
+    expect(quote.zoneName).toBeUndefined();
+    expect(quote.delivery).toBe(149);
+  });
 
   it("charges the matched zone's fee", () => {
     const quote = calculateDeliveryQuote(
-      { subtotal: 500, city: "Bengaluru", pincode: "560034" },
+      { subtotal: 500, city: "Bengaluru", pincode: "560034", location: koramangala },
       commerce(),
       zones,
     );
@@ -332,7 +343,7 @@ describe("what the customer is charged", () => {
     // The whole bug in one assertion: the server passed its zones and the totals
     // helper dropped them, so pricing came from hardcoded Mumbai/Pune demo rows.
     const quote = calculateDeliveryQuote(
-      { subtotal: 500, city: "Bengaluru", pincode: "560034" },
+      { subtotal: 500, city: "Bengaluru", pincode: "560034", location: koramangala },
       commerce(),
       zones,
     );
@@ -364,7 +375,7 @@ describe("what the customer is charged", () => {
     // Free delivery used to return before the lookup, so the orders a shop most
     // wants to look confident about lost their zone and their estimate.
     const quote = calculateDeliveryQuote(
-      { subtotal: 5000, city: "Bengaluru", pincode: "560034" },
+      { subtotal: 5000, city: "Bengaluru", pincode: "560034", location: koramangala },
       commerce(),
       zones,
     );

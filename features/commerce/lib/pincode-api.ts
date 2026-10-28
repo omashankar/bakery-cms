@@ -55,6 +55,21 @@ export async function fetchPincodePlace(pincode: string): Promise<{ place: Pinco
   return info?.kind === "pin" ? { place: info.place } : null;
 }
 
+const suggested = new Map<string, PincodePlace[]>();
+
+/**
+ * The real PINs a half-typed code could be — "3240" → 324001 Kota … — for the
+ * list under a PIN box. Null when the directory could not be asked.
+ */
+export async function fetchPincodeSuggestions(prefix: string): Promise<PincodePlace[] | null> {
+  if (!/^[1-9]\d{2,5}$/.test(prefix)) return [];
+  const hit = suggested.get(prefix);
+  if (hit) return hit;
+  const list = await get<PincodePlace[]>(`prefix=${prefix}`);
+  if (list) suggested.set(prefix, list);
+  return list;
+}
+
 let districts: Promise<DistrictEntry[] | null> | null = null;
 
 /** Every district, for the zone form's suggestions. Asked once per visit. */

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { DEFAULT_TIME_ZONE, isValidTimeZone } from "@/features/orders/lib/viewer-time";
+import { deliveryPinSchema } from "@/features/checkout/server/checkout.validators";
 
 /**
  * Zod contracts for order operations. Nested value objects (items, totals,
@@ -46,6 +47,9 @@ const addressSchema = z
     country: z.string().trim().max(80).optional(),
     altPhone: z.string().trim().max(20).optional(),
     addressLabel: z.enum(["Home", "Office", "Other"]).optional(),
+    // Named so it is bounded: this object passes through, and an unlisted
+    // pin would reach Mongo as whatever the caller sent.
+    location: deliveryPinSchema.optional(),
   })
   .passthrough();
 

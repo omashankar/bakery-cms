@@ -48,11 +48,17 @@ const SECURITY_HEADERS = [
    * same trade this file already refuses when it declines to write a
    * `default-src`.
    *
-   * The three that remain are genuinely unused — nothing in the tree calls
-   * `getUserMedia` or `navigator.geolocation`; the photo-cake upload is a file
-   * input and delivery zones are decided from a typed pincode.
+   * Camera and microphone are genuinely unused — nothing calls `getUserMedia`;
+   * the photo-cake upload is a file input.
+   *
+   * Geolocation is the shop's OWN, and nobody else's: `(self)`. It was `()`
+   * from when delivery was decided by a typed pincode, and stayed when the map
+   * pin took over (2026-10-27) — so "Detect my location", checkout's "Use my
+   * current location" and the zone editor's "I am at the shop" were refused
+   * by the browser on every page, silently, before any permission prompt.
+   * `self` still denies it to every iframe, Razorpay's included.
    */
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self)" },
 ];
 
 /**
