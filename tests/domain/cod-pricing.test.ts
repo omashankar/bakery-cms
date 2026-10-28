@@ -314,3 +314,43 @@ describe("the delivery an order is placed for", () => {
     });
   });
 });
+
+describe("the map pin an order was priced for", () => {
+  /**
+   * The pin decides the zone and its charge now (owner, 2026-10-27), so it is
+   * compared like the PIN: a quote for a pin inside the area, then an order
+   * placed with one outside it, was the cheap-zone hole one field along.
+   */
+  const inside = { lat: 24.9301, lng: 76.2912 };
+  const outside = { lat: 25.18, lng: 75.83 };
+  const draft = (location?: { lat: number; lng: number }) => ({
+    id: "draft-1",
+    items: [{ productSlug: "black-forest", name: "Black Forest", price: 5000, quantity: 1 }],
+    totals: { subtotal: 5000, total: 5250, tax: 250, itemCount: 1 },
+    deliveryAddress: { ...address, ...(location ? { location } : {}) },
+  });
+
+  it("refuses an order placed with a different pin from the one quoted", async () => {
+    setCommerce();
+    state.draft = draft(inside);
+    await expect(codOrder({ draftId: "draft-1", address: { ...address, location: outside } })).rejects.toThrow(
+      /changed since this cart was priced/,
+    );
+    expect(state.inserted).toBeNull();
+  });
+
+  it("refuses a pin added after a quote that had none", async () => {
+    setCommerce();
+    state.draft = draft();
+    await expect(codOrder({ draftId: "draft-1", address: { ...address, location: inside } })).rejects.toThrow(
+      /changed since this cart was priced/,
+    );
+  });
+
+  it("takes the order at the pin it was quoted for", async () => {
+    setCommerce();
+    state.draft = draft(inside);
+    await codOrder({ draftId: "draft-1", address: { ...address, location: { ...inside } } });
+    expect(state.inserted).not.toBeNull();
+  });
+});

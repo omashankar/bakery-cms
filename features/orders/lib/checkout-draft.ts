@@ -51,6 +51,11 @@ export interface CheckoutAddress {
   /** A second number to try. Optional everywhere, including on the order. */
   altPhone?: string;
   addressLabel?: AddressLabel;
+  /**
+   * Where the customer pinned their door on the map. The zone comes from this
+   * — checked again by the server — never from the PIN code.
+   */
+  location?: import("@/types/delivery").DeliveryPin;
 }
 
 /**

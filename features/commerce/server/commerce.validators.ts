@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { MAX_AREAS_PER_ZONE, MAX_POLYGON_POINTS, MAX_RADIUS_KM } from "@/features/commerce/lib/delivery-area";
+
 /**
  * Zod contracts for coupons + delivery zones. The client persists whole
  * collections, so each write validates an array of items. Core fields strict,
@@ -47,13 +49,32 @@ const couponSchema = z
 
 const pinRule = z.string().regex(/^[1-9]\d{2,5}$/, "A PIN code or prefix is 3–6 digits, not starting with 0");
 
+/** A point on the map. 0,0 is refused: it is what a missing coordinate turns into. */
+const latLng = z
+  .object({
+    lat: z.number().finite().min(-90).max(90),
+    lng: z.number().finite().min(-180).max(180),
+  })
+  .refine((point) => !(point.lat === 0 && point.lng === 0), { message: "Pick a real place on the map" });
+
 const deliveryZoneSchema = z
   .object({
     id: z.string().min(1),
     name: z.string().trim().min(1, "Name is required"),
     city: z.string().default(""),
     pincode: z.string().default(""),
-    coverage: z.enum(["country", "states", "cities", "pincodes"]).optional(),
+    coverage: z.enum(["country", "states", "cities", "pincodes", "radius", "polygon", "areas"]).optional(),
+    center: latLng.optional(),
+    polygon: z.array(latLng).max(MAX_POLYGON_POINTS).optional(),
+    areas: z
+      .array(
+        z.discriminatedUnion("kind", [
+          z.object({ kind: z.literal("radius"), center: latLng, radiusKm: z.number().gt(0).max(MAX_RADIUS_KM) }),
+          z.object({ kind: z.literal("polygon"), polygon: z.array(latLng).min(3).max(MAX_POLYGON_POINTS) }),
+        ]),
+      )
+      .max(MAX_AREAS_PER_ZONE)
+      .optional(),
     states: z.array(z.string().trim().min(1).max(80)).max(40).optional(),
     cities: z.array(z.string().trim().min(1).max(80)).max(200).optional(),
     // An exact PIN or a prefix of at least three digits — the form's rule, so
@@ -80,6 +101,15 @@ const deliveryZoneSchema = z
       (zone.coverage !== "cities" || (zone.cities?.length ?? 0) > 0) &&
       (zone.coverage !== "states" || (zone.states?.length ?? 0) > 0),
     { message: "A zone must cover at least one PIN code, city or state" },
+  )
+  // A map area must be one: a centre and a radius, or three corners.
+  .refine(
+    (zone) =>
+      (zone.coverage !== "radius" ||
+        (Boolean(zone.center) && zone.radiusKm > 0 && zone.radiusKm <= MAX_RADIUS_KM)) &&
+      (zone.coverage !== "polygon" || (zone.polygon?.length ?? 0) >= 3) &&
+      (zone.coverage !== "areas" || (zone.areas?.length ?? 0) > 0),
+    { message: `A map area needs a centre and a radius up to ${MAX_RADIUS_KM} km, or at least three corners` },
   );
 
 export const couponsArraySchema = z.array(couponSchema);

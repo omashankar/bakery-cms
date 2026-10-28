@@ -10,11 +10,19 @@ import {
   UndeliverableAtSpeedError,
   OutsideDeliveryZonesError,
   AddressPincodeMismatchError,
+  DeliveryPinError,
   UnknownProductError,
   UnknownWeightError,
 } from "./pricing.server";
 import { createDraft } from "./draft.repository";
-import { quoteSchema } from "./checkout.validators";
+import { deliveryPinCheckSchema, pincodeCheckSchema, quoteSchema } from "./checkout.validators";
+import { getZones } from "@/features/commerce/server/commerce.service";
+import { verifyDeliveryPin } from "@/features/commerce/server/delivery-pin-check.server";
+import { answerPincode } from "@/features/commerce/server/pincode-answer.server";
+import { searchAddresses } from "@/features/commerce/server/osm-search.server";
+import { isValidLatLng } from "@/features/commerce/lib/delivery-area";
+import type { CommerceSettings } from "@/types/settings";
+import type { DeliveryZone } from "@/types/delivery";
 import {
   isBeforeLeadTime,
   isOfferedTimeSlot,
@@ -96,6 +104,8 @@ export const quoteCartController = withErrorHandler(async (request: Request) => 
         // So the street can be checked against the PIN that prices it.
         addressLine1: input.address.addressLine1,
         addressLine2: input.address.addressLine2,
+        // The map pin decides the zone; priceCart checks it before pricing.
+        location: input.address.location,
       }
     : input.deliveryAddress;
 
@@ -244,14 +254,117 @@ export const quoteCartController = withErrorHandler(async (request: Request) => 
         [{ field: "deliveryTierId", message: error.message }],
       );
     }
+    // About the map pin now, which is what is outside — not the PIN code.
     if (error instanceof OutsideDeliveryZonesError) {
-      throw new AppError(OUTSIDE_ZONES_MESSAGE, 409, [
-        { field: "pincode", message: error.message },
-      ]);
+      throw new AppError(OUTSIDE_ZONES_MESSAGE, 409, [{ field: "location", message: OUTSIDE_ZONES_MESSAGE }]);
     }
     if (error instanceof AddressPincodeMismatchError) {
       throw new AppError(error.message, 409, [{ field: "pincode", message: error.message }]);
     }
+    if (error instanceof DeliveryPinError) {
+      throw new AppError(error.message, error.status, [{ field: error.field, message: error.message }]);
+    }
     throw error;
   }
+});
+
+/**
+ * Checks a map pin against the shop's areas and the typed address, for the
+ * checkout to say so as soon as the pin is dropped.
+ *
+ * Advice only. The answer decides nothing: `priceCart` asks again, from the
+ * zones as they are then, before any order is priced — so a forged "eligible"
+ * buys nothing, and a zone switched off in between is honoured.
+ *
+ * Tighter than the quote's limit: every call that lands inside an area can
+ * cost the shop a Google lookup.
+ */
+export const checkDeliveryPinController = withErrorHandler(async (request: Request) => {
+  const { ip } = requestContext(request);
+  if (ip) rateLimit(`delivery-pin:ip:${ip}`, { limit: 30, windowMs: 60_000 });
+
+  const body = await readJson(request);
+  // A PIN alone — the product page, cart and header asking "do you deliver to 324002?".
+  const byPincode = body && typeof body === "object" && !("location" in body) ? validate(pincodeCheckSchema, body) : null;
+  const [settings, zones] = await Promise.all([getSettings(), getZones()]);
+  const commerce = ((settings as unknown as { commerce?: CommerceSettings }).commerce ?? {}) as CommerceSettings;
+
+  // A shop without delivery areas takes every address at its flat fee.
+  if (!commerce.useZoneBasedDelivery) return ok({ required: false, status: "eligible", charge: commerce.deliveryFee });
+
+  if (byPincode) {
+    const answer = await answerPincode(byPincode.pincode, zones as DeliveryZone[], commerce.deliverOutsideZones !== false);
+    if (answer.status !== "eligible") return ok({ required: true, status: answer.status });
+    return ok({
+      required: true,
+      status: "eligible",
+      charge: answer.zone ? answer.zone.deliveryCharge : (commerce.zoneFallbackDeliveryFee ?? commerce.deliveryFee),
+      minDeliveryDays: answer.zone ? answer.zone.minDeliveryDays : null,
+      freeDeliveryThreshold: commerce.freeDeliveryThreshold,
+      priceMayVary: answer.priceMayVary,
+      // For pricing a cart with no pin yet — one of the PIN's post offices, never a door.
+      at: answer.at,
+    });
+  }
+
+  const input = validate(deliveryPinCheckSchema, body);
+
+  const verdict = await verifyDeliveryPin({
+    location: input.location,
+    pincode: input.pincode,
+    city: input.city,
+    state: input.state,
+    zones: zones as DeliveryZone[],
+    deliverOutsideZones: commerce.deliverOutsideZones !== false,
+  });
+
+  if (verdict.status === "eligible") {
+    return ok({
+      required: true,
+      status: verdict.status,
+      // The zone by id, never by name: this answer is public, and the name is the owner's own word.
+      zoneId: verdict.zone?.id ?? "",
+      // What the customer will pay and how soon — the zone's own, or the
+      // shop's fallback for a pin outside every zone it still delivers to.
+      charge: verdict.zone ? verdict.zone.deliveryCharge : (commerce.zoneFallbackDeliveryFee ?? commerce.deliveryFee),
+      minDeliveryDays: verdict.zone ? verdict.zone.minDeliveryDays : null,
+      freeDeliveryThreshold: commerce.freeDeliveryThreshold,
+      // India Post's PIN at the pin; when a PIN line runs close by, the
+      // neighbours the customer may really be in.
+      postalCode: verdict.verification.postalCode,
+      pincodeSure: verdict.nearby?.sure ?? false,
+      otherPincodes: verdict.nearby?.others ?? [],
+      city: verdict.city,
+      state: verdict.state,
+      formattedAddress: verdict.verification.formattedAddress,
+      placeName: verdict.placeName,
+      cityNote: verdict.cityNote,
+    });
+  }
+  return ok({
+    required: true,
+    status: verdict.status,
+    message: verdict.message,
+    field: verdict.field,
+    found: verdict.found,
+    kmToArea: verdict.kmToArea,
+  });
+});
+
+/**
+ * Address suggestions as the customer types, from OpenStreetMap (free).
+ *
+ * Through the shop's server so answers are cached and calls limited — the
+ * free search service asks for fair use. A suggestion only moves the pin; it
+ * proves nothing, and the pin is checked on its own when the order is priced.
+ */
+export const searchAddressesController = withErrorHandler(async (request: Request) => {
+  const { ip } = requestContext(request);
+  if (ip) rateLimit(`address-search:ip:${ip}`, { limit: 60, windowMs: 60_000 });
+  const params = new URL(request.url).searchParams;
+  const q = (params.get("q") ?? "").slice(0, 120);
+  const lat = Number(params.get("lat"));
+  const lng = Number(params.get("lng"));
+  const near = params.has("lat") && isValidLatLng({ lat, lng }) ? { lat, lng } : null;
+  return ok(await searchAddresses(q, near));
 });

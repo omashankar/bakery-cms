@@ -38,6 +38,7 @@ import {
   UndeliverableAtSpeedError,
   OutsideDeliveryZonesError,
   AddressPincodeMismatchError,
+  DeliveryPinError,
   UnknownProductError,
   UnknownWeightError,
 } from "@/features/checkout/server/pricing.server";
@@ -189,6 +190,7 @@ async function repriceForPlacement(input: PlaceOrderInput) {
             state: input.address.state,
             addressLine1: input.address.addressLine1,
             addressLine2: input.address.addressLine2,
+            location: input.address.location,
           }
         : undefined,
     });
@@ -217,6 +219,9 @@ async function repriceForPlacement(input: PlaceOrderInput) {
     }
     if (error instanceof AddressPincodeMismatchError) {
       throw new AppError(error.message, 409);
+    }
+    if (error instanceof DeliveryPinError) {
+      throw new AppError(error.message, error.status);
     }
     throw error;
   }
@@ -403,8 +408,23 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
       (priced.city ?? "").trim().toLowerCase() === input.address.city.trim().toLowerCase();
     const samePincode =
       (priced.pincode ?? "").replace(/\D/g, "") === input.address.pincode.replace(/\D/g, "");
+    // The pin was checked against the State box too; a State changed after the
+    // quote never was. Absent from an old draft is not a change.
+    const pricedState = priced.state;
+    const sameState =
+      !pricedState || pricedState.trim().toLowerCase() === (input.address.state ?? "").trim().toLowerCase();
+    // The pin decides the zone now, so it is compared too: quoting a pin
+    // inside the area and placing with one outside it was the same hole,
+    // one field along. Absent on both sides is a shop without areas.
+    const pricedPin = priced.location;
+    const placedPin = (input.address as { location?: { lat: number; lng: number } }).location;
+    const samePin =
+      (!pricedPin && !placedPin) ||
+      (Boolean(pricedPin && placedPin) &&
+        Math.abs(pricedPin!.lat - placedPin!.lat) < 1e-7 &&
+        Math.abs(pricedPin!.lng - placedPin!.lng) < 1e-7);
 
-    if (!sameCity || !samePincode) {
+    if (!sameCity || !samePincode || !sameState || !samePin) {
       throw new AppError(
         "The delivery address has changed since this cart was priced. Please refresh so the delivery charge can be recalculated.",
         409,
@@ -431,6 +451,15 @@ export async function placeOrder(input: PlaceOrderInput, ctx: RequestCtx): Promi
   const priced = draft
     ? { items: draft.items, totals: draft.totals, coupon: draft.coupon }
     : await repriceForPlacement(input);
+
+  // On a shop with delivery zones, a delivery is priced for a map pin the
+  // server has checked — or not at all. A draft quoted with no street line
+  // never had its pin checked (pricing checks a WHOLE address), was priced at
+  // the fallback fee even with "deliver outside zones" off, and the guard
+  // above let it through because "no pin" matched "no pin". Found 2026-10-28.
+  if (commerce.useZoneBasedDelivery && input.address && !priced.totals.deliveryPin) {
+    throw new AppError("Please pin your delivery location on the map, then place the order again.", 409);
+  }
 
   // A date the shop can actually bake for.
   //

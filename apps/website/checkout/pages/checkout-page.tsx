@@ -105,6 +105,9 @@ import {
   saveUnconfirmedOrder,
 } from "@/features/orders/lib/unconfirmed-order";
 import { requestCartQuote } from "@/features/checkout/lib/quote-api";
+import { DeliveryPinPicker, type PinCheck, type PlaceParts } from "@/apps/website/checkout/components/delivery-pin-picker";
+import { readDeliveryLocation } from "@/features/commerce/lib/delivery-location";
+import type { DeliveryPin } from "@/types/delivery";
 import { grantOrderAccess } from "@/features/orders/lib/order-access";
 import {
   addDays,
@@ -351,6 +354,13 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   const addressFormOpen = showAddressForm || savedAddresses.length === 0;
   const [placing, setPlacing] = useState(false);
   const [commerce, setCommerce] = useState(defaultCommerceSettings);
+  // The customer's map pin, and what the shop last said about it.
+  const [pin, setPin] = useState<DeliveryPin | null>(null);
+  const [pinCheck, setPinCheck] = useState<PinCheck>({ status: "idle" });
+  /** The pin whose PIN, town and state last filled the empty boxes — see the picker's onCheck. */
+  const filledForPin = useRef("");
+  /** A shop with delivery areas: no order without a pin it has said yes to. */
+  const pinRequired = commerce.useZoneBasedDelivery;
   // Null while unknown — do not hide a method on a guess.
   const [onlinePaymentReady, setOnlinePaymentReady] = useState<boolean | null>(null);
 
@@ -646,6 +656,9 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
     // so it now holds on every render including the one after Back.
 
     setItems(cartItems);
+    // The pin comes back with the draft — or, on a first visit, is the spot the
+    // customer checked on a product page. The server checks it again anyway.
+    setPin(draft.address.location ?? readDeliveryLocation()?.location ?? null);
     setDeliverySlot(draft.deliverySlot ?? EMPTY_DELIVERY_SLOT);
     setDeliveryTierId(draft.deliverySlot?.tierId ?? "");
     setSlotOptions(getDeliveryTimeSlots());
@@ -825,6 +838,19 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
       alive = false;
     };
   }, [fullPin, getValues, setValue]);
+
+  /** What a found place or a dropped pin says, into the boxes left EMPTY — what the customer typed stays theirs. */
+  function fillEmptyAddressBoxes(parts: PlaceParts) {
+    if (parts.postalCode && !getValues("pincode")?.trim()) {
+      setValue("pincode", parts.postalCode, { shouldValidate: true });
+    }
+    if (parts.city && !getValues("city")?.trim()) {
+      setValue("city", parts.city, { shouldValidate: true });
+    }
+    if (parts.state && !getValues("state")?.trim()) {
+      setValue("state", parts.state, { shouldValidate: true });
+    }
+  }
   const pinAnswer = pinPlace && pinPlace.code === fullPin ? pinPlace : null;
   const pinStateDiffers = Boolean(
     pinAnswer?.place &&
@@ -963,10 +989,15 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
           pincode: watchedPincode,
           state: watchedState,
           place: pinAnswer?.place,
+          // The map pin is what picks the zone and its charge.
+          location: pin ?? undefined,
+          // A preview of the pin's district and state, from the PIN's India
+          // Post place; the server works out the real one from the pin.
+          region: pinAnswer?.place ? { state: pinAnswer.place.state, districts: pinAnswer.place.districts } : null,
         },
         commerceOverride: commerce,
       }),
-    [items, validCoupon, giftWrap, deliveryTierId, watchedCity, watchedPincode, watchedState, pinAnswer, commerce]
+    [items, validCoupon, giftWrap, deliveryTierId, watchedCity, watchedPincode, watchedState, pinAnswer, pin, commerce]
   );
 
   const totals = serverTotals ?? localTotals;
@@ -1023,7 +1054,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   useEffect(() => {
     setServerTotals(null);
     setServerItems(null);
-  }, [items, validCoupon, giftWrap, deliveryTierId, watchedCity, watchedPincode]);
+  }, [items, validCoupon, giftWrap, deliveryTierId, watchedCity, watchedPincode, pin]);
 
   function persistDraft(
     patch: Partial<{
@@ -1097,13 +1128,28 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   };
 
   const onDeliverySubmit = (address: CheckoutAddress) => {
+    // A shop with delivery areas goes nowhere without a pin the shop has said
+    // yes to. The server refuses the order regardless; stopping here means
+    // the customer is told on the screen where it can be fixed.
+    if (pinRequired && pinCheck.status !== "eligible") {
+      const message =
+        pinCheck.status === "checking"
+          ? "Checking your delivery location — one moment."
+          : pinCheck.status === "idle"
+            ? "Please pin your delivery location on the map."
+            : pinCheck.message;
+      toast.error("Check your delivery location", { description: message });
+      document.getElementById("delivery-pin-heading")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
     setShowAddressForm(false);
     setEditingAddressId(null);
 
     // The slot is asked for on the next screen now, so it is not this one's
     // to persist — writing it here would stamp an empty slot over one the
     // customer had already chosen and come back from.
-    persistDraft({ step: 2, address });
+    persistDraft({ step: 2, address: { ...address, location: pin ?? undefined } });
     goToStep(2);
   };
 
@@ -1412,6 +1458,14 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
         setError("pincode", { type: "server", message: quoteError });
         setFocus("pincode");
         toast.error("Please check the PIN code", { description: quoteError });
+        return;
+      }
+      // The pin, refused at the last step — the areas changed since it was
+      // checked. Back to the map, where it can be moved.
+      if (quoteField === "location" && quoteError) {
+        setPinCheck({ status: "outside", field: "location", message: quoteError });
+        goToStep(1);
+        toast.error("Check your delivery location", { description: quoteError });
         return;
       }
       toast.error("Could not price your order", {
@@ -1829,17 +1883,11 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                           </p>
                         ) : null}
                         {/*
-                          SAID HERE, under the PIN, as soon as it is typed — not
-                          as a failed payment. The shop delivers only inside its
-                          zones and this address is in none of them; the server
-                          refuses the order for the same reason. Not while the
-                          PIN is half typed: "324" is not an address yet.
+                          "Outside our delivery area" used to be said here,
+                          under the PIN. The map pin decides now, so it is said
+                          under the map (DeliveryPinPicker), where it can be
+                          fixed by moving the pin.
                         */}
-                        {totals.deliverable === false && fullPin ? (
-                          <p role="alert" className="text-xs text-destructive">
-                            {OUTSIDE_ZONES_MESSAGE}
-                          </p>
-                        ) : null}
                         {/*
                           India Post's answer, so the customer sees the right
                           code was typed — or is asked to look again. Not a
@@ -1871,12 +1919,10 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                         ) : null}
                         {/* Only for a whole PIN: while it is half typed, the
                             last quote is for the previous code. */}
-                        {commerce.useZoneBasedDelivery && totals.deliveryZoneName && fullPin ? (
+                        {/* The days, never the zone's name — the owner's own word. */}
+                        {commerce.useZoneBasedDelivery && totals.deliveryZoneName && totals.estimatedDeliveryDays && fullPin ? (
                           <p className="text-xs text-bakery-700">
-                            Delivery zone: {totals.deliveryZoneName}
-                            {totals.estimatedDeliveryDays
-                              ? ` · Est. ${totals.estimatedDeliveryDays} day(s)`
-                              : ""}
+                            Est. delivery: {totals.estimatedDeliveryDays} day(s)
                           </p>
                         ) : null}
                       </div>
@@ -2008,6 +2054,41 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                         </div>
                         </div>
                       </div>
+                    ) : null}
+
+                    {/*
+                      WHERE THE DOOR IS, on a map — for every address, saved or
+                      new, because the pin and not the PIN decides delivery
+                      (owner, 2026-10-27). Only on a shop with delivery areas.
+                    */}
+                    {pinRequired ? (
+                      <DeliveryPinPicker
+                        pin={pin}
+                        onPinChange={setPin}
+                        pincode={normalizePincode(watchedPincode ?? "")}
+                        city={watchedCity ?? ""}
+                        state={watchedState ?? ""}
+                        check={pinCheck}
+                        onCheck={(check) => {
+                          setPinCheck(check);
+                          // Wherever the pin is dropped, its PIN, town and state
+                          // fill the boxes still empty — India Post's PIN, not
+                          // the map's (owner, 2026-10-28). Once per drop: a
+                          // customer who empties the PIN box to type another
+                          // must not have it filled back in under them.
+                          const at = pin ? `${pin.lat},${pin.lng}` : "";
+                          if (check.status === "eligible" && at && filledForPin.current !== at) {
+                            filledForPin.current = at;
+                            fillEmptyAddressBoxes({
+                              postalCode: check.postalCode ?? undefined,
+                              city: check.city ?? undefined,
+                              state: check.state ?? undefined,
+                            });
+                          }
+                        }}
+                        onUsePincode={(code) => setValue("pincode", code, { shouldValidate: true, shouldDirty: true })}
+                        onPlaceFound={fillEmptyAddressBoxes}
+                      />
                     ) : null}
 
                     <CartIssuesAlert issues={cartIssues} />

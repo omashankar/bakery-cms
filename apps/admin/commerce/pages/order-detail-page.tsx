@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Image as ImageIcon, Loader2, Mail, MapPin, Phone, Printer } from "lucide-react";
+import { ArrowLeft, ExternalLink, Image as ImageIcon, Loader2, Mail, MapPin, Phone, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { Input } from "@/components/ui/input";
@@ -42,10 +42,65 @@ import { routes } from "@/constants/routes";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { reportedAsSignedOut, reportedAsSignedOutOnRead } from "@/apps/admin/lib/report-write";
 import { addressLines } from "@/features/orders/lib/address-format";
+import { formatLatLng, mapsLinkFor } from "@/features/commerce/lib/delivery-area";
 import { preparationStartedAt } from "@/features/orders/lib/cancellation-policy";
 
 interface OrderDetailPageProps {
   orderId: string;
+}
+
+/**
+ * WHERE THE DOOR IS, as the shop checked it.
+ *
+ * `totals.deliveryPin` is written by the server after it checked the pin
+ * (inside an area, and the map's PIN, when it has one, matching the address), so it is the one
+ * to drive to. The bare `address.location` is the browser's word and is only
+ * shown, marked so, on an order that has nothing better.
+ */
+function OrderDeliveryPin({ order }: { order: Pick<PlacedOrder, "address" | "totals"> }) {
+  const verified = order.totals.deliveryPin;
+  const point = verified ?? order.address.location;
+  return (
+    <div className="mt-3 space-y-1 border-t border-border pt-3">
+      {order.totals.deliveryZoneName ? (
+        <p>
+          Zone: <span className="font-medium text-foreground">{order.totals.deliveryZoneName}</span>
+        </p>
+      ) : null}
+      {verified?.pincodeCheck === "matched" ? (
+        <p className="font-medium text-green-700 dark:text-green-400">
+          Map pin checked · PIN {verified.postalCode} matches
+        </p>
+      ) : verified?.pincodeCheck === "nearby" ? (
+        <p className="font-medium text-amber-700 dark:text-amber-300">
+          Map pin inside the area · the map says PIN {verified.postalCode}, the address {order.address.pincode} (same district)
+        </p>
+      ) : verified ? (
+        <p className="font-medium text-amber-700 dark:text-amber-300">
+          Map pin inside the area · PIN not confirmed
+          {verified.pincodeCheck === "unavailable" ? " (the map could not be asked)" : " (the map has no PIN here)"}
+        </p>
+      ) : point ? (
+        <p className="font-medium text-amber-700 dark:text-amber-300">Map pin not checked by the shop</p>
+      ) : (
+        <p>No map pin — placed before delivery was checked on the map.</p>
+      )}
+      {verified?.formattedAddress ? <p>Pin at: {verified.formattedAddress}</p> : null}
+      {point ? (
+        <p>
+          {formatLatLng(point)} ·{" "}
+          <a
+            href={mapsLinkFor(point)}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 font-medium text-foreground underline underline-offset-2"
+          >
+            Open in Google Maps <ExternalLink className="size-3" aria-hidden />
+          </a>
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 /** The rider on an order, in the shape the form holds. */
@@ -536,6 +591,7 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
                   <p className="mt-2">Also on {order.address.altPhone}</p>
                 ) : null}
                 <p className="mt-2">Est. delivery: {formatDate(order.estimatedDelivery)}</p>
+                <OrderDeliveryPin order={order} />
               </div>
             </div>
           </div>

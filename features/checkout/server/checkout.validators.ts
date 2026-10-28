@@ -1,6 +1,18 @@
 import { z } from "zod";
 
 /**
+ * The customer's map pin: two numbers in range and, when they picked a
+ * suggestion, Google's place id. Nothing else survives — a caller who adds
+ * `verified: true` or a zone id has it stripped here, and the server works
+ * out both for itself (see `verifyDeliveryPin`).
+ */
+export const deliveryPinSchema = z.object({
+  lat: z.number().finite().min(-90).max(90),
+  lng: z.number().finite().min(-180).max(180),
+  placeId: z.string().trim().max(300).optional(),
+});
+
+/**
  * What a caller may say about a cart.
  *
  * Note what is absent: `price`, and any `totals` at all. Those used to arrive
@@ -78,6 +90,7 @@ export const quoteSchema = z.object({
       country: z.string().trim().max(80).optional(),
       altPhone: z.string().trim().max(20).optional(),
       addressLabel: z.enum(["Home", "Office", "Other"]).optional(),
+      location: deliveryPinSchema.optional(),
     })
     .optional(),
   /**
@@ -134,3 +147,16 @@ export const quoteSchema = z.object({
 });
 
 export type QuoteRequest = z.infer<typeof quoteSchema>;
+
+/** A PIN alone, asked about before any address — see `checkDeliveryPinController`. */
+export const pincodeCheckSchema = z.object({
+  pincode: z.string().trim().regex(/^[1-9]\d{5}$/, "Enter a 6-digit PIN code"),
+});
+
+/** A pin to check before the order — see `checkDeliveryPinController`. */
+export const deliveryPinCheckSchema = z.object({
+  location: deliveryPinSchema,
+  pincode: z.string().trim().max(12).default(""),
+  city: z.string().trim().max(80).default(""),
+  state: z.string().trim().max(80).default(""),
+});

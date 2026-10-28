@@ -13,7 +13,9 @@ import { toast } from "sonner";
 import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
 import { DeliveryZoneFormDialog } from "@/apps/admin/commerce/components/delivery-zone-form-dialog";
-import { ZonePinChecker } from "@/apps/admin/commerce/components/zone-pin-checker";
+import { ZoneCoverageMap } from "@/apps/admin/commerce/components/zone-coverage-map";
+import { decidesDelivery } from "@/features/commerce/lib/delivery-area";
+import { checkZoneDraft } from "@/features/commerce/lib/delivery-zone-validation";
 import type { CommerceSettings } from "@/types/settings";
 import {
   describeZoneCoverage,
@@ -30,7 +32,6 @@ import {
   DELIVERY_ZONES_UPDATED_EVENT,
   filterDeliveryZones,
   getDeliveryZoneStats,
-  getUniqueZoneCities,
   loadDeliveryZones,
   toggleDeliveryZoneActive,
 } from "@/features/commerce/lib/delivery-zones-repository";
@@ -60,7 +61,7 @@ const EMPTY_STATS = {
   total: 0,
   active: 0,
   inactive: 0,
-  cities: 0,
+  needsArea: 0,
 };
 
 function exportZonesToCsv(zones: DeliveryZone[]): void {
@@ -106,12 +107,9 @@ function exportZonesToCsv(zones: DeliveryZone[]): void {
 
 export function DeliveryZonesAdminPage({
   initial = null,
-  pinDirectory = null,
 }: {
   /** Every zone, read on the server; null fetches as before. */
   initial?: DeliveryZone[] | null;
-  /** How fresh India Post's PIN list is — said on screen so a stale one shows. */
-  pinDirectory?: { updated: string; pins: number } | null;
 } = {}) {
   // Before this screen's mount read, so it finds the shop's zones — not this
   // browser's old copy or the shipped demo ones — and the save gate open.
@@ -126,6 +124,33 @@ export function DeliveryZonesAdminPage({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [formOpen, setFormOpen] = useState(false);
   const [editingZone, setEditingZone] = useState<DeliveryZone | null>(null);
+
+  /**
+   * The list's on/off switch. Switching a zone ON changes where the shop
+   * delivers, so it gets the form's own checks first: from here, two live
+   * zones could hold the same district or state, which the form refuses
+   * (zone review, 2026-10-28). Switching off needs no check.
+   */
+  function toggleActive(zone: DeliveryZone) {
+    if (!zone.isActive) {
+      const { errors } = checkZoneDraft({
+        zone: { ...zone, isActive: true },
+        pincodeEntries: [],
+        excludedEntries: [],
+        others: zones.filter((other) => other.id !== zone.id),
+      });
+      if (errors.length) {
+        toast.error(`Can't switch "${zone.name}" on: ${errors[0]}`);
+        return;
+      }
+    }
+    void toggleDeliveryZoneActive(zone.id).then(({ persisted }) => {
+      setZones(loadDeliveryZones());
+      // A zone active on the server but shown inactive
+      // here decides whether the shop delivers there.
+      reportWrite(persisted, zone.isActive ? "Zone deactivated" : "Zone activated");
+    });
+  }
 
   // Whether any of this reaches a customer. The master switch lives on Shipping
   // Rules and is OFF by default, so a zone map built here can be entirely inert.
@@ -151,7 +176,6 @@ export function DeliveryZonesAdminPage({
     () => (mounted ? getDeliveryZoneStats(zones) : EMPTY_STATS),
     [zones, mounted]
   );
-  const cities = useMemo(() => getUniqueZoneCities(zones), [zones]);
   const filtered = useMemo(() => filterDeliveryZones(zones, filters), [zones, filters]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -227,7 +251,7 @@ export function DeliveryZonesAdminPage({
     <AdminPage className="space-y-4 sm:space-y-5">
       <AdminPageHeader
         title="Delivery Zones"
-        description="Where the shop delivers, what it charges and how fast — by PIN code, city, state or all of India."
+        description="Where the shop delivers, what it charges and how fast — areas drawn on the map, whole districts or whole states."
         className="gap-3"
         actions={
           /*
@@ -251,7 +275,7 @@ export function DeliveryZonesAdminPage({
         <button
           type="button"
           className="h-full w-full rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          onClick={() => updateFilters({ status: "all", city: "all", search: "" })}
+          onClick={() => updateFilters({ status: "all", kind: "all", search: "" })}
         >
           <DashboardStatCard
             title="Total zones"
@@ -268,7 +292,7 @@ export function DeliveryZonesAdminPage({
           // Clears the other filters too. The card asserts a COUNT, and leaving
           // a city or search term applied meant the number it showed and the rows
           // it produced disagreed.
-          onClick={() => updateFilters({ status: "active", city: "all", search: "" })}
+          onClick={() => updateFilters({ status: "active", kind: "all", search: "" })}
         >
           {/* "Used at checkout" is only true when zone pricing is switched ON,
               and that switch lives on Shipping Rules and defaults to OFF. An
@@ -286,7 +310,7 @@ export function DeliveryZonesAdminPage({
         <button
           type="button"
           className="h-full w-full rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          onClick={() => updateFilters({ status: "inactive", city: "all", search: "" })}
+          onClick={() => updateFilters({ status: "inactive", kind: "all", search: "" })}
         >
           <DashboardStatCard
             title="Inactive"
@@ -297,18 +321,30 @@ export function DeliveryZonesAdminPage({
             tone="neutral"
           />
         </button>
-        <DashboardStatCard
-          title="Cities"
-          value={stats.cities}
-          change="Coverage"
-          changeTone="neutral"
-          icon={MapPin}
-          tone="gold"
-        />
+        {/*
+          "Cities" stood here, counting the City box of PIN-era zones. What
+          an owner needs now is how many zones decide nothing until they are
+          given an area — and one tap to list them.
+        */}
+        <button
+          type="button"
+          className="text-left"
+          onClick={() => updateFilters({ status: "all", kind: "needs-area", search: "" })}
+          aria-label="Show zones that need an area"
+        >
+          <DashboardStatCard
+            title="Need an area"
+            value={stats.needsArea}
+            change={stats.needsArea > 0 ? "Deliver nowhere yet" : "None"}
+            changeTone={stats.needsArea > 0 ? "warning" : "neutral"}
+            icon={MapPin}
+            tone="gold"
+          />
+        </button>
       </section>
 
       {mounted && commerce ? (
-        <ZonePinChecker zones={zones} commerce={commerce} directory={pinDirectory} />
+        <ZoneCoverageMap zones={zones} commerce={commerce} onEdit={openEdit} />
       ) : null}
 
       <FilterPanel>
@@ -316,7 +352,7 @@ export function DeliveryZonesAdminPage({
           <FilterPanelSearch
             value={filters.search}
             onChange={(value) => updateFilters({ search: value })}
-            placeholder="Search zone, city, pincode…"
+            placeholder="Search by zone, district or state…"
           />
           <div className="grid grid-cols-2 gap-2">
             <AdminSelect
@@ -333,16 +369,15 @@ export function DeliveryZonesAdminPage({
               <option value="inactive">Inactive</option>
             </AdminSelect>
             <AdminSelect
-              value={filters.city}
-              onChange={(event) => updateFilters({ city: event.target.value })}
-              aria-label="City filter"
+              value={filters.kind}
+              onChange={(event) => updateFilters({ kind: event.target.value as DeliveryZoneListFilters["kind"] })}
+              aria-label="Zone type"
             >
-              <option value="all">All cities</option>
-              {cities.map((city) => (
-                <option key={city} value={city}>
-                  {city}
-                </option>
-              ))}
+              <option value="all">All types</option>
+              <option value="map">On the map</option>
+              <option value="districts">Whole districts</option>
+              <option value="states">Whole states</option>
+              <option value="needs-area">Needs an area</option>
             </AdminSelect>
           </div>
         </div>
@@ -400,7 +435,7 @@ export function DeliveryZonesAdminPage({
               action={
                 <Button
                   variant="outline"
-                  onClick={() => updateFilters({ status: "all", city: "all", search: "" })}
+                  onClick={() => updateFilters({ status: "all", kind: "all", search: "" })}
                 >
                   Clear filters
                 </Button>
@@ -449,6 +484,11 @@ export function DeliveryZonesAdminPage({
                       <td className="px-4 py-3 font-medium">{zone.name}</td>
                       <td className="max-w-xs px-4 py-3">
                         <p>{describeZoneCoverage(zone).covers}</p>
+                        {!decidesDelivery(zone) ? (
+                          <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                            Decides nothing now — edit it and draw its area
+                          </p>
+                        ) : null}
                         {describeZoneCoverage(zone).except ? (
                           <p className="text-xs text-muted-foreground">
                             Except {describeZoneCoverage(zone).except}
@@ -465,17 +505,7 @@ export function DeliveryZonesAdminPage({
                       <td className="px-4 py-3">
                         <Switch
                           checked={zone.isActive}
-                          onCheckedChange={() => {
-                            void toggleDeliveryZoneActive(zone.id).then(({ persisted }) => {
-                              setZones(loadDeliveryZones());
-                              // A zone active on the server but shown inactive
-                              // here decides whether the shop delivers there.
-                              reportWrite(
-                                persisted,
-                                zone.isActive ? "Zone deactivated" : "Zone activated"
-                              );
-                            });
-                          }}
+                          onCheckedChange={() => toggleActive(zone)}
                           aria-label={zone.isActive ? "Deactivate zone" : "Activate zone"}
                         />
                       </td>
@@ -508,6 +538,11 @@ export function DeliveryZonesAdminPage({
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold">{zone.name}</p>
+                          {!decidesDelivery(zone) ? (
+                            <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                              Decides nothing now — draw its area
+                            </p>
+                          ) : null}
                           <p className="truncate text-xs text-muted-foreground">
                             {describeZoneCoverage(zone).covers}
                             {describeZoneCoverage(zone).except
@@ -522,17 +557,7 @@ export function DeliveryZonesAdminPage({
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <Switch
                           checked={zone.isActive}
-                          onCheckedChange={() => {
-                            void toggleDeliveryZoneActive(zone.id).then(({ persisted }) => {
-                              setZones(loadDeliveryZones());
-                              // A zone active on the server but shown inactive
-                              // here decides whether the shop delivers there.
-                              reportWrite(
-                                persisted,
-                                zone.isActive ? "Zone deactivated" : "Zone activated"
-                              );
-                            });
-                          }}
+                          onCheckedChange={() => toggleActive(zone)}
                           aria-label={zone.isActive ? "Deactivate zone" : "Activate zone"}
                         />
                         <span className="text-xs text-muted-foreground">

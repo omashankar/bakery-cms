@@ -4,6 +4,7 @@ import {
   filterDeliveryZones,
   findDeliveryZone,
   getUniqueZoneCities,
+  zoneKind,
   type ZoneAddress,
 } from "./delivery-zone-utils";
 import { fetchZones, replaceZonesRequest, zonesHydration } from "./commerce-api";
@@ -344,7 +345,8 @@ export function getDeliveryZoneStats(zones: DeliveryZone[] = loadDeliveryZones()
     total: zones.length,
     active: zones.filter((zone) => zone.isActive).length,
     inactive: zones.filter((zone) => !zone.isActive).length,
-    cities: getUniqueZoneCities(zones).length,
+    // Zones that decide nothing: PIN-code or all-of-India zones from before the map.
+    needsArea: zones.filter((zone) => zoneKind(zone) === "needs-area").length,
   };
 }
 

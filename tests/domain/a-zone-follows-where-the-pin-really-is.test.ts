@@ -106,9 +106,10 @@ describe("the real place decides the zone", () => {
     expect(findDeliveryZone([punjab], { pincode: "160055" })).toBeNull();
   });
 
-  it("prices delivery from the place it is given", () => {
+  it("delivers nothing through a district zone now — not even to a pin inside the district", () => {
+    // The map pin decides (owner, 2026-10-27); a district is not an area on the map.
     const quote = calculateDeliveryQuote(
-      { subtotal: 100, pincode: "400001", city: "Kota", place: lookUpPincode("400001") },
+      { subtotal: 100, pincode: "324005", city: "Kota", place: lookUpPincode("324005"), location: { lat: 25.15, lng: 75.85 } },
       { ...defaultCommerceSettings, useZoneBasedDelivery: true, deliverOutsideZones: false },
       [kotaDistrict],
     );
@@ -120,10 +121,10 @@ describe("the real place decides the zone", () => {
       served: false,
       unknownPincode: true,
     });
-    expect(lookUpDeliveryPincode([kotaDistrict], "324005", rules, lookUpPincode("324005"))).toMatchObject({
-      served: true,
-      zoneName: "Kota",
-    });
+    // A real PIN is answered with its place, never as a typo.
+    const real = lookUpDeliveryPincode([kotaDistrict], "324005", rules, lookUpPincode("324005"));
+    expect(real?.unknownPincode).toBeUndefined();
+    expect(real?.place?.districts).toEqual(["Kota"]);
   });
 });
 

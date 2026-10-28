@@ -61,24 +61,25 @@ describe("what the shop's zones say about a PIN code", () => {
     expect(lookUpDeliveryPincode([zone({})], "abc")).toBeNull();
   });
 
-  it("repeats the matched zone's own name, days and charge", () => {
-    const found = lookUpDeliveryPincode([zone({})], "324001");
-
-    expect(found).toEqual({
+  it("says a PIN alone cannot decide, once the shop delivers by map area", () => {
+    // The owner's rule (2026-10-27): the map pin decides. A PIN covers
+    // villages miles apart, so "yes" from the PIN is how a Kota address with
+    // Sangod's PIN was taken. The customer pins their door at checkout.
+    const area = zone({ coverage: "radius", center: { lat: 25.18, lng: 75.83 }, radiusKm: 8 });
+    expect(lookUpDeliveryPincode([area], "324001")).toEqual({
       served: true,
-      zoneName: "Kota City",
-      minDeliveryDays: 1,
-      charge: 40,
+      needsPin: true,
+      areaNames: ["Kota City"],
+      zoneName: "",
+      minDeliveryDays: null,
+      charge: null,
     });
   });
 
-  it("keeps a zone that delivers today, rather than reading 0 as nothing", () => {
-    // 0 is same-day — the fastest thing a shop can configure — and a truthy
-    // check would drop exactly that value and print no line at all.
-    expect(lookUpDeliveryPincode([zone({ minDeliveryDays: 0 })], "324001")?.minDeliveryDays).toBe(
-      0,
-    );
-    expect(lookUpDeliveryPincode([zone({ deliveryCharge: 0 })], "324001")?.charge).toBe(0);
+  it("lets a PIN-code zone answer nothing now", () => {
+    // zone({}) is a PIN zone for 324001. It used to say "Yes, Kota City".
+    expect(lookUpDeliveryPincode([zone({})], "324001")?.served).toBe(false);
+    expect(lookUpDeliveryPincode([zone({})], "324001")?.zoneName).toBe("");
   });
 
   it("does not count a zone the shop has switched off", () => {
@@ -150,7 +151,7 @@ describe("what the panel costs a visitor who never opens it", () => {
      * control most visitors never touch.
      */
     const button = code(BUTTON);
-    const opener = button.slice(button.indexOf("const openPanel"));
+    const opener = button.slice(button.indexOf("const openWindow"));
 
     expect(opener.slice(0, 400), "the zone list is not fetched when the panel opens").toContain(
       "fetchZones()",
@@ -158,7 +159,7 @@ describe("what the panel costs a visitor who never opens it", () => {
     // And nowhere else: an effect that fetched on mount would put the request
     // back on every page load of every visit.
     expect((button.match(/fetchZones\(\)/g) ?? []).length).toBe(1);
-    expect(opener.slice(0, 200)).toContain("if (zones !== null || loading) return;");
+    expect(opener.slice(0, 200)).toContain("if (zones !== null || loading.current) return;");
   });
 
   it("and a failed fetch does not turn into a refusal", () => {

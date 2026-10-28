@@ -113,6 +113,10 @@ const EXEMPT = [
   // Same: on the SERVER, asking Razorpay for the account balance after a
   // refused refund. A 401 there is a bad key, not an ended session.
   "features/payments/server/razorpay-refund.server.ts",
+  // Same again: the SERVER asking OpenStreetMap what is at a customer's map
+  // pin, and for address suggestions. No session of ours is involved.
+  "features/commerce/server/osm-geocoding.server.ts",
+  "features/commerce/server/osm-search.server.ts",
 ];
 
 /**

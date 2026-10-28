@@ -1,12 +1,10 @@
 import type { CommerceSettings } from "@/types/settings";
 import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
-import {
-  findDeliveryZone,
-  resolveDeliveryZoneForAddress,
-} from "@/features/commerce/lib/delivery-zones-repository";
+import { loadDeliveryZones } from "@/features/commerce/lib/delivery-zones-repository";
+import { findDeliveryZoneForPin, findRegionZone, isValidLatLng, type PinRegion } from "@/features/commerce/lib/delivery-area";
 import type { ZoneAddress } from "@/features/commerce/lib/delivery-zone-utils";
-import type { DeliveryZone } from "@/types/delivery";
+import type { DeliveryZone, LatLng } from "@/types/delivery";
 
 export interface DeliveryQuote {
   delivery: number;
@@ -32,6 +30,10 @@ export function calculateDeliveryQuote(
     state?: string;
     /** What India Post says is at the PIN — see `ZoneAddress`. */
     place?: ZoneAddress["place"];
+    /** The customer's pin on the map. The ONLY thing that picks a zone. */
+    location?: LatLng;
+    /** The pin's district and state, for whole-district and whole-state zones. */
+    region?: PinRegion | null;
   },
   commerceOverride?: CommerceSettings,
   /**
@@ -54,10 +56,21 @@ export function calculateDeliveryQuote(
     };
   }
 
-  const address = { city: input.city, pincode: input.pincode, state: input.state, place: input.place };
-  const match = zonesOverride
-    ? findDeliveryZone(zonesOverride, address)
-    : resolveDeliveryZoneForAddress(address);
+  // WHERE THE PIN IS, not what PIN was typed (owner, 2026-10-27). A Kota
+  // address with Sangod's PIN was priced as Sangod and taken; only an area
+  // drawn on the map that holds the customer's pin decides now. PIN, city and
+  // state zones match nothing here — see `DeliveryZoneCoverage`.
+  const location = isValidLatLng(input.location) ? input.location : null;
+  const zones = zonesOverride ?? loadDeliveryZones();
+  // No pin yet (the cart, a running total): a whole district or state the PIN
+  // is in still prices it — it priced nothing, and the cart showed the
+  // fallback fee for a PIN the product page had just quoted at the
+  // district's charge (zone review, 2026-10-28).
+  const match = location
+    ? findDeliveryZoneForPin(zones, location, input.region)
+    : input.region
+      ? findRegionZone(zones, input.region)
+      : null;
 
   // Free delivery no longer short-circuits the lookup.
   //
@@ -68,8 +81,10 @@ export function calculateDeliveryQuote(
   const free = input.subtotal >= commerce.freeDeliveryThreshold;
 
   if (!match) {
-    const addressGiven = Boolean(input.pincode?.trim() || input.city?.trim());
-    if (addressGiven && commerce.deliverOutsideZones === false) {
+    // Only a pin is somewhere to refuse. Before it is dropped — the running
+    // total, the cart — there is nothing to judge yet; the server will not
+    // take the order without one (see `priceCart`).
+    if (location && commerce.deliverOutsideZones === false) {
       return { delivery: 0, usedZonePricing: true, deliverable: false };
     }
     return {

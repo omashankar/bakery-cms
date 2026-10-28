@@ -145,7 +145,12 @@ describe("outside every zone", () => {
   });
 
   it("is refused when the shop delivers only inside its zones, and the product page agrees", () => {
-    const quote = calculateDeliveryQuote({ subtotal: 500, pincode: "560001" }, rules({ deliverOutsideZones: false }), [kotaAreas]);
+    // A pin in Bengaluru, which no area of this shop holds.
+    const quote = calculateDeliveryQuote(
+      { subtotal: 500, pincode: "560001", location: { lat: 12.97, lng: 77.59 } },
+      rules({ deliverOutsideZones: false }),
+      [kotaAreas],
+    );
     expect(quote.deliverable).toBe(false);
     expect(lookUpDeliveryPincode([kotaAreas], "560001", rules({ deliverOutsideZones: false }))?.served).toBe(false);
   });
@@ -158,7 +163,10 @@ describe("outside every zone", () => {
   it("settings saved before the switch existed keep delivering", () => {
     const old = rules({});
     delete (old as Partial<CommerceSettings>).deliverOutsideZones;
-    expect(calculateDeliveryQuote({ subtotal: 500, pincode: "560001" }, old, [kotaAreas]).deliverable).toBe(true);
+    expect(
+      calculateDeliveryQuote({ subtotal: 500, pincode: "560001", location: { lat: 12.97, lng: 77.59 } }, old, [kotaAreas])
+        .deliverable,
+    ).toBe(true);
   });
 
   it("with zones switched off the product page says every PIN is delivered at the flat fee", () => {

@@ -25,9 +25,10 @@ import {
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import type { CommerceSettings, GeneralSettings, ModuleSettings } from "@/types/settings";
 import type { LandingProduct } from "@/constants/landing-data";
-import type { DeliveryZone } from "@/types/delivery";
+import type { DeliveryPin, DeliveryZone } from "@/types/delivery";
 import { lookUpPincode } from "@/features/commerce/server/pincode-directory";
 import { addressPincodeConflict } from "@/features/commerce/server/address-pincode-check";
+import { verifyDeliveryPin, type DeliveryPinProblem } from "@/features/commerce/server/delivery-pin-check.server";
 import { normalizePincode } from "@/features/commerce/lib/delivery-zone-utils";
 
 /**
@@ -79,6 +80,8 @@ export interface QuoteInput {
     state?: string;
     addressLine1?: string;
     addressLine2?: string;
+    /** The customer's map pin. Checked here, never trusted. */
+    location?: DeliveryPin;
   };
 }
 
@@ -163,6 +166,26 @@ export class AddressPincodeMismatchError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "AddressPincodeMismatchError";
+  }
+}
+
+/**
+ * The map pin is missing, not a real place, outside every area, or names a
+ * different PIN or state from the address. See `verifyDeliveryPin`.
+ */
+export class DeliveryPinError extends Error {
+  constructor(
+    readonly problem: DeliveryPinProblem,
+    message: string,
+    readonly field: "location" | "pincode" | "state" = "location",
+  ) {
+    super(message);
+    this.name = "DeliveryPinError";
+  }
+
+  /** Every one of these is the customer's to fix, so a 409 like the other refusals. */
+  get status(): number {
+    return 409;
   }
 }
 
@@ -486,19 +509,49 @@ export async function priceCart(input: QuoteInput): Promise<CartQuote> {
     ? resolveCouponDiscount(await Promise.resolve(coupons), input.couponCode, couponLines)
     : null;
 
+  const liveZones = (await Promise.resolve(zones)) as DeliveryZone[];
+
+  // The address's own words first — free, and no map is asked about an
+  // address that contradicts itself.
+  if (input.deliveryAddress?.addressLine1) {
+    const conflict = addressPincodeConflict(input.deliveryAddress);
+    if (conflict) throw new AddressPincodeMismatchError(conflict);
+  }
+
+  // A whole address on a shop with delivery zones must carry a map pin the
+  // server has checked: inside a zone, and agreeing with the address's PIN
+  // and state. Before the price, because the pin's district and state —
+  // found here — are what price a whole-district or whole-state zone.
+  let verdict: Awaited<ReturnType<typeof verifyDeliveryPin>> | null = null;
+  if (commerce.useZoneBasedDelivery && input.deliveryAddress?.addressLine1) {
+    verdict = await verifyDeliveryPin({
+      location: input.deliveryAddress.location,
+      pincode: input.deliveryAddress.pincode,
+      city: input.deliveryAddress.city,
+      state: input.deliveryAddress.state,
+      zones: liveZones,
+      deliverOutsideZones: commerce.deliverOutsideZones !== false,
+    });
+    if (verdict.status === "outside") throw new OutsideDeliveryZonesError(input.deliveryAddress.pincode ?? "");
+    if (verdict.status !== "eligible") {
+      throw new DeliveryPinError(verdict.status, verdict.message, verdict.field);
+    }
+  }
+
   const totals = calculateCartTotals({
     items: items as never,
     discount: applied?.discountAmount ?? 0,
     giftWrap: Boolean(input.giftWrap),
     deliveryTierId: input.deliveryTierId,
-    // Where the PIN really is, from India Post — never from the browser. A
-    // district or state zone is decided by this, not by the typed City/State.
+    // Where the PIN really is, from India Post — never from the browser.
     deliveryAddress: input.deliveryAddress && {
       ...input.deliveryAddress,
       place: lookUpPincode(normalizePincode(input.deliveryAddress.pincode ?? "")),
+      // The pin's district and state, as the server found them — never the browser's.
+      region: verdict?.status === "eligible" ? verdict.region : null,
     },
     commerceOverride: commerce,
-    zonesOverride: (await Promise.resolve(zones)) as DeliveryZone[],
+    zonesOverride: liveZones,
     // Tax rounds to the shop's minor unit. On the server there is no `<html>`
     // for the formatter to read a locale from, so this has to be passed.
     currencyOverride: currency,
@@ -507,11 +560,7 @@ export async function priceCart(input: QuoteInput): Promise<CartQuote> {
   if (totals.deliverable === false) {
     throw new OutsideDeliveryZonesError(input.deliveryAddress?.pincode ?? "");
   }
-
-  if (input.deliveryAddress?.addressLine1) {
-    const conflict = addressPincodeConflict(input.deliveryAddress);
-    if (conflict) throw new AddressPincodeMismatchError(conflict);
-  }
+  if (verdict?.status === "eligible") totals.deliveryPin = verdict.verification;
 
   return {
     items,

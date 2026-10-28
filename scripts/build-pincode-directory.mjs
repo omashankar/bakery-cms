@@ -31,6 +31,14 @@
  * A PIN's state is the one most of its post offices are in (a few dozen PINs
  * straddle a state line); every district it touches is kept, because a
  * district zone should catch a PIN that is partly inside it.
+ *
+ * Also writes india-pincode-points.json: where each PIN's post offices stand,
+ * so a map pin can be given the PIN of the post offices nearest it (see
+ * pincode-locator.ts). India Post's coordinates are rough: some are missing,
+ * some have latitude and longitude swapped (put back), some sit hundreds of
+ * km from the PIN's other offices (left out — 40 km from their median).
+ *
+ *   pins: { "324005": [251428, 758533, 251365, 758401, …] }  — lat, lng × 10⁴ (~11 m)
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -39,6 +47,9 @@ const RESOURCE = "5c2f62fe-5afa-4119-a499-fec9d604d5bd";
 const API = `https://api.data.gov.in/resource/${RESOURCE}`;
 const PAGE = 10_000;
 const OUT = path.join("features", "commerce", "server", "data", "india-pincodes.json");
+const OUT_POINTS = path.join("features", "commerce", "server", "data", "india-pincode-points.json");
+/** A post office further than this from its PIN's other offices is a typo in the directory. */
+const OUTLIER_KM = 40;
 const MAX_AREAS = 5;
 const SMALL_WORDS = new Set(["and", "of", "the", "in"]);
 
@@ -174,6 +185,71 @@ function areaName(office, district) {
   return name.replace(officeType, "").trim();
 }
 
+// ---- where the post offices are ----
+
+const inIndia = (lat, lng) => lat > 6 && lat < 37.6 && lng > 68 && lng < 97.6;
+
+function kmBetween(a, b) {
+  const rad = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * rad;
+  const dLng = (b.lng - a.lng) * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.sqrt(h));
+}
+
+/** Each PIN's post offices as points, cleaned — see the header. */
+function buildPoints(records, updated) {
+  const byPin = new Map();
+  let unusable = 0;
+  for (const r of records) {
+    const pin = String(r.pincode ?? "").trim();
+    let lat = Number(r.latitude);
+    let lng = Number(r.longitude);
+    if (!/^[1-9]\d{5}$/.test(pin) || missing(r.latitude) || missing(r.longitude) || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+      unusable += 1;
+      continue;
+    }
+    if (!inIndia(lat, lng) && inIndia(lng, lat)) [lat, lng] = [lng, lat];
+    if (!inIndia(lat, lng)) {
+      unusable += 1;
+      continue;
+    }
+    const list = byPin.get(pin) ?? [];
+    list.push({ lat, lng });
+    byPin.set(pin, list);
+  }
+  const median = (values) => [...values].sort((a, b) => a - b)[values.length >> 1];
+  const out = {};
+  let outliers = 0;
+  let points = 0;
+  for (const pin of [...byPin.keys()].sort()) {
+    const list = byPin.get(pin);
+    const middle = { lat: median(list.map((p) => p.lat)), lng: median(list.map((p) => p.lng)) };
+    const seen = new Set();
+    const flat = [];
+    for (const p of list) {
+      if (list.length > 2 && kmBetween(middle, p) > OUTLIER_KM) {
+        outliers += 1;
+        continue;
+      }
+      const lat = Math.round(p.lat * 1e4);
+      const lng = Math.round(p.lng * 1e4);
+      if (seen.has(`${lat},${lng}`)) continue;
+      seen.add(`${lat},${lng}`);
+      flat.push(lat, lng);
+    }
+    if (flat.length) {
+      out[pin] = flat;
+      points += flat.length / 2;
+    }
+  }
+  fs.writeFileSync(OUT_POINTS, JSON.stringify({ updated, pins: out }));
+  console.log(
+    `${points} post office points for ${Object.keys(out).length} PIN codes (${unusable} without a usable place, ` +
+      `${outliers} far from their PIN left out) → ${OUT_POINTS} (${fs.statSync(OUT_POINTS).size} bytes)`,
+  );
+}
+
 // ---- building ----
 
 function build(records, updated) {
@@ -304,6 +380,7 @@ if (args.includes("--download")) {
   }
   const { records, updated } = await download(key);
   build(records, updated);
+  buildPoints(records, updated);
 } else {
   const updatedAt = args.indexOf("--updated");
   const updated = updatedAt >= 0 ? args[updatedAt + 1] : "";
@@ -322,4 +399,5 @@ if (args.includes("--download")) {
     records.push(...rows);
   }
   build(records, updated);
+  buildPoints(records, updated);
 }

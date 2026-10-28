@@ -21,7 +21,8 @@ import { OptimizedImage } from "@/components/shared/optimized-image";
 import { EarliestDelivery } from "@/components/storefront/earliest-delivery";
 import { PincodeCheck } from "@/components/storefront/pincode-check";
 import { fetchPincodePlace } from "@/features/commerce/lib/pincode-api";
-import type { PincodePlace } from "@/types/delivery";
+import type { LatLng, PincodePlace } from "@/types/delivery";
+import { askAboutPincode } from "@/components/storefront/pin-area-answer";
 import { QuantityStepper } from "@/components/shared/quantity-stepper";
 import { FrameThumbnail } from "@/components/storefront/frame-thumbnail";
 import { Button } from "@/components/ui/button";
@@ -298,8 +299,15 @@ export function CartPage({ catalog = [] }: CartPageProps) {
    * button is in the header on this page.
    */
   const [deliveryPincode, setDeliveryPincode] = useState("");
+  // Where the customer said they are ("Detect my location", a found area) — a
+  // real spot, which prices a drawn area as checkout will.
+  const [savedSpot, setSavedSpot] = useState<LatLng | null>(null);
   useEffect(() => {
-    const sync = () => setDeliveryPincode(readDeliveryLocation()?.pincode ?? "");
+    const sync = () => {
+      const saved = readDeliveryLocation();
+      setDeliveryPincode(saved?.pincode ?? "");
+      setSavedSpot(saved?.location ?? null);
+    };
     sync();
     window.addEventListener(DELIVERY_LOCATION_UPDATED_EVENT, sync);
     return () => window.removeEventListener(DELIVERY_LOCATION_UPDATED_EVENT, sync);
@@ -320,6 +328,23 @@ export function CartPage({ catalog = [] }: CartPageProps) {
   }, [deliveryPincode]);
   const place = deliveryPlace?.code === deliveryPincode ? deliveryPlace.place : undefined;
 
+  // A PIN with no spot, on a shop with areas drawn on the map: the shop says
+  // which of the PIN's own post offices to price at — the same answer the
+  // product page gave. Only for this row: it is never a delivery pin.
+  const [pricedAt, setPricedAt] = useState<{ code: string; at: LatLng } | null>(null);
+  const needsSpot = Boolean(commerce.useZoneBasedDelivery && deliveryPincode && !savedSpot);
+  useEffect(() => {
+    if (!needsSpot) return;
+    let alive = true;
+    void askAboutPincode(deliveryPincode).then((reply) => {
+      if (alive && reply?.status === "eligible" && reply.at) setPricedAt({ code: deliveryPincode, at: reply.at });
+    });
+    return () => {
+      alive = false;
+    };
+  }, [needsSpot, deliveryPincode]);
+  const priceSpot = savedSpot ?? (pricedAt?.code === deliveryPincode ? pricedAt.at : undefined);
+
   const totals = useMemo(    () =>
       calculateCartTotals({
         items,
@@ -329,10 +354,18 @@ export function CartPage({ catalog = [] }: CartPageProps) {
         giftWrap: preferences.giftWrap,
         // The same basis the checkout uses, so the Delivery row does not
         // move between the two screens.
-        deliveryAddress: deliveryPincode ? { pincode: deliveryPincode, place } : undefined,
+        // India Post's district and state price a whole-district zone; a spot prices a drawn area.
+        deliveryAddress: deliveryPincode
+          ? {
+              pincode: deliveryPincode,
+              place,
+              region: place ? { state: place.state, districts: place.districts } : null,
+              location: priceSpot ?? undefined,
+            }
+          : undefined,
         commerceOverride: commerce,
       }),
-    [items, validCoupon?.discountAmount, preferences.giftWrap, deliveryPincode, place, commerce]
+    [items, validCoupon?.discountAmount, preferences.giftWrap, deliveryPincode, place, priceSpot, commerce]
   );
 
   const recentlyViewed = useMemo(

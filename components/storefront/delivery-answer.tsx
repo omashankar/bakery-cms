@@ -1,8 +1,10 @@
 "use client";
 
-import { Check, X } from "lucide-react";
+import { useState } from "react";
+import { Check, MapPin, X } from "lucide-react";
 
-import type { DeliveryLookup } from "@/features/commerce/lib/delivery-location";
+import { ExactAddressCheck } from "@/components/storefront/exact-address-check";
+import { soonestDeliveryDays, soonestDeliveryText, type DeliveryLookup } from "@/features/commerce/lib/delivery-location";
 import { formatCurrency } from "@/utils/format";
 import { cn } from "@/lib/utils";
 
@@ -45,12 +47,21 @@ export function DeliveryAnswer({
   result,
   pincode,
   loading,
+  exactCheck = true,
+  exactHint = "Your exact address is checked on the map at checkout.",
   className,
 }: {
   result: DeliveryLookup | null;
   /** Repeated back in the answer, so it is clear which code was checked. */
   pincode?: string;
   loading?: boolean;
+  /**
+   * Offer "check your exact address" where a PIN cannot answer. Off in the
+   * header, which checks the PIN alone (owner, 2026-10-27).
+   */
+  exactCheck?: boolean;
+  /** Said instead, where the exact check is offered some other way. */
+  exactHint?: string;
   className?: string;
 }) {
   if (loading) {
@@ -71,6 +82,28 @@ export function DeliveryAnswer({
           </p>
           <p className="text-muted-foreground">Please check the digits and try again.</p>
         </div>
+      </div>
+    );
+  }
+
+  // Delivered by areas drawn on the map: a PIN cannot say, the door can —
+  // so the customer checks it here, not first at checkout.
+  if (result.needsPin) {
+    return (
+      <div className={cn("min-w-0 space-y-2 text-sm", className)}>
+        <div className="flex min-w-0 items-start gap-2">
+          <MapPin className="mt-0.5 size-4 shrink-0 text-bakery-700" aria-hidden="true" />
+          <div className="min-w-0">
+            <p className="font-medium text-foreground">We deliver to parts of {code || "this PIN"} — check your exact address</p>
+            {/* The place, not the shop's zone names — those are the owner's own words. */}
+            {where ? <p className="text-muted-foreground">{where}</p> : null}
+          </div>
+        </div>
+        {exactCheck ? (
+          <ExactAddressCheck pincode={code} />
+        ) : (
+          <p className="text-xs text-muted-foreground">{exactHint}</p>
+        )}
       </div>
     );
   }
@@ -96,18 +129,11 @@ export function DeliveryAnswer({
   */
   const facts = [
     // The real place first — it is what tells a customer the right code was
-    // checked — and the zone's name only when it says something more.
+    // checked. Not the zone's name: that is the owner's own word ("₹40
+    // areas", "sangod"), and means nothing to the person ordering.
     where || null,
-    result.zoneName && !where.toLowerCase().includes(result.zoneName.toLowerCase())
-      ? result.zoneName
-      : null,
-    result.minDeliveryDays === null
-      ? null
-      : result.minDeliveryDays <= 0
-        ? "Same-day delivery"
-        : result.minDeliveryDays === 1
-          ? "From the next day"
-          : `From ${result.minDeliveryDays} days ahead`,
+    // The zone's days, the shop's lead time and today's cutoff — as checkout's date picker allows.
+    soonestDeliveryText(soonestDeliveryDays(result.minDeliveryDays)),
     result.charge === null
       ? null
       : result.charge > 0
@@ -125,7 +151,24 @@ export function DeliveryAnswer({
         {facts.length > 0 ? (
           <p className="text-muted-foreground">{facts.join(" · ")}</p>
         ) : null}
+        {/* A drawn area inside this district may be cheaper at one door. */}
+        {result.priceMayVary && exactCheck ? <CheaperNearby pincode={code} /> : null}
       </div>
     </div>
+  );
+}
+
+/** "Some areas cost less — check your exact address", opened on request. */
+function CheaperNearby({ pincode }: { pincode: string }) {
+  const [open, setOpen] = useState(false);
+  if (open) return <ExactAddressCheck pincode={pincode} className="mt-2" />;
+  return (
+    <button
+      type="button"
+      onClick={() => setOpen(true)}
+      className="mt-1 text-xs font-medium text-bakery-700 underline underline-offset-2"
+    >
+      Some areas have a lower delivery charge — check your exact address
+    </button>
   );
 }

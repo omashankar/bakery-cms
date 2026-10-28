@@ -4,12 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { MapPin, X } from "lucide-react";
 
 import { DeliveryAnswer } from "@/components/storefront/delivery-answer";
+import { answerPinByArea } from "@/components/storefront/pin-area-answer";
 import { fetchZones } from "@/features/commerce/lib/commerce-api";
 import { fetchPincodePlace } from "@/features/commerce/lib/pincode-api";
 import { loadDeliveryZones } from "@/features/commerce/lib/delivery-zones-repository";
 import { isStorefrontSeeded } from "@/lib/storefront-seed-flag";
 import {
   lookUpDeliveryPincode,
+  pincodeLabel,
   readDeliveryLocation,
   saveDeliveryLocation,
   type DeliveryLookup,
@@ -111,9 +113,12 @@ export function PincodeCheck({
     if (!saved?.pincode) return;
     let alive = true;
     // The real place too, so a district zone answers here as checkout will.
-    void fetchPincodePlace(saved.pincode).then((asked) => {
+    void fetchPincodePlace(saved.pincode).then(async (asked) => {
       if (!alive) return;
-      const found = lookUpDeliveryPincode(zones, saved.pincode, getCommerceSettings(), asked?.place);
+      const lookup = lookUpDeliveryPincode(zones, saved.pincode, getCommerceSettings(), asked?.place);
+      // A plain yes or no, even for a shop that delivers by map area.
+      const found = await answerPinByArea(lookup, saved.pincode);
+      if (!alive) return;
       setResult(found);
       if (found?.served) setEditing(false);
     });
@@ -131,13 +136,15 @@ export function PincodeCheck({
     // India Post's answer: where the PIN is, or that there is no such PIN.
     // A failed request answers from the zones alone, never "not a PIN".
     const asked = await fetchPincodePlace(code);
+    // A plain yes or no, as this box always gave — even where the shop
+    // delivers by map area (owner, 2026-10-27). See `answerPinByArea`.
+    const found = await answerPinByArea(lookUpDeliveryPincode(zones, code, getCommerceSettings(), asked?.place), code);
     setChecking(false);
     // Typed over while the answer was on its way: that answer is not for this box.
     if (seq !== checkSeq.current) return;
-    const found = lookUpDeliveryPincode(zones, code, getCommerceSettings(), asked?.place);
     setResult(found);
     if (found?.served) {
-      saveDeliveryLocation({ pincode: normalizePincode(entered), label: found.zoneName });
+      saveDeliveryLocation({ pincode: normalizePincode(entered), label: pincodeLabel(normalizePincode(entered), asked?.place) });
       if (inline) setEditing(false);
     }
   };
@@ -167,8 +174,8 @@ export function PincodeCheck({
           <MapPin className="size-4 shrink-0 text-bakery-700" aria-hidden="true" />
           <span className="shrink-0 whitespace-nowrap text-muted-foreground">Deliver to:</span>
           <span className="shrink-0 font-semibold text-foreground">{normalizePincode(entered)}</span>
-          {result.zoneName ? (
-            <span className="truncate text-muted-foreground">· {result.zoneName}</span>
+          {result.place?.districts[0] ? (
+            <span className="truncate text-muted-foreground">· {result.place.districts[0]}</span>
           ) : null}
         </p>
         <button
@@ -302,7 +309,8 @@ export function PincodeCheck({
     </form>
   );
 
-  const answer = <DeliveryAnswer result={result} pincode={entered} loading={checking} />;
+  // PIN only here, a yes or a no (owner, 2026-10-27): the exact door is checked on checkout's map.
+  const answer = <DeliveryAnswer result={result} pincode={entered} loading={checking} exactCheck={false} />;
 
   if (inline) {
     return (

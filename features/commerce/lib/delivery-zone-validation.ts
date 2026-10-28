@@ -1,6 +1,7 @@
 import type {
   DeliveryZone,
   DeliveryZoneFormData,
+  LatLng,
   DeliveryZoneMatch,
   DistrictEntry,
   PincodeInfo,
@@ -14,6 +15,16 @@ import {
   rankDeliveryZones,
 } from "./delivery-zone-utils";
 import { matchStateName, stateForPincode, type IndianState } from "./india-states";
+import {
+  areasTouch,
+  isAreaZone,
+  isValidLatLng,
+  MAX_AREAS_PER_ZONE,
+  MAX_POLYGON_POINTS,
+  MAX_RADIUS_KM,
+  polygonCrossesItself,
+  zoneShapes,
+} from "./delivery-area";
 
 /**
  * WHAT AN OWNER TYPED INTO A PIN BOX, READ ONE ENTRY AT A TIME.
@@ -254,10 +265,10 @@ export function checkZoneDraft({
 
   if (coverage === "cities") {
     const cities = zone.cities ?? [];
-    if (cities.length === 0) missing.push("Add at least one city.");
+    if (cities.length === 0) missing.push("Add at least one district.");
     const pins = cities.filter((city) => /^\d[\d\s]*$/.test(city.trim()));
     if (pins.length) {
-      errors.push(`${listed(pins)} is a PIN code, not a city — choose "PIN codes / areas" for PIN codes.`);
+      errors.push(`${listed(pins)} is a PIN code, not a district — choose a district from the list.`);
     }
     if (districts && districts.length > 0) {
       // A city zone matches the DISTRICT India Post puts the customer's PIN
@@ -271,14 +282,61 @@ export function checkZoneDraft({
         const hint = closestDistricts(city, districts);
         errors.push(
           `"${city}" is not a district in India Post's list, so no customer would match it.` +
-            (hint.length ? ` Did you mean ${hint.map((name) => `"${name}"`).join(" or ")}?` : " Pick a district from the suggestions, or use PIN codes."),
+            (hint.length ? ` Did you mean ${hint.map((name) => `"${name}"`).join(" or ")}?` : " Pick a district from the suggestions."),
         );
+      }
+      // Bilaspur, Aurangabad, Hamirpur…: one name, two states. Chosen by name,
+      // the zone covers both — say so, or a Chhattisgarh shop delivers to Himachal.
+      for (const city of cities) {
+        const states = [...new Set(districts.filter((entry) => entry.name.toLowerCase() === city.trim().toLowerCase()).map((entry) => entry.state))];
+        if (states.length > 1) {
+          warnings.push(`"${city.trim()}" is a district in ${states.length} states — ${listed(states)}. This zone covers all of them.`);
+        }
       }
     }
   }
 
   if (coverage === "states" && (zone.states ?? []).length === 0) {
     missing.push("Choose at least one state.");
+  }
+
+  // The zone's map areas — one circle, one boundary, or several of either.
+  // Each is checked on its own and, when there are several, named by number.
+  const shapes =
+    coverage === "radius"
+      ? [{ kind: "radius" as const, center: zone.center as LatLng, radiusKm: zone.radiusKm }]
+      : coverage === "polygon" || coverage === "areas"
+        ? zoneShapes(zone)
+        : [];
+  if (coverage === "areas" && shapes.length === 0) missing.push("Add at least one area: a circle or a boundary.");
+  if (coverage === "areas" && shapes.length > MAX_AREAS_PER_ZONE) {
+    errors.push(`A zone can hold at most ${MAX_AREAS_PER_ZONE} areas — split it into two zones.`);
+  }
+  shapes.forEach((shape, i) => {
+    const which = shapes.length > 1 ? `Area ${i + 1}: ` : "";
+    if (shape.kind === "radius") {
+      if (!isValidLatLng(shape.center)) missing.push(`${which}Put the centre on the map, or type its latitude and longitude.`);
+      if (!(shape.radiusKm > 0)) missing.push(`${which}Set how far it reaches, in km.`);
+      else if (shape.radiusKm > MAX_RADIUS_KM) errors.push(`${which}A circle can reach at most ${MAX_RADIUS_KM} km from its centre.`);
+      return;
+    }
+    const points = shape.polygon ?? [];
+    if (points.length < 3) missing.push(`${which}Draw the boundary: click at least three corners on the map.`);
+    if (points.length > MAX_POLYGON_POINTS) errors.push(`${which}A boundary can have at most ${MAX_POLYGON_POINTS} corners.`);
+    if (points.some((point) => !isValidLatLng(point))) errors.push(`${which}A corner of the boundary is not a real place.`);
+    if (polygonCrossesItself(points)) {
+      errors.push(`${which}The boundary crosses itself — tap the corners in order, going round the area. Clear and draw it again.`);
+    }
+  });
+  if (isAreaZone(zone) && zone.isActive) {
+    const draft = { ...zone, id: zone.id ?? "draft", isActive: true, createdAt: "", updatedAt: "" } as DeliveryZone;
+    for (const other of others) {
+      if (other.isActive && isAreaZone(other) && areasTouch(draft, other)) {
+        warnings.push(
+          `This area overlaps "${other.name.trim() || "another zone"}" — where they overlap, the smaller area wins.`,
+        );
+      }
+    }
   }
 
   for (const entry of excludedEntries) if (entry.problem) errors.push(`Leave out: ${entry.problem}.`);
@@ -342,7 +400,9 @@ export function checkZoneDraft({
 
       const cities = mine.cities.filter((city) => theirs.cities.includes(city));
       if (cities.length) {
-        errors.push(`${listed(cities)} is already in ${label}. One city can be in only one zone.`);
+        // Named as the owner typed them — the comparison is case-blind, the message need not be.
+        const asTyped = cities.map((key) => (zone.cities ?? []).find((name) => name.trim().toLowerCase() === key)?.trim() ?? key);
+        errors.push(`${listed(asTyped)} is already in ${label}. One district can be in only one zone.`);
       }
       const states = mine.states.filter((state) => theirs.states.includes(state));
       if (states.length) {
@@ -362,6 +422,7 @@ const MATCHED_BY: Record<DeliveryZoneMatch["matchType"], string> = {
   city: "its district",
   state: "its state",
   country: "all of India",
+  area: "its map area",
 };
 
 /** "its PIN codes" — the part of a zone that caught an address. */
