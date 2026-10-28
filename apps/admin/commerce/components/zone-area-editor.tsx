@@ -6,7 +6,10 @@ import { useEffect, useRef, useState } from "react";
 import type * as Leaflet from "leaflet";
 import { Crosshair, Loader2, RotateCw, Trash2, Undo2 } from "lucide-react";
 
+import { toast } from "sonner";
+
 import { Button } from "@/components/ui/button";
+import { locateDevice } from "@/lib/device-location";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -123,16 +126,12 @@ export function ZoneAreaEditor({
   }
 
   function locateMe() {
-    if (!("geolocation" in navigator)) return;
     setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setLocating(false);
-        goTo({ lat: position.coords.latitude, lng: position.coords.longitude });
-      },
-      () => setLocating(false),
-      { enableHighAccuracy: true, timeout: 10_000 },
-    );
+    // The best reading in a few seconds, not the first — see `locateDevice`.
+    void locateDevice()
+      .then((fix) => goTo(fix.point))
+      .catch((error: Error) => toast.error(error.message))
+      .finally(() => setLocating(false));
   }
 
   // What the corners box says, kept as typed so a half-written line survives;

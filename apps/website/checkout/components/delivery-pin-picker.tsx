@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { PlaceSearch, type PlaceSuggestion } from "@/components/shared/place-search";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/utils/format";
+import { locateDevice } from "@/lib/device-location";
 import { soonestDeliveryDays, soonestDeliveryText } from "@/features/commerce/lib/delivery-location";
 import { addMapControls, boundsOf, drawZoneShapes, loadLeaflet, pinIcon } from "@/lib/leaflet-map";
 import { loadDeliveryZones } from "@/features/commerce/lib/delivery-zones-repository";
@@ -142,6 +143,8 @@ export function DeliveryPinPicker({
   const [locating, setLocating] = useState(false);
   // "Use my current location" from a device that only guessed (a computer, from its network): metres.
   const [roughBy, setRoughBy] = useState<number | null>(null);
+  // The pin "Use my current location" put down, until the customer moves it.
+  const locatedAt = useRef("");
   const [retry, setRetry] = useState(0);
   // Whether the key under the map has anything to explain — known once the map is drawn.
   const [hasAreas, setHasAreas] = useState(false);
@@ -295,6 +298,9 @@ export function DeliveryPinPicker({
   useEffect(() => {
     const current = leaflet.current;
     if (!mapReady || !current || check.status !== "outside" || !pin || !isValidLatLng(pin)) return;
+    // "My current location" stays close on the customer: they asked to see where they are. The
+    // distance is said under the map, and the "show all" button is one press away.
+    if (locatedAt.current === `${pin.lat},${pin.lng}`) return;
     const areas = boundsOf(current.L, current.areas.getLayers());
     if (!areas) return;
     current.map.fitBounds(areas.extend(current.L.latLng(pin.lat, pin.lng)), { padding: [32, 32], maxZoom: 16, animate: false });
@@ -302,36 +308,29 @@ export function DeliveryPinPicker({
   }, [check.status, mapReady]);
 
   function locateMe() {
-    if (!("geolocation" in navigator)) return;
     setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setLocating(false);
-        const point = { lat: position.coords.latitude, lng: position.coords.longitude };
-        const metres = Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : 0;
+    void locateDevice()
+      .then(({ point, accuracy }) => {
         const current = leaflet.current;
         if (current) {
           current.accuracy?.remove();
           // The circle the device says it is somewhere inside — the honest picture of a guess.
-          current.accuracy = metres > 0
-            ? current.L.circle(point, { radius: metres, color: "#2563eb", weight: 1, fillOpacity: 0.08, interactive: false }).addTo(current.map)
+          current.accuracy = accuracy > 0 && Number.isFinite(accuracy)
+            ? current.L.circle(point, { radius: accuracy, color: "#2563eb", weight: 1, fillOpacity: 0.08, interactive: false }).addTo(current.map)
             : null;
-          if (current.accuracy && metres > ROUGH_METRES) {
+          if (current.accuracy && accuracy > ROUGH_METRES) {
             current.map.fitBounds(current.accuracy.getBounds(), { padding: [16, 16], maxZoom: 18, animate: false });
           } else {
             current.map.setView(point, 18, { animate: false });
           }
         }
-        setRoughBy(metres > ROUGH_METRES ? metres : null);
+        setRoughBy(accuracy > ROUGH_METRES ? accuracy : null);
+        locatedAt.current = `${point.lat},${point.lng}`;
         placeMarker(point);
         onPinChange(point);
-      },
-      () => {
-        setLocating(false);
-        onCheck({ status: "missing", field: "location", message: "We couldn't get your location. Search your address or tap your door on the map instead." });
-      },
-      { enableHighAccuracy: true, timeout: 10_000 },
-    );
+      })
+      .catch((error: Error) => onCheck({ status: "missing", field: "location", message: error.message }))
+      .finally(() => setLocating(false));
   }
 
   return (

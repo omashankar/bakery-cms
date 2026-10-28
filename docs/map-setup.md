@@ -37,7 +37,7 @@ one area exists, no delivery order can be placed.**
 
 | Part | Service | Cost |
 |---|---|---|
-| Map pictures | OpenStreetMap tiles, drawn with Leaflet | Free |
+| Street map | Esri World Street Map, drawn with Leaflet. It names colonies (Talwandi, Vigyan Nagar), which OpenStreetMap's own tiles do not in Kota | Free, credited on the map |
 | Address suggestions | Photon (OpenStreetMap search) | Free |
 | PIN code at the pin | India Post's post office locations, in this app | Free |
 | Address and state at the pin | Nominatim (OpenStreetMap geocoder) | Free |
@@ -92,7 +92,8 @@ Post's list. A pin inside a circle or boundary never needs to ask.
 The free public services ask for fair use:
 
 - the geocoder takes at most one request a second;
-- the tile server is not meant for heavy traffic.
+- the street map and Satellite view (Esri) are free for light use; a busy
+  shop should create a free ArcGIS developer account.
 
 This app keeps within those limits. It caches every answer, spaces its
 geocoder calls a second apart, and never calls the geocoder for a pin outside

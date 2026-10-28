@@ -116,3 +116,26 @@ describe("boundsOf", () => {
     expect(boundsOf(L, [])).toBeNull();
   });
 });
+
+describe("the street map names the colonies", () => {
+  it("is Esri's World Street Map by default — OpenStreetMap's own tiles name no colony in Kota", async () => {
+    const { tileMaxNativeZoom } = await import("@/lib/leaflet-map");
+    expect(tileUrl()).toContain("World_Street_Map");
+    // Esri draws Indian towns to 17; beyond, the 17 tiles are enlarged, never a "no data" tile.
+    expect(tileMaxNativeZoom()).toBe(17);
+  });
+
+  it("asks the street server for nothing past its own zoom", () => {
+    const map = build();
+    addMapControls(L, map);
+    const street = (() => {
+      let found: Leaflet.TileLayer | null = null;
+      map.eachLayer((layer) => {
+        if (layer instanceof L.TileLayer && (layer as unknown as { _url: string })._url === tileUrl()) found = layer;
+      });
+      return found as Leaflet.TileLayer | null;
+    })();
+    expect(street?.options.maxNativeZoom).toBe(17);
+    expect(street?.options.maxZoom).toBe(19);
+  });
+});

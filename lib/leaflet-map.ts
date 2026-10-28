@@ -4,29 +4,43 @@ import { isUsableShape, zoneShapes } from "@/features/commerce/lib/delivery-area
 import type { DeliveryZone } from "@/types/delivery";
 
 /**
- * THE MAP IN THE BROWSER — Leaflet over OpenStreetMap, free, with no key.
+ * THE MAP IN THE BROWSER — Leaflet, free, with no key.
  *
  * Loaded only where a map is drawn (the checkout's delivery step, a zone's
  * editor): every page of this shop must stay light, so nothing pulls Leaflet
  * in up front.
  *
- * The tiles are OpenStreetMap's own by default, which ask for attribution
- * (shown on the map) and fair use — fine for a shop's checkout, not for heavy
- * traffic. `NEXT_PUBLIC_MAP_TILE_URL` points at another tile server (a hosted
- * one with a free tier, or the shop's own) without touching the code.
+ * The street map is Esri's World Street Map by default, credited on the map.
+ * It was OpenStreetMap's own tiles, which name no colony in Kota — Talwandi,
+ * Vigyan Nagar, Keshavpura were bare grids of streets — and a customer
+ * finding their door, or an owner drawing round a mohalla, reads the map by
+ * those names (owner, 2026-10-28: "area bhi ni dikh rhe"). Esri asks a busy
+ * shop for a free developer account; `NEXT_PUBLIC_MAP_TILE_URL` points at
+ * another tile server without touching the code — see docs/map-setup.md.
  */
 
 export type LeafletModule = typeof Leaflet;
 
+const ESRI_STREETS = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}";
+
 export function tileUrl(): string {
-  return process.env.NEXT_PUBLIC_MAP_TILE_URL?.trim() || "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+  return process.env.NEXT_PUBLIC_MAP_TILE_URL?.trim() || ESRI_STREETS;
 }
 
 export function tileAttribution(): string {
   return (
     process.env.NEXT_PUBLIC_MAP_TILE_ATTRIBUTION?.trim() ||
-    '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors'
+    "Map &copy; Esri, HERE, Garmin, &copy; OpenStreetMap contributors"
   );
+}
+
+/**
+ * Esri draws Indian towns to zoom 17; past it the server answers "map data not
+ * yet available". Leaflet enlarges the 17 tiles instead, so a close-in pin
+ * still sits on its street. Another server is trusted to its own 19.
+ */
+export function tileMaxNativeZoom(): number {
+  return tileUrl() === ESRI_STREETS ? 17 : 19;
 }
 
 /**
@@ -163,7 +177,7 @@ export function addMapControls(
   map: Leaflet.Map,
   { fitAll, fitLabel = "Show all delivery areas" }: { fitAll?: () => Leaflet.LatLngBounds | null; fitLabel?: string } = {},
 ): void {
-  const street = L.tileLayer(tileUrl(), { attribution: tileAttribution(), maxZoom: 19 });
+  const street = L.tileLayer(tileUrl(), { attribution: tileAttribution(), maxZoom: 19, maxNativeZoom: tileMaxNativeZoom() });
   const satellite = L.layerGroup([
     L.tileLayer(satelliteUrl(), { attribution: satelliteAttribution(), maxZoom: 19, maxNativeZoom: 18 }),
     ...SATELLITE_LABELS.map((url) => L.tileLayer(url, { maxZoom: 19, maxNativeZoom: 18 })),

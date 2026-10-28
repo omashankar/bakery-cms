@@ -7,6 +7,7 @@ import { PlaceSearch, type PlaceSuggestion } from "@/components/shared/place-sea
 import { placeLabel, saveDeliveryLocation, soonestDeliveryDays, soonestDeliveryText } from "@/features/commerce/lib/delivery-location";
 import { formatCurrency } from "@/utils/format";
 import { cn } from "@/lib/utils";
+import { locateDevice } from "@/lib/device-location";
 import type { LatLng } from "@/types/delivery";
 
 /**
@@ -107,19 +108,9 @@ export function shortName(place: Pick<PlaceSuggestion, "area" | "city">): string
   return [place.area, place.city].filter((part, i, all): part is string => Boolean(part) && all.indexOf(part) === i).join(", ");
 }
 
-/** The phone's own position, or a sentence saying why not. */
+/** The device's own position, or a sentence saying why not — its best reading, see `locateDevice`. */
 export function currentPosition(): Promise<LatLng> {
-  return new Promise((resolve, reject) => {
-    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
-      reject(new Error("This browser can't share its location. Search your area instead."));
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (position) => resolve({ lat: position.coords.latitude, lng: position.coords.longitude }),
-      () => reject(new Error("We couldn't get your location. Search your area instead.")),
-      { enableHighAccuracy: true, timeout: 10_000 },
-    );
-  });
+  return locateDevice().then((fix) => fix.point);
 }
 
 /** What the shop said about a spot. */
