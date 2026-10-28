@@ -161,10 +161,26 @@ describe("the two that are conditional", () => {
     expect(value, "the payment permission is denied — this breaks Razorpay's Google Pay").not.toMatch(
       /payment\s*=/,
     );
-    // The ones that ARE denied are genuinely unused: nothing in the tree calls
-    // getUserMedia or navigator.geolocation.
+    // The ones that ARE denied are genuinely unused: nothing calls getUserMedia.
     expect(value).toMatch(/camera=\(\)/);
-    expect(value).toMatch(/geolocation=\(\)/);
+    expect(value).toMatch(/microphone=\(\)/);
+  });
+
+  it("lets the shop's own pages ask where the customer is — and no iframe", () => {
+    /**
+     * The map pin decides delivery (2026-10-27), and three buttons ask the
+     * phone where it is: "Detect my location", "Use my current location", "I
+     * am at the shop". `geolocation=()` refused all three on every page before
+     * any prompt (found 2026-10-28). `(self)` is the shop, and only the shop.
+     */
+    const code = stripComments(config());
+    const at = code.indexOf("Permissions-Policy");
+    const value = code.slice(at, code.indexOf("}", at));
+    expect(value).toMatch(/geolocation=\(self\)/);
+    // Every other spelling that is wrong: off for the shop too, or on for any frame.
+    expect(value).not.toMatch(/geolocation=\(\)/);
+    expect(value).not.toMatch(/geolocation=\*/);
+    expect(value).not.toMatch(/geolocation=\(self\s+[^)]/);
   });
 
   it("stops announcing the framework and its version", () => {
