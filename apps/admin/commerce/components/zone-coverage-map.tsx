@@ -184,8 +184,10 @@ export function ZoneCoverageMap({
 
       <PlaceSearch
         onPick={(place) => {
-          leaflet.current?.map.setView(place.location, 15, { animate: false });
-          checkSpot(place.location);
+          const zoom = place.zoom ?? 15;
+          leaflet.current?.map.setView(place.location, Math.min(zoom, 15), { animate: false });
+          // A town or wider is many answers: the owner taps the spot to check.
+          if (zoom >= 15) checkSpot(place.location);
         }}
         placeholder="Find an area or address to check"
       />

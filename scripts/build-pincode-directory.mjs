@@ -198,6 +198,85 @@ function kmBetween(a, b) {
 }
 
 /** Each PIN's post offices as points, cleaned — see the header. */
+/** Further than this from every PIN of its own district, a PIN is filed under the wrong one. */
+const MISFILED_KM = 300;
+/** …and this close to a PIN of its own block, it is where that block is. */
+const NEAR_KM = 50;
+
+/**
+ * India Post's own directory files a few PINs under a district and state
+ * hundreds of km from where their post offices stand: 799001, Agartala's head
+ * office, is "Nirmal, TELANGANA"; 334002 in Bikaner is "Raipur, Chhattisgarh".
+ * A customer typing 799001 was told Telangana.
+ *
+ * India Post's COORDINATES are wronger than its filing far more often — a
+ * first pass that trusted them "moved" Patna's 800011 to Meghalaya — so a PIN
+ * is refiled only when three things agree:
+ *   1. its state is not the state of almost every PIN sharing its first three
+ *      digits (the postal circle's own numbering);
+ *   2. its offices stand within NEAR_KM of a PIN of that same block;
+ *   3. they stand further than MISFILED_KM from every other PIN of the
+ *      district it is filed under — and that district HAS other PINs, so an
+ *      enclave like Mahe (Puducherry, inside Kerala) is left alone.
+ * It then takes the filing of that nearest same-block PIN. Runs after both
+ * files are written, on them.
+ */
+function correctMisfiledPins() {
+  const directory = JSON.parse(fs.readFileSync(OUT, "utf8"));
+  const { pins: flat } = JSON.parse(fs.readFileSync(OUT_POINTS, "utf8"));
+  const median = (values) => [...values].sort((a, b) => a - b)[values.length >> 1];
+  const middle = {};
+  for (const [pin, list] of Object.entries(flat)) {
+    const lats = [];
+    const lngs = [];
+    for (let i = 0; i + 1 < list.length; i += 2) {
+      lats.push(list[i] / 1e4);
+      lngs.push(list[i + 1] / 1e4);
+    }
+    middle[pin] = { lat: median(lats), lng: median(lngs) };
+  }
+  const districtsOf = (row) => (Array.isArray(row[1]) ? row[1] : [row[1]]);
+  const pinsIn = new Map();
+  for (const [pin, row] of Object.entries(directory.pins)) {
+    for (const d of districtsOf(row)) pinsIn.set(d, [...(pinsIn.get(d) ?? []), pin]);
+  }
+  // Each three-digit block's states, counted.
+  const blockStates = new Map();
+  for (const [pin, row] of Object.entries(directory.pins)) {
+    const counts = blockStates.get(pin.slice(0, 3)) ?? new Map();
+    counts.set(row[0], (counts.get(row[0]) ?? 0) + 1);
+    blockStates.set(pin.slice(0, 3), counts);
+  }
+  const fixed = [];
+  for (const [pin, row] of Object.entries(directory.pins)) {
+    const at = middle[pin];
+    if (!at) continue;
+    // 1. Its state is a stranger in its own block.
+    const counts = blockStates.get(pin.slice(0, 3));
+    const total = [...counts.values()].reduce((sum, n) => sum + n, 0);
+    const [blockState, most] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (row[0] === blockState || most / total < 0.8 || (counts.get(row[0]) ?? 0) > 2) continue;
+    // 3. Far from every other PIN of its district — which has some to be far from.
+    const siblings = districtsOf(row).flatMap((d) => (pinsIn.get(d) ?? []).filter((other) => other !== pin && middle[other]));
+    if (siblings.length === 0 || siblings.some((other) => kmBetween(at, middle[other]) <= MISFILED_KM)) continue;
+    // 2. Beside a PIN of its own block, filed in the block's state.
+    let best = null;
+    for (const [other, there] of Object.entries(middle)) {
+      if (other === pin || other.slice(0, 3) !== pin.slice(0, 3) || directory.pins[other]?.[0] !== blockState) continue;
+      const km = kmBetween(at, there);
+      if (!best || km < best.km) best = { pin: other, km };
+    }
+    if (!best || best.km > NEAR_KM) continue;
+    const from = `${districtsOf(row).map((d) => directory.districts[d][0]).join("/")}, ${directory.states[row[0]]}`;
+    const source = directory.pins[best.pin];
+    row[0] = source[0];
+    row[1] = source[1];
+    fixed.push(`${pin}: ${from} → ${districtsOf(row).map((d) => directory.districts[d][0]).join("/")}, ${directory.states[row[0]]} (like ${best.pin}, ${best.km.toFixed(0)} km)`);
+  }
+  fs.writeFileSync(OUT, JSON.stringify(directory));
+  console.log(`${fixed.length} PIN(s) filed far from their district, corrected:\n  ${fixed.join("\n  ")}`);
+}
+
 function buildPoints(records, updated) {
   const byPin = new Map();
   let unusable = 0;
@@ -381,6 +460,7 @@ if (args.includes("--download")) {
   const { records, updated } = await download(key);
   build(records, updated);
   buildPoints(records, updated);
+  correctMisfiledPins();
 } else {
   const updatedAt = args.indexOf("--updated");
   const updated = updatedAt >= 0 ? args[updatedAt + 1] : "";
@@ -400,4 +480,5 @@ if (args.includes("--download")) {
   }
   build(records, updated);
   buildPoints(records, updated);
+  correctMisfiledPins();
 }

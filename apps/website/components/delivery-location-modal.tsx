@@ -123,6 +123,12 @@ export default function DeliveryLocationModal({
       void checkPin(place.postalCode);
       return;
     }
+    // A town, district or state has many PINs: ask for the street or the PIN instead.
+    if ((place.zoom ?? 17) < 15) {
+      setNote(`${place.label.split(",")[0]} has many PIN codes — search your street or area, or type your PIN.`);
+      setFindingPin(true);
+      return;
+    }
     // The map has no PIN for it: ask about the place itself instead.
     void checkSpot(place);
   }

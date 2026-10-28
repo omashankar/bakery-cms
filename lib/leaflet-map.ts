@@ -21,6 +21,11 @@ import type { DeliveryZone } from "@/types/delivery";
 
 export type LeafletModule = typeof Leaflet;
 
+const OSM_TILES = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+const OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors';
+/** Tiles that fail before any arrives, before the map gives up on its street server. */
+const TILE_FAILURES_BEFORE_FALLBACK = 4;
+
 const ESRI_STREETS = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}";
 
 export function tileUrl(): string {
@@ -184,6 +189,24 @@ export function addMapControls(
   ]);
   street.addTo(map);
 
+  // The street map's server down: OpenStreetMap's own tiles instead, so the
+  // customer still has streets to put a pin on. Only before any tile has come.
+  const fallbackUrl = process.env.NEXT_PUBLIC_MAP_FALLBACK_TILE_URL?.trim() || OSM_TILES;
+  let streetLoaded = 0;
+  let streetFailed = 0;
+  street.on("tileload", () => (streetLoaded += 1));
+  street.on("tileerror", () => {
+    streetFailed += 1;
+    if (streetLoaded > 0 || streetFailed < TILE_FAILURES_BEFORE_FALLBACK || tileUrl() === fallbackUrl) return;
+    if (!map.hasLayer(street)) return;
+    street.setUrl(fallbackUrl);
+    street.options.maxNativeZoom = 19;
+    // The credit follows the tiles — now, and whenever the layer is shown again.
+    street.options.attribution = OSM_ATTRIBUTION;
+    map.attributionControl?.removeAttribution(tileAttribution()).addAttribution(OSM_ATTRIBUTION);
+    streetLoaded = 1; // switched once; never back and forth
+  });
+
   // Map | Satellite, as two words rather than Leaflet's stacked-squares icon nobody reads.
   buttonBar(L, "topright", (bar) => {
     bar.style.display = "flex";
@@ -216,10 +239,14 @@ export function addMapControls(
   // On a phone-wide map the credit line runs the full width and hid the scale: lift it above.
   const lift = () => {
     const container = scale.getContainer();
-    if (container) container.style.marginBottom = map.getSize().x < 520 ? "24px" : "";
+    if (!container) return;
+    // As high as the credit actually is — it wraps to two lines on a phone with Esri's longer one.
+    const credit = map.attributionControl?.getContainer()?.offsetHeight ?? 0;
+    container.style.marginBottom = map.getSize().x < 520 ? `${Math.max(credit, 16) + 6}px` : "";
   };
   lift();
-  map.on("resize", lift);
+  // The credit changes with the layer shown (Map or Satellite), and with the width.
+  map.on("resize layeradd layerremove", lift);
 
   const box = map.getContainer();
   const frame = box.parentElement ?? box;

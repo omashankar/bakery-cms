@@ -119,8 +119,13 @@ export function ZoneAreaEditor({
   }
 
   /** A place found by search or by the device: the centre, or — for a boundary — where to start drawing. */
-  function goTo(point: LatLng) {
+  function goTo(point: LatLng, zoom = 17) {
     setZoomHint(false);
+    // A town or district found by name: go there, and let the owner tap the shop.
+    if (zoom < 15) {
+      leaflet.current?.map.setView(point, zoom, { animate: false });
+      return;
+    }
     if (latest.current.kind === "radius") centreAt(point);
     else leaflet.current?.map.setView(point, 15, { animate: false });
   }
@@ -315,7 +320,7 @@ export function ZoneAreaEditor({
       <div className="flex flex-col gap-2 sm:flex-row">
         <PlaceSearch
           className="flex-1"
-          onPick={(place) => goTo(place.location)}
+          onPick={(place) => goTo(place.location, place.zoom)}
           near={center ?? null}
           placeholder={kind === "radius" ? "Find your shop or area" : "Find the area to draw around"}
         />

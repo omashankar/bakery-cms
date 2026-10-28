@@ -179,7 +179,15 @@ export function ExactAddressCheck({ pincode, className }: { pincode?: string; cl
     <div className={cn("space-y-2 rounded-lg border border-border bg-card p-3", className)}>
       <p className="text-sm font-medium text-foreground">Check your exact address</p>
       <PlaceSearch
-        onPick={(place: PlaceSuggestion) => void ask(place.location, place.label, shortName(place))}
+        onPick={(place: PlaceSuggestion) => {
+          // A town or wider is not one address: ask for the street instead of guessing its middle.
+          if ((place.zoom ?? 17) < 15) {
+            setLocateError(`${place.label.split(",")[0]} is a big area — search your street, area or a landmark.`);
+            return;
+          }
+          setLocateError("");
+          void ask(place.location, place.label, shortName(place));
+        }}
         placeholder="Search your area, street or landmark"
       />
       <button
