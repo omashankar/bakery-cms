@@ -19,7 +19,7 @@ import { deliveryPinCheckSchema, pincodeCheckSchema, quoteSchema } from "./check
 import { getZones } from "@/features/commerce/server/commerce.service";
 import { verifyDeliveryPin } from "@/features/commerce/server/delivery-pin-check.server";
 import { answerPincode } from "@/features/commerce/server/pincode-answer.server";
-import { searchAddresses } from "@/features/commerce/server/osm-search.server";
+import { AddressSearchUnavailableError, searchAddresses } from "@/features/commerce/server/osm-search.server";
 import { isValidLatLng } from "@/features/commerce/lib/delivery-area";
 import type { CommerceSettings } from "@/types/settings";
 import type { DeliveryZone } from "@/types/delivery";
@@ -366,5 +366,17 @@ export const searchAddressesController = withErrorHandler(async (request: Reques
   const lat = Number(params.get("lat"));
   const lng = Number(params.get("lng"));
   const near = params.has("lat") && isValidLatLng({ lat, lng }) ? { lat, lng } : null;
-  return ok(await searchAddresses(q, near));
+  // A pressed Search also asks Nominatim, which allows a request a second — so it
+  // gets its own, tighter limit than the suggestions typed into the box.
+  const full = params.get("full") === "1";
+  if (full && ip) rateLimit(`address-search-full:ip:${ip}`, { limit: 10, windowMs: 60_000 });
+  try {
+    return ok(await searchAddresses(q, near, { full }));
+  } catch (error) {
+    if (!(error instanceof AddressSearchUnavailableError)) throw error;
+    throw new AppError(
+      "Address search isn't available right now. Drag the pin, tap the map or use your current location instead.",
+      503,
+    );
+  }
 });

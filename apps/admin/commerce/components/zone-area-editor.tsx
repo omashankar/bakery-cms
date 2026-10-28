@@ -6,7 +6,10 @@ import { useEffect, useRef, useState } from "react";
 import type * as Leaflet from "leaflet";
 import { Crosshair, Loader2, RotateCw, Trash2, Undo2 } from "lucide-react";
 
+import { toast } from "sonner";
+
 import { Button } from "@/components/ui/button";
+import { locateDevice } from "@/lib/device-location";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -116,23 +119,24 @@ export function ZoneAreaEditor({
   }
 
   /** A place found by search or by the device: the centre, or — for a boundary — where to start drawing. */
-  function goTo(point: LatLng) {
+  function goTo(point: LatLng, zoom = 17) {
     setZoomHint(false);
+    // A town or district found by name: go there, and let the owner tap the shop.
+    if (zoom < 15) {
+      leaflet.current?.map.setView(point, zoom, { animate: false });
+      return;
+    }
     if (latest.current.kind === "radius") centreAt(point);
     else leaflet.current?.map.setView(point, 15, { animate: false });
   }
 
   function locateMe() {
-    if (!("geolocation" in navigator)) return;
     setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setLocating(false);
-        goTo({ lat: position.coords.latitude, lng: position.coords.longitude });
-      },
-      () => setLocating(false),
-      { enableHighAccuracy: true, timeout: 10_000 },
-    );
+    // The best reading in a few seconds, not the first — see `locateDevice`.
+    void locateDevice()
+      .then((fix) => goTo(fix.point))
+      .catch((error: Error) => toast.error(error.message))
+      .finally(() => setLocating(false));
   }
 
   // What the corners box says, kept as typed so a half-written line survives;
@@ -316,7 +320,7 @@ export function ZoneAreaEditor({
       <div className="flex flex-col gap-2 sm:flex-row">
         <PlaceSearch
           className="flex-1"
-          onPick={(place) => goTo(place.location)}
+          onPick={(place) => goTo(place.location, place.zoom)}
           near={center ?? null}
           placeholder={kind === "radius" ? "Find your shop or area" : "Find the area to draw around"}
         />

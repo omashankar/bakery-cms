@@ -62,6 +62,7 @@ const cacheKey = (point: LatLng) => `${point.lat.toFixed(5)},${point.lng.toFixed
 /** For tests. */
 export function clearGeocodeCache(): void {
   cache.clear();
+  searchCache.clear();
   nextSlot = 0;
 }
 
@@ -111,6 +112,58 @@ async function takeTurn(): Promise<void> {
   if (slot - now > MAX_QUEUE_WAIT_MS) throw new LocationServiceUnavailableError("busy", "queue full");
   nextSlot = slot + SPACING_MS;
   if (slot > now) await new Promise((resolve) => setTimeout(resolve, slot - now));
+}
+
+/** A place Nominatim found for a search — read by `osm-search.server.ts`. */
+export interface NominatimHit {
+  display_name?: string;
+  lat?: string;
+  lon?: string;
+  /** "city", "suburb", "state", "residential", "railway"… */
+  addresstype?: string;
+  address?: NominatimAddress & { road?: string; house_number?: string; county?: string };
+}
+
+const searchCache = new Map<string, { hits: NominatimHit[]; at: number }>();
+
+/**
+ * Nominatim's SEARCH — for a customer who pressed Search, never per keystroke.
+ *
+ * Its usage policy forbids autocomplete, so the box's suggestions come from
+ * Photon; this answers only an explicit "Search for …". It is here because
+ * it knows what Photon does not: Hindi names (जयपुर, कनॉट प्लेस — measured
+ * 2026-10-28, Photon found neither) and some places Photon misses. Shares
+ * the one-a-second queue with the reverse lookup above.
+ */
+export async function searchNominatim(query: string): Promise<NominatimHit[]> {
+  const id = query.toLowerCase();
+  const hit = searchCache.get(id);
+  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.hits;
+
+  await takeTurn();
+  const base = (process.env.MAP_GEOCODER_URL?.trim() || DEFAULT_GEOCODER).replace(/\/+$/, "");
+  const email = process.env.MAP_CONTACT_EMAIL?.trim();
+  const url =
+    `${base}/search?format=jsonv2&addressdetails=1&countrycodes=in&limit=5&accept-language=en` +
+    `&q=${encodeURIComponent(query)}${email ? `&email=${encodeURIComponent(email)}` : ""}`;
+  let hits: NominatimHit[];
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": geocoderUserAgent(), Accept: "application/json" },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+      cache: "no-store",
+    });
+    if (res.status === 429) throw new LocationServiceUnavailableError("busy", "HTTP 429");
+    if (!res.ok) throw new LocationServiceUnavailableError("error", `HTTP ${res.status}`);
+    hits = (await res.json()) as NominatimHit[];
+  } catch (error) {
+    if (error instanceof LocationServiceUnavailableError) throw error;
+    const name = (error as { name?: string })?.name;
+    throw new LocationServiceUnavailableError(name === "TimeoutError" || name === "AbortError" ? "timeout" : "error");
+  }
+  if (searchCache.size >= CACHE_MAX) searchCache.delete(searchCache.keys().next().value!);
+  searchCache.set(id, { hits: Array.isArray(hits) ? hits : [], at: Date.now() });
+  return Array.isArray(hits) ? hits : [];
 }
 
 /** What is at this point, per OpenStreetMap. Throws `LocationServiceUnavailableError` when it cannot be asked. */

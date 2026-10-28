@@ -23,6 +23,8 @@ export interface PlaceSuggestion {
   city?: string;
   state?: string;
   location: LatLng;
+  /** How close to show it: a street at 17, a town at 12, a state at 7. */
+  zoom?: number;
 }
 
 /**
@@ -73,12 +75,27 @@ export async function findPlace(query: string, near?: LatLng | null): Promise<Pl
   return null;
 }
 
+/**
+ * Places for what was typed, and whether search could be made at all.
+ * `full` is a pressed Search: the shop also asks a second service, which
+ * allows no search-as-you-type (see osm-search.server.ts).
+ */
+export async function searchPlaces(
+  query: string,
+  near?: LatLng | null,
+  signal?: AbortSignal,
+  full = false,
+): Promise<{ results: PlaceSuggestion[]; unavailable: boolean }> {
+  const bias = near ? `&lat=${near.lat}&lng=${near.lng}` : "";
+  const res = await fetch(`/api/checkout/address-search?q=${encodeURIComponent(query)}${bias}${full ? "&full=1" : ""}`, { signal });
+  const body = (await res.json().catch(() => null)) as { success?: boolean; data?: PlaceSuggestion[] } | null;
+  if (res.ok && body?.success && Array.isArray(body.data)) return { results: body.data, unavailable: false };
+  return { results: [], unavailable: res.status === 503 };
+}
+
 /** Suggestions for what was typed — the same list the box shows. Empty on any failure. */
 export async function askForPlaces(query: string, near?: LatLng | null, signal?: AbortSignal): Promise<PlaceSuggestion[]> {
-  const bias = near ? `&lat=${near.lat}&lng=${near.lng}` : "";
-  const res = await fetch(`/api/checkout/address-search?q=${encodeURIComponent(query)}${bias}`, { signal });
-  const body = (await res.json().catch(() => null)) as { success?: boolean; data?: PlaceSuggestion[] } | null;
-  return res.ok && body?.success && Array.isArray(body.data) ? body.data : [];
+  return (await searchPlaces(query, near, signal)).results;
 }
 
 export function PlaceSearch({
@@ -96,10 +113,15 @@ export function PlaceSearch({
   const listId = useId();
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
+  // What the list on screen answers, and whether that was a pressed Search.
+  const [answered, setAnswered] = useState<{ query: string; full: boolean } | null>(null);
   const [searching, setSearching] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
+  const [listOpen, setListOpen] = useState(false);
   const [active, setActive] = useState(-1);
   // A picked suggestion fills the box with its label; that is not a new search.
   const picked = useRef(false);
+  const fullSearch = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const q = query.trim();
@@ -111,9 +133,11 @@ export function PlaceSearch({
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       setSearching(true);
-      void askForPlaces(q, near, controller.signal)
-        .then((results) => {
+      void searchPlaces(q, near, controller.signal)
+        .then(({ results, unavailable: down }) => {
           setSuggestions(results);
+          setAnswered({ query: q, full: false });
+          setUnavailable(down);
           setActive(-1);
         })
         .catch(() => undefined)
@@ -127,14 +151,45 @@ export function PlaceSearch({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
+  /**
+   * "Search for …", pressed: the shop asks a second service too — the one
+   * that knows Hindi names (जयपुर, कनॉट प्लेस) and some places the
+   * suggestions miss. Never per keystroke: its rules forbid that.
+   */
+  function searchEverywhere() {
+    const q = query.trim();
+    if (q.length < 3) return;
+    fullSearch.current?.abort();
+    const controller = new AbortController();
+    fullSearch.current = controller;
+    setSearching(true);
+    setListOpen(true);
+    void searchPlaces(q, near, controller.signal, true)
+      .then(({ results, unavailable: down }) => {
+        setSuggestions(results);
+        setAnswered({ query: q, full: true });
+        setUnavailable(down);
+        setActive(results.length ? 0 : -1);
+      })
+      .catch(() => undefined)
+      .finally(() => setSearching(false));
+  }
+
   function choose(place: PlaceSuggestion) {
     picked.current = true;
     setQuery(place.label);
     setSuggestions([]);
+    setListOpen(false);
     onPick(place);
   }
 
-  const open = suggestions.length > 0 && query.trim().length >= 3;
+  const q = query.trim();
+  const current = answered?.query === q;
+  // The last row offers a wider search, until one has been made for these words.
+  const canSearchMore = q.length >= 3 && !(current && answered?.full) && !unavailable;
+  const nothingFound = current && answered?.full && suggestions.length === 0;
+  const rows = suggestions.length + (canSearchMore ? 1 : 0);
+  const open = listOpen && q.length >= 3 && current && (rows > 0 || Boolean(nothingFound));
 
   return (
     <div className={cn("relative", className)}>
@@ -147,23 +202,30 @@ export function PlaceSearch({
         aria-autocomplete="list"
         aria-label={placeholder}
         value={query}
-        onChange={(event) => setQuery(event.target.value)}
+        onChange={(event) => {
+          setQuery(event.target.value);
+          setListOpen(true);
+        }}
+        onFocus={() => setListOpen(true)}
         // A choice is made on mousedown, before this — so leaving the box only closes the list.
-        onBlur={() => setSuggestions([])}
+        onBlur={() => setListOpen(false)}
         onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            // Inside a form: Enter picks or searches, it never submits the form.
+            if (q.length >= 3) event.preventDefault();
+            if (open && active >= 0 && active < suggestions.length) choose(suggestions[active]);
+            else if (q.length >= 3) searchEverywhere();
+            return;
+          }
           if (!open) return;
           if (event.key === "ArrowDown") {
             event.preventDefault();
-            setActive((i) => Math.min(i + 1, suggestions.length - 1));
+            setActive((i) => Math.min(i + 1, rows - 1));
           } else if (event.key === "ArrowUp") {
             event.preventDefault();
             setActive((i) => Math.max(i - 1, 0));
-          } else if (event.key === "Enter" && active >= 0) {
-            // Inside a form: Enter must pick, not submit it.
-            event.preventDefault();
-            choose(suggestions[active]);
           } else if (event.key === "Escape") {
-            setSuggestions([]);
+            setListOpen(false);
           }
         }}
         placeholder={placeholder}
@@ -173,7 +235,7 @@ export function PlaceSearch({
         <Loader2 className="absolute top-1/2 right-3 size-4 -translate-y-1/2 animate-spin text-muted-foreground" aria-hidden />
       ) : null}
       {open ? (
-        <ul id={listId} role="listbox" className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-border bg-popover py-1 text-sm shadow-lg">
+        <ul id={listId} role="listbox" className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-md border border-border bg-popover py-1 text-sm shadow-lg">
           {suggestions.map((place, i) => (
             <li
               key={`${place.label}-${i}`}
@@ -188,7 +250,36 @@ export function PlaceSearch({
               {place.label}
             </li>
           ))}
+          {canSearchMore ? (
+            <li
+              role="option"
+              aria-selected={active === suggestions.length}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                searchEverywhere();
+              }}
+              className={cn(
+                "flex cursor-pointer items-center gap-2 border-t border-border px-3 py-2 font-medium text-bakery-700",
+                active === suggestions.length ? "bg-muted" : "hover:bg-muted/60",
+              )}
+            >
+              <Search className="size-4 shrink-0" aria-hidden />
+              <span className="min-w-0 truncate">
+                {suggestions.length ? "Not here? " : ""}Search for &ldquo;{q}&rdquo;
+              </span>
+            </li>
+          ) : null}
+          {nothingFound ? (
+            <li className="px-3 py-2 text-muted-foreground">
+              No place found for &ldquo;{q}&rdquo;. Try your area&apos;s name, a landmark nearby, or your PIN code.
+            </li>
+          ) : null}
         </ul>
+      ) : null}
+      {unavailable && current ? (
+        <p role="alert" className="mt-1.5 text-xs text-amber-700 dark:text-amber-300">
+          Address search isn&apos;t working right now. Drag the pin, tap the map, or use your current location instead.
+        </p>
       ) : null}
     </div>
   );

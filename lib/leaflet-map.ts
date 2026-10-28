@@ -4,29 +4,48 @@ import { isUsableShape, zoneShapes } from "@/features/commerce/lib/delivery-area
 import type { DeliveryZone } from "@/types/delivery";
 
 /**
- * THE MAP IN THE BROWSER — Leaflet over OpenStreetMap, free, with no key.
+ * THE MAP IN THE BROWSER — Leaflet, free, with no key.
  *
  * Loaded only where a map is drawn (the checkout's delivery step, a zone's
  * editor): every page of this shop must stay light, so nothing pulls Leaflet
  * in up front.
  *
- * The tiles are OpenStreetMap's own by default, which ask for attribution
- * (shown on the map) and fair use — fine for a shop's checkout, not for heavy
- * traffic. `NEXT_PUBLIC_MAP_TILE_URL` points at another tile server (a hosted
- * one with a free tier, or the shop's own) without touching the code.
+ * The street map is Esri's World Street Map by default, credited on the map.
+ * It was OpenStreetMap's own tiles, which name no colony in Kota — Talwandi,
+ * Vigyan Nagar, Keshavpura were bare grids of streets — and a customer
+ * finding their door, or an owner drawing round a mohalla, reads the map by
+ * those names (owner, 2026-10-28: "area bhi ni dikh rhe"). Esri asks a busy
+ * shop for a free developer account; `NEXT_PUBLIC_MAP_TILE_URL` points at
+ * another tile server without touching the code — see docs/map-setup.md.
  */
 
 export type LeafletModule = typeof Leaflet;
 
+const OSM_TILES = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+const OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors';
+/** Tiles that fail before any arrives, before the map gives up on its street server. */
+const TILE_FAILURES_BEFORE_FALLBACK = 4;
+
+const ESRI_STREETS = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}";
+
 export function tileUrl(): string {
-  return process.env.NEXT_PUBLIC_MAP_TILE_URL?.trim() || "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+  return process.env.NEXT_PUBLIC_MAP_TILE_URL?.trim() || ESRI_STREETS;
 }
 
 export function tileAttribution(): string {
   return (
     process.env.NEXT_PUBLIC_MAP_TILE_ATTRIBUTION?.trim() ||
-    '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors'
+    "Map &copy; Esri, HERE, Garmin, &copy; OpenStreetMap contributors"
   );
+}
+
+/**
+ * Esri draws Indian towns to zoom 17; past it the server answers "map data not
+ * yet available". Leaflet enlarges the 17 tiles instead, so a close-in pin
+ * still sits on its street. Another server is trusted to its own 19.
+ */
+export function tileMaxNativeZoom(): number {
+  return tileUrl() === ESRI_STREETS ? 17 : 19;
 }
 
 /**
@@ -163,12 +182,30 @@ export function addMapControls(
   map: Leaflet.Map,
   { fitAll, fitLabel = "Show all delivery areas" }: { fitAll?: () => Leaflet.LatLngBounds | null; fitLabel?: string } = {},
 ): void {
-  const street = L.tileLayer(tileUrl(), { attribution: tileAttribution(), maxZoom: 19 });
+  const street = L.tileLayer(tileUrl(), { attribution: tileAttribution(), maxZoom: 19, maxNativeZoom: tileMaxNativeZoom() });
   const satellite = L.layerGroup([
     L.tileLayer(satelliteUrl(), { attribution: satelliteAttribution(), maxZoom: 19, maxNativeZoom: 18 }),
     ...SATELLITE_LABELS.map((url) => L.tileLayer(url, { maxZoom: 19, maxNativeZoom: 18 })),
   ]);
   street.addTo(map);
+
+  // The street map's server down: OpenStreetMap's own tiles instead, so the
+  // customer still has streets to put a pin on. Only before any tile has come.
+  const fallbackUrl = process.env.NEXT_PUBLIC_MAP_FALLBACK_TILE_URL?.trim() || OSM_TILES;
+  let streetLoaded = 0;
+  let streetFailed = 0;
+  street.on("tileload", () => (streetLoaded += 1));
+  street.on("tileerror", () => {
+    streetFailed += 1;
+    if (streetLoaded > 0 || streetFailed < TILE_FAILURES_BEFORE_FALLBACK || tileUrl() === fallbackUrl) return;
+    if (!map.hasLayer(street)) return;
+    street.setUrl(fallbackUrl);
+    street.options.maxNativeZoom = 19;
+    // The credit follows the tiles — now, and whenever the layer is shown again.
+    street.options.attribution = OSM_ATTRIBUTION;
+    map.attributionControl?.removeAttribution(tileAttribution()).addAttribution(OSM_ATTRIBUTION);
+    streetLoaded = 1; // switched once; never back and forth
+  });
 
   // Map | Satellite, as two words rather than Leaflet's stacked-squares icon nobody reads.
   buttonBar(L, "topright", (bar) => {
@@ -202,10 +239,14 @@ export function addMapControls(
   // On a phone-wide map the credit line runs the full width and hid the scale: lift it above.
   const lift = () => {
     const container = scale.getContainer();
-    if (container) container.style.marginBottom = map.getSize().x < 520 ? "24px" : "";
+    if (!container) return;
+    // As high as the credit actually is — it wraps to two lines on a phone with Esri's longer one.
+    const credit = map.attributionControl?.getContainer()?.offsetHeight ?? 0;
+    container.style.marginBottom = map.getSize().x < 520 ? `${Math.max(credit, 16) + 6}px` : "";
   };
   lift();
-  map.on("resize", lift);
+  // The credit changes with the layer shown (Map or Satellite), and with the width.
+  map.on("resize layeradd layerremove", lift);
 
   const box = map.getContainer();
   const frame = box.parentElement ?? box;

@@ -10,10 +10,11 @@ import { Button } from "@/components/ui/button";
 import { PlaceSearch, type PlaceSuggestion } from "@/components/shared/place-search";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/utils/format";
+import { locateDevice } from "@/lib/device-location";
 import { soonestDeliveryDays, soonestDeliveryText } from "@/features/commerce/lib/delivery-location";
 import { addMapControls, boundsOf, drawZoneShapes, loadLeaflet, pinIcon } from "@/lib/leaflet-map";
 import { loadDeliveryZones } from "@/features/commerce/lib/delivery-zones-repository";
-import { hasUsableArea, isAreaZone, isValidLatLng, shapeMiddle, zoneShapes } from "@/features/commerce/lib/delivery-area";
+import { formatLatLng, hasUsableArea, isAreaZone, isValidLatLng, shapeMiddle, zoneShapes } from "@/features/commerce/lib/delivery-area";
 import type { DeliveryPin, DeliveryZone, LatLng } from "@/types/delivery";
 
 /**
@@ -99,6 +100,9 @@ if (typeof window !== "undefined") void loadLeaflet().catch(() => undefined);
  */
 const ROUGH_METRES = 150;
 
+/** A search result shown further out than this is a town or wider — never a door. */
+const WIDE_PLACE_ZOOM = 15;
+
 /** "800 m", "4 km". */
 function formatDistance(metres: number): string {
   return metres < 1000 ? `${Math.round(metres / 50) * 50 || 50} m` : `${Math.round(metres / 1000)} km`;
@@ -142,6 +146,11 @@ export function DeliveryPinPicker({
   const [locating, setLocating] = useState(false);
   // "Use my current location" from a device that only guessed (a computer, from its network): metres.
   const [roughBy, setRoughBy] = useState<number | null>(null);
+  // Where the pin came from — said under the answer, so a point is never mistaken for a checked address.
+  const [pinSource, setPinSource] = useState<"device" | "manual" | "search" | null>(null);
+  const [deviceMetres, setDeviceMetres] = useState<number | null>(null);
+  // The pin "Use my current location" put down, until the customer moves it.
+  const locatedAt = useRef("");
   const [retry, setRetry] = useState(0);
   // Whether the key under the map has anything to explain — known once the map is drawn.
   const [hasAreas, setHasAreas] = useState(false);
@@ -162,6 +171,7 @@ export function DeliveryPinPicker({
     const marker = current.L.marker(point, { draggable: true, icon: pinIcon(current.L), title: "Your door — drag to move" });
     marker.on("dragend", () => {
       clearAccuracy();
+      setPinSource("manual");
       const at = marker.getLatLng();
       latest.current({ lat: at.lat, lng: at.lng });
     });
@@ -204,6 +214,7 @@ export function DeliveryPinPicker({
         if (pin && isValidLatLng(pin)) placeMarker(pin);
         map.on("click", (event: Leaflet.LeafletMouseEvent) => {
           clearAccuracy();
+          setPinSource("manual");
           placeMarker(event.latlng);
           latest.current({ lat: event.latlng.lat, lng: event.latlng.lng });
         });
@@ -242,10 +253,17 @@ export function DeliveryPinPicker({
   function choose(suggestion: PlaceSuggestion) {
     clearAccuracy();
     const map = leaflet.current?.map;
-    map?.setView(suggestion.location, 17, { animate: false });
+    const zoom = suggestion.zoom ?? 17;
+    map?.setView(suggestion.location, zoom, { animate: false });
+    onPlaceFound({ postalCode: suggestion.postalCode, city: suggestion.city, state: suggestion.state });
+    // A town, district or state is not a door: the map goes there, and the customer taps theirs.
+    if (zoom < WIDE_PLACE_ZOOM) {
+      onCheck({ status: "missing", field: "location", message: `Now tap your door on the map — or search your street or area in ${suggestion.label.split(",")[0]}.` });
+      return;
+    }
+    setPinSource("search");
     placeMarker(suggestion.location);
     onPinChange({ ...suggestion.location });
-    onPlaceFound({ postalCode: suggestion.postalCode, city: suggestion.city, state: suggestion.state });
   }
 
   /* ASK THE SHOP about the pin, a moment after it settles. */
@@ -295,6 +313,9 @@ export function DeliveryPinPicker({
   useEffect(() => {
     const current = leaflet.current;
     if (!mapReady || !current || check.status !== "outside" || !pin || !isValidLatLng(pin)) return;
+    // "My current location" stays close on the customer: they asked to see where they are. The
+    // distance is said under the map, and the "show all" button is one press away.
+    if (locatedAt.current === `${pin.lat},${pin.lng}`) return;
     const areas = boundsOf(current.L, current.areas.getLayers());
     if (!areas) return;
     current.map.fitBounds(areas.extend(current.L.latLng(pin.lat, pin.lng)), { padding: [32, 32], maxZoom: 16, animate: false });
@@ -302,36 +323,31 @@ export function DeliveryPinPicker({
   }, [check.status, mapReady]);
 
   function locateMe() {
-    if (!("geolocation" in navigator)) return;
     setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setLocating(false);
-        const point = { lat: position.coords.latitude, lng: position.coords.longitude };
-        const metres = Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : 0;
+    void locateDevice()
+      .then(({ point, accuracy }) => {
         const current = leaflet.current;
         if (current) {
           current.accuracy?.remove();
           // The circle the device says it is somewhere inside — the honest picture of a guess.
-          current.accuracy = metres > 0
-            ? current.L.circle(point, { radius: metres, color: "#2563eb", weight: 1, fillOpacity: 0.08, interactive: false }).addTo(current.map)
+          current.accuracy = accuracy > 0 && Number.isFinite(accuracy)
+            ? current.L.circle(point, { radius: accuracy, color: "#2563eb", weight: 1, fillOpacity: 0.08, interactive: false }).addTo(current.map)
             : null;
-          if (current.accuracy && metres > ROUGH_METRES) {
+          if (current.accuracy && accuracy > ROUGH_METRES) {
             current.map.fitBounds(current.accuracy.getBounds(), { padding: [16, 16], maxZoom: 18, animate: false });
           } else {
             current.map.setView(point, 18, { animate: false });
           }
         }
-        setRoughBy(metres > ROUGH_METRES ? metres : null);
+        setRoughBy(accuracy > ROUGH_METRES ? accuracy : null);
+        setPinSource("device");
+        setDeviceMetres(Number.isFinite(accuracy) ? accuracy : null);
+        locatedAt.current = `${point.lat},${point.lng}`;
         placeMarker(point);
         onPinChange(point);
-      },
-      () => {
-        setLocating(false);
-        onCheck({ status: "missing", field: "location", message: "We couldn't get your location. Search your address or tap your door on the map instead." });
-      },
-      { enableHighAccuracy: true, timeout: 10_000 },
-    );
+      })
+      .catch((error: Error) => onCheck({ status: "missing", field: "location", message: error.message }))
+      .finally(() => setLocating(false));
   }
 
   return (
@@ -390,19 +406,40 @@ export function DeliveryPinPicker({
         </p>
       ) : null}
 
-      <PinStatus check={check} pincode={pincode} onUsePincode={onUsePincode} />
+      <PinStatus check={check} pincode={pincode} onUsePincode={onUsePincode} pinNote={pinNoteFor(pin, pinSource, deviceMetres)} />
     </section>
   );
+}
+
+/**
+ * "Pin 25.14670, 75.84070 · from this device's location (±20 m)" — the point
+ * itself and where it came from, kept apart from the map's words for it and
+ * from the address the customer typed.
+ */
+function pinNoteFor(pin: DeliveryPin | null, source: "device" | "manual" | "search" | null, metres: number | null): string {
+  if (!pin || !isValidLatLng(pin)) return "";
+  const from =
+    source === "device"
+      ? `from this device's location${metres ? ` (±${formatDistance(metres)})` : ""}`
+      : source === "manual"
+        ? "placed by you"
+        : source === "search"
+          ? "from your search — drag it onto your door if it isn't there"
+          : "saved earlier";
+  return `Pin ${formatLatLng(pin)} · ${from}`;
 }
 
 function PinStatus({
   check,
   pincode,
   onUsePincode,
+  pinNote,
 }: {
   check: PinCheck;
   pincode: string;
   onUsePincode: (pincode: string) => void;
+  /** "Pin 25.14670, 75.84070 · from this device's location (±20 m)" — where the point came from. */
+  pinNote?: string;
 }) {
   if (check.status === "idle") {
     return (
@@ -436,18 +473,24 @@ function PinStatus({
             return text ? ` · ${text}` : "";
           })()}
         </p>
+        {/* What the MAP says is at the pin — not the address the customer typed above. */}
         {check.formattedAddress ? (
           <p className="mt-1.5 flex items-start gap-1.5 text-xs">
             <MapPin className="mt-px size-3.5 shrink-0" aria-hidden />
-            <span className="min-w-0 break-words">{check.formattedAddress}</span>
+            <span className="min-w-0 break-words">
+              <span className="opacity-80">The map shows here: </span>
+              {check.formattedAddress}
+            </span>
           </p>
         ) : null}
         <PinAtPin check={check} pincode={pincode} onUsePincode={onUsePincode} />
         {check.cityNote ? <p className="mt-1 text-xs opacity-80">{check.cityNote}</p> : null}
+        {pinNote ? <p className="mt-1 text-xs opacity-70">{pinNote}</p> : null}
       </div>
     );
   }
-  const soft = check.status === "unavailable";
+  // A pin still to be placed, or a check that could not be made: amber, not a refusal.
+  const soft = check.status === "unavailable" || check.status === "missing";
   const suggested = check.status === "mismatch" && check.field === "pincode" ? check.found?.postalCode : null;
   return (
     <div
@@ -474,6 +517,7 @@ function PinStatus({
           If this is not where you are, move the pin to your door.
         </p>
       ) : null}
+      {pinNote && check.status !== "missing" ? <p className="mt-1 text-xs opacity-70">{pinNote}</p> : null}
       {suggested && suggested !== pincode ? (
         <Button type="button" size="sm" variant="outline" className="mt-2 bg-card" onClick={() => onUsePincode(suggested)}>
           Use PIN {suggested}
@@ -498,12 +542,21 @@ function PinAtPin({
   onUsePincode: (pincode: string) => void;
 }) {
   const atPin = check.postalCode;
-  if (!atPin) return null;
+  if (!atPin) {
+    // No post office near enough to say: the customer's PIN stands — but they are asked to check it, never told it is confirmed.
+    return (
+      <p className="mt-1.5 text-xs">
+        We couldn&apos;t find a PIN code for this spot.{" "}
+        {pincode ? `Please check that ${pincode} is right for your address.` : "Please type your PIN code above."}
+      </p>
+    );
+  }
   const choices = [atPin, ...(check.pincodeSure ? [] : (check.otherPincodes ?? []))].filter((code) => code !== pincode);
   return (
     <div className="mt-1.5 text-xs">
       <p>
-        PIN code here: <span className="font-semibold tracking-wide">{atPin}</span>
+        {/* India Post's PIN for the nearest post office — an estimate, said as one. */}
+        PIN code here (nearest post office): <span className="font-semibold tracking-wide">{atPin}</span>
         {pincode && pincode !== atPin ? <span className="opacity-80"> · your address says {pincode}</span> : null}
       </p>
       {choices.length ? (
