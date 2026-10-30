@@ -189,8 +189,11 @@ test("every heading moves when the shop moves it, whatever shape its row is", as
       );
     }
     // And it really travelled, rather than shifting by a padding change
-    // wearing the setting's name.
-    if (end.left - row.left < 40) {
+    // wearing the setting's name — 40px, or all the room it had when the
+    // words leave less. "Sweet Treats & Thoughtful Gifts for Every Occasion"
+    // is 526px of a 624px band: ranged left it has 34px of air one side and
+    // 64px the other, so 30px is the whole way across.
+    if (end.left - row.left < Math.min(40, row.right - row.left)) {
       wrong.push(
         `${row.id}: left to right moved it only ${end.left - row.left}px`,
       );

@@ -991,13 +991,19 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
           place: pinAnswer?.place,
           // The map pin is what picks the zone and its charge.
           location: pin ?? undefined,
-          // A preview of the pin's district and state, from the PIN's India
-          // Post place; the server works out the real one from the pin.
-          region: pinAnswer?.place ? { state: pinAnswer.place.state, districts: pinAnswer.place.districts } : null,
+          // The pin's district and state as the server read them, once it has
+          // checked the pin — the ones it prices by. Until then a preview from
+          // the PIN's India Post place.
+          region:
+            pinCheck.status === "eligible" && pinCheck.region
+              ? pinCheck.region
+              : pinAnswer?.place
+                ? { state: pinAnswer.place.state, districts: pinAnswer.place.districts }
+                : null,
         },
         commerceOverride: commerce,
       }),
-    [items, validCoupon, giftWrap, deliveryTierId, watchedCity, watchedPincode, watchedState, pinAnswer, pin, commerce]
+    [items, validCoupon, giftWrap, deliveryTierId, watchedCity, watchedPincode, watchedState, pinAnswer, pin, pinCheck, commerce]
   );
 
   const totals = serverTotals ?? localTotals;

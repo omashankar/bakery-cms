@@ -642,8 +642,18 @@ test("and a department has a page of its own", async ({ page }) => {
       { $set: { departments: [...departmentsBefore, probe] } },
     );
 
-    /* AND THE PRODUCT'S OWN TRAIL LINKS BACK TO IT. */
-    await page.goto(`/store/p/${inCategory[0]}`);
+    /* AND THE PRODUCT'S OWN TRAIL LINKS BACK TO IT.
+
+       A product FILED FIRST under that category. The trail follows a product's
+       primary category, and a page also lists products filed there second — the
+       first card on Chocolate Cakes is a pastry whose primary is Pastries, so its
+       trail rightly named a department that does not hold Pastries. */
+    const own = await db.collection("products").findOne({
+      slug: { $in: inCategory },
+      "categoryIds.0": held!.id,
+    });
+    expect(own, `no product on ${held!.slug} is filed there first`).toBeTruthy();
+    await page.goto(`/store/p/${own!.slug}`);
     await page.waitForLoadState("networkidle");
     const crumb = await page.evaluate(() =>
       [...document.querySelectorAll('nav[aria-label="Breadcrumb"] a')].map((node) => ({
