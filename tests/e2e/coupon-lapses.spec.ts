@@ -26,9 +26,12 @@ async function addToCart(page: Page, slug: string) {
 
 test.describe("a coupon that stops qualifying", () => {
   let customerEmail = "";
+  let probeCouponId: string | null = null;
 
   test.afterAll(async () => {
     await removeCustomer(customerEmail);
+    // By its id, never by a query: only the coupon this run put there goes.
+    if (probeCouponId) await (await connect()).collection("coupons").deleteOne({ _id: probeCouponId as never });
   });
 
   test("says so, instead of staying green over a total with no discount", async ({ page }) => {
@@ -48,8 +51,7 @@ test.describe("a coupon that stops qualifying", () => {
         (!c.expiresAt || new Date(c.expiresAt).getTime() > now) &&
         (!c.startsAt || new Date(c.startsAt).getTime() <= now),
     );
-    const coupon = live[0] ?? null;
-    expect(coupon, "this shop has no coupon with a minimum order value to test").toBeTruthy();
+    let coupon = live[0] ?? null;
 
     /*
       THE DEAREST CAKE, AS MANY AS IT TAKES. This asked for one product priced
@@ -68,6 +70,30 @@ test.describe("a coupon that stops qualifying", () => {
       .findOne({ status: "published", price: { $lt: 2000 }, slug: { $ne: dear?.slug } });
     expect(dear, "the shop has no product to buy").toBeTruthy();
     expect(cheap, "no inexpensive product to leave in the cart").toBeTruthy();
+    /*
+      A COUPON OF ITS OWN when the shop has none live. Every coupon this shop
+      had lapsed on 25 Oct 2026, and the test then failed on its own
+      precondition — the flow it guards was never driven. The probe needs the
+      dear cake to qualify and the cheap one alone not to, and is removed by id.
+    */
+    if (!coupon) {
+      const at = new Date();
+      coupon = {
+        _id: "probe-coupon-lapses" as never,
+        code: "E2ELAPSE",
+        label: "₹50 OFF",
+        description: "Browser-test probe — removed when the run ends",
+        minSubtotal: Math.max(dear!.price, cheap!.price + 1),
+        flatOff: 50,
+        isActive: true,
+        usageCount: 0,
+        categoryIds: [],
+        createdAt: at,
+        updatedAt: at,
+      };
+      await db.collection("coupons").insertOne(coupon);
+      probeCouponId = "probe-coupon-lapses";
+    }
     const copies = Math.ceil(coupon!.minSubtotal / dear!.price);
     test.skip(copies > 10, `the coupon's minimum needs ${copies} of the dearest cake`);
 
@@ -96,6 +122,11 @@ test.describe("a coupon that stops qualifying", () => {
     await coupons.getByPlaceholder(/coupon code/i).fill(coupon!.code);
     // The box's own Apply; each listed offer below it carries one too.
     await coupons.getByRole("button", { name: /^apply$/i }).first().click();
+    // The dialog closing on "Coupon applied", not the code being on screen: the
+    // offer list inside the dialog prints the code too, so that passed before
+    // the box had applied anything, and the walk on raced the 400ms apply.
+    await expect(page.getByText("Coupon applied")).toBeVisible();
+    await expect(coupons).toBeHidden();
     await expect(page.getByText(coupon!.code, { exact: false }).first()).toBeVisible();
     await expect(
       page.getByText(/no longer applies/i),

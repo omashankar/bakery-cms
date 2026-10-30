@@ -4,6 +4,7 @@ import { adminSession } from "./admin-session";
 import { connect, PROBE_ADDRESS } from "./shop-state";
 import { probeEmail, removeCustomer, signInAsCustomer } from "./sign-in";
 import { bookDeliverySlot } from "./delivery-slot";
+import { pinDeliveryDoor } from "./delivery-pin";
 
 /**
  * The cancel-and-refund journey, end to end, on a Razorpay TEST key.
@@ -40,6 +41,8 @@ async function buyAndPay(page: Page, productSlug: string, email: string): Promis
   await page.getByLabel(/city/i).fill(PROBE_ADDRESS.city);
   await page.getByLabel(/state/i).fill(PROBE_ADDRESS.state);
   await page.getByLabel(/PIN code/i).fill(PROBE_ADDRESS.pincode);
+  // The map pin decides delivery; a typed PIN alone no longer continues.
+  await pinDeliveryDoor(page);
   await page.getByRole("button", { name: /continue|next/i }).first().click();
 
   // One field and a dialog now: day, delivery type, window.

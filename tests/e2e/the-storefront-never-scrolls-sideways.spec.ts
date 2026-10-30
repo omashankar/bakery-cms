@@ -196,7 +196,11 @@ test("and a phone can ask whether the shop delivers to it", async ({ page }) => 
 
     await trigger.first().click();
 
-    const panel = page.locator("#storefront-mobile-nav input").first();
+    // It opens the "Select Delivery Location" dialog now, not a panel inside
+    // the drawer — the PIN box is the dialog's.
+    const panel = page
+      .getByRole("dialog", { name: "Select Delivery Location" })
+      .getByRole("combobox", { name: "PIN code" });
     await expect(
       panel,
       `the delivery panel does not open in view at ${width}px`,

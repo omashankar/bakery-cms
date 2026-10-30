@@ -1,4 +1,29 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+/**
+ * The hero, once the page has finished arriving.
+ *
+ * /store streams behind its loading skeleton, and React reveals the streamed
+ * page a beat AFTER the load event — measured at 100–500ms on a production
+ * build. Until then the hero is absent, or sits in the hidden `S:0` holder,
+ * and for one moment of the swap there are two of it: a strict locator
+ * refused, and a `querySelector` measured the hidden copy ("painted at
+ * NaN:1"). One question, asked in one go, waits all of that out: exactly one
+ * hero, drawn, and not inside anything hidden. A customer sees none of it.
+ */
+async function heroReady(page: Page): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const heroes = document.querySelectorAll('[data-section-id^="hero"]');
+          const [hero] = heroes;
+          return heroes.length === 1 && !hero.closest("[hidden]") && hero.getBoundingClientRect().height > 0;
+        }),
+      { message: "the hero never settled into one drawn copy" },
+    )
+    .toBe(true);
+}
 
 /**
  * THE TOP OF THE PAGE, MEASURED RATHER THAN READ.
@@ -78,8 +103,7 @@ for (const { name, width, height } of WIDTHS) {
 
     // The banner's own picture, the dots that belong to it, and the first tile
     // of the band under it — the three things whose spacing is the subject.
-    const hero = page.locator('[data-section-id^="hero"]');
-    await expect(hero).toBeVisible();
+    await heroReady(page);
 
     const gap = await page.evaluate(() => {
       const heroEl = document.querySelector('[data-section-id^="hero"]');
@@ -140,7 +164,7 @@ for (const { name, width, height } of WIDTHS) {
      */
     await page.setViewportSize({ width, height });
     await page.goto("/store");
-    await expect(page.locator('[data-section-id^="hero"]')).toBeVisible();
+    await heroReady(page);
 
     const { scrollWidth, clientWidth } = await page.evaluate(() => ({
       scrollWidth: document.documentElement.scrollWidth,
@@ -166,7 +190,7 @@ test("one slide slides into the next rather than cutting", async ({ page }) => {
   const width = 1440;
   await page.setViewportSize({ width, height: 900 });
   await page.goto("/store");
-  await expect(page.locator('[data-section-id^="hero"]')).toBeVisible();
+  await heroReady(page);
 
   const measure = () =>
     page.evaluate(() => {
@@ -234,7 +258,7 @@ test("and only the slide on screen can be tabbed to", async ({ page }) => {
    */
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/store");
-  await expect(page.locator('[data-section-id^="hero"]')).toBeVisible();
+  await heroReady(page);
 
   const reachable = await page.evaluate(() => {
     const hero = document.querySelector('[data-section-id^="hero"]');
@@ -261,6 +285,7 @@ test("the banner is shown whole, at whatever shape the shop uploaded", async ({ 
    */
   await page.setViewportSize({ width: 800, height: 900 });
   await page.goto("/store");
+  await heroReady(page);
 
   const shape = await page.evaluate(() => {
     const img = document.querySelector<HTMLImageElement>(
@@ -334,7 +359,7 @@ test("the loop never runs backwards, and picks itself up again", async ({ page }
   const height = 900;
   await page.setViewportSize({ width, height });
   await page.goto("/store");
-  await expect(page.locator('[data-section-id^="hero"]')).toBeVisible();
+  await heroReady(page);
 
   const sample = () =>
     page.evaluate(() => {
@@ -480,7 +505,7 @@ test("a tap on a dot does not stop the hero for the rest of the visit", async ({
   });
   const page = await context.newPage();
   await page.goto("/store");
-  await expect(page.locator('[data-section-id^="hero"]')).toBeVisible();
+  await heroReady(page);
 
   const rowLeft = () =>
     page.evaluate(() => {
@@ -549,7 +574,7 @@ test("the swipe loops at both ends, one slide at a time", async ({ page }) => {
   const width = 1440;
   await page.setViewportSize({ width, height: 900 });
   await page.goto("/store");
-  await expect(page.locator('[data-section-id^="hero"]')).toBeVisible();
+  await heroReady(page);
 
   const read = () =>
     page.evaluate(() => {
@@ -641,7 +666,7 @@ test("every hero slide is fetched at once, so the row is never mismatched", asyn
    */
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/store");
-  await expect(page.locator('[data-section-id^="hero"]')).toBeVisible();
+  await heroReady(page);
 
   const state = await page.evaluate(() => {
     const hero = document.querySelector('[data-section-id^="hero"]');
@@ -682,7 +707,7 @@ test("pressing faster than the slide can move never empties the band", async ({ 
   test.setTimeout(90_000);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/store");
-  await expect(page.locator('[data-section-id^="hero"]')).toBeVisible();
+  await heroReady(page);
 
   const covered = () =>
     page.evaluate(() => {
@@ -782,7 +807,7 @@ test("and at speed the row still only ever moves forwards", async ({ page }) => 
   test.setTimeout(90_000);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/store");
-  await expect(page.locator('[data-section-id^="hero"]')).toBeVisible();
+  await heroReady(page);
 
   const row = () =>
     page.evaluate(() => {

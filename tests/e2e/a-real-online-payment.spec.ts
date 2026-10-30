@@ -3,6 +3,7 @@ import { PROBE_ADDRESS } from "./shop-state";
 
 import { probeEmail, signInAsCustomer } from "./sign-in";
 import { bookDeliverySlot } from "./delivery-slot";
+import { pinDeliveryDoor } from "./delivery-pin";
 
 /**
  * A payment carried all the way through Razorpay, on a test key.
@@ -69,6 +70,8 @@ test.describe("paying for real, on a test key", () => {
     await page.getByLabel(/city/i).fill(PROBE_ADDRESS.city);
     await page.getByLabel(/state/i).fill(PROBE_ADDRESS.state);
     await page.getByLabel(/PIN code/i).fill(PROBE_ADDRESS.pincode);
+    // The map pin decides delivery; a typed PIN alone no longer continues.
+    await pinDeliveryDoor(page);
 
     await page.getByRole("button", { name: /continue|next/i }).first().click();
 

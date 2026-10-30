@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 import { connect, PROBE_ADDRESS } from "./shop-state";
 import { probeEmail, removeCustomer, signInAsCustomer } from "./sign-in";
 import { bookDeliverySlot } from "./delivery-slot";
+import { pinDeliveryDoor } from "./delivery-pin";
 
 /**
  * The one journey the whole shop exists for, driven the way a customer drives
@@ -84,6 +85,8 @@ test.describe("a customer placing an order", () => {
     await page.getByLabel(/city/i).fill(PROBE_ADDRESS.city);
     await page.getByLabel(/state/i).fill(PROBE_ADDRESS.state);
     await page.getByLabel(/PIN code/i).fill(PROBE_ADDRESS.pincode);
+    // The map pin decides delivery; a typed PIN alone no longer continues.
+    await pinDeliveryDoor(page);
 
     await page.getByRole("button", { name: /continue|next/i }).first().click();
 

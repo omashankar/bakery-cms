@@ -129,6 +129,20 @@ test("still reports a genuine zero once the figures are in", async ({ page }) =>
   });
 
   await page.goto("/admin/dashboard");
+  /*
+    THE FIRST FIGURES ARE THE SERVER'S, drawn with the page — no request goes
+    out for them, so the zeroed answer above was never asked for and the real
+    ₹7,979 stood. Another range is a request the browser makes, and that is
+    the one the empty state has to survive.
+  */
+  // Picked again until the page asks: a pick before hydration is undone by it.
+  const range = page.getByRole("combobox", { name: "Dashboard date range" });
+  await expect(async () => {
+    const asked = page.waitForRequest(/\/api\/orders\/analytics\?.*range=7d/, { timeout: 3_000 });
+    await range.selectOption({ label: "Last 30 days" });
+    await range.selectOption({ label: "Last 7 days" });
+    await asked;
+  }).toPass({ timeout: 30_000 });
 
   await expect(page.getByText("All clear")).toBeVisible();
   await expect(page.getByText("No sales data yet")).toBeVisible();
