@@ -329,6 +329,12 @@ export const checkDeliveryPinController = withErrorHandler(async (request: Reque
       charge: verdict.zone ? verdict.zone.deliveryCharge : (commerce.zoneFallbackDeliveryFee ?? commerce.deliveryFee),
       minDeliveryDays: verdict.zone ? verdict.zone.minDeliveryDays : null,
       freeDeliveryThreshold: commerce.freeDeliveryThreshold,
+      // The district and state the server read at the pin — the ones it will
+      // price the order by. The browser's running total uses these rather than
+      // the typed PIN's, which named a different district for a PIN spanning
+      // two, or a pin just over a district line, and the summary changed at
+      // Place order.
+      region: verdict.region,
       // India Post's PIN at the pin; when a PIN line runs close by, the
       // neighbours the customer may really be in.
       postalCode: verdict.verification.postalCode,

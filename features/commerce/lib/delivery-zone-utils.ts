@@ -369,10 +369,13 @@ export function describeZoneCoverage(zone: DeliveryZone): { covers: string; exce
     }
     case "country":
       return { covers: "All of India", except };
+    // No "except" for a district or state: the pin's place decides those, and
+    // a leave-out PIN list left over from before the map is never read — the
+    // list said "Rajasthan · except 3420…" while 3420 was delivered.
     case "states":
-      return { covers: `States: ${listed(zone.states ?? [], 3) || "none chosen"}`, except };
+      return { covers: `States: ${listed(zone.states ?? [], 3) || "none chosen"}`, except: "" };
     case "cities":
-      return { covers: `Districts: ${listed(zoneCities(zone), 3) || "none chosen"}`, except };
+      return { covers: `Districts: ${listed(zoneCities(zone), 3) || "none chosen"}`, except: "" };
     case "pincodes":
       return {
         covers: `PIN codes: ${listed(zonePincodeRules(zone).map(describePincodeRule), 4) || "none chosen"}`,

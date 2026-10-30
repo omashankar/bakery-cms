@@ -14,7 +14,7 @@ import { locateDevice } from "@/lib/device-location";
 import { soonestDeliveryDays, soonestDeliveryText } from "@/features/commerce/lib/delivery-location";
 import { addMapControls, boundsOf, drawZoneShapes, loadLeaflet, pinIcon } from "@/lib/leaflet-map";
 import { loadDeliveryZones } from "@/features/commerce/lib/delivery-zones-repository";
-import { formatLatLng, hasUsableArea, isAreaZone, isValidLatLng, shapeMiddle, zoneShapes } from "@/features/commerce/lib/delivery-area";
+import { formatLatLng, hasUsableArea, isAreaZone, isValidLatLng, shapeMiddle, zoneShapes, type PinRegion } from "@/features/commerce/lib/delivery-area";
 import type { DeliveryPin, DeliveryZone, LatLng } from "@/types/delivery";
 
 /**
@@ -44,6 +44,8 @@ export type PinCheck =
       minDeliveryDays?: number | null;
       /** The order total past which this delivery is free. */
       freeDeliveryThreshold?: number;
+      /** The pin's district and state as the server read them — what the order is priced by. */
+      region?: PinRegion | null;
       /** India Post's PIN at the pin, from its nearest post offices — null where none is near. */
       postalCode: string | null;
       /** False when a PIN line runs close by: `otherPincodes` may be the customer's. */
