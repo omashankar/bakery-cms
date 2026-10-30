@@ -269,3 +269,23 @@ export async function getTransactionsPage(
     },
   };
 }
+
+/**
+ * The analytics as one member may see them.
+ *
+ * Reaching this at all needs `reports.revenue.view` — the whole payload is
+ * revenue. Two parts are about PEOPLE rather than money and keep their own
+ * permissions: the top customers (names and emails) and the recent orders
+ * (whole order documents). Emptied, not omitted, so every screen that reads
+ * the shape keeps working.
+ */
+export function analyticsForViewer(
+  analytics: OrderAnalytics,
+  permissions: ReadonlySet<string>,
+): OrderAnalytics {
+  return {
+    ...analytics,
+    topCustomers: permissions.has("customers.view") ? analytics.topCustomers : [],
+    recentOrders: permissions.has("orders.view") ? analytics.recentOrders : [],
+  };
+}

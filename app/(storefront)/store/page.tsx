@@ -22,6 +22,6 @@ export default async function Page(props: PageProps) {
   const { cmsPreview } = await props.searchParams;
   // The parameter asks; the session decides. Without this anyone holding the URL
   // read the unpublished homepage.
-  const isPreview = cmsPreview === "1" && (await canPreviewDraft());
+  const isPreview = cmsPreview === "1" && (await canPreviewDraft("homepage.manage"));
   return <StoreHomePage isPreview={isPreview} />;
 }

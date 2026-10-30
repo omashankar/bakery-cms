@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { RefundCenterAdminPage } from "@/apps/admin/commerce/pages/refund-center-admin-page";
-import { whenAdmin } from "@/lib/server/auth/admin-initial";
+import { whenAllowed } from "@/lib/server/auth/access";
 import { asQueryParams } from "@/lib/server/http/query-params";
 import { refundCasesQuerySchema } from "@/features/orders/server/order.validators";
 import { getRefundCasesPage } from "@/features/orders/server/order.analytics";
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
  * (its default filters, page 1, 8 rows), through the API's schema.
  */
 export default async function Page() {
-  const initial = await whenAdmin(async () => {
+  const initial = await whenAllowed(["payments.view", "orders.refund"], async () => {
     const { page, limit, ...filters } = refundCasesQuerySchema.parse(
       asQueryParams({ ...defaultRefundFilters, page: 1, limit: 8 }),
     );

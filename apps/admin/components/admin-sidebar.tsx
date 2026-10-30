@@ -10,6 +10,7 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
+  ChefHat,
   CreditCard,
   ExternalLink,
   FileText,
@@ -73,6 +74,8 @@ import {
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { cn } from "@/lib/utils";
 import { adminShell } from "./admin-shell";
+import { useAccess } from "@/features/team/lib/access-context";
+import { canOpenRoute } from "@/features/team/lib/route-access";
 
 const navRow = adminShell.navRow;
 
@@ -81,6 +84,7 @@ const navIdle = adminShell.navIdle;
 
 const iconMap: Record<string, LucideIcon> = {
   LayoutDashboard,
+  ChefHat,
   Cake,
   Tags,
   Flag,
@@ -496,15 +500,23 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
   }, []);
 
   const labels = useBusinessLabels();
+  const { access, can } = useAccess();
   const navSections = useMemo(() => {
     return adminNavSections.map((section) => ({
       ...section,
       items: section.items
+        // Only the screens this member can open — the same table the route
+        // guard reads. No access snapshot (an account that is no longer
+        // active, about to be signed out) shows nothing rather than everything.
+        .filter((item) => access !== null && canOpenRoute(item.href, can))
+        .filter((item) => !(item.hiddenWith && can(item.hiddenWith)))
         // The route is /admin/products for every shop; the visible label is
         // the shop's own word. Shared with the command palette, which used to disagree.
         .map((item) => ({ ...item, label: navItemLabel(item, labels) })),
-    }));
-  }, [labels]);
+    }))
+      // A heading with nothing under it is noise.
+      .filter((section) => section.items.length > 0);
+  }, [labels, access, can]);
 
   useEffect(() => {
     setOpenMenu(findOpenMenuHref(pathname));

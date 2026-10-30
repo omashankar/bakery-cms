@@ -41,6 +41,8 @@ import {
 } from "@/apps/admin/media/lib/use-media-upload";
 import { shrinkImageFile } from "@/lib/images/shrink-image";
 import { thumbnailImageUrl } from "@/lib/image-url";
+import { useAccess, type ClientAccess } from "@/features/team/lib/access-context";
+import { PermissionSummary } from "@/apps/admin/team/components/permission-summary";
 
 /** Shown only while hydration is pending, behind the skeleton. */
 const EMPTY_PROFILE: AdminProfile = {
@@ -61,12 +63,55 @@ function initials(name: string) {
   return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
 }
 
-export function AdminProfilePage({
-  initial = null,
-}: {
-  /** The admin config blobs and account, read on the server; null fetches as before. */
-  initial?: Parameters<typeof applyServerAdminConfig>[0] | null;
-} = {}) {
+type ProfileInitial = Parameters<typeof applyServerAdminConfig>[0] | null;
+
+/**
+ * The OWNER edits the shop's profile (name, phone, photo — one per shop, from
+ * before there was a team). Any other member sees their own account: who they
+ * are, their role and what it allows, and where to change their password.
+ */
+export function AdminProfilePage({ initial = null }: { initial?: ProfileInitial } = {}) {
+  const { access } = useAccess();
+  if (access && !access.isOwner) return <MemberProfile access={access} />;
+  return <OwnerProfilePage initial={initial} />;
+}
+
+function MemberProfile({ access }: { access: ClientAccess }) {
+  return (
+    <AdminPage className="space-y-4">
+      <AdminPageHeader title="My Profile" description="Your account on this shop's admin." />
+      <Card>
+        <CardHeader>
+          <CardTitle>{access.name || access.email}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <dl className="grid gap-3 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="text-muted-foreground">Email</dt>
+              <dd className="font-medium text-foreground">{access.email}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Role</dt>
+              <dd className="font-medium text-foreground">{access.roleName}</dd>
+            </div>
+          </dl>
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-foreground">What your role lets you do</p>
+            <PermissionSummary permissions={access.permissions} />
+          </div>
+          <p className="text-sm text-muted-foreground">
+            To change your name, email or role, ask the shop owner.
+          </p>
+          <Button variant="outline" render={<Link href={routes.admin.changePassword} />} nativeButton={false}>
+            Change password
+          </Button>
+        </CardContent>
+      </Card>
+    </AdminPage>
+  );
+}
+
+function OwnerProfilePage({ initial = null }: { initial?: ProfileInitial }) {
   // Before the form's own hydration effect, so it finds the gate open.
   useLayoutEffect(() => {
     if (initial) applyServerAdminConfig(initial);

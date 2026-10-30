@@ -3,7 +3,7 @@ import { clientIpFrom, proxyHeadersAreTrusted } from "@/lib/server/http/client-i
 import { connection } from "next/server";
 import { headers } from "next/headers";
 
-import { getSession } from "@/lib/server/auth/dal";
+import { can, getActor } from "@/lib/server/auth/access";
 import { defaultMaintenanceSettings } from "@/features/settings/lib/settings-utils";
 import { normalizeIp } from "@/features/settings/lib/maintenance-access";
 
@@ -30,9 +30,6 @@ export interface MaintenanceState {
   /** The final answer: hide the storefront from this visitor. */
   isClosed: boolean;
 }
-
-/** Roles that may work on a closed shop — the same pair that may close it. */
-const MAINTENANCE_ROLES = ["owner", "admin"];
 
 /**
  * `x-forwarded-for` is written by the CLIENT unless something upstream
@@ -90,8 +87,10 @@ export const getMaintenanceState = cache(async (): Promise<MaintenanceState> => 
     // check their own work before reopening. Scoped to the roles that can
     // actually operate the switch: a Viewer or Content Editor session is not a
     // reason to serve them a shop that is closed to everyone else.
-    const session = await getSession();
-    if (session && MAINTENANCE_ROLES.includes(session.role)) {
+    // The people who may work on a closed shop are the people who may close it.
+    // Read from the database, and only once the shop IS closed and the
+    // visitor has a session — an open shop never pays for this lookup.
+    if (can(await getActor(), "settings.manage")) {
       return { isEnabled, message, isExempt: true, exemption: "admin", isClosed: false };
     }
 

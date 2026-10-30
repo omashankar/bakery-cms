@@ -148,7 +148,7 @@ describe("bulk publish sends ids, not snapshots", () => {
 
   it("the endpoint requires an admin and validates its input", () => {
     const route = read("app/api/products/status/route.ts");
-    expect(route).toContain("requireProductAdmin()");
+    expect(route).toContain('requireProductPermission("products.update")');
     expect(route).toContain("validate(bodySchema");
     expect(route).toContain("writeAuditLog");
   });

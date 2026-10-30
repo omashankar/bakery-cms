@@ -6,7 +6,7 @@ import {
   saveRazorpayConfig,
   verifyRazorpayCredentials,
 } from "@/lib/server/payments/razorpay-credentials";
-import { requireAdminResponse } from "@/lib/server/auth/guard";
+import { requirePermissionResponse } from "@/lib/server/auth/guard";
 
 /**
  * Connection status only — no secret is ever in a response from this route.
@@ -17,7 +17,7 @@ import { requireAdminResponse } from "@/lib/server/auth/guard";
  * read of the shop's payment setup for anyone who asks.
  */
 export async function GET(request: Request) {
-  const auth = await requireAdminResponse();
+  const auth = await requirePermissionResponse("payments.manage");
   if (auth instanceof NextResponse) return auth;
 
   const status = await getRazorpayStatus();
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
 
 /** Saves admin-entered keys server-side (Mongo), never to the browser. */
 export async function POST(request: Request) {
-  const auth = await requireAdminResponse();
+  const auth = await requirePermissionResponse("payments.manage");
   if (auth instanceof NextResponse) return auth;
 
   const status = await getRazorpayStatus();
@@ -97,7 +97,7 @@ export async function POST(request: Request) {
 
 /** Removes saved keys (disconnect). */
 export async function DELETE() {
-  const auth = await requireAdminResponse();
+  const auth = await requirePermissionResponse("payments.manage");
   if (auth instanceof NextResponse) return auth;
 
   const status = await getRazorpayStatus();

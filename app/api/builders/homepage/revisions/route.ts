@@ -4,7 +4,7 @@ import {
   listHomepageRevisions,
   restoreHomepageRevision,
 } from "@/features/cms-sections/data/homepage-sections.server";
-import { requireAdminResponse } from "@/lib/server/auth/guard";
+import { requirePermissionResponse } from "@/lib/server/auth/guard";
 
 /**
  * Homepage builder revision history.
@@ -29,7 +29,7 @@ async function parseBody(request: Request): Promise<RestoreBody | null> {
 }
 
 export async function GET() {
-  const auth = await requireAdminResponse();
+  const auth = await requirePermissionResponse("homepage.manage");
   if (auth instanceof NextResponse) return auth;
 
   try {
@@ -40,7 +40,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireAdminResponse();
+  const auth = await requirePermissionResponse("homepage.manage");
   if (auth instanceof NextResponse) return auth;
 
   const body = await parseBody(request);

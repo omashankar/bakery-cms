@@ -62,6 +62,12 @@ export interface DeliveryPartner {
   phone?: string;
   /** "Bike", "Refrigerated van" — free text, because every shop's fleet differs. */
   vehicle?: string;
+  /**
+   * The team member delivering it, when it is one. Their "My deliveries" list
+   * is every order carrying their id here — nothing else decides it. Absent
+   * for an outside courier, who has a name and a phone and no account.
+   */
+  userId?: string;
 }
 
 export interface PlacedOrder {
@@ -658,7 +664,7 @@ export async function updateOrderAdminNotes(
  */
 export async function updateOrderDeliveryPartner(
   orderId: string,
-  partner: { name: string; phone?: string; vehicle?: string },
+  partner: { name: string; phone?: string; vehicle?: string; userId?: string },
 ): Promise<OrderMutationResult> {
   const current = await resolveOrderForMutation(orderId);
   if (!current) return { order: null, persisted: false };
@@ -667,7 +673,12 @@ export async function updateOrderDeliveryPartner(
   const updated = commitOrder(orderId, current, (order) => ({
     ...order,
     deliveryPartner: name
-      ? { name, phone: partner.phone?.trim() || undefined, vehicle: partner.vehicle?.trim() || undefined }
+      ? {
+          name,
+          phone: partner.phone?.trim() || undefined,
+          vehicle: partner.vehicle?.trim() || undefined,
+          userId: partner.userId || undefined,
+        }
       : undefined,
   }));
 

@@ -31,6 +31,7 @@ import { routes } from "@/constants/routes";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
+import { useCan } from "@/features/team/lib/access-context";
 import { RelativeTime } from "@/components/shared/relative-time";
 
 interface CustomerDetailPageProps {
@@ -39,6 +40,7 @@ interface CustomerDetailPageProps {
 
 export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
   const labels = useBusinessLabels();
+  const canEdit = useCan("customers.update");
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [orders, setOrders] = useState<PlacedOrder[]>([]);
   const [notes, setNotes] = useState("");
@@ -501,69 +503,72 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
               <CardDescription>Internal notes for your team</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="customer-notes">Notes</Label>
-                <textarea
-                  id="customer-notes"
-                  className={adminTextareaClassName}
-                  rows={5}
-                  value={notes}
-                  onChange={(event) => {
-                    // Mark the field mid-edit so a background refresh — a tag
-                    // write, another tab, the 30s poll — cannot overwrite what
-                    // is being typed with the server's older copy.
-                    notesDirty.current = true;
-                    notesRef.current = event.target.value;
-                    setNotes(event.target.value);
-                  }}
-                  placeholder="Repeat client, prefers morning delivery, always asks for a note…"
-                />
-              </div>
-              <Button variant="bakery" className="w-full" onClick={handleSaveNotes}>
-                Save notes
-              </Button>
-
-              <div className="space-y-2">
-                <Label htmlFor="customer-tag">Tags</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="customer-tag"
-                    value={tagInput}
-                    onChange={(event) => setTagInput(event.target.value)}
-                    placeholder="Wedding, Corporate…"
+              {/* Read-only without customers.update — the server refuses the save anyway. */}
+              <fieldset disabled={!canEdit} className="m-0 min-w-0 space-y-4 border-0 p-0 disabled:opacity-70">
+                <div className="space-y-2">
+                  <Label htmlFor="customer-notes">Notes</Label>
+                  <textarea
+                    id="customer-notes"
+                    className={adminTextareaClassName}
+                    rows={5}
+                    value={notes}
+                    onChange={(event) => {
+                      // Mark the field mid-edit so a background refresh — a tag
+                      // write, another tab, the 30s poll — cannot overwrite what
+                      // is being typed with the server's older copy.
+                      notesDirty.current = true;
+                      notesRef.current = event.target.value;
+                      setNotes(event.target.value);
+                    }}
+                    placeholder="Repeat client, prefers morning delivery, always asks for a note…"
                   />
-                  <Button type="button" variant="outline" size="icon" onClick={handleAddTag}>
-                    <Plus className="size-4" />
-                  </Button>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {profile.meta.tags.map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2.5 py-1 text-xs"
-                      onClick={() => handleRemoveTag(tag)}
-                    >
-                      <Tag className="size-3" />
-                      {tag}
-                      <X className="size-3" />
-                    </button>
-                  ))}
-                </div>
-              </div>
+                <Button variant="bakery" className="w-full" onClick={handleSaveNotes}>
+                  Save notes
+                </Button>
 
-              <label className="flex items-center justify-between rounded-xl border border-border p-4">
-                <div>
-                  <p className="text-sm font-medium">Marketing opt-in</p>
-                  <p className="text-xs text-muted-foreground">
-                    Customer agrees to promotional email and offers
-                  </p>
+                <div className="space-y-2">
+                  <Label htmlFor="customer-tag">Tags</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="customer-tag"
+                      value={tagInput}
+                      onChange={(event) => setTagInput(event.target.value)}
+                      placeholder="Wedding, Corporate…"
+                    />
+                    <Button type="button" variant="outline" size="icon" onClick={handleAddTag}>
+                      <Plus className="size-4" />
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {profile.meta.tags.map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2.5 py-1 text-xs"
+                        onClick={() => handleRemoveTag(tag)}
+                      >
+                        <Tag className="size-3" />
+                        {tag}
+                        <X className="size-3" />
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <Switch
-                  checked={profile.meta.marketingOptIn}
-                  onCheckedChange={handleMarketingToggle}
-                />
-              </label>
+
+                <label className="flex items-center justify-between rounded-xl border border-border p-4">
+                  <div>
+                    <p className="text-sm font-medium">Marketing opt-in</p>
+                    <p className="text-xs text-muted-foreground">
+                      Customer agrees to promotional email and offers
+                    </p>
+                  </div>
+                  <Switch
+                    checked={profile.meta.marketingOptIn}
+                    onCheckedChange={handleMarketingToggle}
+                  />
+                </label>
+              </fieldset>
             </CardContent>
           </Card>
         </aside>

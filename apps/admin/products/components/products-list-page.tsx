@@ -61,6 +61,7 @@ import {
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { AdminSelect } from "./admin-field";
 import { DeleteProductDialog } from "./delete-product-dialog";
+import { useAccess } from "@/features/team/lib/access-context";
 import { RelativeTime } from "@/components/shared/relative-time";
 
 const PAGE_SIZE = 10;
@@ -141,6 +142,7 @@ export function ProductsListPage({
   /** The category names, for the rows' first render; see the page. */
   initialCategories?: Array<{ id: string; name: string }> | null;
 } = {}) {
+  const { can } = useAccess();
   // Two flags, not one. `loaded`: the list is here (from the server or the
   // fetch) — the table waits on this. `mounted`: this is the browser — what
   // reads this browser's caches (the category options, the stock thresholds)
@@ -332,15 +334,17 @@ export function ProductsListPage({
         description={`Manage your ${productLower} catalog`}
         className="gap-3"
         actions={
-          <Button
-            variant="bakery"
-            className="w-full sm:w-auto"
-            render={<Link href={routes.admin.cakes.add} />}
-          >
-            <Plus className="size-4" />
-            <span className="sm:hidden">Add</span>
-            <span className="hidden sm:inline">Add {labels.productWord}</span>
-          </Button>
+          can("products.create") ? (
+            <Button
+              variant="bakery"
+              className="w-full sm:w-auto"
+              render={<Link href={routes.admin.cakes.add} />}
+            >
+              <Plus className="size-4" />
+              <span className="sm:hidden">Add</span>
+              <span className="hidden sm:inline">Add {labels.productWord}</span>
+            </Button>
+          ) : undefined
         }
       />
 
@@ -525,10 +529,12 @@ export function ProductsListPage({
           title={`No ${productsLower} found`}
           description={`Try another filter, or add your first ${productLower}.`}
           action={
-            <Button variant="bakery" render={<Link href={routes.admin.cakes.add} />}>
-              <Plus className="size-4" />
-              Add {labels.productWord}
-            </Button>
+            can("products.create") ? (
+              <Button variant="bakery" render={<Link href={routes.admin.cakes.add} />}>
+                <Plus className="size-4" />
+                Add {labels.productWord}
+              </Button>
+            ) : undefined
           }
         />
       ) : (
@@ -539,20 +545,26 @@ export function ProductsListPage({
                 {selectedIds.length} selected
               </span>
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" onClick={handleBulkPublish}>
-                  Publish
-                </Button>
-                <Button size="sm" variant="outline" onClick={handleBulkArchive}>
-                  Archive
-                </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={() => setDeleteTarget({ ids: selectedIds })}
-                >
-                  <Trash2 className="size-4" />
-                  Delete
-                </Button>
+                {can("products.update") ? (
+                  <>
+                    <Button size="sm" variant="outline" onClick={handleBulkPublish}>
+                      Publish
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={handleBulkArchive}>
+                      Archive
+                    </Button>
+                  </>
+                ) : null}
+                {can("products.delete") ? (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => setDeleteTarget({ ids: selectedIds })}
+                  >
+                    <Trash2 className="size-4" />
+                    Delete
+                  </Button>
+                ) : null}
                 <Button size="sm" variant="ghost" onClick={() => setSelectedIds([])}>
                   Clear
                 </Button>
@@ -659,28 +671,34 @@ export function ProductsListPage({
                           <MoreHorizontal className="size-4" />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            render={<Link href={routes.admin.cakes.edit(cake.id)} />}
-                          >
-                            <Pencil className="size-3.5" />
-                            Edit
-                          </DropdownMenuItem>
+                          {can("products.update") ? (
+                            <DropdownMenuItem
+                              render={<Link href={routes.admin.cakes.edit(cake.id)} />}
+                            >
+                              <Pencil className="size-3.5" />
+                              Edit
+                            </DropdownMenuItem>
+                          ) : null}
                           <DropdownMenuItem
                             render={<Link href={routes.admin.cakes.preview(cake.id)} />}
                           >
                             <ExternalLink className="size-3.5" />
                             Preview
                           </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            variant="destructive"
-                            onClick={() =>
-                              setDeleteTarget({ ids: [cake.id], name: cake.name })
-                            }
-                          >
-                            <Trash2 className="size-3.5" />
-                            Delete
-                          </DropdownMenuItem>
+                          {can("products.delete") ? (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onClick={() =>
+                                  setDeleteTarget({ ids: [cake.id], name: cake.name })
+                                }
+                              >
+                                <Trash2 className="size-3.5" />
+                                Delete
+                              </DropdownMenuItem>
+                            </>
+                          ) : null}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </td>
@@ -725,14 +743,16 @@ export function ProductsListPage({
                       </Badge>
                     </div>
                     <div className="mt-2 flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 min-w-0 flex-1"
-                        render={<Link href={routes.admin.cakes.edit(cake.id)} />}
-                      >
-                        Edit
-                      </Button>
+                      {can("products.update") ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 min-w-0 flex-1"
+                          render={<Link href={routes.admin.cakes.edit(cake.id)} />}
+                        >
+                          Edit
+                        </Button>
+                      ) : null}
                       <Button
                         size="sm"
                         variant="outline"
@@ -741,18 +761,20 @@ export function ProductsListPage({
                       >
                         Preview
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 shrink-0"
-                        aria-label="Delete"
-                        onClick={() =>
-                          setDeleteTarget({ ids: [cake.id], name: cake.name })
-                        }
-                      >
-                        <Trash2 className="size-3.5" />
-                        <span className="hidden sm:inline">Delete</span>
-                      </Button>
+                      {can("products.delete") ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 shrink-0"
+                          aria-label="Delete"
+                          onClick={() =>
+                            setDeleteTarget({ ids: [cake.id], name: cake.name })
+                          }
+                        >
+                          <Trash2 className="size-3.5" />
+                          <span className="hidden sm:inline">Delete</span>
+                        </Button>
+                      ) : null}
                     </div>
                   </div>
                 </div>

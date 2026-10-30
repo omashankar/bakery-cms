@@ -26,9 +26,12 @@ vi.mock("@/lib/server/audit/audit-log", () => ({
   ...audit,
   requestContext: () => ({ ip: "", userAgent: "test" }),
 }));
-vi.mock("@/lib/server/auth/dal", () => ({
-  requireRole: vi.fn(async () => ({ sub: "u1", email: "owner@example.com", role: "owner" })),
-}));
+vi.mock("@/lib/server/auth/access", async () =>
+  (await import("@/tests/stubs/access")).accessStub(() =>
+    // An owner — the question here is the section name, not who may ask.
+    ({ sub: "u1", email: "owner@example.com", name: "Owner", role: "owner", roleName: "Owner", isOwner: true, permissions: new Set(["catalog.manage"]) }) as never,
+  ),
+);
 
 import { resetSection } from "@/features/catalog/server/catalog.service";
 import { updateCatalogSectionController } from "@/features/catalog/server/catalog.controller";

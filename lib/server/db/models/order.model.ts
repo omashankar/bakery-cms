@@ -89,6 +89,9 @@ const orderSchema = new mongoose.Schema(
 // The admin list sorts by placedAt and pages through it; without this index that
 // is a full collection scan plus an in-memory sort on every request.
 orderSchema.index({ placedAt: -1 });
+// A rider's "My deliveries" list is a query on this and nothing else. Sparse:
+// most orders are never assigned to a team member.
+orderSchema.index({ "deliveryPartner.userId": 1, status: 1 }, { sparse: true });
 
 orderSchema.set("toJSON", {
   virtuals: false,

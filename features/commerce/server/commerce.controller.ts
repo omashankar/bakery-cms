@@ -2,13 +2,11 @@ import { ok } from "@/lib/server/http/response";
 import { ValidationError, withErrorHandler } from "@/lib/server/http/errors";
 import { describePincodeCode, listDistricts, suggestPincodes } from "./pincode-directory";
 import { validate, readJson } from "@/lib/server/http/validate";
-import { getSession, requireRole } from "@/lib/server/auth/dal";
+import { can, getActor, requirePermission } from "@/lib/server/auth/access";
 import { requestContext } from "@/lib/server/audit/audit-log";
 
 import * as service from "./commerce.service";
 import { couponsReplaceSchema, deliveryZonesReplaceSchema } from "./commerce.validators";
-
-const COMMERCE_ROLES = ["owner", "admin"] as const;
 
 // ---- Coupons ----
 
@@ -17,8 +15,7 @@ export const getCouponsController = withErrorHandler(async () => {
   // server re-resolves it. A visitor gets only the codes they could actually
   // use; it used to hand out the shop's whole discount table, switched-off and
   // unlaunched codes included. Staff ask as an authenticated caller.
-  const session = await getSession();
-  const isStaff = Boolean(session && COMMERCE_ROLES.includes(session.role as never));
+  const isStaff = can(await getActor(), "coupons.view");
 
   return ok(
     isStaff ? await service.getCoupons() : await service.getPublicCoupons(),
@@ -27,7 +24,7 @@ export const getCouponsController = withErrorHandler(async () => {
 });
 
 export const replaceCouponsController = withErrorHandler(async (request: Request) => {
-  const session = await requireRole(...COMMERCE_ROLES);
+  const session = await requirePermission("coupons.manage");
   const { coupons, knownIds } = validate(couponsReplaceSchema, await readJson(request));
   const result = await service.replaceCoupons(coupons, knownIds, {
     ...requestContext(request),
@@ -43,8 +40,7 @@ export const getZonesController = withErrorHandler(async () => {
   // Public read — checkout has to tell a visitor whether their pincode is
   // served. Scoped the same way the coupons read above is: a visitor sees the
   // live zones, staff see the switched-off ones they have to manage.
-  const session = await getSession();
-  const isStaff = Boolean(session && COMMERCE_ROLES.includes(session.role as never));
+  const isStaff = can(await getActor(), "settings.view");
 
   return ok(
     isStaff ? await service.getZones() : await service.getPublicZones(),
@@ -53,7 +49,7 @@ export const getZonesController = withErrorHandler(async () => {
 });
 
 export const replaceZonesController = withErrorHandler(async (request: Request) => {
-  const session = await requireRole(...COMMERCE_ROLES);
+  const session = await requirePermission("settings.manage");
   const { zones, knownIds } = validate(deliveryZonesReplaceSchema, await readJson(request));
   const result = await service.replaceZones(zones, knownIds, {
     ...requestContext(request),

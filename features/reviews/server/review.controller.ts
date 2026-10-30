@@ -1,7 +1,7 @@
 import { ok, created } from "@/lib/server/http/response";
 import { withErrorHandler } from "@/lib/server/http/errors";
 import { validate, readJson } from "@/lib/server/http/validate";
-import { requireRole } from "@/lib/server/auth/dal";
+import { requirePermission } from "@/lib/server/auth/access";
 import { rateLimit } from "@/lib/server/http/rate-limit";
 import { requestContext } from "@/lib/server/audit/audit-log";
 
@@ -12,7 +12,6 @@ import {
   deleteReviewsSchema,
 } from "./review.validators";
 
-const REVIEW_ROLES = ["owner", "admin"] as const;
 type IdContext = { params: Promise<{ id: string }> };
 
 export const listReviewsController = withErrorHandler(async (request: Request) => {
@@ -21,7 +20,7 @@ export const listReviewsController = withErrorHandler(async (request: Request) =
   if (productSlug) {
     return ok(await service.getApprovedForProduct(productSlug), "Approved reviews");
   }
-  await requireRole(...REVIEW_ROLES);
+  await requirePermission("reviews.manage");
   return ok(await service.getReviews(), "Reviews");
 });
 
@@ -94,7 +93,7 @@ export const markReviewUnhelpfulController = withErrorHandler(
 );
 
 export const updateReviewController = withErrorHandler(async (request: Request, ctx: IdContext) => {
-  const session = await requireRole(...REVIEW_ROLES);
+  const session = await requirePermission("reviews.manage");
   const { id } = await ctx.params;
   const patch = validate(updateReviewSchema, await readJson(request));
   const review = await service.updateReview(id, patch, {
@@ -106,7 +105,7 @@ export const updateReviewController = withErrorHandler(async (request: Request, 
 });
 
 export const deleteReviewsController = withErrorHandler(async (request: Request) => {
-  const session = await requireRole(...REVIEW_ROLES);
+  const session = await requirePermission("reviews.manage");
   const { ids } = validate(deleteReviewsSchema, await readJson(request));
   const deleted = await service.deleteReviews(ids, {
     ...requestContext(request),

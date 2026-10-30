@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { setProductStatus } from "@/features/products/data/products-service";
-import { requireProductAdmin } from "@/features/products/server/guard";
+import { requireProductPermission } from "@/features/products/server/guard";
 import { validate, readJson } from "@/lib/server/http/validate";
 import { AppError } from "@/lib/server/http/errors";
 import { writeAuditLog, requestContext } from "@/lib/server/audit/audit-log";
@@ -24,7 +24,7 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const auth = await requireProductAdmin();
+  const auth = await requireProductPermission("products.update");
   if (auth instanceof NextResponse) return auth;
 
   let body: z.infer<typeof bodySchema>;

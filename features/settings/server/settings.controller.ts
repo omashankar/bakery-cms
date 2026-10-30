@@ -1,7 +1,7 @@
 import { ok } from "@/lib/server/http/response";
 import { withErrorHandler, AppError, NotFoundError, ConflictError } from "@/lib/server/http/errors";
 import { validate, readJson } from "@/lib/server/http/validate";
-import { requireRole } from "@/lib/server/auth/dal";
+import { requirePermission, requireStaff, type Actor } from "@/lib/server/auth/access";
 import { requestContext } from "@/lib/server/audit/audit-log";
 
 import { sendTestEmail } from "@/lib/server/mail/send-test-email";
@@ -11,8 +11,33 @@ import { StaleSectionError } from "./settings.repository";
 import { sectionSchemas, type SettingsSection } from "./settings.validators";
 import { allowlisted } from "@/lib/server/http/allowlist";
 
-/** Roles allowed to read/write settings (owner + legacy admin). */
-const SETTINGS_ROLES = ["owner", "admin"] as const;
+/**
+ * The permission a section needs to be CHANGED. The sign-in policy is security,
+ * not shop configuration — "Change settings" must not be a way to switch off
+ * the login lockout.
+ */
+function writePermission(section: string) {
+  return section === "security" ? ("security.manage" as const) : ("settings.manage" as const);
+}
+
+/**
+ * The settings as THIS person may see them.
+ *
+ * Every admin screen reads the settings — business labels, modules, the shop
+ * name in the header — so every active member gets them. The mail server's
+ * address and username are configuration of the shop's mail account; without
+ * settings.view they are left out entirely, not just the password.
+ */
+export function settingsForActor(
+  settings: Awaited<ReturnType<typeof service.getSettings>>,
+  actor: Pick<Actor, "permissions">,
+) {
+  const redacted = redactMailPassword(settings);
+  if (actor.permissions.has("settings.view")) return redacted;
+  const { smtp: _smtp, ...rest } = redacted as Record<string, unknown>;
+  void _smtp;
+  return rest as typeof redacted;
+}
 
 type SectionContext = { params: Promise<{ section: string }> };
 
@@ -71,8 +96,8 @@ function settingsResponse(
 }
 
 export const getSettingsController = withErrorHandler(async () => {
-  await requireRole(...SETTINGS_ROLES);
-  return settingsResponse(await service.getSettings(), "Settings");
+  const actor = await requireStaff();
+  return ok(settingsForActor(await service.getSettings(), actor), "Settings");
 });
 
 export const getPublicSettingsController = withErrorHandler(async () => {
@@ -86,8 +111,8 @@ export const getLabelsController = withErrorHandler(async () => {
 
 export const updateSectionController = withErrorHandler(
   async (request: Request, context: SectionContext) => {
-    const session = await requireRole(...SETTINGS_ROLES);
     const { section } = await context.params;
+    const session = await requirePermission(writePermission(section));
 
     /**
      * `in` on the OWN keys, not a bare index.
@@ -126,8 +151,8 @@ export const updateSectionController = withErrorHandler(
 
 export const resetSectionController = withErrorHandler(
   async (request: Request, context: SectionContext) => {
-    const session = await requireRole(...SETTINGS_ROLES);
     const { section } = await context.params;
+    const session = await requirePermission(writePermission(section));
     const ctx = requestContext(request);
     const updated = await service.resetSection(section, {
       ...ctx,
@@ -147,7 +172,7 @@ export const resetSectionController = withErrorHandler(
  * than silently on the next customer's order confirmation.
  */
 export const sendTestEmailController = withErrorHandler(async (request: Request) => {
-  const session = await requireRole(...SETTINGS_ROLES);
+  const session = await requirePermission("settings.manage");
 
   // Only ever to the caller's own address. Accepting a recipient from the body
   // would turn an admin endpoint into a way to send mail from the shop's domain

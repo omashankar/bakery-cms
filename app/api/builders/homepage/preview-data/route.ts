@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getHomepageRenderData } from "@/apps/website/lib/homepage-render-data.server";
-import { requireAdminResponse } from "@/lib/server/auth/guard";
+import { requirePermissionResponse } from "@/lib/server/auth/guard";
 
 /**
  * Everything the homepage builder's PREVIEW needs, computed exactly the way the
@@ -23,7 +23,7 @@ import { requireAdminResponse } from "@/lib/server/auth/guard";
  * so nothing here is more privileged than the storefront already serves.
  */
 export async function GET() {
-  const auth = await requireAdminResponse();
+  const auth = await requirePermissionResponse("homepage.manage");
   if (auth instanceof NextResponse) return auth;
 
   try {

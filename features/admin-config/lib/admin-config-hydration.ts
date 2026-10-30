@@ -39,18 +39,25 @@ import { persistServerCustomCode } from "@/features/settings/lib/custom-code-rep
  * applied without a request — the same writes, then the gate.
  */
 export function applyServerAdminConfig(read: {
-  profile: Record<string, unknown>;
-  gateways: Record<string, unknown>;
-  prefs: Record<string, unknown>;
-  code: { css: string; js: string };
+  /**
+   * Each null when THIS member may not read it (see admin-config.access.ts) —
+   * the profile is the owner's own. Only what arrived is stored, and the gate
+   * opens only when all four did, exactly as `ensureAdminConfigHydrated` does:
+   * a null taken for "nothing saved" would let a save push this browser's
+   * seed over the shop's real values.
+   */
+  profile: Record<string, unknown> | null;
+  gateways: Record<string, unknown> | null;
+  prefs: Record<string, unknown> | null;
+  code: { css: string; js: string } | null;
   account: Record<string, unknown> | null;
 }): void {
-  persistServerAdminProfile(read.profile);
+  if (read.profile) persistServerAdminProfile(read.profile);
   persistServerAccount(read.account);
-  persistServerGateways(read.gateways);
-  persistServerNotifPrefs(read.prefs);
-  persistServerCustomCode(read.code);
-  adminConfigHydration.markSettled();
+  if (read.gateways) persistServerGateways(read.gateways);
+  if (read.prefs) persistServerNotifPrefs(read.prefs);
+  if (read.code) persistServerCustomCode(read.code);
+  if (read.profile && read.gateways && read.prefs && read.code) adminConfigHydration.markSettled();
 }
 
 export async function ensureAdminConfigHydrated(): Promise<boolean> {

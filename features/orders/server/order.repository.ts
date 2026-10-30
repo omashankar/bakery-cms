@@ -300,6 +300,45 @@ export async function listSince(sinceIso: string | null): Promise<PlacedOrder[]>
 }
 
 /**
+ * The kitchen's queue: everything waiting to be made or collected, oldest
+ * first — the order that has waited longest is the one to start. Capped, because
+ * a queue this long is a backlog nobody is working from a phone.
+ */
+export async function listKitchenQueue(statuses: readonly OrderStatus[], limit = 200): Promise<PlacedOrder[]> {
+  await connectDB();
+  const docs = (await OrderModel.find({ status: { $in: [...statuses] } })
+    .sort({ placedAt: 1 })
+    .limit(limit)
+    .lean()) as unknown as Raw[];
+  return docs.map(toOrder);
+}
+
+/**
+ * One rider's deliveries: everything assigned to them that is still on its way,
+ * and what they delivered since `deliveredSince` so they can see their day.
+ * The assignment is the only thing that decides it.
+ */
+export async function listAssignedDeliveries(
+  userId: string,
+  activeStatuses: readonly OrderStatus[],
+  deliveredSince: string,
+  limit = 200,
+): Promise<PlacedOrder[]> {
+  await connectDB();
+  const docs = (await OrderModel.find({
+    "deliveryPartner.userId": userId,
+    $or: [
+      { status: { $in: [...activeStatuses] } },
+      { status: "delivered", updatedAt: { $gte: deliveredSince } },
+    ],
+  })
+    .sort({ placedAt: 1 })
+    .limit(limit)
+    .lean()) as unknown as Raw[];
+  return docs.map(toOrder);
+}
+
+/**
  * Only the orders that could possibly be a refund case, newest first.
  *
  * This is `isRefundCase` expressed as a query — the one part of the refund
@@ -612,10 +651,19 @@ export async function patchIfStatus(
   id: string,
   expectedStatus: OrderStatus,
   fields: Partial<PlacedOrder>,
+  /**
+   * Only if the order is STILL assigned to this member — a rider's move must
+   * not land on an order that was handed to someone else since they loaded it.
+   */
+  assignedTo?: string,
 ): Promise<PlacedOrder | null> {
   await connectDB();
   const doc = (await OrderModel.findOneAndUpdate(
-    { _id: id, status: expectedStatus },
+    {
+      _id: id,
+      status: expectedStatus,
+      ...(assignedTo ? { "deliveryPartner.userId": assignedTo } : {}),
+    },
     { $set: { ...fields, updatedAt: new Date().toISOString() } },
     { new: true },
   ).lean()) as unknown as Raw | null;

@@ -25,6 +25,10 @@ import type { StorefrontCacheSeedData } from "@/apps/website/components/storefro
  * that; seeding them with the visitor's subset would put the wrong list in
  * the cache. Staff keep the old fetch-after-load path.
  *
+ * ANY team session, whatever its role — decided from the token alone so a
+ * customer's page view never waits on a database read. A member who is not an
+ * editor of those lists gets the visitor's subset from the fetch anyway.
+ *
  * NULL on any failure too, which also means the old path: the page must
  * never fail because its prefetch did.
  */
@@ -33,7 +37,7 @@ export async function getStorefrontCacheSeed(
 ): Promise<StorefrontCacheSeedData | null> {
   try {
     const session = await getSession();
-    if (session && (session.role === "owner" || session.role === "admin")) return null;
+    if (session) return null;
 
     const [settings, catalog, coupons, zones, bannerItems, testimonials, faqs, account] =
       await Promise.all([

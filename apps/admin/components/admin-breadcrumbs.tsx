@@ -15,6 +15,9 @@ import { getAdminBreadcrumbs } from "@/lib/admin-breadcrumbs";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { useIsMobile } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
+import { routes } from "@/constants/routes";
+import { useAccess } from "@/features/team/lib/access-context";
+import { canOpenRoute } from "@/features/team/lib/route-access";
 
 function getVisibleCrumbs<T extends { label: string; href?: string }>(
   crumbs: T[],
@@ -34,7 +37,18 @@ export function AdminBreadcrumbs({ className }: AdminBreadcrumbsProps) {
   const labels = useBusinessLabels();
   // `labels` in the deps, or the trail keeps the wording from first paint and
   // never picks up the shop’s own after the settings fetch lands.
-  const crumbs = useMemo(() => getAdminBreadcrumbs(pathname, labels), [pathname, labels]);
+  // A crumb is a link only to a screen this member can open: the trail is
+  // "Dashboard › Settings › Payments" for everyone, and for a manager or the
+  // kitchen two of those are Access Denied pages. The root is dropped for a
+  // member without the dashboard; the rest stay as plain words.
+  const { access, can } = useAccess();
+  const crumbs = useMemo(() => {
+    const all = getAdminBreadcrumbs(pathname, labels);
+    if (!access) return all;
+    return all
+      .filter((crumb, index) => !(index === 0 && crumb.href === routes.admin.dashboard && !can("dashboard.view") && all.length > 1))
+      .map((crumb) => (crumb.href && !canOpenRoute(crumb.href, can) ? { ...crumb, href: undefined } : crumb));
+  }, [pathname, labels, access, can]);
   const visibleCrumbs = useMemo(
     () => getVisibleCrumbs(crumbs, isMobile),
     [crumbs, isMobile]

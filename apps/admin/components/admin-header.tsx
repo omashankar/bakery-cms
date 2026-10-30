@@ -9,6 +9,8 @@ import {
   getAdminProfile,
 } from "@/features/auth/lib/admin-profile";
 import { getDemoSession } from "@/features/auth/lib/session";
+import { useAccess } from "@/features/team/lib/access-context";
+import { canOpenRoute } from "@/features/team/lib/route-access";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -95,6 +97,7 @@ export function AdminHeader({
   const paletteWanted = useIdle(3000);
   const openPalette = useCallback(() => setCommandOpen(true), []);
   useCommandSearchShortcut(openPalette);
+  const { access, can } = useAccess();
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [initials, setInitials] = useState("AU");
   const [displayName, setDisplayName] = useState("Administrator");
@@ -116,6 +119,16 @@ export function AdminHeader({
      * subscribes to its store this way.
      */
     const sync = () => {
+      // A member who is not the owner is shown THEIR account, from the server.
+      // The stored profile is the owner's (one per shop, from before there
+      // was a team) and may be sitting in this browser from an earlier sign-in.
+      if (access && !access.isOwner) {
+        setDisplayName(access.name || access.email);
+        setEmail(access.email);
+        setPhotoUrl("");
+        setInitials(initialsFor(access.name, access.email));
+        return;
+      }
       const profile = getAdminProfile();
       setDisplayName(profile.fullName || "Administrator");
       setEmail(profile.email);
@@ -126,7 +139,7 @@ export function AdminHeader({
     sync();
     window.addEventListener(ADMIN_PROFILE_UPDATED_EVENT, sync);
     return () => window.removeEventListener(ADMIN_PROFILE_UPDATED_EVENT, sync);
-  }, []);
+  }, [access]);
 
   return (
     <>
@@ -189,7 +202,8 @@ export function AdminHeader({
           </Button>
 
           <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
-            <AdminNotificationBell />
+            {/* Its alerts are orders, stock and enquiries — only for a member who can open them. */}
+            {canOpenRoute(routes.admin.commerce.notifications, can) ? <AdminNotificationBell /> : null}
             <ThemeToggle className={adminShell.iconButton} />
 
             <DropdownMenu>
@@ -223,6 +237,9 @@ export function AdminHeader({
                     <p className="truncate text-sm font-semibold text-foreground">{displayName}</p>
                     {email ? (
                       <p className="truncate text-xs text-muted-foreground">{email}</p>
+                    ) : null}
+                    {access?.roleName ? (
+                      <p className="truncate text-[11px] font-medium text-primary">{access.roleName}</p>
                     ) : null}
                   </div>
                 </div>

@@ -42,6 +42,12 @@ export const storefrontNav: NavItem[] = [
 
 export interface AdminNavItem extends NavItem {
   icon: string;
+  /**
+   * Hidden from members who hold this permission, even though they could open
+   * the screen — "My deliveries" is a rider's list, and a manager who sees every
+   * order has no use for it in the menu.
+   */
+  hiddenWith?: import("@/features/team/lib/permissions").Permission;
 }
 
 export interface AdminNavSection {
@@ -64,6 +70,10 @@ export const adminNavSections: AdminNavSection[] = [
   {
     title: "Sales",
     items: [
+      // The two screens for the people who make and deliver the orders and do
+      // not see the order list itself. Shown by permission, like every item.
+      { label: "Kitchen", href: routes.admin.kitchen, icon: "ChefHat" },
+      { label: "My deliveries", href: routes.admin.deliveries, icon: "Truck", hiddenWith: "orders.view" },
       { label: "Orders", href: routes.admin.orders.list, icon: "ShoppingBag" },
       // Payments had no sidebar entry at all — gateway keys, transactions and
       // refunds were reachable only two levels inside Settings, or by knowing

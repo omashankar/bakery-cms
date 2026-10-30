@@ -125,12 +125,18 @@ export const routes = {
     success: "/auth/success",
     error: "/auth/error",
     sessionExpired: "/auth/session-expired",
+    /** Where an invitation link lands — the token rides in the URL fragment. */
+    invite: "/invite",
   },
 
   /** Admin CMS */
   admin: {
     root: "/admin",
     dashboard: "/admin/dashboard",
+    /** The kitchen queue — for kitchen staff, who do not see the order list. */
+    kitchen: "/admin/kitchen",
+    /** A rider's own deliveries. */
+    deliveries: "/admin/deliveries",
     profile: "/admin/profile",
     changePassword: "/admin/profile/password",
 

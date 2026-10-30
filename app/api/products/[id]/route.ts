@@ -7,7 +7,7 @@ import {
 } from "@/features/products/data/products-service";
 import { productFormSchema } from "@/features/products/server/product.validators";
 import { isDuplicateSlugError } from "@/features/products/server/product.repository";
-import { requireProductAdmin } from "@/features/products/server/guard";
+import { requireProductPermission } from "@/features/products/server/guard";
 import { validate, readJson } from "@/lib/server/http/validate";
 import { AppError } from "@/lib/server/http/errors";
 import { writeAuditLog, requestContext } from "@/lib/server/audit/audit-log";
@@ -34,7 +34,7 @@ export async function GET(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
     if (product.status !== "published") {
-      const auth = await requireProductAdmin();
+      const auth = await requireProductPermission("products.view");
       if (auth instanceof NextResponse) {
         return NextResponse.json({ error: "Product not found" }, { status: 404 });
       }
@@ -46,7 +46,7 @@ export async function GET(_request: Request, context: RouteContext) {
 }
 
 export async function PUT(request: Request, context: RouteContext) {
-  const auth = await requireProductAdmin();
+  const auth = await requireProductPermission("products.update");
   if (auth instanceof NextResponse) return auth;
 
   const { id } = await context.params;
@@ -95,7 +95,7 @@ export async function PUT(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
-  const auth = await requireProductAdmin();
+  const auth = await requireProductPermission("products.delete");
   if (auth instanceof NextResponse) return auth;
 
   const { id } = await context.params;

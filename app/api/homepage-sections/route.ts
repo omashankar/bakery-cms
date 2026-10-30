@@ -8,7 +8,7 @@ import {
 } from "@/features/cms-sections/data/homepage-sections.server";
 import { BuilderConflictError } from "@/features/cms-sections/lib/builder-conflict";
 import { parseSectionsPayload } from "@/features/cms-sections/lib/section-payload";
-import { requireAdminResponse } from "@/lib/server/auth/guard";
+import { requirePermissionResponse } from "@/lib/server/auth/guard";
 import type { HomepageSectionInstance } from "@/types/homepage-builder";
 
 /**
@@ -59,7 +59,7 @@ async function parseBody(request: Request): Promise<SectionsBody | null> {
 }
 
 export async function GET() {
-  const auth = await requireAdminResponse();
+  const auth = await requirePermissionResponse("homepage.manage");
   if (auth instanceof NextResponse) return auth;
 
   try {
@@ -71,7 +71,7 @@ export async function GET() {
 
 /** Save the draft. */
 export async function PUT(request: Request) {
-  const auth = await requireAdminResponse();
+  const auth = await requirePermissionResponse("homepage.manage");
   if (auth instanceof NextResponse) return auth;
 
   const body = await parseBody(request);
@@ -100,7 +100,7 @@ export async function PUT(request: Request) {
 
 /** Publish the given sections, or reset the homepage to registry defaults. */
 export async function POST(request: Request) {
-  const auth = await requireAdminResponse();
+  const auth = await requirePermissionResponse("homepage.manage");
   if (auth instanceof NextResponse) return auth;
 
   const body = await parseBody(request);

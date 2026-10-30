@@ -72,6 +72,32 @@ export async function replaceFiles(
   return filesStore.read();
 }
 
+/**
+ * Add files to the library without touching what is already in it.
+ *
+ * For someone who may upload but not curate (see MEDIA_CONTRIBUTORS): the
+ * stored files are kept exactly as stored and only ids the library does not
+ * have yet are appended. Nothing is ever destroyed on Cloudinary from here.
+ */
+export async function addFiles(files: MediaFile[], ctx: RequestCtx) {
+  const current = await filesStore.read();
+  const known = new Set(current.map((f) => f.id));
+  const added = files.filter((f) => !known.has(f.id));
+  if (added.length === 0) return current;
+
+  await filesStore.write([...current, ...added]);
+  await writeAuditLog({
+    action: "media.files.add",
+    actorId: ctx.actorId ?? null,
+    actorEmail: ctx.actorEmail,
+    target: { type: "media", id: "files" },
+    metadata: { added: added.length },
+    ip: ctx.ip,
+    userAgent: ctx.userAgent,
+  });
+  return filesStore.read();
+}
+
 export function getFolders() {
   return foldersStore.read();
 }

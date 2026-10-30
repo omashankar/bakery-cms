@@ -6,6 +6,8 @@ import { AlertTriangle, Bell, ChevronRight, MessageSquare, Package } from "lucid
 import { syncNotifications } from "@/apps/admin/commerce/lib/notifications-repository";
 import { adminShell } from "@/apps/admin/components/admin-shell";
 import { cn } from "@/lib/utils";
+import { useAccess } from "@/features/team/lib/access-context";
+import { canOpenRoute } from "@/features/team/lib/route-access";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { getDashboardAlerts, type DashboardAlert } from "../lib/dashboard-analytics";
 import { subscribeToAdminData } from "@/apps/admin/lib/admin-data-events";
@@ -24,8 +26,11 @@ const toneStyles = {
 };
 
 export function DashboardAlertsStrip() {
-  const [alerts, setAlerts] = useState<DashboardAlert[]>([]);
+  const [allAlerts, setAlerts] = useState<DashboardAlert[]>([]);
   const labels = useBusinessLabels();
+  // An alert is a link; only the ones that lead somewhere this member can go.
+  const { can } = useAccess();
+  const alerts = allAlerts.filter((alert) => canOpenRoute(alert.href, can));
 
   useEffect(() => {
     function refresh() {

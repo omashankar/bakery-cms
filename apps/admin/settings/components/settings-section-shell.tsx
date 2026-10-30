@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { RotateCcw, Save } from "lucide-react";
+import { Eye, RotateCcw, Save } from "lucide-react";
+import { useCanEditHere } from "@/features/team/lib/use-can-edit-here";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -87,6 +88,13 @@ export function SettingsSectionShell({
   isSaving = false,
 }: SettingsSectionShellProps) {
   const [resetOpen, setResetOpen] = useState(false);
+  /**
+   * A role that may OPEN this screen but not change it (View settings without
+   * Change settings) gets it read-only: the fields are disabled and there is
+   * no Save, Discard or Reset to press — rather than buttons the server would
+   * refuse after the work of filling the form in.
+   */
+  const canEdit = useCanEditHere();
 
   useEffect(() => {
     if (!isDirty) return;
@@ -111,51 +119,65 @@ export function SettingsSectionShell({
         status={status}
         className="gap-3"
         actions={
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
-            {extraActions}
-            {isDirty ? (
-              <Button variant="outline" className="hidden md:inline-flex" onClick={onDiscard}>
-                Discard
+          !canEdit ? (
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+              {extraActions}
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+                <Eye className="size-3.5" aria-hidden />
+                View only — your role can&apos;t change this page
+              </span>
+            </div>
+          ) : (
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
+              {extraActions}
+              {isDirty ? (
+                <Button variant="outline" className="hidden md:inline-flex" onClick={onDiscard}>
+                  Discard
+                </Button>
+              ) : null}
+              <Button
+                variant="bakery"
+                className="hidden md:inline-flex"
+                onClick={onSave}
+                disabled={!isDirty || saveDisabled || isSaving}
+                aria-busy={isSaving}
+              >
+                <Save className="size-4" />
+                {isSaving ? "Saving…" : saveLabel}
               </Button>
-            ) : null}
-            <Button
-              variant="bakery"
-              className="hidden md:inline-flex"
-              onClick={onSave}
-              disabled={!isDirty || saveDisabled || isSaving}
-              aria-busy={isSaving}
-            >
-              <Save className="size-4" />
-              {isSaving ? "Saving…" : saveLabel}
-            </Button>
-            {/*
-              LAST, and quiet.
+              {/*
+                LAST, and quiet.
 
-              It led the row and was the full-width control on a phone — so on a
-              screen nobody had touched yet, where Save and Discard are both
-              disabled or absent, the one prominent enabled button on the page
-              was the one that overwrites it.
-            */}
-            <Button
-              variant="ghost"
-              className="w-full justify-center text-muted-foreground hover:text-destructive sm:w-auto"
-              onClick={() => setResetOpen(true)}
-              disabled={resetDisabled}
-            >
-              <RotateCcw className="size-4" />
-              Reset this page
-            </Button>
-          </div>
+                It led the row and was the full-width control on a phone — so on a
+                screen nobody had touched yet, where Save and Discard are both
+                disabled or absent, the one prominent enabled button on the page
+                was the one that overwrites it.
+              */}
+              <Button
+                variant="ghost"
+                className="w-full justify-center text-muted-foreground hover:text-destructive sm:w-auto"
+                onClick={() => setResetOpen(true)}
+                disabled={resetDisabled}
+              >
+                <RotateCcw className="size-4" />
+                Reset this page
+              </Button>
+            </div>
+          )
         }
       />
 
       {!mounted ? (
         <div className="min-h-48 animate-pulse rounded-xl border border-border bg-muted" />
-      ) : (
+      ) : canEdit ? (
         children
+      ) : (
+        <fieldset disabled className="m-0 min-w-0 border-0 p-0">
+          {children}
+        </fieldset>
       )}
 
-      {isDirty ? (
+      {isDirty && canEdit ? (
         <AdminMobileActionBar className="md:hidden">
           <Button variant="outline" className="flex-1" onClick={onDiscard}>
             Discard

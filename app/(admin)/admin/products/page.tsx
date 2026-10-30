@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getServerLabels } from "@/features/settings/server/labels.server";
 import { ProductsListPage } from "@/apps/admin/products/components/products-list-page";
-import { whenAdmin } from "@/lib/server/auth/admin-initial";
+import { whenAllowed } from "@/lib/server/auth/access";
 import { getProducts } from "@/features/products/data/products-service";
 import { getCatalog } from "@/features/catalog/server/catalog.service";
 
@@ -20,10 +20,10 @@ export async function generateMetadata(): Promise<Metadata> {
  * phone). Same read as GET /api/products for staff.
  */
 export default async function Page() {
-  const initial = await whenAdmin(() => getProducts());
+  const initial = await whenAllowed("products.view", () => getProducts());
   // The names the rows print, from the same catalogue the browser's copy is
   // filled from — so the server's HTML and the first client render agree.
-  const categories = await whenAdmin(async () =>
+  const categories = await whenAllowed("products.view", async () =>
     ((await getCatalog()).categories as Array<{ id: string; name: string }>).map(({ id, name }) => ({ id, name })),
   );
   return <ProductsListPage initial={initial} initialCategories={categories} />;

@@ -65,7 +65,7 @@ export function LoginFormPage() {
        */
       markSessionRenewed();
       toast.success("Signed in", {
-        description: "Opening your dashboard…",
+        description: "Opening the admin…",
       });
       router.push(routes.admin.dashboard);
     } catch (error) {
@@ -78,7 +78,7 @@ export function LoginFormPage() {
   return (
     <AuthCard
       title="Welcome back"
-      description="Sign in with your staff account to open the dashboard."
+      description="Sign in with your own staff account."
       footer={
         <div className="flex flex-col items-center gap-3 text-center">
           <Link

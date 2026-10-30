@@ -21,6 +21,7 @@ import {
 } from "@/apps/admin/components/filter-panel";
 import { MobileDetailDrawer } from "@/components/shared/mobile-detail-drawer";
 import { RefundOrderDialog } from "@/apps/admin/commerce/components/refund-order-dialog";
+import { useCan } from "@/features/team/lib/access-context";
 import { RefundStatusBadge } from "@/apps/admin/commerce/components/refund-status-badge";
 import { RefundTimeline } from "@/apps/admin/commerce/components/refund-timeline";
 import {
@@ -80,6 +81,9 @@ function RefundCaseDetail({
   onIssueRefund: () => void;
   onDeclineRefund: () => void;
 }) {
+  // Paying money back, or refusing to, is `orders.refund`; payments.view alone
+  // may read the case.
+  const canRefund = useCan("orders.refund");
   // A request nothing has been paid against — the only case the shop can
   // still say no to. See `declineRefund` on the server.
   const declinable =
@@ -185,7 +189,7 @@ function RefundCaseDetail({
             </div>
           ) : null}
 
-          {order.status !== "refunded" ? (
+          {order.status !== "refunded" && canRefund ? (
             <Button variant="bakery" className="w-full" onClick={onIssueRefund}>
               Issue refund
             </Button>
@@ -196,7 +200,7 @@ function RefundCaseDetail({
             was already baked may not be. Issue refund can still pay a partial
             amount; this is for paying nothing.
           */}
-          {declinable ? (
+          {declinable && canRefund ? (
             <Button variant="outline" className="w-full" onClick={onDeclineRefund}>
               Decline refund
             </Button>

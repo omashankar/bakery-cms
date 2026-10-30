@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireAdminResponse } from "@/lib/server/auth/guard";
+import { requirePermissionResponse } from "@/lib/server/auth/guard";
 import {
   listUnclaimedPayments,
   unclaimedPaymentTotal,
@@ -15,7 +15,7 @@ import {
  * the list that can.
  */
 export async function GET() {
-  const auth = await requireAdminResponse();
+  const auth = await requirePermissionResponse("payments.view");
   if (auth instanceof NextResponse) return auth;
 
   const [items, summary] = await Promise.all([listUnclaimedPayments(), unclaimedPaymentTotal()]);

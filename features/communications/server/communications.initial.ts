@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getSession } from "@/lib/server/auth/dal";
+import type { Actor } from "@/lib/server/auth/access";
 import type { EmailTemplateRecord, WhatsAppTemplateRecord } from "@/types/communication";
 import type { NotificationSettings } from "@/types/notification";
 
@@ -13,20 +13,26 @@ import { getNotificationState } from "./notification-state.service";
  * admin's read/dismissed state. A screen that waits on that hydration gets all
  * four, or it would still wait on whichever was left out.
  *
- * Call inside `whenAdmin`, which has already checked the session.
+ * Call inside `whenStaff` or `whenAllowed`, which have already checked the session.
  */
-export async function readCommunicationsForAdmin() {
-  const session = await getSession();
-  if (!session) throw new Error("No admin session");
+/**
+ * The templates are shop configuration (settings.view); the notification
+ * settings and this member's own read/dismissed state are what the bell needs
+ * on every screen, so every member gets those.
+ */
+export async function readCommunicationsForAdmin(actor: Actor) {
+  const templates = actor.permissions.has("settings.view");
   const [email, whatsapp, settings, state] = await Promise.all([
-    getTemplates("email-templates"),
-    getTemplates("whatsapp-templates"),
+    templates ? getTemplates("email-templates") : Promise.resolve(null),
+    templates ? getTemplates("whatsapp-templates") : Promise.resolve(null),
     getNotificationSettings(),
-    getNotificationState(session.sub),
+    getNotificationState(actor.sub),
   ]);
   return {
-    email: email as EmailTemplateRecord[],
-    whatsapp: whatsapp as WhatsAppTemplateRecord[],
+    // Null, not [], for a member who may not read them: an empty list would be
+    // taken for the shop's real (empty) collection and settle the cache on it.
+    email: email as EmailTemplateRecord[] | null,
+    whatsapp: whatsapp as WhatsAppTemplateRecord[] | null,
     settings: settings as NotificationSettings,
     state: { read: state.read, dismissed: state.dismissed },
   };

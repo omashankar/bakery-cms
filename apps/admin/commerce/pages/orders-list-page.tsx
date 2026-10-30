@@ -30,6 +30,7 @@ import {
 } from "@/apps/admin/commerce/lib/order-utils";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { adminShell } from "@/apps/admin/components/admin-shell";
+import { useAccess } from "@/features/team/lib/access-context";
 import {
   bulkUpdateOrderStatus,
   type OrderStatus,
@@ -92,6 +93,7 @@ interface OrdersListPageProps {
 }
 
 export function OrdersListPage({ initial = null }: OrdersListPageProps = {}) {
+  const { can } = useAccess();
   const router = useRouter();
   const [orders, setOrders] = useState<PlacedOrder[]>(initial?.orders ?? []);
   const [filters, setFilters] = useState<OrderListFilters>(defaultOrderFilters);
@@ -604,32 +606,37 @@ export function OrdersListPage({ initial = null }: OrdersListPageProps = {}) {
               {selectedIds.length} selected
             </span>
             <div className="flex flex-wrap items-center gap-2">
-              <AdminSelect
-                className="w-full sm:w-44"
-                value={bulkStatus}
-                onChange={(event) => setBulkStatus(event.target.value as OrderStatus)}
-                aria-label="Bulk status"
-              >
-                {getActiveFulfillmentStatuses().map((status) => (
-                  <option key={status} value={status}>
-                    Mark {status.replace(/_/g, " ")}
-                  </option>
-                ))}
-              </AdminSelect>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleBulkStatusUpdate}
-                disabled={applying || lockedSelection.length > 0}
-              >
-                {applying ? "Applying..." : "Apply"}
-              </Button>
-              {lockedSelection.length > 0 ? (
-                <span className="text-xs text-destructive">
-                  {lockedSelection.length} cancelled or refunded order
-                  {lockedSelection.length === 1 ? " is" : "s are"} selected — their status
-                  cannot be changed.
-                </span>
+              {/* Moving orders is its own permission; selecting them for export is not. */}
+              {can("orders.update_status") ? (
+                <>
+                  <AdminSelect
+                    className="w-full sm:w-44"
+                    value={bulkStatus}
+                    onChange={(event) => setBulkStatus(event.target.value as OrderStatus)}
+                    aria-label="Bulk status"
+                  >
+                    {getActiveFulfillmentStatuses().map((status) => (
+                      <option key={status} value={status}>
+                        Mark {status.replace(/_/g, " ")}
+                      </option>
+                    ))}
+                  </AdminSelect>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleBulkStatusUpdate}
+                    disabled={applying || lockedSelection.length > 0}
+                  >
+                    {applying ? "Applying..." : "Apply"}
+                  </Button>
+                  {lockedSelection.length > 0 ? (
+                    <span className="text-xs text-destructive">
+                      {lockedSelection.length} cancelled or refunded order
+                      {lockedSelection.length === 1 ? " is" : "s are"} selected — their status
+                      cannot be changed.
+                    </span>
+                  ) : null}
+                </>
               ) : null}
               <Button size="sm" variant="outline" onClick={handleExport}>
                 Export

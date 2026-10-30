@@ -6,7 +6,7 @@ import {
   getPages,
   updatePage,
 } from "@/features/content/data/pages.server";
-import { requireAdminResponse } from "@/lib/server/auth/guard";
+import { requirePermissionResponse } from "@/lib/server/auth/guard";
 import type { CmsPageFormData } from "@/types/content";
 
 /** Next 16 delivers dynamic route params as a Promise — await before use. */
@@ -16,7 +16,7 @@ interface RouteContext {
 
 /** Owner/admin only on every verb — see the collection route for why the read too. */
 export async function GET(_request: Request, context: RouteContext) {
-  const auth = await requireAdminResponse();
+  const auth = await requirePermissionResponse("pages.view");
   if (auth instanceof NextResponse) return auth;
 
   const { id } = await context.params;
@@ -30,7 +30,7 @@ export async function GET(_request: Request, context: RouteContext) {
 }
 
 export async function PUT(request: Request, context: RouteContext) {
-  const auth = await requireAdminResponse();
+  const auth = await requirePermissionResponse("pages.manage");
   if (auth instanceof NextResponse) return auth;
 
   const { id } = await context.params;
@@ -67,7 +67,7 @@ export async function PUT(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
-  const auth = await requireAdminResponse();
+  const auth = await requirePermissionResponse("pages.manage");
   if (auth instanceof NextResponse) return auth;
 
   const { id } = await context.params;

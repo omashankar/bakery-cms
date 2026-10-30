@@ -1,9 +1,25 @@
 import { withoutStaffOnlyFields } from "@/features/orders/server/customer-view";
 import { ok, created } from "@/lib/server/http/response";
-import { withErrorHandler, AppError, NotFoundError } from "@/lib/server/http/errors";
+import { withErrorHandler, AppError, ForbiddenError, NotFoundError } from "@/lib/server/http/errors";
 import { getMaintenanceState } from "@/features/settings/server/maintenance.server";
 import { validate, readJson } from "@/lib/server/http/validate";
-import { getSession, requireRole, requireSession } from "@/lib/server/auth/dal";
+import {
+  can,
+  getActor,
+  requireActor,
+  requireAnyPermission,
+  requirePermission,
+} from "@/lib/server/auth/access";
+import {
+  DELIVERED_VISIBLE_FOR_MS,
+  DELIVERY_ACTIVE_STATUSES,
+  KITCHEN_QUEUE_STATUSES,
+  kitchenMoves,
+  scopedMoveAllowed,
+  statusScopeFor,
+} from "@/features/orders/lib/staff-scope";
+import { deliveryMemberById } from "@/features/team/server/team.service";
+import { toDeliveryView, toKitchenView } from "./staff-views";
 import { requestContext } from "@/lib/server/audit/audit-log";
 import { rateLimit } from "@/lib/server/http/rate-limit";
 
@@ -29,6 +45,7 @@ import {
   transactionsQuerySchema,
 } from "./order.validators";
 import {
+  analyticsForViewer,
   getCommerceOverviews,
   getInvoicesPage,
   getOrderAnalytics,
@@ -36,7 +53,6 @@ import {
   getTransactionsPage,
 } from "./order.analytics";
 
-const ORDER_ROLES = ["owner", "admin"] as const;
 type IdContext = { params: Promise<{ id: string }> };
 type NumberContext = { params: Promise<{ orderNumber: string }> };
 
@@ -177,8 +193,7 @@ export const getByNumberController = withErrorHandler(async (request: Request, c
   const lookup = { email: params.get("email") ?? undefined, phone: params.get("phone") ?? undefined };
   if (verifyOrderLookup(order, lookup)) return ok(withoutStaffOnlyFields(order), "Order");
 
-  const session = await getSession();
-  if (session && ORDER_ROLES.includes(session.role as (typeof ORDER_ROLES)[number])) {
+  if (can(await getActor(), "orders.view")) {
     return ok(order, "Order");
   }
 
@@ -215,10 +230,7 @@ export const emailInvoiceController = withErrorHandler(
 
     let allowed = verifyOrderLookup(order, lookup);
     if (!allowed) {
-      const session = await getSession();
-      allowed = Boolean(
-        session && ORDER_ROLES.includes(session.role as (typeof ORDER_ROLES)[number]),
-      );
+      allowed = can(await getActor(), "orders.view");
     }
     // Same 404 as an unknown number, for the same reason as the lookup.
     if (!allowed) throw new NotFoundError("Order not found");
@@ -240,12 +252,12 @@ export const emailInvoiceController = withErrorHandler(
  * caller may read their OWN orders; reading anyone else's is an admin action.
  */
 export const customerOrdersController = withErrorHandler(async (request: Request) => {
-  const session = await requireSession();
+  const session = await requireActor();
   const email = new URL(request.url).searchParams.get("email");
   if (!email) return ok([], "No email provided");
 
   const isSelf = email.trim().toLowerCase() === session.email.trim().toLowerCase();
-  if (!isSelf) await requireRole(...ORDER_ROLES);
+  if (!isSelf) await requirePermission("orders.view");
 
   return ok(await service.getByCustomer(email), "Customer orders");
 });
@@ -261,7 +273,7 @@ export const customerOrdersController = withErrorHandler(async (request: Request
  * the client-side cache hydration (`useOrdersServerSync`) still asks for.
  */
 export const listOrdersController = withErrorHandler(async (request: Request) => {
-  await requireRole(...ORDER_ROLES);
+  await requirePermission("orders.view");
   const params = Object.fromEntries(new URL(request.url).searchParams);
   const query = validate(orderQuerySchema, params);
   const { items, total } = await service.getOrdersPage(query);
@@ -277,7 +289,7 @@ export const listOrdersController = withErrorHandler(async (request: Request) =>
 });
 
 export const orderStatsController = withErrorHandler(async () => {
-  await requireRole(...ORDER_ROLES);
+  await requirePermission("orders.view");
   return ok(await service.getStats(), "Order stats");
 });
 
@@ -289,42 +301,96 @@ export const orderStatsController = withErrorHandler(async () => {
  * outgrew the cache.
  */
 export const orderAnalyticsController = withErrorHandler(async (request: Request) => {
-  await requireRole(...ORDER_ROLES);
+  const session = await requirePermission("reports.revenue.view");
   const params = Object.fromEntries(new URL(request.url).searchParams);
   const { range, timeZone } = validate(orderAnalyticsQuerySchema, params);
-  return ok(await getOrderAnalytics(range, timeZone), "Order analytics");
+  return ok(
+    analyticsForViewer(await getOrderAnalytics(range, timeZone), session.permissions),
+    "Order analytics",
+  );
 });
 
 /** Refund, invoice and payment overview counters, over every order. */
 export const commerceOverviewsController = withErrorHandler(async (request: Request) => {
-  await requireRole(...ORDER_ROLES);
+  await requirePermission("payments.view");
   const params = Object.fromEntries(new URL(request.url).searchParams);
   const { timeZone } = validate(orderAnalyticsQuerySchema, params);
   return ok(await getCommerceOverviews(timeZone), "Commerce overviews");
 });
 
 export const getOrderController = withErrorHandler(async (_req: Request, ctx: IdContext) => {
-  await requireRole(...ORDER_ROLES);
+  await requirePermission("orders.view");
   const { id } = await ctx.params;
   const order = await service.getById(id);
   if (!order) throw new NotFoundError("Order not found");
   return ok(order, "Order");
 });
 
+/**
+ * A status move — by anyone with `orders.update_status`, within what they can
+ * see.
+ *
+ * With `orders.view` the order rules are the whole answer, as they always were.
+ * The kitchen and riders are held to their own steps (see staff-scope.ts) and
+ * are answered with THEIR view of the order, never the full document: the
+ * response is a read too, and the full order carries prices, payment and the
+ * customer's email.
+ */
 export const updateStatusController = withErrorHandler(async (request: Request, ctx: IdContext) => {
-  const session = await requireRole(...ORDER_ROLES);
+  const session = await requirePermission("orders.update_status");
   const { id } = await ctx.params;
   const { status } = validate(statusSchema, await readJson(request));
-  const order = await service.updateStatus(id, status, {
+  const audit = {
     ...requestContext(request),
     actorId: session.sub,
     actorEmail: session.email,
+  };
+
+  const scope = statusScopeFor(session.permissions, session.sub);
+  if (scope.all) {
+    return ok(await service.updateStatus(id, status, audit), "Order status updated");
+  }
+
+  const current = await service.getById(id);
+  // Not found and not yours read the same: a rider must not be able to probe
+  // which order ids exist.
+  if (!current) throw new NotFoundError("Order not found");
+  if (!scopedMoveAllowed(scope, current, status)) {
+    if (!scope.kitchen && current.deliveryPartner?.userId !== session.sub) {
+      throw new NotFoundError("Order not found");
+    }
+    throw new ForbiddenError("You can't move this order to that step.");
+  }
+
+  // A rider's move only lands while the order is still theirs; a kitchen move
+  // is not tied to an assignment. Judged by which step ALLOWED this move.
+  const viaKitchen = scope.kitchen && kitchenMoves(current).includes(status);
+  const updated = await service.updateStatus(id, status, audit, {
+    assignedTo: viaKitchen ? undefined : session.sub,
   });
-  return ok(order, "Order status updated");
+  const view = scope.deliveriesOf && updated.deliveryPartner?.userId === session.sub
+    ? toDeliveryView(updated)
+    : toKitchenView(updated);
+  return ok(view, "Order status updated");
+});
+
+/** The kitchen queue — `orders.view_kitchen`, and only the kitchen's view of each order. */
+export const kitchenQueueController = withErrorHandler(async () => {
+  await requirePermission("orders.view_kitchen");
+  const orders = await service.getKitchenQueue(KITCHEN_QUEUE_STATUSES);
+  return ok(orders.map(toKitchenView), "Kitchen queue");
+});
+
+/** The signed-in rider's own deliveries — `orders.view_assigned`. */
+export const myDeliveriesController = withErrorHandler(async () => {
+  const session = await requirePermission("orders.view_assigned");
+  const since = new Date(Date.now() - DELIVERED_VISIBLE_FOR_MS).toISOString();
+  const orders = await service.getAssignedDeliveries(session.sub, DELIVERY_ACTIVE_STATUSES, since);
+  return ok(orders.map(toDeliveryView), "My deliveries");
 });
 
 export const cancelOrderController = withErrorHandler(async (request: Request, ctx: IdContext) => {
-  const session = await requireRole(...ORDER_ROLES);
+  const session = await requirePermission("orders.cancel");
   const { id } = await ctx.params;
   const { cancellationReason } = validate(cancelSchema, await readJson(request));
   const order = await service.cancel(id, cancellationReason, {
@@ -336,7 +402,7 @@ export const cancelOrderController = withErrorHandler(async (request: Request, c
 });
 
 export const refundOrderController = withErrorHandler(async (request: Request, ctx: IdContext) => {
-  const session = await requireRole(...ORDER_ROLES);
+  const session = await requirePermission("orders.refund");
   const { id } = await ctx.params;
   const input = validate(refundSchema, await readJson(request));
   const order = await service.refund(id, input, {
@@ -348,7 +414,7 @@ export const refundOrderController = withErrorHandler(async (request: Request, c
 });
 
 export const paymentStatusController = withErrorHandler(async (request: Request, ctx: IdContext) => {
-  const session = await requireRole(...ORDER_ROLES);
+  const session = await requirePermission("payments.manage");
   const { id } = await ctx.params;
   const { paymentStatus, paymentReference } = validate(paymentSchema, await readJson(request));
   const order = await service.updatePayment(id, paymentStatus, paymentReference, {
@@ -360,7 +426,7 @@ export const paymentStatusController = withErrorHandler(async (request: Request,
 });
 
 export const adminNotesController = withErrorHandler(async (request: Request, ctx: IdContext) => {
-  const session = await requireRole(...ORDER_ROLES);
+  const session = await requirePermission("orders.manage");
   const { id } = await ctx.params;
   const { adminNotes } = validate(notesSchema, await readJson(request));
   const order = await service.updateAdminNotes(id, adminNotes, {
@@ -372,9 +438,24 @@ export const adminNotesController = withErrorHandler(async (request: Request, ct
 });
 
 export const deliveryPartnerController = withErrorHandler(async (request: Request, ctx: IdContext) => {
-  const session = await requireRole(...ORDER_ROLES);
+  const session = await requirePermission("orders.assign_delivery");
   const { id } = await ctx.params;
   const input = validate(deliveryPartnerSchema, await readJson(request));
+
+  // A team member, if one is named, must be a real, ACTIVE member whose role
+  // lets them see their own deliveries — otherwise the order lands on a list
+  // nobody can open, or on someone who was just blocked. Their name comes from
+  // their account, not the request.
+  if (input.userId) {
+    const member = await deliveryMemberById(input.userId);
+    if (!member) {
+      throw new AppError("That team member can't take deliveries.", 422, [
+        { field: "userId", message: "Choose an active member whose role includes own deliveries." },
+      ]);
+    }
+    input.name = member.name;
+  }
+
   const order = await service.updateDeliveryPartner(id, input, {
     ...requestContext(request),
     actorId: session.sub,
@@ -384,7 +465,7 @@ export const deliveryPartnerController = withErrorHandler(async (request: Reques
 });
 
 export const refundNotesController = withErrorHandler(async (request: Request, ctx: IdContext) => {
-  const session = await requireRole(...ORDER_ROLES);
+  const session = await requirePermission("orders.manage");
   const { id } = await ctx.params;
   const { notes } = validate(refundNotesSchema, await readJson(request));
   const order = await service.updateRefundNotes(id, notes, {
@@ -396,7 +477,7 @@ export const refundNotesController = withErrorHandler(async (request: Request, c
 });
 
 export const requestRefundController = withErrorHandler(async (request: Request, ctx: IdContext) => {
-  const session = await requireRole(...ORDER_ROLES);
+  const session = await requirePermission("orders.manage");
   const { id } = await ctx.params;
   const input = validate(refundRequestSchema, await readJson(request));
   const order = await service.requestRefund(id, input, {
@@ -408,7 +489,7 @@ export const requestRefundController = withErrorHandler(async (request: Request,
 });
 
 export const declineRefundController = withErrorHandler(async (request: Request, ctx: IdContext) => {
-  const session = await requireRole(...ORDER_ROLES);
+  const session = await requirePermission("orders.refund");
   const { id } = await ctx.params;
   const { reason } = validate(declineRefundSchema, await readJson(request));
   const order = await service.declineRefund(id, reason, {
@@ -425,7 +506,7 @@ export const declineRefundController = withErrorHandler(async (request: Request,
  * the rows under it.
  */
 export const refundCasesController = withErrorHandler(async (request: Request) => {
-  await requireRole(...ORDER_ROLES);
+  await requireAnyPermission("payments.view", "orders.refund");
   const params = Object.fromEntries(new URL(request.url).searchParams);
   const { page, limit, ...filters } = validate(refundCasesQuerySchema, params);
   const result = await getRefundCasesPage(filters, page, limit);
@@ -440,7 +521,7 @@ export const refundCasesController = withErrorHandler(async (request: Request) =
 });
 
 export const invoicesController = withErrorHandler(async (request: Request) => {
-  await requireRole(...ORDER_ROLES);
+  await requirePermission("payments.view");
   const params = Object.fromEntries(new URL(request.url).searchParams);
   const { page, limit, ...filters } = validate(invoicesQuerySchema, params);
   const result = await getInvoicesPage(filters, page, limit);
@@ -455,7 +536,7 @@ export const invoicesController = withErrorHandler(async (request: Request) => {
 });
 
 export const transactionsListController = withErrorHandler(async (request: Request) => {
-  await requireRole(...ORDER_ROLES);
+  await requirePermission("payments.view");
   const params = Object.fromEntries(new URL(request.url).searchParams);
   const { page, limit, ...filters } = validate(transactionsQuerySchema, params);
   const result = await getTransactionsPage(filters, page, limit);

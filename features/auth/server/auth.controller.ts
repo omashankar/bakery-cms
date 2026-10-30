@@ -7,6 +7,7 @@ import {
   loginAttemptLimit,
 } from "@/features/settings/server/security-policy.server";
 import { requireSession, getCurrentUser } from "@/lib/server/auth/dal";
+import { requireActor, toAccessSnapshot } from "@/lib/server/auth/access";
 import { getRefreshCookie } from "@/lib/server/auth/cookies";
 import { recognisedDevice, rememberDevice } from "@/lib/server/auth/device-cookie";
 import { requestContext } from "@/lib/server/audit/audit-log";
@@ -80,9 +81,11 @@ export const refreshController = withErrorHandler(async (request: Request) => {
 });
 
 export const meController = withErrorHandler(async () => {
-  await requireSession();
+  // The account as it stands NOW — a blocked or removed member is a 401 here,
+  // whatever their token says — with what their role currently allows.
+  const actor = await requireActor();
   const user = await getCurrentUser();
-  return ok(user, "Current user");
+  return ok(user ? { ...user, access: toAccessSnapshot(actor) } : null, "Current user");
 });
 
 export const forgotPasswordController = withErrorHandler(async (request: Request) => {

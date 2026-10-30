@@ -44,6 +44,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { routes } from "@/constants/routes";
+import { useAccess } from "@/features/team/lib/access-context";
+import { canOpenRoute } from "@/features/team/lib/route-access";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { cn } from "@/lib/utils";
 import {
@@ -286,11 +288,10 @@ const groups: SettingsGroup[] = [
         icon: Activity,
       },
       {
-        title: "Permissions",
-        description: "Team access control — available in a future release.",
+        title: "Team & permissions",
+        description: "Invite your staff, give each a role, and decide what every role can do.",
         href: routes.admin.settings.permissions,
         icon: UserCog,
-        future: true,
       },
     ],
   },
@@ -326,6 +327,11 @@ export function SettingsOverviewPage() {
   //  - `hydrated`: has the SERVER's copy arrived? Only the two CLAIMS wait on
   //    this — the shop's name, and whether maintenance mode is on.
   const [mounted, setMounted] = useState(false);
+  // Only the screens this member can open; a group left empty is not drawn.
+  const { can } = useAccess();
+  const visibleGroups = groups
+    .map((group) => ({ ...group, items: group.items.filter((item) => canOpenRoute(item.href, can)) }))
+    .filter((group) => group.items.length > 0);
   const [hydrated, setHydrated] = useState(settingsHydration.hasSettled());
   const [siteName, setSiteName] = useState("");
   const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
@@ -411,7 +417,7 @@ export function SettingsOverviewPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {groups.map((group) => (
+          {visibleGroups.map((group) => (
             <Card key={group.title} className="shadow-sm">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">{group.title}</CardTitle>

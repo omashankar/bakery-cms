@@ -1137,6 +1137,22 @@ export function getByCustomer(email: string) {
   return repo.findByCustomerEmail(email);
 }
 
+/** The orders the kitchen is working on. Callers must project them — see staff-views.ts. */
+export async function getKitchenQueue(statuses: readonly OrderStatus[]) {
+  const orders = await repo.listKitchenQueue(statuses);
+  return Promise.all(orders.map((order) => withItemImages(order)));
+}
+
+/** One rider's deliveries. Callers must project them — see staff-views.ts. */
+export async function getAssignedDeliveries(
+  userId: string,
+  activeStatuses: readonly OrderStatus[],
+  deliveredSince: string,
+) {
+  const orders = await repo.listAssignedDeliveries(userId, activeStatuses, deliveredSince);
+  return Promise.all(orders.map((order) => withItemImages(order)));
+}
+
 // ---- Lifecycle mutations --------------------------------------------------
 
 async function requireOrder(id: string): Promise<PlacedOrder> {
@@ -1145,7 +1161,13 @@ async function requireOrder(id: string): Promise<PlacedOrder> {
   return order;
 }
 
-export async function updateStatus(id: string, status: OrderStatus, ctx: RequestCtx) {
+export async function updateStatus(
+  id: string,
+  status: OrderStatus,
+  ctx: RequestCtx,
+  /** Only while the order is still assigned to this member — see `patchIfStatus`. */
+  options: { assignedTo?: string } = {},
+) {
   const order = await requireOrder(id);
   if (order.status === status) return order;
 
@@ -1181,7 +1203,7 @@ export async function updateStatus(id: string, status: OrderStatus, ctx: Request
     status,
     statusHistory: [...order.statusHistory, { status, at: now }],
     ...(startsKitchen ? { preparationStartedAt: now } : {}),
-  });
+  }, options.assignedTo);
   if (!updated) {
     throw new AppError("This order was changed by someone else just now. Reload it and try again.", 409);
   }
@@ -1491,17 +1513,27 @@ export async function updateAdminNotes(id: string, adminNotes: string, ctx: Requ
  */
 export async function updateDeliveryPartner(
   id: string,
-  input: { name: string; phone?: string; vehicle?: string },
+  /** `userId` must already have been checked against the team by the caller. */
+  input: { name: string; phone?: string; vehicle?: string; userId?: string },
   ctx: RequestCtx,
 ) {
-  await requireOrder(id);
+  const before = await requireOrder(id);
   const name = input.name.trim();
   const partner = name
-    ? { name, phone: input.phone?.trim() || undefined, vehicle: input.vehicle?.trim() || undefined }
+    ? {
+        name,
+        phone: input.phone?.trim() || undefined,
+        vehicle: input.vehicle?.trim() || undefined,
+        userId: input.userId || undefined,
+      }
     : undefined;
 
   const updated = await repo.patch(id, { deliveryPartner: partner });
-  await audit(ctx, "order.delivery_partner", id, { assigned: Boolean(partner) });
+  await audit(ctx, "order.delivery_partner", id, {
+    assigned: Boolean(partner),
+    ...(partner?.userId ? { userId: partner.userId } : {}),
+    ...(before.deliveryPartner?.userId ? { previousUserId: before.deliveryPartner.userId } : {}),
+  });
   return updated;
 }
 
