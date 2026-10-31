@@ -58,6 +58,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   maintenance: "Maintenance Mode",
   backup: "Backup & Restore",
   activity: "Activity Log",
+  errors: "Error log",
   permissions: "Team & permissions",
   commerce: "Commerce",
   orders: "Orders",

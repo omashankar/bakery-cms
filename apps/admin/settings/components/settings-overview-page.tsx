@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {
   Activity,
+  Bug,
   AlertTriangle,
   BarChart3,
   Blocks,
@@ -286,6 +287,12 @@ const groups: SettingsGroup[] = [
         description: "Recent admin actions across the CMS.",
         href: routes.admin.settings.activity,
         icon: Activity,
+      },
+      {
+        title: "Error log",
+        description: "Problems the site ran into — on the server or in a customer's browser.",
+        href: routes.admin.settings.errors,
+        icon: Bug,
       },
       {
         title: "Team & permissions",

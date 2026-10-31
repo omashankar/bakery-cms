@@ -91,6 +91,7 @@ const RULES: readonly RouteRule[] = [
   { match: ADMIN.settings.permissions, anyOf: ["team.view", "roles.view"] },
   { match: ADMIN.settings.security, anyOf: ["security.view"], write: "security.manage" },
   { match: ADMIN.settings.activity, anyOf: ["security.view"] },
+  { match: ADMIN.settings.errors, anyOf: ["security.view"] },
   // The Settings hub lists only the cards a member may open.
   { match: ADMIN.settings.overview, anyOf: ["settings.view", "security.view", "team.view", "roles.view"] },
   { match: `${ADMIN.settings.overview}/`, anyOf: ["settings.view"], write: "settings.manage" },

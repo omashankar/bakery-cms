@@ -191,6 +191,7 @@ export const routes = {
       maintenance: "/admin/settings/maintenance",
       backup: "/admin/settings/backup",
       activity: "/admin/settings/activity",
+      errors: "/admin/settings/errors",
       // The page is "Order Settings"; it was /settings/commerce (redirects).
       commerce: "/admin/settings/orders",
       permissions: "/admin/settings/permissions",
