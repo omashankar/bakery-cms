@@ -53,6 +53,9 @@ import {
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
+import { writeCartCookie } from "@/features/cart/lib/cart-cookie";
+import type { CommerceSettings } from "@/types/settings";
+import type { DeliveryZone } from "@/types/delivery";
 import {
   addToCart,
   cartLineToAddInput,
@@ -88,16 +91,26 @@ import type { LandingProduct } from "@/constants/landing-data";
 interface CartPageProps {
   /** The shop's published catalogue, read on the server — see `getRecentlyViewedProducts`. */
   catalog?: LandingProduct[];
+  /**
+   * The lines from the cart cookie, read on the server (cart-cookie.ts), so the
+   * page is drawn with them rather than a skeleton. localStorage stays the truth
+   * and replaces them on mount.
+   */
+  initialItems?: CartLineItem[];
+  /** The shop's delivery rules, read on the server, so the first totals are right. */
+  initialCommerce?: CommerceSettings;
+  /** The delivery zones, read on the server, so the PIN box is drawn with the page. */
+  initialZones?: DeliveryZone[];
 }
 
-export function CartPage({ catalog = [] }: CartPageProps) {
-  const [items, setItems] = useState<CartLineItem[]>([]);
+export function CartPage({ catalog = [], initialItems, initialCommerce, initialZones }: CartPageProps) {
+  const [items, setItems] = useState<CartLineItem[]>(() => initialItems ?? []);
   const [savedItems, setSavedItems] = useState<CartLineItem[]>([]);
   const [preferences, setPreferences] = useState<CartPreferences>({
     giftWrap: false,
     specialInstructions: "",
   });
-  const [commerce, setCommerce] = useState(defaultCommerceSettings);
+  const [commerce, setCommerce] = useState(() => initialCommerce ?? defaultCommerceSettings);
   const [loaded, setLoaded] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
   /**
@@ -133,6 +146,9 @@ export function CartPage({ catalog = [] }: CartPageProps) {
   useEffect(() => {
     refresh();
     setLoaded(true);
+    // A cart from before the cookie existed gets one now, so its next visit
+    // is drawn on the server too.
+    writeCartCookie(getCartItems());
 
     // subscribeToCart also listens for the browser storage event, so a cart
     // edited in another tab is reflected here too.
@@ -424,10 +440,11 @@ export function CartPage({ catalog = [] }: CartPageProps) {
       {/* `pb-24` on a phone: the sticky checkout bar sits over the last of it. */}
       <section className={cn(layoutSpacing.sectionY, "pb-28 lg:pb-16")}>
         <div className={layoutSpacing.container}>
-          {!loaded ? (
-            // The cart lives in this browser, so the server has nothing to
-            // render. Mirror the real layout rather than showing one grey slab,
-            // so the page does not visibly jump when the data arrives.
+          {!loaded && items.length === 0 ? (
+            // No cart cookie (a first visit, or a cart too big for one): the
+            // server has nothing to render. Mirror the real layout rather than
+            // showing one grey slab, so the page does not visibly jump when the
+            // data arrives. With the cookie, the lines are drawn straight away.
             <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_320px]" aria-hidden>
               <div className="space-y-4">
                 {[0, 1].map((row) => (
@@ -504,6 +521,7 @@ export function CartPage({ catalog = [] }: CartPageProps) {
                 */}
                 <PincodeCheck
                   inline
+                  initialZones={initialZones}
                   title="Check delivery to your area"
                   className="rounded-xl border border-border bg-card px-4 py-3"
                 />

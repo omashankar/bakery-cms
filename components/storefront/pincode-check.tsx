@@ -50,6 +50,7 @@ export function PincodeCheck({
   className,
   title,
   inline = false,
+  initialZones,
 }: {
   className?: string;
   /**
@@ -64,8 +65,14 @@ export function PincodeCheck({
    * than a heading over a full-width box.
    */
   inline?: boolean;
+  /**
+   * The shop's zones, read on the server — so the box is in the page's HTML
+   * instead of appearing after hydration and pushing everything under it down
+   * (146px on the cart, CLS 0.11). The effect below still reads the live list.
+   */
+  initialZones?: DeliveryZone[];
 }) {
-  const [zones, setZones] = useState<DeliveryZone[] | null>(null);
+  const [zones, setZones] = useState<DeliveryZone[] | null>(() => initialZones ?? null);
   const [entered, setEntered] = useState("");
   // Bumped on every edit, so a check answered after the box changed is dropped.
   const checkSeq = useRef(0);

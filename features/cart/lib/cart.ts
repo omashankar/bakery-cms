@@ -1,4 +1,5 @@
 import { safeSetItem } from "@/lib/safe-storage";
+import { writeCartCookie } from "./cart-cookie";
 import { weightAxisLabel } from "@/features/products/lib/product-pricing";
 import {
   addSavedForLaterItem,
@@ -238,6 +239,8 @@ function readCart(): CartLineItem[] {
 
 function writeCart(items: CartLineItem[]): void {
   if (typeof window === "undefined") return;
+  // The copy the server reads to draw the cart page at once (cart-cookie.ts).
+  writeCartCookie(items);
   try {
     safeSetItem(CART_STORAGE_KEY, JSON.stringify(items));
   } catch {
