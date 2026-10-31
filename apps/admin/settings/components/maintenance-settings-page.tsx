@@ -160,10 +160,10 @@ export function MaintenanceSettingsPage({
             <CardTitle className="text-base">Storefront status</CardTitle>
             <CardDescription>Close the public website while you make updates.</CardDescription>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             {/* What the switch DOES, not a state: "Closed" beside an off switch read
                 as a contradiction of "Store open" just above it. */}
-            <Label htmlFor="maintenance-enabled" className="text-sm">
+            <Label htmlFor="maintenance-enabled" className="whitespace-nowrap text-sm">
               Close the store
             </Label>
             <Switch

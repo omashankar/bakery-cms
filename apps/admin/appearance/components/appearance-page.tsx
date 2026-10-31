@@ -242,7 +242,7 @@ export function AppearancePage({
       resetDescription="Restore the default preset and radius. Custom colors will be lost."
     >
       <SettingsHydrationNotice hydration={hydration} />
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] xl:items-start">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] xl:items-start">
         <div className="space-y-4">
           <Card className="shadow-sm">
             <CardHeader>

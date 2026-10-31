@@ -348,7 +348,7 @@ export function InquiriesListPage({
         </FilterPanelToolbar>
       </FilterPanel>
 
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(260px,20rem)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(260px,20rem)]">
         <div className="min-w-0 space-y-4">
           {figures === "loading" ? (
             // "No inquiries found" before the SERVER has answered is a claim
@@ -391,7 +391,7 @@ export function InquiriesListPage({
                   </div>
                 ) : null}
 
-                <div className="hidden overflow-x-auto md:block">
+                <div className="relative hidden overflow-x-auto md:block">
                   <table className="w-full min-w-[600px] text-sm">
                     <thead>
                       <tr className="border-b border-border text-left text-xs text-muted-foreground">

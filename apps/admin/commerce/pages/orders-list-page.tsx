@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
-import { isTerminalOrderStatus } from "@/features/orders/lib/order-status-meta";
+import { ORDER_STATUS_LABELS, isTerminalOrderStatus } from "@/features/orders/lib/order-status-meta";
 import {
   FilterPanel,
   FilterPanelSearch,
@@ -521,7 +521,7 @@ export function OrdersListPage({ initial = null }: OrdersListPageProps = {}) {
         />
       </section>
 
-      <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+      <div className="relative -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         <div className="flex w-max min-w-full gap-1.5 pb-0.5">
           {statusTabs.map((tab) => {
             const active = filters.status === tab.value;
@@ -617,7 +617,7 @@ export function OrdersListPage({ initial = null }: OrdersListPageProps = {}) {
                   >
                     {getActiveFulfillmentStatuses().map((status) => (
                       <option key={status} value={status}>
-                        Mark {status.replace(/_/g, " ")}
+                        Mark {(ORDER_STATUS_LABELS[status] ?? status.replace(/_/g, " ")).toLowerCase()}
                       </option>
                     ))}
                   </AdminSelect>
@@ -668,7 +668,7 @@ export function OrdersListPage({ initial = null }: OrdersListPageProps = {}) {
           />
         ) : (
           <>
-            <div className="hidden overflow-x-auto lg:block">
+            <div className="relative hidden overflow-x-auto xl:block">
               <table className="w-full min-w-[880px] text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs text-muted-foreground">
@@ -752,7 +752,7 @@ export function OrdersListPage({ initial = null }: OrdersListPageProps = {}) {
               </table>
             </div>
 
-            <ul className="divide-y divide-border lg:hidden">
+            <ul className="divide-y divide-border xl:hidden">
               {paginated.map((order) => (
                 <li key={order.id} className="p-3 sm:p-4">
                   <div className="flex items-start gap-3">

@@ -572,24 +572,24 @@ export function ProductsListPage({
             </div>
           ) : null}
 
-          <div className="hidden overflow-x-auto lg:block">
+          <div className="relative hidden overflow-x-auto xl:block">
             <table className="w-full min-w-[760px] text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                  <th className="px-4 py-3">
+                  <th className="px-3 py-3">
                     <Checkbox
                       checked={allOnPageSelected}
                       onCheckedChange={toggleSelectAllOnPage}
                       aria-label="Select all on page"
                     />
                   </th>
-                  <th className="px-4 py-3 font-medium">{labels.productWord}</th>
-                  <th className="px-4 py-3 font-medium">Category</th>
-                  <th className="px-4 py-3 font-medium">Price</th>
-                  <th className="px-4 py-3 font-medium">Stock</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Updated</th>
-                  <th className="px-4 py-3 font-medium">
+                  <th className="px-3 py-3 font-medium">{labels.productWord}</th>
+                  <th className="px-3 py-3 font-medium">Category</th>
+                  <th className="px-3 py-3 font-medium">Price</th>
+                  <th className="px-3 py-3 font-medium">Stock</th>
+                  <th className="px-3 py-3 font-medium">Status</th>
+                  <th className="px-3 py-3 font-medium">Updated</th>
+                  <th className="px-3 py-3 font-medium">
                     <span className="sr-only">Actions</span>
                   </th>
                 </tr>
@@ -600,14 +600,14 @@ export function ProductsListPage({
                     key={cake.id}
                     className="border-b border-border/70 transition-colors last:border-0 hover:bg-muted"
                   >
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3">
                       <Checkbox
                         checked={selectedIds.includes(cake.id)}
                         onCheckedChange={() => toggleSelect(cake.id)}
                         aria-label={`Select ${cake.name}`}
                       />
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3">
                       <div className="flex items-center gap-3">
                         <div className="relative size-11 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
                           {cake.images[0] ? (
@@ -641,11 +641,11 @@ export function ProductsListPage({
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">
+                    <td className="px-3 py-3 text-muted-foreground">
                       {categoryLabel(cake)}
                     </td>
-                    <td className="px-4 py-3 font-semibold">{formatCurrency(cake.price)}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3 font-semibold">{formatCurrency(cake.price)}</td>
+                    <td className="px-3 py-3">
                       <StockStatusBadge
                         status={deriveStockStatus(cake, getInventorySettings())}
                         unlimited={cake.unlimitedStock}
@@ -653,15 +653,15 @@ export function ProductsListPage({
                         showQuantity
                       />
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3">
                       <Badge variant={getStatusVariant(cake.status)}>
                         {formatStatusLabel(cake.status)}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                    <td className="px-3 py-3 whitespace-nowrap text-muted-foreground">
                       <RelativeTime date={cake.updatedAt} />
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3">
                       <DropdownMenu>
                         <DropdownMenuTrigger
                           render={
@@ -708,7 +708,7 @@ export function ProductsListPage({
             </table>
           </div>
 
-          <ul className="divide-y divide-border lg:hidden">
+          <ul className="divide-y divide-border xl:hidden">
             {paginated.map((cake) => (
               <li key={cake.id} className="p-3 sm:p-4">
                 <div className="flex items-start gap-3">

@@ -303,7 +303,7 @@ export function SecuritySettingsPage() {
         onValueChange={(value) => setTab(value as SecurityTab)}
         className="space-y-4"
       >
-        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 bg-muted/50 p-1">
+        <TabsList className="flex w-full flex-wrap justify-start gap-1 bg-muted/50 p-1 group-data-horizontal/tabs:h-auto [&>[data-slot=tabs-trigger]]:h-8 [&>[data-slot=tabs-trigger]]:flex-none">
           <TabsTrigger value="policies">Policies</TabsTrigger>
           <TabsTrigger value="history">Login history</TabsTrigger>
           <TabsTrigger value="failed">

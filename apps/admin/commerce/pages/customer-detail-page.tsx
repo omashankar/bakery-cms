@@ -279,23 +279,25 @@ export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
         ))}
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Two across on a phone, like every other screen's figures — one per row
+          was four tall cards before anything about the customer. */}
+      <section className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
         {[
           { label: "Lifetime value", value: formatCurrency(profile.totalSpent) },
           { label: "Orders", value: String(profile.orderCount) },
           { label: "Average order value", value: formatCurrency(profile.averageOrderValue) },
           { label: "Active orders", value: String(profile.activeOrders) },
         ].map((stat) => (
-          <Card key={stat.label} className="shadow-sm">
+          <Card key={stat.label} className="gap-0 py-0 shadow-sm">
             <CardContent className="p-4">
               <p className="text-xs text-muted-foreground">{stat.label}</p>
-              <p className="mt-1 text-2xl font-semibold">{stat.value}</p>
+              <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">{stat.value}</p>
             </CardContent>
           </Card>
         ))}
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
         <div className="space-y-6">
           <Card className="shadow-sm">
             <CardHeader>

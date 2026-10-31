@@ -374,7 +374,7 @@ export function PageFormPage({ mode, pageId }: PageFormPageProps) {
         }
       />
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(260px,320px)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(260px,320px)]">
         <Tabs defaultValue="content" className="space-y-4">
           <TabsList>
             <TabsTrigger value="content">Content</TabsTrigger>

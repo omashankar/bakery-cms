@@ -94,7 +94,7 @@ export function PermissionMatrix({
         </div>
       ) : null}
 
-      <div className="overflow-x-auto rounded-xl border border-border">
+      <div className="relative overflow-x-auto rounded-xl border border-border">
         <table className="w-full min-w-[56rem] border-collapse text-sm">
           <thead className="bg-muted/60 text-xs text-muted-foreground">
             <tr>

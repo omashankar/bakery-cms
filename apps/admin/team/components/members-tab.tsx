@@ -474,7 +474,7 @@ export function MembersTab({ roles, onRolesStale }: { roles: RoleView[]; onRoles
 
       {statusFilter !== "invited" ? (
         <section className={adminShell.tableCard} aria-label="Team members">
-          <div className="hidden overflow-x-auto md:block">
+          <div className="relative hidden overflow-x-auto xl:block">
             <table className="w-full min-w-[52rem] text-sm">
               <thead className="border-b border-border bg-muted/50 text-xs text-muted-foreground">
                 <tr>
@@ -583,7 +583,7 @@ export function MembersTab({ roles, onRolesStale }: { roles: RoleView[]; onRoles
             </table>
           </div>
           {/* Phones get cards: seven columns do not fit in 390px. */}
-          <ul className="divide-y divide-border md:hidden" aria-label="Team members">
+          <ul className="divide-y divide-border xl:hidden" aria-label="Team members">
             {membersState === "loading" && members.length === 0 ? (
               <li className="p-4">
                 <Skeleton className="h-14 w-full" />

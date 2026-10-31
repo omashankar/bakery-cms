@@ -22,7 +22,7 @@ import { runBrowserPrint } from "@/features/commerce/lib/print-invoice";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { OrderStatusTimeline } from "@/components/shared/order-status-timeline";
 import { getOrderTimeline } from "@/features/orders/lib/order-tracking";
-import { isTerminalOrderStatus } from "@/features/orders/lib/order-status-meta";
+import { ORDER_STATUS_LABELS, isTerminalOrderStatus } from "@/features/orders/lib/order-status-meta";
 import { getActiveFulfillmentStatuses } from "@/features/orders/lib/order-tracking";
 import {
   cancelOrder,
@@ -236,7 +236,7 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
     if (!updated) return reportUnreachable();
     setOrder(updated);
     if (!persisted) return reportUnpersisted("Status changed");
-    toast.success(`Order marked as ${status.replace(/_/g, " ")}`);
+    toast.success(`Order marked as ${ORDER_STATUS_LABELS[status] ?? status.replace(/_/g, " ")}`);
   }
 
   async function handleSaveNotes() {
@@ -727,7 +727,7 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
             >
               {statusOptions.map((status) => (
                 <option key={status} value={status}>
-                  {status.replace(/_/g, " ")}
+                  {ORDER_STATUS_LABELS[status] ?? status.replace(/_/g, " ")}
                 </option>
               ))}
             </AdminSelect>
