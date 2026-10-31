@@ -153,6 +153,65 @@ describe("analytics are revenue — the people in them need their own permission
   });
 });
 
+/**
+ * Reports opens with `reports.view`; its money needs `reports.revenue.view`.
+ * The analytics used to demand the revenue permission outright, so a role
+ * given Reports alone — the simple editor's "View" — opened it to "Figures
+ * unavailable". Now it gets the counts, and every amount is zeroed on the
+ * server, never sent.
+ */
+describe("reports without the revenue permission", () => {
+  const summary = {
+    revenue: 52_000, orders: 40, averageOrderValue: 1300, delivered: 30, cancelled: 2, refunded: 1,
+    couponDiscount: 900, itemsSold: 61, activeOrders: 7, uniqueCustomers: 25, deliveryFees: 1200,
+    taxCollected: 2600, codOrders: 12, prepaidOrders: 28,
+  };
+  const full = {
+    range: "30d",
+    summary,
+    previousSummary: summary,
+    comparison: {
+      revenue: { label: "+12%", tone: "positive" },
+      orders: { label: "+5%", tone: "positive" },
+      averageOrderValue: { label: "+7%", tone: "positive" },
+      itemsSold: { label: "+3%", tone: "positive" },
+    },
+    trend: [{ label: "Mon", revenue: 5200, orders: 4 }],
+    statusBreakdown: [{ status: "delivered", count: 30, revenue: 39_000 }],
+    paymentBreakdown: [{ key: "cod", label: "COD", count: 12, revenue: 15_600 }],
+    topProducts: [{ slug: "cake", name: "Cake", quantity: 9, revenue: 11_700 }],
+    topCustomers: [],
+    cityBreakdown: [{ city: "Kota", orders: 40, revenue: 52_000 }],
+    couponBreakdown: [{ code: "DIWALI", uses: 3, discount: 900 }],
+    recentOrders: [],
+  } as unknown as OrderAnalytics;
+
+  it("keeps every count", () => {
+    const out = analyticsForViewer(full, new Set(["reports.view"]));
+    expect(out.includesRevenue).toBe(false);
+    expect(out.summary.orders).toBe(40);
+    expect(out.summary.itemsSold).toBe(61);
+    expect(out.trend[0].orders).toBe(4);
+    expect(out.topProducts[0].quantity).toBe(9);
+    expect(out.cityBreakdown[0].orders).toBe(40);
+    expect(out.couponBreakdown[0].uses).toBe(3);
+  });
+
+  it("sends no amount at all", () => {
+    const out = JSON.stringify(analyticsForViewer(full, new Set(["reports.view", "dashboard.view"])));
+    for (const amount of ["52000", "1300", "900", "1200", "2600", "5200", "39000", "15600", "11700", "+12%", "+7%"]) {
+      expect(out, amount).not.toContain(amount);
+    }
+  });
+
+  it("with the revenue permission, nothing is taken out", () => {
+    const out = analyticsForViewer(full, new Set(["reports.view", "reports.revenue.view"]));
+    expect(out.includesRevenue).toBe(true);
+    expect(out.summary.revenue).toBe(52_000);
+    expect(out.topProducts[0].revenue).toBe(11_700);
+  });
+});
+
 describe("the settings every screen reads", () => {
   const settings = {
     general: { siteName: "Cake Shop" },

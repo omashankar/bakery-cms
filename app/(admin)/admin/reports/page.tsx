@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 /** The default range's analytics, read with the page. */
 export default async function Page() {
-  const initial = await whenAllowed("reports.revenue.view", async (actor) =>
+  const initial = await whenAllowed("reports.view", async (actor) =>
     JSON.parse(JSON.stringify(await readOrderAnalytics(DEFAULT_REPORT_RANGE, actor.permissions))),
   );
   return <ReportsPage initial={initial} />;

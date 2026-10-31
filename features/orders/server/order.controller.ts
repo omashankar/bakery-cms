@@ -301,7 +301,9 @@ export const orderStatsController = withErrorHandler(async () => {
  * outgrew the cache.
  */
 export const orderAnalyticsController = withErrorHandler(async (request: Request) => {
-  const session = await requirePermission("reports.revenue.view");
+  // Reports or the dashboard opens it; the money in it is the revenue
+  // permission's, and `analyticsForViewer` takes it out for everyone else.
+  const session = await requireAnyPermission("reports.view", "dashboard.view", "reports.revenue.view");
   const params = Object.fromEntries(new URL(request.url).searchParams);
   const { range, timeZone } = validate(orderAnalyticsQuerySchema, params);
   return ok(

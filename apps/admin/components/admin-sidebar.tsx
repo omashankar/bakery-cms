@@ -75,7 +75,7 @@ import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { cn } from "@/lib/utils";
 import { adminShell } from "./admin-shell";
 import { useAccess } from "@/features/team/lib/access-context";
-import { canOpenRoute } from "@/features/team/lib/route-access";
+import { canOpenRoute, homeRoute } from "@/features/team/lib/route-access";
 
 const navRow = adminShell.navRow;
 
@@ -538,7 +538,9 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
         )}
       >
         <AppBrand
-          href={routes.admin.dashboard}
+          // The member's own first screen — the kitchen for kitchen staff, not a
+          // dashboard they would only be bounced away from.
+          href={access ? homeRoute(can) : routes.admin.dashboard}
           // The shop's name, not the product's. A blank one falls back to the
           // component's default rather than heading the panel with nothing.
           name={shopName || undefined}

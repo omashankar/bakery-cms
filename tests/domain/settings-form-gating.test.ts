@@ -376,8 +376,12 @@ describe("admin forms that replace a whole document in their own store", () => {
     const code = source(file);
     // A gate AND an opener. The gate alone is what several of these already had:
     // it protected the request while the form had long since captured the seed.
-    expect(code).toMatch(/gate:\s*\w+Hydration/);
-    expect(code).toMatch(/ensureHydrated:\s*ensure\w+Hydrated/);
+    // Either a store's own gate, or one admin-config blob's gate and the opener
+    // for that same blob.
+    expect(code).toMatch(/gate:\s*(\w+Hydration|adminConfigGates\["[\w-]+"\])/);
+    expect(code).toMatch(/ensureHydrated:\s*(ensure\w+Hydrated|\(\) => ensureAdminConfigHydrated\(\["[\w-]+"\]\))/);
+    const blob = code.match(/gate:\s*adminConfigGates\["([\w-]+)"\]/)?.[1];
+    if (blob) expect(code).toContain(`ensureAdminConfigHydrated(["${blob}"])`);
   });
 
   it.each(REPLACE_ALL_FORMS)("$name holds its FIELDS closed until hydration", ({ file, fieldGate }) => {
@@ -427,12 +431,8 @@ describe("admin forms that replace a whole document in their own store", () => {
 });
 
 describe("the store gates behind those forms", () => {
-  it("opens the admin-config gate only when EVERY blob it vouches for arrived", () => {
-    const code = source("features/admin-config/lib/admin-config-hydration.ts");
-    // It was `profile !== null || gateways !== null || prefs !== null || code !== null`
-    // — one arrival opened the gate for three stores it had never read.
-    expect(code).toContain("if (!profile || !gateways || !prefs || !code) return false;");
-  });
+  // The admin-config gates are checked by behaviour, in
+  // a-member-can-save-the-config-their-role-allows.test.ts.
 
   it("opens the site-layout gate only when header, footer AND appearance arrived", () => {
     // Beside the sync component, not in `features/site-layout/lib/`: it needs

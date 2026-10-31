@@ -256,13 +256,20 @@ export function processScheduledPagePublishes(): number {
   return count;
 }
 
+/**
+ * A blank page. The same every time it is called — the editor builds it twice
+ * (the form, and the baseline it compares the form with) and once on the
+ * server. A clock-stamped block id made those differ: a fresh Add Page could
+ * read as "unsaved changes" before anyone typed, and the server's HTML did not
+ * match the browser's. Blocks added later get their own unique ids.
+ */
 export function createEmptyPageForm(): CmsPageFormData {
   return {
     title: "",
     slug: "",
     description: "",
     template: "standard",
-    blocks: [block(`block-${Date.now()}`, "paragraph", "")],
+    blocks: [block("block-first", "paragraph", "")],
     heroImage: "",
     status: "draft",
     isSystem: false,

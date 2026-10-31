@@ -58,6 +58,8 @@ export interface OrderAnalyticsResponse {
   cityBreakdown: CityBreakdownItem[];
   couponBreakdown: CouponBreakdownItem[];
   recentOrders: PlacedOrder[];
+  /** False when the money was zeroed for a member without `reports.revenue.view` — hide it, do not print ₹0. */
+  includesRevenue?: boolean;
 }
 
 interface Envelope<T> {

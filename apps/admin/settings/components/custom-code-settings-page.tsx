@@ -20,7 +20,7 @@ import {
 import { SettingsSectionShell } from "./settings-section-shell";
 import { useLayoutEffect } from "react";
 import { useHydratedForm } from "@/features/settings/lib/use-hydrated-form";
-import { adminConfigHydration } from "@/features/admin-config/lib/admin-config-api";
+import { adminConfigGates } from "@/features/admin-config/lib/admin-config-api";
 import {
   applyServerAdminConfig,
   ensureAdminConfigHydrated,
@@ -62,8 +62,8 @@ export function CustomCodeSettingsPage({
   } = useHydratedForm<CustomCode>({
     read: loadCustomCode,
     fallback: EMPTY_CODE,
-    gate: adminConfigHydration,
-    ensureHydrated: ensureAdminConfigHydrated,
+    gate: adminConfigGates["custom-code"],
+    ensureHydrated: () => ensureAdminConfigHydrated(["custom-code"]),
     updatedEvent: CUSTOM_CODE_UPDATED_EVENT,
   });
 

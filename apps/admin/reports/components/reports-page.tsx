@@ -34,6 +34,7 @@ import {
 } from "@/features/orders/lib/orders-api";
 import { ORDERS_UPDATED_EVENT, isOrdersCacheRefill } from "@/features/orders/lib/orders";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
+import { useCan } from "@/features/team/lib/access-context";
 import { DEFAULT_REPORT_RANGE } from "../lib/reports-defaults";
 import { RelativeTime } from "@/components/shared/relative-time";
 
@@ -89,7 +90,8 @@ function RankListItem({
   rank: number;
   title: string;
   subtitle: string;
-  value: string;
+  /** The amount, or nothing when the member may not see money. */
+  value?: string;
 }) {
   return (
     <li className="flex items-center justify-between gap-3 py-2.5">
@@ -100,7 +102,7 @@ function RankListItem({
         </p>
         <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
       </div>
-      <p className="shrink-0 text-sm font-semibold text-primary">{value}</p>
+      {value ? <p className="shrink-0 text-sm font-semibold text-primary">{value}</p> : null}
     </li>
   );
 }
@@ -118,6 +120,7 @@ export function ReportsPage({
   initial?: OrderAnalyticsResponse | null;
 } = {}) {
   const labels = useBusinessLabels();
+  const canSeeRevenue = useCan("reports.revenue.view");
   const [range, setRange] = useState<ReportDateRange>(DEFAULT_REPORT_RANGE);
   const [analytics, setAnalytics] = useState<OrderAnalyticsResponse | null>(initial);
   const [failed, setFailed] = useState(false);
@@ -205,6 +208,13 @@ export function ReportsPage({
   const cities = (analytics?.cityBreakdown ?? []).slice(0, LIST_ROWS);
   const coupons = (analytics?.couponBreakdown ?? []).slice(0, LIST_ROWS);
   const recentOrders = (analytics?.recentOrders ?? []).slice(0, LIST_ROWS);
+  /**
+   * Whether money may be shown. Reports opens with `reports.view`; the amounts
+   * need `reports.revenue.view` too, and the server zeroes them otherwise — so
+   * they are hidden here rather than printed as ₹0, and the counts carry the
+   * page: orders, items, statuses, cities and top products by quantity.
+   */
+  const money = canSeeRevenue && analytics?.includesRevenue !== false;
 
   // The bar grid is wider than the card at every breakpoint, so it scrolls.
   // Start at the right — the latest day matters most on a trend chart.
@@ -214,7 +224,9 @@ export function ReportsPage({
     if (el) el.scrollLeft = el.scrollWidth;
   }, [trend]);
 
-  const maxRevenue = Math.max(...trend.map((item) => item.revenue), 1);
+  // The bars are revenue, or — for a member who may not see money — orders.
+  const barValue = (item: { revenue: number; orders: number }) => (money ? item.revenue : item.orders);
+  const maxBar = Math.max(...trend.map(barValue), 1);
   const hasTrendData = trend.some((item) => item.revenue > 0 || item.orders > 0);
   // Label the range the FIGURES are for, not the one the selector is on. They
   // differ while a new range is loading, and captioning last month's revenue
@@ -251,7 +263,8 @@ export function ReportsPage({
       cities,
       coupons,
       paymentBreakdown,
-      shownRange
+      shownRange,
+      money,
     );
     toast.success("Full report exported to CSV");
   }
@@ -301,16 +314,18 @@ export function ReportsPage({
         }
       />
 
-      <section className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
-        <DashboardStatCard
-          title="Revenue"
-          value={formatCurrency(summary.revenue)}
-          change={showComparison ? comparison.revenue.label : "All-time total"}
-          changeTone={showComparison ? comparison.revenue.tone : "neutral"}
-          icon={IndianRupee}
-          tone="gold"
-          figures={figures}
-        />
+      <section className={cn("grid grid-cols-2 gap-2.5 sm:gap-3", money && "xl:grid-cols-4")}>
+        {money ? (
+          <DashboardStatCard
+            title="Revenue"
+            value={formatCurrency(summary.revenue)}
+            change={showComparison ? comparison.revenue.label : "All-time total"}
+            changeTone={showComparison ? comparison.revenue.tone : "neutral"}
+            icon={IndianRupee}
+            tone="gold"
+            figures={figures}
+          />
+        ) : null}
         <DashboardStatCard
           title="Orders"
           value={summary.orders}
@@ -321,15 +336,17 @@ export function ReportsPage({
           figures={figures}
           href={routes.admin.orders.list}
         />
-        <DashboardStatCard
-          title="Avg. order"
-          value={formatCurrency(summary.averageOrderValue)}
-          change={showComparison ? comparison.averageOrderValue.label : "All-time average"}
-          changeTone={showComparison ? comparison.averageOrderValue.tone : "neutral"}
-          icon={BarChart3}
-          tone="neutral"
-          figures={figures}
-        />
+        {money ? (
+          <DashboardStatCard
+            title="Avg. order"
+            value={formatCurrency(summary.averageOrderValue)}
+            change={showComparison ? comparison.averageOrderValue.label : "All-time average"}
+            changeTone={showComparison ? comparison.averageOrderValue.tone : "neutral"}
+            icon={BarChart3}
+            tone="neutral"
+            figures={figures}
+          />
+        ) : null}
         <DashboardStatCard
           title="Items sold"
           value={summary.itemsSold}
@@ -345,7 +362,7 @@ export function ReportsPage({
         <div className="min-w-0 lg:col-span-8">
           <Card className="flex h-full flex-col shadow-sm">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Revenue trend</CardTitle>
+              <CardTitle className="text-base">{money ? "Revenue trend" : "Orders trend"}</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-1 flex-col pt-0">
               <div
@@ -358,7 +375,7 @@ export function ReportsPage({
                         the one left asserting "No sales data yet" while the
                         analytics request was in flight, and after it failed. */}
                     <p className="text-sm text-muted-foreground">
-                      {figures === "loading" ? "Loading the revenue trend…" : "Figures unavailable"}
+                      {figures === "loading" ? "Loading the trend…" : "Figures unavailable"}
                     </p>
                   </div>
                 ) : !hasTrendData ? (
@@ -374,10 +391,10 @@ export function ReportsPage({
                     }}
                   >
                     {trend.map((item, index) => {
-                      const hasRevenue = item.revenue > 0;
+                      const hasValue = barValue(item) > 0;
                       // Leave headroom at 92% so the tallest bar doesn't touch the top.
-                      const height = hasRevenue
-                        ? Math.max(12, Math.round((item.revenue / maxRevenue) * 92))
+                      const height = hasValue
+                        ? Math.max(12, Math.round((barValue(item) / maxBar) * 92))
                         : 3;
                       const isLatest = index === trend.length - 1;
                       const showLabel =
@@ -395,9 +412,9 @@ export function ReportsPage({
                             <div
                               className="w-full rounded-t-sm bg-gold-300 transition-colors hover:bg-gold-400 data-[active=true]:bg-bakery-500 data-[empty=true]:bg-border"
                               data-active={isLatest}
-                              data-empty={!hasRevenue}
+                              data-empty={!hasValue}
                               style={{ height: `${height}%` }}
-                              title={`${item.label}: ${formatCurrency(item.revenue)} · ${item.orders} ${item.orders === 1 ? "order" : "orders"}`}
+                              title={`${item.label}: ${money ? `${formatCurrency(item.revenue)} · ` : ""}${item.orders} ${item.orders === 1 ? "order" : "orders"}`}
                             />
                           </div>
                           {showLabel ? (
@@ -444,9 +461,11 @@ export function ReportsPage({
                       <AdminOrderStatusBadge status={item.status} />
                       <div className="text-right text-sm">
                         <p className="font-medium">{item.count}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatCurrency(item.revenue)}
-                        </p>
+                        {money ? (
+                          <p className="text-xs text-muted-foreground">
+                            {formatCurrency(item.revenue)}
+                          </p>
+                        ) : null}
                       </div>
                     </li>
                   ))}
@@ -489,16 +508,22 @@ export function ReportsPage({
                     <div className="flex items-center justify-between gap-2 text-sm">
                       <span className="truncate font-medium">{item.label}</span>
                       <span className="shrink-0 text-xs text-muted-foreground">
-                        {item.count} · {formatCurrency(item.revenue)}
+                        {item.count}
+                        {money ? ` · ${formatCurrency(item.revenue)}` : ""}
                       </span>
                     </div>
                     <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                       <div
                         className="h-full rounded-full bg-primary"
                         style={{
+                          // Share of revenue, or of orders when money is hidden.
                           width: `${Math.max(
                             8,
-                            Math.round((item.revenue / Math.max(summary.revenue, 1)) * 100)
+                            Math.round(
+                              money
+                                ? (item.revenue / Math.max(summary.revenue, 1)) * 100
+                                : (item.count / Math.max(summary.orders, 1)) * 100,
+                            )
                           )}%`,
                         }}
                       />
@@ -557,7 +582,7 @@ export function ReportsPage({
                     rank={index + 1}
                     title={city.city}
                     subtitle={`${city.orders} orders`}
-                    value={formatCurrency(city.revenue)}
+                    value={money ? formatCurrency(city.revenue) : undefined}
                   />
                 ))}
               </ul>
@@ -584,7 +609,7 @@ export function ReportsPage({
                     rank={index + 1}
                     title={product.name}
                     subtitle={`${product.quantity} sold`}
-                    value={formatCurrency(product.revenue)}
+                    value={money ? formatCurrency(product.revenue) : undefined}
                   />
                 ))}
               </ul>
@@ -609,7 +634,7 @@ export function ReportsPage({
                     rank={index + 1}
                     title={customer.name}
                     subtitle={`${customer.orders} orders · ${customer.email}`}
-                    value={formatCurrency(customer.revenue)}
+                    value={money ? formatCurrency(customer.revenue) : undefined}
                   />
                 ))}
               </ul>
@@ -622,12 +647,14 @@ export function ReportsPage({
             <CardTitle className="text-base">Coupons</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col gap-3 pt-0">
-            <div className="border-b border-border pb-3">
-              <p className="text-[11px] text-muted-foreground">Total savings</p>
-              <p className="mt-0.5 font-heading text-lg font-semibold">
-                {figures === "ready" ? formatCurrency(summary.couponDiscount) : "—"}
-              </p>
-            </div>
+            {money ? (
+              <div className="border-b border-border pb-3">
+                <p className="text-[11px] text-muted-foreground">Total savings</p>
+                <p className="mt-0.5 font-heading text-lg font-semibold">
+                  {figures === "ready" ? formatCurrency(summary.couponDiscount) : "—"}
+                </p>
+              </div>
+            ) : null}
             {awaitingAnalytics ? (
               <ListLoading rows={3} label="Loading coupon usage" />
             ) : coupons.length === 0 ? (
@@ -643,9 +670,11 @@ export function ReportsPage({
                       <p className="truncate text-sm font-medium">{coupon.code}</p>
                       <p className="text-xs text-muted-foreground">{coupon.uses} uses</p>
                     </div>
-                    <p className="shrink-0 text-sm font-semibold text-primary">
-                      {formatCurrency(coupon.discount)}
-                    </p>
+                    {money ? (
+                      <p className="shrink-0 text-sm font-semibold text-primary">
+                        {formatCurrency(coupon.discount)}
+                      </p>
+                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -666,7 +695,7 @@ export function ReportsPage({
               <EmptyState message="No orders in this range" />
             ) : (
               <>
-                <div className="hidden overflow-x-auto lg:block">
+                <div className="relative hidden overflow-x-auto lg:block">
                   <table className="w-full min-w-[640px] text-sm">
                     <thead>
                       <tr className="border-b border-border text-left text-xs text-muted-foreground">

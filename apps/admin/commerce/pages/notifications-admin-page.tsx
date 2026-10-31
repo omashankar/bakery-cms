@@ -53,6 +53,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 import { useOrdersServerSync } from "@/features/orders/lib/use-orders-server-sync";
+import { useCan } from "@/features/team/lib/access-context";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 
 const PAGE_SIZE = 12;
@@ -133,8 +134,12 @@ export function NotificationsAdminPage({
    * Mounting the same hook here costs nothing — `hydrateOnce` makes the
    * layout's later call join this read rather than repeat it — and the rest of
    * the batch still waits its turn.
+   *
+   * Only for a member who may read orders: anyone else (a role with the
+   * dashboard or the stock alerts only) was sent a refused request every visit.
    */
-  useOrdersServerSync();
+  const canReadOrders = useCan("orders.view");
+  useOrdersServerSync(canReadOrders);
 
 
   const [filters, setFilters] = useState<NotificationListFilters>(defaultNotificationFilters);
@@ -328,7 +333,7 @@ export function NotificationsAdminPage({
         </button>
       </section>
 
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(240px,300px)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(240px,300px)]">
         <div className="min-w-0 space-y-4">
           <FilterPanel>
             <FilterPanelToolbar className="gap-2.5 sm:flex-row sm:items-center">

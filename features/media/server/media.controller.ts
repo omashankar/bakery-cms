@@ -6,6 +6,7 @@ import { requestContext } from "@/lib/server/audit/audit-log";
 import type { Permission } from "@/features/team/lib/permissions";
 
 import * as service from "./media.service";
+import { getMediaUsage } from "./media.usage";
 import { mediaFilesPayloadSchema, mediaFoldersSchema, uploadSchema } from "./media.validators";
 
 /**
@@ -77,4 +78,15 @@ export const uploadController = withErrorHandler(async (request: Request) => {
   // Cloudinary not configured → { configured: false } so the client falls back
   // to storing the raw source (the pre-Cloudinary behaviour).
   return ok(result ?? { configured: false }, result ? "Uploaded" : "Cloudinary not configured");
+});
+
+/**
+ * Where each file is used, for "is this file in use?" — read with the server's
+ * own access, addresses only (see media.usage.ts). Anyone who may see the
+ * library may ask: deleting needs `media.manage`, but the "Unused" filter and
+ * the usage panel are part of viewing it.
+ */
+export const getUsageController = withErrorHandler(async () => {
+  await requireAnyPermission(...MEDIA_READERS);
+  return ok(await getMediaUsage(), "Media usage");
 });

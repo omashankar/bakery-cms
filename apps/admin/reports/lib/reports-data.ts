@@ -60,7 +60,13 @@ export function exportReportsCsv(
   cities: CityBreakdownItem[],
   coupons: CouponBreakdownItem[],
   payments: PaymentBreakdownItem[],
-  range: ReportDateRange
+  range: ReportDateRange,
+  /**
+   * False for a member without the revenue permission. Their figures arrive
+   * with every amount zeroed, and a file of "Revenue 0" columns would read as
+   * a shop that sold nothing — so the money is left out, not printed as 0.
+   */
+  money = true,
 ): void {
   if (typeof window === "undefined") return;
 
@@ -71,46 +77,50 @@ export function exportReportsCsv(
   // brand at all.
   const shopName = getGeneralSettings().siteName?.trim();
 
+  /** A row, with its money cells dropped when the member may not see money. */
+  const row = (cells: (string | null)[]) => cells.filter((cell): cell is string => cell !== null);
+  const amount = (value: number) => (money ? String(value) : null);
+  const heading = (label: string) => (money ? label : null);
+
   const lines = [
     [shopName ? `${shopName} — Reports Export` : "Reports Export"],
     ["Range", range],
     ["Generated", new Date().toISOString()],
     [],
     ["Summary Metric", "Value"],
-    ["Revenue", String(summary.revenue)],
+    ...(money ? [["Revenue", String(summary.revenue)]] : []),
     ["Orders", String(summary.orders)],
-    ["Average Order Value", String(summary.averageOrderValue)],
+    ...(money ? [["Average Order Value", String(summary.averageOrderValue)]] : []),
     ["Items Sold", String(summary.itemsSold)],
     ["Active Orders", String(summary.activeOrders)],
     ["Unique Customers", String(summary.uniqueCustomers)],
     ["Delivered", String(summary.delivered)],
     ["Cancelled", String(summary.cancelled)],
     ["Refunded", String(summary.refunded)],
-    ["Coupon Discount", String(summary.couponDiscount)],
-    ["Delivery Fees", String(summary.deliveryFees)],
-    ["Tax Collected", String(summary.taxCollected)],
+    ...(money
+      ? [
+          ["Coupon Discount", String(summary.couponDiscount)],
+          ["Delivery Fees", String(summary.deliveryFees)],
+          ["Tax Collected", String(summary.taxCollected)],
+        ]
+      : []),
     ["COD Orders", String(summary.codOrders)],
     ["Prepaid Orders", String(summary.prepaidOrders)],
     [],
-    ["Top Products", "Quantity", "Revenue"],
-    ...products.map((item) => [item.name, String(item.quantity), String(item.revenue)]),
+    row(["Top Products", "Quantity", heading("Revenue")]),
+    ...products.map((item) => row([item.name, String(item.quantity), amount(item.revenue)])),
     [],
-    ["Top Customers", "Orders", "Revenue", "Email"],
-    ...customers.map((item) => [
-      item.name,
-      String(item.orders),
-      String(item.revenue),
-      item.email,
-    ]),
+    row(["Top Customers", "Orders", heading("Revenue"), "Email"]),
+    ...customers.map((item) => row([item.name, String(item.orders), amount(item.revenue), item.email])),
     [],
-    ["Cities", "Orders", "Revenue"],
-    ...cities.map((item) => [item.city, String(item.orders), String(item.revenue)]),
+    row(["Cities", "Orders", heading("Revenue")]),
+    ...cities.map((item) => row([item.city, String(item.orders), amount(item.revenue)])),
     [],
-    ["Coupons", "Uses", "Discount"],
-    ...coupons.map((item) => [item.code, String(item.uses), String(item.discount)]),
+    row(["Coupons", "Uses", heading("Discount")]),
+    ...coupons.map((item) => row([item.code, String(item.uses), amount(item.discount)])),
     [],
-    ["Payments", "Orders", "Revenue"],
-    ...payments.map((item) => [item.label, String(item.count), String(item.revenue)]),
+    row(["Payments", "Orders", heading("Revenue")]),
+    ...payments.map((item) => row([item.label, String(item.count), amount(item.revenue)])),
   ];
 
   const csv = toCsv(lines);

@@ -18,6 +18,8 @@ import { useOrdersServerSync } from "@/features/orders/lib/use-orders-server-syn
 import { useCommunicationsServerSync } from "@/apps/admin/communications/lib/use-communications-server-sync";
 import { useInquiriesServerSync } from "@/features/inquiries/lib/use-inquiries-server-sync";
 import { useAdminConfigServerSync } from "@/features/admin-config/lib/use-admin-config-server-sync";
+import { ADMIN_CONFIG_KEYS } from "@/features/admin-config/lib/admin-config-api";
+import { mayUseAdminConfigBlob } from "@/features/admin-config/lib/admin-config-rules";
 import { ensureSiteLayoutHydrated } from "@/components/shared/site-layout-server-sync";
 import { useIdle } from "@/hooks/use-idle";
 import { applyServerSettings } from "@/features/settings/lib/settings-repository";
@@ -74,7 +76,7 @@ function AdminDataHydration() {
    * refused by its API otherwise — mounting them all for kitchen staff was a
    * burst of 403s on every screen, each still costing the server a request.
    */
-  const { access, can, canAny } = useAccess();
+  const { can, canAny } = useAccess();
   return (
     <>
       <SharedHydration />
@@ -82,7 +84,8 @@ function AdminDataHydration() {
       {can("inventory.view") ? <InventoryHydration /> : null}
       {can("orders.view") ? <OrdersHydration /> : null}
       {can("inquiries.view") ? <InquiriesHydration /> : null}
-      {access?.isOwner || canAny(["payments.view", "settings.view"]) ? <AdminConfigHydration /> : null}
+      {/* Only the blobs this member may read — none at all for kitchen staff. */}
+      <AdminConfigHydration />
     </>
   );
 }
@@ -111,7 +114,12 @@ function InquiriesHydration(): null {
 // Admin-only config blobs: the owner's profile, and the payment screens'
 // gateway and notification switches, which have no read of their own.
 function AdminConfigHydration(): null {
-  useAdminConfigServerSync();
+  const { access, can } = useAccess();
+  useAdminConfigServerSync(
+    ADMIN_CONFIG_KEYS.filter((key) =>
+      mayUseAdminConfigBlob({ isOwner: Boolean(access?.isOwner), has: can }, key, "read"),
+    ),
+  );
   return null;
 }
 

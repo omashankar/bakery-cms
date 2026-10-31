@@ -21,7 +21,7 @@ import {
   type AdminProfile,
 } from "@/features/auth/lib/admin-profile";
 import { useHydratedForm } from "@/features/settings/lib/use-hydrated-form";
-import { adminConfigHydration } from "@/features/admin-config/lib/admin-config-api";
+import { adminConfigGates } from "@/features/admin-config/lib/admin-config-api";
 import {
   applyServerAdminConfig,
   ensureAdminConfigHydrated,
@@ -135,8 +135,8 @@ function OwnerProfilePage({ initial = null }: { initial?: ProfileInitial }) {
   } = useHydratedForm<AdminProfile>({
     read: getAdminProfile,
     fallback: EMPTY_PROFILE,
-    gate: adminConfigHydration,
-    ensureHydrated: ensureAdminConfigHydrated,
+    gate: adminConfigGates["admin-profile"],
+    ensureHydrated: () => ensureAdminConfigHydrated(["admin-profile"]),
     updatedEvent: ADMIN_PROFILE_UPDATED_EVENT,
   });
   const fileRef = useRef<HTMLInputElement>(null);
