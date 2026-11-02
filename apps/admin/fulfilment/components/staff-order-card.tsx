@@ -8,6 +8,7 @@ import { RelativeTime } from "@/components/shared/relative-time";
 import { ORDER_STATUS_LABELS } from "@/features/orders/lib/order-status-meta";
 import type { KitchenOrderView } from "@/features/orders/lib/staff-order-types";
 import { formatCalendarDate } from "@/utils/format";
+import { thumbnailImageUrl } from "@/lib/image-url";
 import { cn } from "@/lib/utils";
 
 import type { SlotUrgency } from "../lib/slot-urgency";
@@ -101,7 +102,7 @@ export function StaffOrderCard({
               {picture ? (
                 // eslint-disable-next-line @next/next/no-img-element -- a small thumbnail, from wherever the order stored it
                 <img
-                  src={picture}
+                  src={thumbnailImageUrl(picture, 48)}
                   alt=""
                   className="size-12 shrink-0 rounded-md border border-border object-cover"
                   loading="lazy"

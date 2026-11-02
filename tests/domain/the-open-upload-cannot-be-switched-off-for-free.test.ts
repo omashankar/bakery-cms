@@ -44,6 +44,8 @@ vi.mock("@/features/uploads/server/photo-upload.service", () => ({
     seen.checked.push(file.size);
   }),
   refuseIfStorageIsFull: vi.fn(async () => undefined),
+  // Header-only; its own test is approved-review-photos-do-not-fill-the-upload-ceiling.
+  refuseOversizedBody: vi.fn(),
   uploadPhotoCakeImage: vi.fn(async () => {
     seen.uploads += 1;
     return { url: "https://cdn.example/p.png", bytes: 10 };

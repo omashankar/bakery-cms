@@ -38,6 +38,7 @@ import { uploadFailureMessage, uploadMediaRequest } from "@/apps/admin/media/lib
 import {
   MAX_INLINE_BYTES,
   MAX_SOURCE_BYTES,
+  MAX_UPLOAD_BYTES,
 } from "@/apps/admin/media/lib/use-media-upload";
 import { shrinkImageFile } from "@/lib/images/shrink-image";
 import { thumbnailImageUrl } from "@/lib/image-url";
@@ -189,6 +190,13 @@ function OwnerProfilePage({ initial = null }: { initial?: ProfileInitial }) {
     // Cleared so choosing the same file again still fires a change.
     event.target.value = "";
 
+    // The library's own checks. Without them a PDF picked under "All files"
+    // went up as data:application/pdf and came back "check the image host
+    // account" — and a big GIF, which is not shrunk, as a bare 413.
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file");
+      return;
+    }
     if (file.size > MAX_SOURCE_BYTES) {
       toast.error("That file is too large to open");
       return;
@@ -197,6 +205,12 @@ function OwnerProfilePage({ initial = null }: { initial?: ProfileInitial }) {
     setUploading(true);
     try {
       const { dataUrl, bytes } = await shrinkImageFile(file);
+      if (bytes > MAX_UPLOAD_BYTES) {
+        toast.error("That photo is too large to upload", {
+          description: `Even after resizing it is over ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} MB.`,
+        });
+        return;
+      }
       const outcome = await uploadMediaRequest(dataUrl, "bakery-cms/profile");
 
       if (outcome.status === "uploaded") {

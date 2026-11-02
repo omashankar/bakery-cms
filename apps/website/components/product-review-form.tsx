@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { submitStorefrontReview } from "@/features/reviews/lib/reviews-repository";
+import { thumbnailImageUrl } from "@/lib/image-url";
+import { shrinkImageForUpload } from "@/lib/images/shrink-image";
 
 interface ProductReviewFormProps {
   productSlug: string;
@@ -43,7 +45,7 @@ export function ProductReviewForm({ productSlug, cakeName, onSubmitted }: Produc
     setUploading(true);
     try {
       const body = new FormData();
-      body.append("photo", file);
+      body.append("photo", await shrinkImageForUpload(file));
       const res = await fetch("/api/uploads/photo-cake", {
         method: "POST",
         credentials: "same-origin",
@@ -53,7 +55,13 @@ export function ProductReviewForm({ productSlug, cakeName, onSubmitted }: Produc
         | { data?: { url?: string }; message?: string }
         | null;
       if (!res.ok || !parsed?.data?.url) {
-        toast.error(parsed?.message ?? "Could not upload that photo");
+        // The endpoint is shared with the photo cake, whose 503 says "place
+        // your order and the store will contact you" — wrong advice here.
+        toast.error(
+          res.status === 503
+            ? "Photos cannot be added just now. You can still post your review without one."
+            : (parsed?.message ?? "Could not upload that photo"),
+        );
         return;
       }
       setPhotoUrls((current) => [...current, parsed.data!.url!]);
@@ -198,7 +206,7 @@ export function ProductReviewForm({ productSlug, cakeName, onSubmitted }: Produc
                 className="relative size-16 overflow-hidden rounded-lg border border-border bg-card"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={url} alt="" className="size-full object-cover" />
+                <img src={thumbnailImageUrl(url, 64)} alt="" className="size-full object-cover" />
                 <button
                   type="button"
                   aria-label="Remove photo"

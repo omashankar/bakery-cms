@@ -38,6 +38,12 @@ const photoUploadSchema = new mongoose.Schema({
   // ignores the second, so the backstop this model spends a paragraph on was
   // never actually created. One declaration, and it is the one with the TTL.
   createdAt: { type: Date, default: () => new Date() },
+  /**
+   * Set by the sweep when the photo is on a review the shop APPROVED. Such a
+   * row is kept for as long as the review shows it, so it is not "unclaimed"
+   * and does not count against the ceiling — see `refuseIfStorageIsFull`.
+   */
+  keptFor: { type: String },
 });
 
 photoUploadSchema.index({ createdAt: 1 }, { expireAfterSeconds: 180 * 24 * 60 * 60 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Camera, ChevronDown, ImageIcon, Loader2, Trash2 } from "lucide-react";
 
 import { MediaPicker } from "@/apps/admin/products/components/media-picker";
@@ -109,9 +109,46 @@ export function PhotoField({
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const { isUploading, uploadFiles } = useMediaUpload({
-    onAdded: (file) => onChange(file.url),
+  /**
+   * THE FORM AS IT IS WHEN THE UPLOAD LANDS, not as it was when it began.
+   *
+   * `onAdded` fires seconds after the drop, and it called the `onChange` of
+   * the render that started the upload. In the homepage builder that closure
+   * holds the whole section list as it was then — so a headline typed, a
+   * section hidden or deleted while a slide image uploaded was written back
+   * over when the image arrived. The latest handler is called instead, and a
+   * field removed in the meantime writes nothing (its image is still in the
+   * library).
+   */
+  const latestOnChange = useRef(onChange);
+  const mounted = useRef(true);
+  useEffect(() => {
+    latestOnChange.current = onChange;
   });
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  /**
+   * One field, one picture: dropping three photos filled the field with the
+   * LAST of them. The first fills it, as the library picker does; the others
+   * still land in the library.
+   */
+  const filled = useRef(false);
+  const { isUploading, uploadFiles: uploadAll } = useMediaUpload({
+    onAdded: (file) => {
+      if (!mounted.current || filled.current) return;
+      filled.current = true;
+      latestOnChange.current(file.url);
+    },
+  });
+  const uploadFiles = (files: FileList | File[] | null) => {
+    filled.current = false;
+    return uploadAll(files);
+  };
 
   // Derived, not synced: an effect that opened the panel when `error` appeared
   // would also slam it shut the moment the admin fixed the value mid-typing.
@@ -323,7 +360,11 @@ export function PhotoField({
         </div>
       ) : null}
 
-      <MediaPicker open={pickerOpen} onOpenChange={setPickerOpen} onSelect={onChange} />
+      <MediaPicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        onSelect={(url) => latestOnChange.current(url)}
+      />
     </div>
   );
 }

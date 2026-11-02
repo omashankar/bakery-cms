@@ -2,6 +2,7 @@
 
 import { useRef, useState, type ChangeEvent } from "react";
 import { toast } from "@/lib/lazy-toast";
+import { shrinkImageForUpload } from "@/lib/images/shrink-image";
 import {
   removeCustomerAvatar,
   uploadCustomerAvatar,
@@ -29,17 +30,23 @@ export function useAvatarEditor() {
     // Cleared, so choosing the same file again is still a change.
     event.target.value = "";
     if (!file) return;
-    if (!TYPES.includes(file.type)) {
+    // An empty type is let through: some Android pickers report none for a
+    // real photo. The server reads the bytes and refuses anything else.
+    if (file.type && !file.type.startsWith("image/")) {
       toast.error("Please choose a JPG, PNG or WebP photo");
-      return;
-    }
-    if (file.size > MAX_BYTES) {
-      toast.error("That photo is too large", { description: "Please use an image under 6 MB." });
       return;
     }
 
     setBusy(true);
-    const result = await uploadCustomerAvatar(file);
+    // Shrunk first, as the admin's uploads are: a phone's 8 MB original was
+    // refused outright, and an accepted one was stored to fill an 80px circle.
+    const photo = await shrinkImageForUpload(file);
+    if (photo.size > MAX_BYTES) {
+      setBusy(false);
+      toast.error("That photo is too large", { description: "Please use an image under 6 MB." });
+      return;
+    }
+    const result = await uploadCustomerAvatar(photo);
     setBusy(false);
     if ("error" in result) {
       toast.error("Could not update your photo", { description: result.error });

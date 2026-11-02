@@ -25,6 +25,8 @@ export const MEDIA_CONTRIBUTORS: Permission[] = [
   "testimonials.manage",
   "pages.manage",
   "settings.manage",
+  // The invoice screen's logo field uploads like every other photo field.
+  "payments.manage",
 ];
 
 /** The picker shows the library to the same people, plus anyone who may view it. */

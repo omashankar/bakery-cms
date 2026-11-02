@@ -48,6 +48,7 @@ import {
   type RecentSearch,
 } from "@/apps/website/lib/recent-searches";
 import { cn } from "@/lib/utils";
+import { thumbnailImageUrl } from "@/lib/image-url";
 
 /**
  * The sign-in modal, loaded the first time it is opened.
@@ -1112,7 +1113,9 @@ export function StorefrontNavbar({ chrome, initialCustomer }: StorefrontNavbarPr
                         {row.image ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            src={row.image}
+                            // A 40px square — up to six per keystroke, each the
+                            // product's full main photo until it asked for its size.
+                            src={thumbnailImageUrl(row.image, 40)}
                             alt=""
                             loading="lazy"
                             decoding="async"

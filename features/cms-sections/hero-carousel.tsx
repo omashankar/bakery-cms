@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { layoutSpacing } from "@/constants/spacing";
 import type { HeroCopySide } from "@/types/homepage-builder";
 import { cn } from "@/lib/utils";
+import { optimizedImageUrl } from "@/lib/image-url";
 
 export interface HeroSlide {
   badge?: string;
@@ -138,12 +139,15 @@ function HeroBannerSlideView({
    * and next/image does not expose it. That trades the optimiser for
    * correctness, and costs less than it sounds: this path only runs when a
    * shop has deliberately uploaded a second, already-sized picture.
+   *
+   * Both URLs still ask Cloudinary for AVIF/WebP at the drawn width — they
+   * were the stored originals, on the largest image on the page.
    */
   const image = mobile ? (
     <picture>
-      <source media="(min-width: 640px)" srcSet={slide.imageUrl} />
+      <source media="(min-width: 640px)" srcSet={optimizedImageUrl(slide.imageUrl, { width: 1440 })} />
       <img
-        src={mobile}
+        src={optimizedImageUrl(mobile, { width: 480 })}
         alt={alt}
         className="absolute inset-0 size-full object-cover"
         // Same reason as the branch below, though this one is cropped to a

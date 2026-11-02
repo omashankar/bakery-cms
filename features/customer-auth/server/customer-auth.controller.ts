@@ -13,7 +13,7 @@ import { isCrossSite } from "@/lib/server/http/same-site";
 import { readJson, validate } from "@/lib/server/http/validate";
 import * as orderService from "@/features/orders/server/order.service";
 import { cancelAsCustomer } from "@/features/orders/server/cancellation.service";
-import { rejectUnusableFile } from "@/features/uploads/server/photo-upload.service";
+import { refuseOversizedBody, rejectUnusableFile } from "@/features/uploads/server/photo-upload.service";
 
 import * as service from "./customer-auth.service";
 import {
@@ -114,6 +114,7 @@ export const uploadAvatarController = withErrorHandler(async (request: Request) 
     throw new AppError("Photo uploads are only accepted from this shop.", 403);
   }
   const customer = await requireCustomer();
+  refuseOversizedBody(request);
 
   const form = await request.formData().catch(() => null);
   const file = form?.get("photo");

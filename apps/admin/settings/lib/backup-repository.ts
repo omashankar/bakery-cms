@@ -491,6 +491,9 @@ export async function restoreBackupToServer(
     try {
       parsed = JSON.parse(raw);
     } catch {
+      // Named, not skipped: a section the file holds but cannot be read did
+      // not come back, and the summary has to say so.
+      failedSections.push(section.title);
       continue;
     }
 

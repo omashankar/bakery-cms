@@ -7,6 +7,7 @@ import { ok } from "@/lib/server/http/response";
 
 import {
   refuseIfStorageIsFull,
+  refuseOversizedBody,
   rejectUnusableFile,
   uploadPhotoCakeImage,
 } from "./photo-upload.service";
@@ -60,6 +61,7 @@ export const photoUploadController = withErrorHandler(async (request: Request) =
   if (isCrossSite(request)) {
     throw new AppError("Photo uploads are only accepted from this shop.", 403);
   }
+  refuseOversizedBody(request);
 
   const form = await request.formData().catch(() => null);
   const file = form?.get("photo");
