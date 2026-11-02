@@ -497,7 +497,9 @@ export function MediaLibraryPage({
         ))}
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)_minmax(260px,320px)]">
+      {/* The file panel only from 2xl: at 1280 it squeezed the grid to 90px
+          cards. Below that, a picked file opens in the drawer. */}
+      <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)] 2xl:grid-cols-[220px_minmax(0,1fr)_minmax(260px,320px)]">
         <div className="hidden xl:block">
           <MediaFolderSidebar
             folders={folders}
@@ -661,7 +663,7 @@ export function MediaLibraryPage({
           ) : null}
         </div>
 
-        <aside className="hidden min-h-[28rem] overflow-hidden rounded-xl border border-border bg-card shadow-sm xl:block">
+        <aside className="hidden min-h-[28rem] overflow-hidden rounded-xl border border-border bg-card shadow-sm 2xl:block">
           <MediaDetailPanel
             key={selectedFile?.id ?? "empty"}
             file={selectedFile}
@@ -681,6 +683,7 @@ export function MediaLibraryPage({
       </div>
 
       <MobileDetailDrawer
+        from="2xl"
         open={Boolean(selectedFile)}
         onClose={() => setSelectedId(null)}
         title={selectedFile?.name ?? "Media details"}

@@ -36,10 +36,6 @@ export function MediaToolsDialog({
         <DialogHeader>
           <DialogTitle>Media tools</DialogTitle>
           <DialogDescription>
-            {/* Names only what works. Compression below is a disabled button
-                with "(coming soon)" on it — the repo's honest pattern — but a
-                heading that promises "compression utilities" turns an
-                admitted gap back into a claim. */}
             Find duplicate files in the media library.
           </DialogDescription>
         </DialogHeader>
@@ -50,14 +46,17 @@ export function MediaToolsDialog({
               <ImageDown className="size-4 text-foreground" />
             </div>
             <div className="flex-1 space-y-2">
-              <p className="text-sm font-medium">Image compression</p>
+              <p className="text-sm font-medium">Image compression is automatic</p>
+              {/* It said "not available yet — stored at the size they arrive
+                  in" beside a dead button, long after uploads began to be
+                  shrunk (lib/images/shrink-image.ts) and every picture began
+                  to be delivered at its drawn size (lib/image-url.ts). */}
               <p className="text-xs text-muted-foreground">
-                Not available yet. Uploaded images are stored at the size they
-                arrive in.
+                Every upload is resized to at most 1600 pixels and saved as WebP
+                before it is sent. Your shop then serves each picture at the size
+                it is shown, in the lightest format the visitor&apos;s browser
+                reads. There is nothing to compress by hand.
               </p>
-              <Button variant="outline" size="sm" disabled>
-                Compress selected (coming soon)
-              </Button>
             </div>
           </div>
         </section>
