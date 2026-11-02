@@ -101,13 +101,18 @@ export function DeliveryLocationButton() {
           tint runs between the shop's own lightest steps, so a shop that picks
           other colours gets this in its own. Level with the search box from lg.
         */
-        className="group flex max-w-full items-center rounded-full border border-gold-200 bg-gradient-to-r from-gold-50 to-bakery-50 text-left text-sm shadow-sm transition-premium hover:border-gold-300 hover:shadow lg:h-11 lg:max-w-[22rem]"
+        className="group flex max-w-full items-center rounded-full border border-gold-200 bg-gradient-to-r from-gold-50 to-bakery-50 text-left text-sm shadow-sm transition-premium hover:border-gold-300 hover:shadow lg:h-11 lg:max-w-[16rem] xl:max-w-[22rem]"
       >
-        <span className="flex shrink-0 items-center gap-1.5 border-r border-gold-200 py-2 pr-2.5 pl-3.5 lg:pr-3 lg:pl-4">
+        {/*
+          Not between lg and xl. At 1024 the pill took 333px of the row and the
+          search box beside it was cut to "Search for cakes, gifts, and"; the
+          flag says the least of the three, so it is what steps aside.
+        */}
+        <span className="flex shrink-0 items-center gap-1.5 border-r border-gold-200 py-2 pr-2.5 pl-3.5 lg:hidden xl:flex xl:pr-3 xl:pl-4">
           <IndiaFlag className="h-3.5 w-5 rounded-[2px] shadow-[0_0_0_0.5px_rgb(0_0_0/0.15)]" />
           <span className="text-xs font-semibold text-foreground lg:text-sm">IND</span>
         </span>
-        <span className="flex min-w-0 items-center gap-1.5 py-2 pr-3.5 pl-2.5 lg:gap-2 lg:pr-4 lg:pl-3">
+        <span className="flex min-w-0 items-center gap-1.5 py-2 pr-3.5 pl-2.5 lg:gap-2 lg:pr-4 lg:pl-4 xl:pl-3">
           <MapPin className="size-4 shrink-0 fill-bakery-700 text-gold-50 lg:size-5" aria-hidden />
         {/*
           The customer's own place when they chose one ("Kota 324005"), and a
@@ -115,7 +120,16 @@ export function DeliveryLocationButton() {
           sangod" was the owner's word, and outlived the zone it named.
         */}
           <span className="truncate font-semibold text-foreground">
-            {chosen ? `Deliver to ${chosen}` : "Choose Delivery Location"}
+            {chosen ? (
+              `Deliver to ${chosen}`
+            ) : (
+              <>
+                {/* The short form only where the pill is slim (lg–xl), so it is
+                    never cut to "Choose Delivery Locati…". */}
+                <span className="hidden lg:inline xl:hidden">Choose Location</span>
+                <span className="lg:hidden xl:inline">Choose Delivery Location</span>
+              </>
+            )}
           </span>
           <Pencil className="size-3.5 shrink-0 text-foreground/60 transition-colors group-hover:text-foreground" aria-hidden />
         </span>

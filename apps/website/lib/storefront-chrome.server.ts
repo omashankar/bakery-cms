@@ -28,6 +28,8 @@ import {
 } from "@/features/site-layout/lib/appearance-tokens";
 import type { AppearanceSettings } from "@/types/appearance";
 import { chosen, chosenList, hoursIdentity } from "./shipped-placeholder";
+import { sameDayWindow } from "./storefront-trust.server";
+import type { CommerceSettings } from "@/types/settings";
 
 /**
  * The "chrome" (navbar + footer) data for the storefront, read on the SERVER
@@ -109,7 +111,15 @@ export interface StorefrontChrome {
    * The bar above the logo, resolved: only what the shop wrote, its phone
    * from Contact, or null when it is off or has nothing in it.
    */
-  infoBar: { points: string[]; phone: string; location: string } | null;
+  infoBar: {
+    points: string[];
+    phone: string;
+    location: string;
+    /** The shop's own WhatsApp link (Settings → Social), "" when it has none. */
+    whatsapp?: string;
+    /** Today's same-day window; null when the shop has none. */
+    sameDay?: { closesAt: string; timeLeft: string | null } | null;
+  } | null;
   /*
     GONE, AT THE SHOP'S REQUEST: the header's call-to-action button, the thin
     row above the bar, and the currency note that was the only thing in it.
@@ -196,6 +206,18 @@ export function infoBarFrom(
   const phone = stored.showPhone ? contactPhone.trim() : "";
   const location = (stored.location ?? "").trim();
   return points.length || phone || location ? { points, phone, location } : null;
+}
+
+/**
+ * The bar's two live facts — the shop's WhatsApp and today's same-day deadline
+ * — added to a bar the shop has switched on. They never switch a bar on by
+ * themselves: a shop that wrote nothing there still gets no bar.
+ */
+function withInfoBarExtras(
+  bar: StorefrontChrome["infoBar"],
+  extras: { whatsapp: string; sameDay: { closesAt: string; timeLeft: string | null } | null },
+): StorefrontChrome["infoBar"] {
+  return bar ? { ...bar, ...extras } : null;
 }
 
 /** The navbar badge falls back to the shop's initial rather than a seeded letter. */
@@ -421,7 +443,18 @@ export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => 
       searchPlaceholder: (header.searchPlaceholder ?? "").trim(),
       showBannerStrip:
         header.showBannerStrip ?? defaultHeaderSettings.showBannerStrip ?? true,
-      infoBar: infoBarFrom(header.infoBar, contact.phone ?? ""),
+      infoBar: withInfoBarExtras(infoBarFrom(header.infoBar, contact.phone ?? ""), {
+        whatsapp:
+          activeSocial.find((s) => s.platform?.toLowerCase() === "whatsapp" && isSafeSocialUrl(s.href ?? ""))
+            ?.href ?? "",
+        sameDay: (() => {
+          const today = sameDayWindow(
+            settings.commerce as Partial<CommerceSettings> | undefined,
+            general.timezone,
+          );
+          return today.closesAt ? today : null;
+        })(),
+      }),
       /*
         RESOLVED FIRST, then filtered for visibility.
 
