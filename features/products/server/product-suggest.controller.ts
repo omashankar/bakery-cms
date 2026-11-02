@@ -3,7 +3,7 @@ import { withErrorHandler } from "@/lib/server/http/errors";
 import { rateLimit } from "@/lib/server/http/rate-limit";
 import { requestContext } from "@/lib/server/audit/audit-log";
 
-import { getStorefrontProductCards } from "@/features/products/data/products-service";
+import { getSuggestionCards } from "@/features/products/data/products-service";
 import {
   MIN_SUGGEST_CHARS,
   SUGGESTION_LIMIT,
@@ -91,6 +91,6 @@ export const suggestProductsController = withErrorHandler(async (request: Reques
     one" is a different picture. A product whose first image will not fit gets
     no thumbnail rather than somebody else's.
   */
-  const cards = await getStorefrontProductCards();
+  const cards = await getSuggestionCards();
   return ok(suggestProducts(query, cards, SUGGESTION_LIMIT), "Suggestions");
 });

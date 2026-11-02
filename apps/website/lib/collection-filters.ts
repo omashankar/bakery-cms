@@ -1,6 +1,6 @@
 import { groupIndian } from "@/utils/format";
 import type { LandingProduct } from "@/constants/landing-data";
-import { searchHaystack } from "@/features/products/lib/product-catalog";
+import { searchCatalog } from "@/features/products/lib/search-match";
 
 /**
  * Text order without `localeCompare`.
@@ -18,7 +18,12 @@ function compareText(a: string, b: string): number {
 }
 
 
-export type CollectionSort = "name" | "price-asc" | "price-desc" | "popular";
+/**
+ * "relevance" is how well a product answers the search in the box — offered,
+ * and chosen, only while there is one. Sorting a search for "chocolate cake"
+ * by rating put whatever was best reviewed first, chocolate or not.
+ */
+export type CollectionSort = "name" | "price-asc" | "price-desc" | "popular" | "relevance";
 
 /**
  * The delivery speeds worth offering on THIS page.
@@ -622,10 +627,14 @@ export function applyCollectionFilters(
   cakes: LandingProduct[],
   filters: CollectionFilters
 ): LandingProduct[] {
-  const query = filters.search.trim().toLowerCase();
+  const query = filters.search.trim();
+  // How well each product answers the search; absent means it does not.
+  const searchRank = query
+    ? new Map(searchCatalog(query, cakes).hits.map((hit) => [hit.product.slug, hit.rank]))
+    : null;
 
   let result = cakes.filter((cake) => {
-    if (query) {
+    if (searchRank) {
       /*
         THE SAME FUNCTION AS THE HEADER'S DROPDOWN, not the same six field
         names written out a second time.
@@ -642,7 +651,7 @@ export function applyCollectionFilters(
         findable by the page underneath it, and now it is by construction:
         the dropdown ranks on top of this predicate rather than beside it.
       */
-      if (!searchHaystack(cake).includes(query)) return false;
+      if (!searchRank.has(cake.slug)) return false;
     }
 
     if (cake.price < filters.priceMin || cake.price > filters.priceMax) return false;
@@ -672,7 +681,16 @@ export function applyCollectionFilters(
   result = [...result].sort((a, b) => {
     if (filters.sort === "price-asc") return a.price - b.price;
     if (filters.sort === "price-desc") return b.price - a.price;
-    if (filters.sort === "popular") return (b.rating ?? 0) - (a.rating ?? 0);
+    if (filters.sort === "relevance" && searchRank) {
+      return (
+        (searchRank.get(a.slug) ?? 99) - (searchRank.get(b.slug) ?? 99) ||
+        (b.rating ?? 0) - (a.rating ?? 0) ||
+        compareText(a.name, b.name)
+      );
+    }
+    if (filters.sort === "popular" || filters.sort === "relevance") {
+      return (b.rating ?? 0) - (a.rating ?? 0);
+    }
     return compareText(a.name, b.name);
   });
 

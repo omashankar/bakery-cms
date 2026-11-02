@@ -351,6 +351,67 @@ export async function getStorefrontProductCards(): Promise<LandingProduct[]> {
   return products.map((product) => toCard(product, modules));
 }
 
+/**
+ * THE CARDS THE SEARCH DROPDOWN RANKS, held for thirty seconds.
+ *
+ * The dropdown asks on every pause in typing, and each answer read the whole
+ * published catalogue from the database: 90–180 ms of round trip to Atlas for
+ * what is, between two keystrokes, the same list. Held here it is answered in
+ * a few milliseconds.
+ *
+ * Only for the dropdown, which shows a name, a photo and a category — never a
+ * price or stock, so a held copy cannot misquote either. Every product write
+ * on this server lets it go at once; another server instance holds its copy at
+ * most thirty seconds, and the product page behind a suggestion reads fresh.
+ */
+const SUGGESTION_CARDS_MS = 30_000;
+/** Past this, a held copy is too old to answer with while a fresh one is read. */
+const SUGGESTION_CARDS_STALE_MS = 5 * 60_000;
+let suggestionCards: { at: number; cards: LandingProduct[] } | null = null;
+let suggestionRead: Promise<LandingProduct[]> | null = null;
+/** Bumped by every write, so a read begun before it cannot be kept after it. */
+let suggestionGeneration = 0;
+
+function readSuggestionCards(): Promise<LandingProduct[]> {
+  if (!suggestionRead) {
+    const generation = suggestionGeneration;
+    const read = getStorefrontProductCards().then((cards) => {
+      if (generation === suggestionGeneration) suggestionCards = { at: Date.now(), cards };
+      return cards;
+    });
+    suggestionRead = read;
+    // Settled either way; a failed read is not kept, and the next keystroke asks again.
+    read.then(
+      () => {
+        if (suggestionRead === read) suggestionRead = null;
+      },
+      () => {
+        if (suggestionRead === read) suggestionRead = null;
+      },
+    );
+  }
+  return suggestionRead;
+}
+
+/**
+ * Answered from the held copy; once it is over thirty seconds old the next
+ * one is read behind the answer rather than in front of it — so no customer's
+ * keystroke is the one that waits for the database, bar the very first.
+ */
+export async function getSuggestionCards(): Promise<LandingProduct[]> {
+  const held = suggestionCards;
+  const age = held ? Date.now() - held.at : Infinity;
+  if (!held || age > SUGGESTION_CARDS_STALE_MS) return readSuggestionCards();
+  if (age > SUGGESTION_CARDS_MS) void readSuggestionCards().catch(() => undefined);
+  return held.cards;
+}
+
+function forgetSuggestionCards(): void {
+  suggestionGeneration += 1;
+  suggestionCards = null;
+  suggestionRead = null;
+}
+
 export async function getStorefrontProductBySlug(
   slug: string
 ): Promise<LandingProduct | null> {
@@ -383,6 +444,7 @@ function nextId(): string {
 }
 
 export async function createProduct(data: ProductFormData): Promise<Product> {
+  forgetSuggestionCards();
   if (data.status === "published") await assertPublishable([data]);
   const timestamp = nowIso();
   return productRepo.insertOne({
@@ -407,6 +469,7 @@ export async function updateProduct(
   data: ProductFormData,
   options: { stockQuantityLoaded?: number } = {},
 ): Promise<Product | null> {
+  forgetSuggestionCards();
   const existing = await getProductById(id);
   if (!existing) return null;
   if (data.status === "published") await assertPublishable([data]);
@@ -482,6 +545,7 @@ async function stockForEdit(
  * survive because a follow-up cleanup failed.
  */
 export async function deleteProduct(id: string): Promise<boolean> {
+  forgetSuggestionCards();
   const existing = await getProductById(id);
   const removed = await productRepo.deleteOne(id);
   if (!removed || !existing) return removed;
@@ -499,6 +563,7 @@ export async function setProductStatus(
   ids: string[],
   status: Product["status"]
 ): Promise<number> {
+  forgetSuggestionCards();
   if (ids.length === 0) return 0;
   if (status === "published") {
     const products = await Promise.all(ids.map((id) => productRepo.findById(id)));

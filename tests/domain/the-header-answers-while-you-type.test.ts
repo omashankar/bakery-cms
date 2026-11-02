@@ -339,9 +339,10 @@ describe("what the header offers while a customer types", () => {
     */
     const filters = read("apps/website/lib/collection-filters.ts");
 
-    expect(filters, "the filter no longer shares the haystack").toContain(
-      "searchHaystack(cake).includes(query)",
-    );
+    // One matcher (search-match.ts) for both, over the one haystack.
+    expect(filters, "the filter no longer shares the matcher").toContain("searchCatalog(query, cakes)");
+    expect(read("features/products/lib/product-suggestions.ts")).toContain("searchCatalog(query, products)");
+    expect(read("features/products/lib/search-match.ts")).toContain("searchHaystack(product)");
     expect(
       filters.includes("...(cake.optionLabels ?? []),"),
       "the haystack has been copied back into the filter",
@@ -355,13 +356,13 @@ describe("the endpoint that answers the box", () => {
   it("refuses a blank query before it reads anything", () => {
     /*
       ORDER IS THE POINT, not the presence of the check. Below the minimum
-      this must return before `getStorefrontProductCards()`, or a stranger
+      this must return before `getSuggestionCards()`, or a stranger
       holding down a key costs the shop a full catalogue read per keystroke to
       be told nothing.
     */
     const source = read(CONTROLLER);
     const refusal = source.indexOf("query.length < MIN_SUGGEST_CHARS");
-    const readsProducts = source.indexOf("await getStorefrontProductCards()");
+    const readsProducts = source.indexOf("await getSuggestionCards()");
 
     expect(refusal, "the blank-query guard is gone").toBeGreaterThan(-1);
     expect(readsProducts, "the endpoint reads no products at all").toBeGreaterThan(-1);
