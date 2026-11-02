@@ -5,6 +5,8 @@ import { requirePermission, requireStaff, type Actor } from "@/lib/server/auth/a
 import { requestContext } from "@/lib/server/audit/audit-log";
 
 import { sendTestEmail } from "@/lib/server/mail/send-test-email";
+import { runDeliveryCheck } from "@/lib/server/mail/delivery-check";
+import { rateLimit } from "@/lib/server/http/rate-limit";
 
 import * as service from "./settings.service";
 import { StaleSectionError } from "./settings.repository";
@@ -171,6 +173,19 @@ export const resetSectionController = withErrorHandler(
  * and delivers an actual message, so a wrong port or password fails HERE rather
  * than silently on the next customer's order confirmation.
  */
+/**
+ * "Is mail reaching inboxes?" — the From domain's DNS, and for Brevo (with
+ * BREVO_API_KEY on the server) the account, the sender and Brevo's own log.
+ * A server that accepts a message has not delivered it; this is the rest.
+ */
+export const deliveryCheckController = withErrorHandler(async (request: Request) => {
+  const session = await requirePermission("settings.manage");
+  rateLimit(`delivery-check:${session.sub}`, { limit: 20, windowMs: 10 * 60_000 });
+  void request;
+  const settings = (await service.getSettings()) as { smtp?: { host?: string; fromEmail?: string } };
+  return ok(await runDeliveryCheck(settings.smtp ?? {}), "Delivery check");
+});
+
 export const sendTestEmailController = withErrorHandler(async (request: Request) => {
   const session = await requirePermission("settings.manage");
 

@@ -22,6 +22,7 @@ import {
   saveSmtpSettings,
 } from "@/features/settings/lib/settings-repository";
 import { SettingsSectionShell } from "./settings-section-shell";
+import { MailDeliveryCheck } from "./mail-delivery-check";
 import { SettingsHydrationNotice } from "./settings-field-error";
 import { useSettingsSection } from "@/features/settings/lib/use-settings-section";
 
@@ -320,6 +321,8 @@ export function SmtpSettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <MailDeliveryCheck />
     </SettingsSectionShell>
   );
 }
