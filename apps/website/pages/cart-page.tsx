@@ -97,13 +97,15 @@ interface CartPageProps {
    * and replaces them on mount.
    */
   initialItems?: CartLineItem[];
+  /** The server knows what the cart holds — its lines, or that it is empty — so no skeleton. */
+  cartKnown?: boolean;
   /** The shop's delivery rules, read on the server, so the first totals are right. */
   initialCommerce?: CommerceSettings;
   /** The delivery zones, read on the server, so the PIN box is drawn with the page. */
   initialZones?: DeliveryZone[];
 }
 
-export function CartPage({ catalog = [], initialItems, initialCommerce, initialZones }: CartPageProps) {
+export function CartPage({ catalog = [], initialItems, cartKnown = false, initialCommerce, initialZones }: CartPageProps) {
   const [items, setItems] = useState<CartLineItem[]>(() => initialItems ?? []);
   const [savedItems, setSavedItems] = useState<CartLineItem[]>([]);
   const [preferences, setPreferences] = useState<CartPreferences>({
@@ -440,7 +442,7 @@ export function CartPage({ catalog = [], initialItems, initialCommerce, initialZ
       {/* `pb-24` on a phone: the sticky checkout bar sits over the last of it. */}
       <section className={cn(layoutSpacing.sectionY, "pb-28 lg:pb-16")}>
         <div className={layoutSpacing.container}>
-          {!loaded && items.length === 0 ? (
+          {!loaded && items.length === 0 && !cartKnown ? (
             // No cart cookie (a first visit, or a cart too big for one): the
             // server has nothing to render. Mirror the real layout rather than
             // showing one grey slab, so the page does not visibly jump when the

@@ -64,9 +64,30 @@ export function decodeCartCookie(raw: string | undefined): CartLineItem[] {
 }
 
 /** Mirror the cart into the cookie — or clear it when empty or too big. */
+/**
+ * Written when the cart has lines but they will not fit in a cookie.
+ *
+ * Without it "no cookie" meant two things — an empty cart, or one too big to
+ * mirror — so the page could only show a skeleton for both, and every first
+ * visit waited for the scripts to find out its cart was empty. Now no cookie
+ * means empty, and this means "look in the browser".
+ */
+export const CART_TOO_BIG = "big";
+
+/**
+ * What the server may say about this browser's cart before any script runs:
+ * its lines, "empty", or "unknown" (too big to mirror — draw a skeleton).
+ */
+export function cartFromCookie(raw: string | undefined): { items: CartLineItem[]; known: boolean } {
+  if (raw === undefined || raw === "") return { items: [], known: true };
+  if (raw === CART_TOO_BIG) return { items: [], known: false };
+  const items = decodeCartCookie(raw);
+  return { items, known: items.length > 0 };
+}
+
 export function writeCartCookie(items: readonly CartLineItem[]): void {
   if (typeof document === "undefined") return;
-  const value = encodeCartCookie(items);
+  const value = items.length > 0 ? (encodeCartCookie(items) ?? CART_TOO_BIG) : null;
   document.cookie = value
     ? `${CART_COOKIE}=${value}; Path=${CART_COOKIE_PATH}; Max-Age=${MAX_AGE_S}; SameSite=Lax`
     : `${CART_COOKIE}=; Path=${CART_COOKIE_PATH}; Max-Age=0; SameSite=Lax`;

@@ -6,7 +6,7 @@ import { getStorefrontProductCards } from "@/features/products/data/products-ser
 import { getPublicSettings } from "@/features/settings/server/settings.service";
 import { getPublicZones } from "@/features/commerce/server/commerce.service";
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
-import { CART_COOKIE, decodeCartCookie } from "@/features/cart/lib/cart-cookie";
+import { CART_COOKIE, cartFromCookie } from "@/features/cart/lib/cart-cookie";
 import type { CommerceSettings } from "@/types/settings";
 
 export const metadata: Metadata = {
@@ -29,7 +29,9 @@ export default async function Page() {
   // drawn with them instead of a skeleton (see cart-cookie.ts) — and the
   // shop's own delivery rules beside them, merged over the defaults exactly as
   // the browser merges them, so the first numbers are the right ones.
-  const initialItems = decodeCartCookie(jar.get(CART_COOKIE)?.value);
+  // No cookie at all is an empty cart, drawn as one at once: a first visit
+  // used to show a skeleton until the scripts had run, to say "empty".
+  const { items: initialItems, known: cartKnown } = cartFromCookie(jar.get(CART_COOKIE)?.value);
   const stored = (settings.commerce ?? {}) as Partial<CommerceSettings>;
   const initialCommerce: CommerceSettings = {
     ...defaultCommerceSettings,
@@ -41,6 +43,7 @@ export default async function Page() {
     <CartPage
       catalog={catalog}
       initialItems={initialItems}
+      cartKnown={cartKnown}
       initialCommerce={initialCommerce}
       // The delivery box is drawn with the page rather than after it.
       initialZones={JSON.parse(JSON.stringify(zones))}

@@ -121,13 +121,36 @@ function renderSections(
       );
     }
 
-    return (
+    const rendered = (
       <HomepageSectionRenderer
         {...data}
         key={section.instanceId}
         section={section}
         aboveTheFold={index < 3}
       />
+    );
+    if (index < 3) return rendered;
+
+    /*
+      BELOW THE FIRST SCREEN, NOT DRAWN UNTIL IT IS NEARLY ON SCREEN.
+
+      On a throttled phone the home page fetched about thirty product photos
+      (~600 KB) before anyone scrolled: Chrome loads a `lazy` image 2,500px
+      ahead on a slow connection, and twenty bands of rails sit inside that.
+      They shared the line with the scripts, so the page answered a tap later.
+      A skipped band has no layout, so its lazy images are not near anything
+      and wait; it also costs no style or layout work until it is reached.
+
+      The reserved height is a guess for the scrollbar only — `auto` keeps
+      each band's real height once it has been drawn.
+    */
+    return (
+      <div
+        key={section.instanceId}
+        className="[content-visibility:auto] [contain-intrinsic-size:auto_640px]"
+      >
+        {rendered}
+      </div>
     );
   });
 }
