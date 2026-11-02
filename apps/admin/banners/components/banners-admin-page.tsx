@@ -364,6 +364,7 @@ export function BannersAdminPage({
           />
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:w-auto">
             <AdminSelect
+              aria-label="Filter by status"
               value={filters.status}
               onChange={(e) =>
                 updateFilters({ status: e.target.value as BannerListFilters["status"] })
@@ -376,6 +377,7 @@ export function BannersAdminPage({
               <option value="expired">Expired</option>
             </AdminSelect>
             <AdminSelect
+              aria-label="Filter by position"
               value={filters.position}
               onChange={(e) =>
                 updateFilters({ position: e.target.value as BannerListFilters["position"] })
@@ -387,6 +389,7 @@ export function BannersAdminPage({
               <option value="popup">Popup</option>
             </AdminSelect>
             <AdminSelect
+              aria-label="Filter by visibility"
               value={filters.visibility}
               onChange={(e) =>
                 updateFilters({
@@ -400,6 +403,7 @@ export function BannersAdminPage({
               <option value="collections">Collections</option>
             </AdminSelect>
             <AdminSelect
+              aria-label="Sort by"
               value={filters.sort}
               onChange={(e) =>
                 updateFilters({ sort: e.target.value as BannerListFilters["sort"] })

@@ -33,7 +33,7 @@ export function DeleteBannerDialog({
         <DialogHeader>
           <DialogTitle>Delete {count > 1 ? "banners" : "banner"}?</DialogTitle>
           <DialogDescription>
-            Delete {label}? This cannot be undone in the demo CMS.
+            Delete {label}? This cannot be undone.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="gap-2 sm:justify-end">

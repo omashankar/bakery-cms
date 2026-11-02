@@ -671,12 +671,12 @@ export function MegaMenu({
                     section.href ? (
                       <Link
                         href={section.href}
-                        className="mb-2 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80 transition-premium hover:text-bakery-700"
+                        className="mb-2 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground transition-premium hover:text-bakery-700"
                       >
                         {section.heading}
                       </Link>
                     ) : (
-                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                         {section.heading}
                       </p>
                     )
@@ -900,7 +900,7 @@ export function MobileShopLinks({
                 fix that lands on one of these two renderers and not the
                 other is a defect this component has shipped twice. */}
             {group.heading.trim() ? (
-              <p className="px-3 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+              <p className="px-3 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 {group.heading}
               </p>
             ) : null}
@@ -962,12 +962,12 @@ export function MobileShopLinks({
               <Link
                 href={section.href}
                 onClick={onNavigate}
-                className="block px-3 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80 transition-premium hover:text-bakery-700"
+                className="block px-3 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground transition-premium hover:text-bakery-700"
               >
                 {section.heading}
               </Link>
             ) : (
-              <p className="px-3 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+              <p className="px-3 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 {section.heading}
               </p>
             )

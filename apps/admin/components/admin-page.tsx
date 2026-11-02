@@ -60,7 +60,7 @@ export function AdminPageHeader({
           <p className="max-w-2xl text-sm text-pretty text-muted-foreground">{description}</p>
         ) : null}
         {status ? (
-          <p className="text-xs font-medium text-muted-foreground/80 tabular-nums">{status}</p>
+          <p className="text-xs font-medium text-muted-foreground tabular-nums">{status}</p>
         ) : null}
       </div>
       {actions ? (

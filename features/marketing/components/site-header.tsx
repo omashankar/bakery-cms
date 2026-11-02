@@ -24,7 +24,7 @@ function NavItem({
     return (
       <span
         className={cn(
-          "inline-flex cursor-default items-center gap-1.5 text-sm font-medium text-muted-foreground/70",
+          "inline-flex cursor-default items-center gap-1.5 text-sm font-medium text-muted-foreground",
           className
         )}
       >

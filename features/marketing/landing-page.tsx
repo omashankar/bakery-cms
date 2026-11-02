@@ -79,7 +79,7 @@ export function LandingPage() {
               <ul className="mt-2 flex flex-wrap gap-x-6 gap-y-2">
                 {heroTrust.map((item) => (
                   <li key={item} className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-                    <span className="flex size-4 items-center justify-center rounded-full bg-[#E9F1E4] text-[#4f8a45]">
+                    <span className="flex size-4 items-center justify-center rounded-full bg-[#E9F1E4] text-[#3d6e35]">
                       <CheckIcon className="size-2.5" strokeWidth={3} />
                     </span>
                     {item}
@@ -97,7 +97,7 @@ export function LandingPage() {
                 <DashboardMockup />
               </BrowserFrame>
               <div className="absolute -bottom-5 -left-4 hidden items-center gap-2.5 rounded-2xl border border-border bg-card px-4 py-3 shadow-lg sm:flex">
-                <span className="flex size-9 items-center justify-center rounded-xl bg-[#E9F1E4] text-[#4f8a45]">
+                <span className="flex size-9 items-center justify-center rounded-xl bg-[#E9F1E4] text-[#3d6e35]">
                   <TrendingUpIcon className="size-5" />
                 </span>
                 <div>
@@ -216,7 +216,7 @@ export function LandingPage() {
                 >
                   <div className="flex items-center justify-between">
                     <IconTile icon={m.icon} className="size-11 rounded-xl [&_svg]:size-5" />
-                    <span className="rounded-full bg-[#F3EEE7] px-2.5 py-1 text-[11px] font-semibold text-[#8a6a45]">
+                    <span className="rounded-full bg-[#F3EEE7] px-2.5 py-1 text-[11px] font-semibold text-[#735836]">
                       {m.status}
                     </span>
                   </div>
@@ -346,7 +346,7 @@ export function LandingPage() {
                       key={metric}
                       className="flex items-center gap-2 rounded-xl border border-border bg-card px-3.5 py-3 text-sm font-medium shadow-sm"
                     >
-                      <CheckIcon className="size-4 shrink-0 text-[#4f8a45]" strokeWidth={2.5} />
+                      <CheckIcon className="size-4 shrink-0 text-[#3d6e35]" strokeWidth={2.5} />
                       {metric}
                     </div>
                   ))}
@@ -447,8 +447,8 @@ export function LandingPage() {
                           className={
                             "inline-flex w-fit shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold " +
                             (item.status === "Available"
-                              ? "bg-[#E9F1E4] text-[#4f8a45]"
-                              : "bg-[#F6ECDF] text-[#8a6a45]")
+                              ? "bg-[#E9F1E4] text-[#3d6e35]"
+                              : "bg-[#F6ECDF] text-[#735836]")
                           }
                         >
                           <span
@@ -520,7 +520,7 @@ export function LandingPage() {
                   className="absolute -bottom-20 -left-16 size-64 rounded-full bg-[#D4A373]/15 blur-2xl"
                 />
                 <div className="relative flex flex-col items-center gap-6">
-                  <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-1.5 text-xs font-semibold text-[#F0DFC9]">
+                  <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-1.5 text-xs font-semibold text-[#FAF1E4]">
                     <SparklesIcon className="size-3.5" />
                     Ready when you are
                   </span>

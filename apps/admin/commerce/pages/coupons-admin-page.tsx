@@ -282,6 +282,7 @@ export function CouponsAdminPage({
                     <div className="flex items-center gap-2 rounded-lg border border-border px-3 py-2">
                       <span className="text-xs text-muted-foreground">Active</span>
                       <Switch
+                        aria-label={`${coupon.code} active`}
                         checked={coupon.isActive}
                         onCheckedChange={() => handleToggle(coupon)}
                       />

@@ -210,7 +210,18 @@ export function AccountDashboardPage() {
             <div className="grid gap-5 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="firstName">First Name</Label>
-                <IconInput icon={User} id="firstName" autoComplete="given-name" {...register("firstName", { required: true })} />
+                <IconInput
+                  icon={User}
+                  id="firstName"
+                  autoComplete="given-name"
+                  aria-invalid={formState.errors.firstName ? true : undefined}
+                  {...register("firstName", { required: "Enter your first name" })}
+                />
+                {formState.errors.firstName ? (
+                  <p role="alert" className="text-xs text-destructive">
+                    {formState.errors.firstName.message}
+                  </p>
+                ) : null}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="lastName">Last Name</Label>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { Fragment, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import {
   Breadcrumb,
@@ -63,7 +63,9 @@ export function AdminBreadcrumbs({ className }: AdminBreadcrumbsProps) {
           const showEllipsis = collapsed && index === 0;
 
           return (
-            <span key={`${crumb.label}-${index}`} className="contents">
+            // A Fragment, not a wrapper: an <ol> may hold only <li>, and a span
+            // around each pair made the trail an invalid list for screen readers.
+            <Fragment key={`${crumb.label}-${index}`}>
               {index > 0 ? <BreadcrumbSeparator /> : null}
               {showEllipsis ? (
                 <>
@@ -102,7 +104,7 @@ export function AdminBreadcrumbs({ className }: AdminBreadcrumbsProps) {
                   )}
                 </BreadcrumbItem>
               )}
-            </span>
+            </Fragment>
           );
         })}
       </BreadcrumbList>

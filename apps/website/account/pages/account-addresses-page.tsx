@@ -274,7 +274,14 @@ export function AccountAddressesPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <IconInput icon={Mail} id="email" type="email" {...register("email", { required: true })} />
+                <IconInput
+                  icon={Mail}
+                  id="email"
+                  type="email"
+                  aria-invalid={formState.errors.email ? true : undefined}
+                  {...register("email", { required: "Enter an email for order updates" })}
+                />
+                <FieldError message={formState.errors.email?.message} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone</Label>

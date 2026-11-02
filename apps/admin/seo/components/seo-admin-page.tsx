@@ -728,7 +728,7 @@ export function SeoAdminPage({
         <CardHeader>
           <CardTitle className="text-base">Sitemap & robots</CardTitle>
           <CardDescription>
-            Generated from indexable SEO routes in this demo environment.
+            Generated from the pages search engines may index.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">

@@ -41,7 +41,9 @@ export function GatewayCard({
     <div
       className={cn(
         "flex flex-col rounded-2xl border bg-card p-5 shadow-sm transition-colors",
-        !wired ? "border-dashed border-border opacity-70" : null,
+        // Faded by its border and a muted fill, not opacity: opacity took the text
+        // below a readable contrast.
+        !wired ? "border-dashed border-border bg-muted/30" : null,
         wired && runtime.enabled ? "border-bakery-700/40" : "border-border"
       )}
     >

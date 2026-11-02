@@ -308,6 +308,7 @@ export function TestimonialsAdminPage({
           />
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:w-auto">
             <AdminSelect
+              aria-label="Filter by status"
               value={filters.status}
               onChange={(e) =>
                 updateFilters({ status: e.target.value as TestimonialListFilters["status"] })
@@ -319,6 +320,7 @@ export function TestimonialsAdminPage({
               <option value="archived">Archived</option>
             </AdminSelect>
             <AdminSelect
+              aria-label="Filter by featured"
               value={filters.featured}
               onChange={(e) =>
                 updateFilters({
@@ -330,6 +332,7 @@ export function TestimonialsAdminPage({
               <option value="featured">Featured only</option>
             </AdminSelect>
             <AdminSelect
+              aria-label="Sort by"
               value={filters.sort}
               onChange={(e) =>
                 updateFilters({ sort: e.target.value as TestimonialListFilters["sort"] })

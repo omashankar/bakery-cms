@@ -35,7 +35,7 @@ export function DeleteProductDialog({
         <DialogHeader>
           <DialogTitle>Delete {count > 1 ? "products" : "product"}?</DialogTitle>
           <DialogDescription>
-            Delete {label}? This cannot be undone in the demo store.
+            Delete {label}? This cannot be undone.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="gap-2 sm:justify-end">

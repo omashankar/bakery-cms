@@ -367,6 +367,9 @@ export function ReportsPage({
             <CardContent className="flex flex-1 flex-col pt-0">
               <div
                 ref={trendScrollRef}
+                tabIndex={0}
+                role="region"
+                aria-label={money ? "Revenue trend chart" : "Orders trend chart"}
                 className="flex flex-1 flex-col overflow-x-auto rounded-xl border border-dashed border-border bg-muted/50 p-3 sm:p-4"
               >
                 {figures !== "ready" ? (
