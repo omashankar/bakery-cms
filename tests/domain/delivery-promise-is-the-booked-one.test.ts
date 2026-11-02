@@ -224,3 +224,29 @@ describe("there is no map, and no slot for one", () => {
     expect(getDeliveryTrackingSnapshot(order()).destinationLabel).toBe("Mumbai, 400001");
   });
 });
+
+describe("a delivered order says the day it arrived", () => {
+  /**
+   * It printed the BOOKED day. A cake booked for Thursday 5 November and
+   * delivered early on 31 October read "Your order arrived on Thursday,
+   * 5 November" — a delivery dated in the future.
+   */
+  it("is the day of the delivered event, not the booked slot", () => {
+    const delivered = order({
+      status: "delivered",
+      deliverySlot: { date: "2026-11-05", timeSlot: "10:00 AM – 12:00 PM" },
+      statusHistory: [
+        { status: "confirmed", at: "2026-10-31T05:00:00.000Z" },
+        { status: "delivered", at: "2026-10-31T09:30:00.000Z" },
+      ],
+    } as Partial<PlacedOrder>);
+    const detail = getDeliveryTrackingSnapshot(delivered).etaDetail;
+    expect(detail).toContain("31 October");
+    expect(detail).not.toContain("5 November");
+  });
+
+  it("falls back to the booked day when the history has no delivered event", () => {
+    const detail = getDeliveryTrackingSnapshot(order({ status: "delivered" })).etaDetail;
+    expect(detail).toContain("16 August");
+  });
+});

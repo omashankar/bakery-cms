@@ -47,6 +47,8 @@ import {
   sendTemplatedEmail,
 } from "@/features/communications/server/email.service";
 import { notifyWhatsApp } from "@/features/communications/server/whatsapp.service";
+import { sendMail } from "@/lib/server/mail/send-mail";
+import * as teamRepo from "@/features/team/server/team.repository";
 import { isNotificationEnabled } from "@/features/payments/server/notification-prefs.server";
 import { routes } from "@/constants/routes";
 import { formatCurrency } from "@/utils/format";
@@ -1534,7 +1536,51 @@ export async function updateDeliveryPartner(
     ...(partner?.userId ? { userId: partner.userId } : {}),
     ...(before.deliveryPartner?.userId ? { previousUserId: before.deliveryPartner.userId } : {}),
   });
+  // A NEW rider is told. Re-saving the same one sends nothing.
+  if (updated && partner?.userId && partner.userId !== before.deliveryPartner?.userId) {
+    await notifyRiderOfAssignment(updated, partner.userId);
+  }
   return updated;
+}
+
+const escapeHtml = (text: string) =>
+  text.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+
+/**
+ * Tell a team member a delivery is now theirs.
+ *
+ * Assigning a rider changed a field and nothing else: the rider found out
+ * only if they happened to open My deliveries. Their own account's email now
+ * gets the order, the day and window, and the area — enough to plan a round —
+ * with a link to the screen that holds the address and the customer's phone.
+ * Those stay out of the email: it is read on any device, and the screen is
+ * behind the rider's own sign-in.
+ *
+ * Never fails the assignment: the rider is assigned either way, and the
+ * screen tells them too (it rings for a new delivery).
+ */
+async function notifyRiderOfAssignment(order: PlacedOrder, userId: string): Promise<void> {
+  try {
+    const rider = await teamRepo.findMember(userId);
+    if (!rider?.email || rider.status !== "active") return;
+    const base = (await publicBaseUrl()).replace(/\/$/, "");
+    const link = `${base}${routes.admin.deliveries}`;
+    const slot = order.deliverySlot;
+    const when = slot?.date ? `${slot.date}${slot.timeSlot ? `, ${slot.timeSlot}` : ""}` : "as soon as it is ready";
+    const area = [order.address?.city, order.address?.pincode].filter(Boolean).join(" ");
+    const items = (order.items ?? []).map((item) => `${item.quantity} × ${item.name}`).join(", ");
+    const result = await sendMail({
+      to: rider.email,
+      subject: `New delivery for you: ${order.orderNumber}`,
+      html: `<p>Hi ${escapeHtml(rider.name || "there")},</p>
+<p>Order <strong>${escapeHtml(order.orderNumber)}</strong> has been given to you to deliver.</p>
+<p><strong>When:</strong> ${escapeHtml(when)}<br><strong>Area:</strong> ${escapeHtml(area || "see the app")}<br><strong>Items:</strong> ${escapeHtml(items)}</p>
+<p><a href="${link}">Open My deliveries</a> for the address, the customer's phone and directions.</p>`,
+    });
+    if (!result.sent) console.error(`[orders] Could not email the rider for ${order.orderNumber}: ${result.error}`);
+  } catch (error) {
+    console.error(`[orders] Could not tell the rider about ${order.orderNumber}:`, error);
+  }
 }
 
 /**

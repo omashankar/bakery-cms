@@ -18,6 +18,7 @@ import { StaffMoveButton } from "./components/staff-move-button";
 import { StaffOrderCard } from "./components/staff-order-card";
 import { bySlot, slotUrgency, urgencyLabel, useShopToday } from "./lib/slot-urgency";
 import { useStaffOrders } from "./lib/use-staff-orders";
+import { announceArrivals, useArrivalAlerts } from "./lib/arrival-alert";
 
 const COLUMNS = [
   { status: "confirmed", title: "To start", empty: "Nothing waiting to be started.", dot: "bg-amber-500", icon: Inbox },
@@ -34,7 +35,16 @@ type Step = (typeof COLUMNS)[number]["status"];
  * instead of three squeezed columns. Soonest delivery first; refreshes itself.
  */
 export function KitchenPage({ initial = null }: { initial?: KitchenOrderView[] | null } = {}) {
-  const { orders, state, stale, lastLoaded, refresh, replace } = useStaffOrders(fetchKitchenQueue, initial);
+  // A new order to make rings the counter tablet, not just joins the list.
+  useArrivalAlerts();
+  const { orders, state, stale, lastLoaded, refresh, replace } = useStaffOrders(fetchKitchenQueue, initial, (arrived) => {
+    const toMake = arrived.filter((o) => o.status === "confirmed");
+    if (toMake.length === 0) return;
+    announceArrivals(
+      toMake.length === 1 ? `New order to make: ${toMake[0].orderNumber}` : `${toMake.length} new orders to make`,
+      toMake.length,
+    );
+  });
   const canMove = useCan("orders.update_status");
   const clock = useShopToday();
   // Until someone picks a tab, open the first step that has work in it.
@@ -90,7 +100,7 @@ export function KitchenPage({ initial = null }: { initial?: KitchenOrderView[] |
           </TabsList>
 
           {clock && !loading ? (
-            <div className="flex flex-wrap items-center gap-2 text-xs font-medium" aria-label="Kitchen summary">
+            <div className="flex flex-wrap items-center gap-2 text-xs font-medium" role="group" aria-label="Kitchen summary">
               {late > 0 ? (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-2.5 py-1 text-destructive">
                   <AlertTriangle className="size-3.5" aria-hidden />

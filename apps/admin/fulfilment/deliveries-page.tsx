@@ -15,6 +15,7 @@ import { StaffMoveButton } from "./components/staff-move-button";
 import { StaffOrderCard } from "./components/staff-order-card";
 import { bySlot, slotUrgency, urgencyLabel, useShopToday } from "./lib/slot-urgency";
 import { useStaffOrders } from "./lib/use-staff-orders";
+import { announceArrivals, useArrivalAlerts } from "./lib/arrival-alert";
 
 /** What the rider does next, first: what is in the bag, what to collect, what is still being made. */
 const GROUPS = [
@@ -89,7 +90,14 @@ function DeliveryDetails({ order }: { order: DeliveryOrderView }) {
  * server sends. What is on its way first, then what they delivered today.
  */
 export function DeliveriesPage({ initial = null }: { initial?: DeliveryOrderView[] | null } = {}) {
-  const { orders, state, stale, lastLoaded, refresh, replace } = useStaffOrders(fetchMyDeliveries, initial);
+  // A delivery handed to this rider rings their phone, not just joins the list.
+  useArrivalAlerts();
+  const { orders, state, stale, lastLoaded, refresh, replace } = useStaffOrders(fetchMyDeliveries, initial, (arrived) =>
+    announceArrivals(
+      arrived.length === 1 ? `New delivery for you: ${arrived[0].orderNumber}` : `${arrived.length} new deliveries for you`,
+      arrived.length,
+    ),
+  );
   const { access, can } = useAccess();
   const userId = access?.userId ?? null;
   const days = useShopToday();
