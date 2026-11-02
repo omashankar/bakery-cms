@@ -13,7 +13,7 @@ interface BrowserFrameProps {
  * Pure CSS — no external images.
  */
 export function BrowserFrame({
-  url = "app.bakerycms.com/admin",
+  url = "yourbakery.in/admin",
   children,
   className,
   bodyClassName,

@@ -57,6 +57,8 @@ export const pricingTiers: PricingTier[] = [
       "Inventory tracking with low-stock alerts",
       "Coupons, offers and delivery zones",
       "Reviews with moderation",
+      "Kitchen board and rider deliveries, with new-order alerts",
+      "Staff logins — kitchen, delivery and manager roles",
       "Reports — revenue, top products, customers, payment mix",
       "WhatsApp and email templates",
       "Media library with folders",

@@ -2,26 +2,29 @@ import type { ComponentType, SVGProps } from "react";
 import {
   BarChart3Icon,
   BellIcon,
+  BikeIcon,
+  CalendarCheckIcon,
+  CameraIcon,
+  ChefHatIcon,
+  IndianRupeeIcon,
+  UserCogIcon,
   BoxesIcon,
   CakeIcon,
   CandyIcon,
   Flower2Icon,
   GiftIcon,
   LaptopIcon,
-  PillIcon,
   ShirtIcon,
   ShoppingBasketIcon,
   UtensilsCrossedIcon,
   ClipboardCheckIcon,
   ClockIcon,
   CreditCardIcon,
-  DatabaseIcon,
   FileTextIcon,
   HomeIcon,
   ImageIcon,
   LayoutDashboardIcon,
   LayoutGridIcon,
-  LayoutTemplateIcon,
   MailIcon,
   MapPinIcon,
   MessageCircleIcon,
@@ -32,7 +35,6 @@ import {
   RotateCcwIcon,
   SearchIcon,
   ServerIcon,
-  SettingsIcon,
   ShieldCheckIcon,
   ShoppingBagIcon,
   ShoppingCartIcon,
@@ -41,7 +43,6 @@ import {
   StarIcon,
   StoreIcon,
   TicketPercentIcon,
-  TrendingUpIcon,
   TruckIcon,
   UsersIcon,
   WalletIcon,
@@ -94,52 +95,6 @@ export const ctaLinks = {
   reports: routes.admin.reports,
 };
 
-/* ------------------------------------------------------------------ */
-/* Section 3 — Trusted Features                                        */
-/* ------------------------------------------------------------------ */
-
-export const trustedFeatures: {
-  icon: IconType;
-  title: string;
-  description: string;
-}[] = [
-  {
-    icon: LayoutTemplateIcon,
-    title: "CMS Driven Website",
-    description:
-      "Publish and update every page of your bakery website visually — no code, no developers.",
-  },
-  {
-    icon: ShoppingBagIcon,
-    title: "Online Ordering",
-    description:
-      "Take cake orders online with customization, scheduling, and a secure, guided checkout.",
-  },
-  {
-    icon: BoxesIcon,
-    title: "Inventory",
-    description:
-      "Track stock and availability across your entire catalog in real time, automatically.",
-  },
-  {
-    icon: TruckIcon,
-    title: "Delivery",
-    description:
-      "Set delivery zones, time slots, and shipping rules that match how your bakery ships.",
-  },
-  {
-    icon: CreditCardIcon,
-    title: "Payments",
-    description:
-      "Accept every popular payment method with automatic invoices, taxes, and refunds.",
-  },
-  {
-    icon: BarChart3Icon,
-    title: "Analytics",
-    description:
-      "See revenue, orders, and customer trends together in one clear, elegant dashboard.",
-  },
-];
 
 /* ------------------------------------------------------------------ */
 /* Section 4 — Customer Journey                                        */
@@ -149,7 +104,7 @@ export const customerJourney: { icon: IconType; label: string }[] = [
   { icon: HomeIcon, label: "Home" },
   { icon: LayoutGridIcon, label: "Browse Cakes" },
   { icon: CakeIcon, label: "Product Details" },
-  { icon: SparklesIcon, label: "Customization" },
+  { icon: SparklesIcon, label: "Personalise" },
   { icon: ShoppingCartIcon, label: "Cart" },
   { icon: ClipboardCheckIcon, label: "Checkout" },
   { icon: CreditCardIcon, label: "Payment" },
@@ -165,22 +120,23 @@ export const adminModules: {
   icon: IconType;
   title: string;
   description: string;
-  status: string;
 }[] = [
-  { icon: LayoutDashboardIcon, title: "Dashboard", description: "Your whole business at a glance.", status: "Real-time" },
-  { icon: ShoppingBagIcon, title: "Orders", description: "Manage every order end to end.", status: "Live" },
-  { icon: UsersIcon, title: "Customers", description: "Profiles, history, and segments.", status: "CRM" },
-  { icon: CakeIcon, title: "Products", description: "Cakes, catalog, and variants.", status: "Catalog" },
-  { icon: BoxesIcon, title: "Inventory", description: "Stock levels and low-stock alerts.", status: "Real-time" },
-  { icon: CreditCardIcon, title: "Payments", description: "Gateways, transactions, refunds.", status: "Secure" },
-  { icon: TruckIcon, title: "Delivery", description: "Zones, slots, and shipping rules.", status: "Configurable" },
-  { icon: TicketPercentIcon, title: "Coupons", description: "Discounts and promo campaigns.", status: "Marketing" },
-  { icon: BarChart3Icon, title: "Reports", description: "Revenue and performance insights.", status: "Analytics" },
-  { icon: PanelsTopLeftIcon, title: "Homepage Builder", description: "Design your site visually.", status: "Drag & drop" },
-  { icon: FileTextIcon, title: "Pages", description: "About, policies, and pages of your own.", status: "No code" },
-  { icon: ImageIcon, title: "Media Library", description: "A central home for every asset.", status: "Cloud" },
-  { icon: SearchIcon, title: "SEO", description: "Metadata, sitemaps, and more.", status: "Optimized" },
-  { icon: SettingsIcon, title: "Settings", description: "Configure the whole platform.", status: "Flexible" },
+  { icon: LayoutDashboardIcon, title: "Dashboard", description: "Your whole business at a glance." },
+  { icon: ShoppingBagIcon, title: "Orders", description: "Manage every order end to end." },
+  { icon: UsersIcon, title: "Customers", description: "Profiles, history, and segments." },
+  { icon: CakeIcon, title: "Products", description: "Cakes, catalog, and variants." },
+  { icon: BoxesIcon, title: "Inventory", description: "Stock levels and low-stock alerts." },
+  { icon: CreditCardIcon, title: "Payments", description: "Gateways, transactions, refunds." },
+  { icon: TruckIcon, title: "Delivery", description: "Zones, slots, and shipping rules." },
+  { icon: TicketPercentIcon, title: "Coupons", description: "Discounts and promo campaigns." },
+  { icon: BarChart3Icon, title: "Reports", description: "Revenue and performance insights." },
+  { icon: PanelsTopLeftIcon, title: "Homepage Builder", description: "Design your site visually." },
+  { icon: FileTextIcon, title: "Pages", description: "About, policies, and pages of your own." },
+  { icon: ImageIcon, title: "Media Library", description: "A central home for every asset." },
+  { icon: SearchIcon, title: "SEO", description: "Metadata, sitemaps, and more." },
+  { icon: ChefHatIcon, title: "Kitchen Board", description: "Today's orders to make, with a chime for each new one." },
+  { icon: BikeIcon, title: "Rider Deliveries", description: "Each rider sees only their own drop-offs." },
+  { icon: UserCogIcon, title: "Team & Roles", description: "Kitchen, delivery and manager logins." },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -193,7 +149,7 @@ export const commerceFeatures: {
   description: string;
 }[] = [
   { icon: BoxesIcon, title: "Inventory Management", description: "Keep stock accurate across every product and variant." },
-  { icon: MapPinIcon, title: "Delivery Zones", description: "Define exactly where, and when, you deliver." },
+  { icon: MapPinIcon, title: "Delivery Zones", description: "By PIN code, city, or an area drawn on the map." },
   { icon: TruckIcon, title: "Shipping Rules", description: "Rates by area, and free delivery over an order value." },
   { icon: CreditCardIcon, title: "Payment Gateways", description: "Razorpay for UPI, cards, net banking and wallets." },
   { icon: ClockIcon, title: "Order Timeline", description: "Track each order from placed to delivered." },
@@ -211,9 +167,8 @@ export const commerceFeatures: {
 /* ------------------------------------------------------------------ */
 
 export const builderCapabilities: { icon: IconType; title: string; description: string }[] = [
-  { icon: LayoutGridIcon, title: "Drag & Drop", description: "Rearrange sections by simply moving them." },
+  { icon: LayoutGridIcon, title: "Drag & Drop", description: "Reorder sections by simply moving them." },
   { icon: MonitorSmartphoneIcon, title: "Enable / Disable", description: "Toggle any section on or off instantly." },
-  { icon: TrendingUpIcon, title: "Sorting", description: "Order your content exactly how you want it." },
   { icon: ImageIcon, title: "Backgrounds", description: "Set images, colors, and styles per section." },
   { icon: SparklesIcon, title: "Buttons", description: "Configure calls-to-action without code." },
   { icon: SearchIcon, title: "Live Preview", description: "See every change before it goes live." },
@@ -225,11 +180,11 @@ export const builderCapabilities: { icon: IconType; title: string; description: 
 /* ------------------------------------------------------------------ */
 
 export const paymentMethods: { icon: IconType; name: string; note: string }[] = [
-  { icon: ZapIcon, name: "Razorpay", note: "Instant" },
+  { icon: ZapIcon, name: "Razorpay", note: "Into your account" },
   { icon: TruckIcon, name: "Cash on Delivery", note: "On arrival" },
   { icon: SmartphoneIcon, name: "UPI", note: "1-tap" },
   { icon: CreditCardIcon, name: "Cards", note: "Credit & debit" },
-  { icon: ServerIcon, name: "Net Banking", note: "All banks" },
+  { icon: ServerIcon, name: "Net Banking", note: "Major Indian banks" },
   { icon: WalletIcon, name: "Wallets", note: "Popular apps" },
 ];
 
@@ -251,15 +206,15 @@ export const reportMetrics: string[] = [
 /* ------------------------------------------------------------------ */
 
 export const whyChoose: { icon: IconType; title: string; description: string }[] = [
-  { icon: MonitorSmartphoneIcon, title: "Responsive", description: "Flawless on desktop, tablet, and mobile." },
-  { icon: SearchIcon, title: "SEO Ready", description: "Built to rank with clean metadata." },
-  { icon: RocketIcon, title: "Future Ready", description: "Architected to grow with your business." },
-  { icon: ZapIcon, title: "Fast", description: "Optimized for speed on every page." },
-  { icon: SparklesIcon, title: "Modern", description: "A refined, contemporary interface." },
-  { icon: LayoutDashboardIcon, title: "Clean UI", description: "Intuitive design your team will love." },
-  { icon: PanelsTopLeftIcon, title: "CMS Driven", description: "Every section editable, no code." },
-  { icon: TrendingUpIcon, title: "Scalable", description: "From a dozen products to thousands." },
-  { icon: ShieldCheckIcon, title: "Secure", description: "Protected data and safe payments." },
+  { icon: PercentIcon, title: "No commission", description: "Your own website — no marketplace cut on every order." },
+  { icon: UsersIcon, title: "Your customers stay yours", description: "Names, numbers and order history live in your admin." },
+  { icon: IndianRupeeIcon, title: "Made for Indian shops", description: "UPI, cash on delivery, GST invoices, PIN code delivery." },
+  { icon: ChefHatIcon, title: "Kitchen and rider screens", description: "Staff see only their own work, and hear each new order." },
+  { icon: CameraIcon, title: "Photo cakes and custom orders", description: "Customers upload a photo and add a message to the cake." },
+  { icon: MessageCircleIcon, title: "Customers kept informed", description: "Email and WhatsApp updates as an order moves." },
+  { icon: ZapIcon, title: "Fast on phones", description: "Light pages, and every photo shrunk automatically." },
+  { icon: SearchIcon, title: "Found on Google", description: "Page titles, descriptions, a sitemap and clean links." },
+  { icon: ShieldCheckIcon, title: "Safe by default", description: "Staff roles, an activity log and device sign-out." },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -279,21 +234,25 @@ export const techStack: string[] = [
 ];
 
 /* ------------------------------------------------------------------ */
-/* Section 13 — Roadmap                                                */
+/* Section 13 — How it works                                           */
 /* ------------------------------------------------------------------ */
 
-export const roadmap: {
-  icon: IconType;
-  title: string;
-  description: string;
-  status: "Available" | "Coming soon";
-}[] = [
-  { icon: MonitorSmartphoneIcon, title: "Storefront Experience", description: "A polished, conversion-ready customer website.", status: "Available" },
-  { icon: LayoutDashboardIcon, title: "Business Dashboard", description: "A complete admin to run daily operations.", status: "Available" },
-  { icon: MessageCircleIcon, title: "WhatsApp Order Updates", description: "Order messages sent from your own business number.", status: "Available" },
-  { icon: DatabaseIcon, title: "Reliable Data Core", description: "Fast, structured storage for catalog and orders.", status: "Available" },
-  { icon: CreditCardIcon, title: "Online Payments", description: "UPI, cards, net banking and wallets through Razorpay.", status: "Available" },
-  { icon: MapPinIcon, title: "Delivery Zones & Slots", description: "Deliver by PIN code, on the day and hour customers pick.", status: "Available" },
+export const howItWorks: { icon: IconType; title: string; description: string }[] = [
+  {
+    icon: CalendarCheckIcon,
+    title: "Book a demo",
+    description: "We walk you through the storefront and the admin, and listen to how your shop works.",
+  },
+  {
+    icon: SparklesIcon,
+    title: "We set your shop up",
+    description: "Your name, logo, products, delivery areas and payments — configured for you.",
+  },
+  {
+    icon: RocketIcon,
+    title: "You take orders",
+    description: "Orders reach your kitchen with an alert, and payments go to your own account.",
+  },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -313,7 +272,7 @@ export const businessTypes: { icon: IconType; name: string }[] = [
   { icon: ShoppingBasketIcon, name: "Grocery" },
   { icon: ShirtIcon, name: "Fashion" },
   { icon: LaptopIcon, name: "Electronics" },
-  { icon: PillIcon, name: "Pharmacy" },
+  { icon: ChefHatIcon, name: "Cloud Kitchen" },
 ];
 
 export const faqs: { question: string; answer: string }[] = [
@@ -323,24 +282,14 @@ export const faqs: { question: string; answer: string }[] = [
    * had answers below, so only what was actually new moved here.
    */
   {
-    question: "What do I need before I can take a payment?",
-    answer:
-      "A Razorpay account for card, UPI and netbanking, and a Cloudinary account so you can upload your own photos. Both have free tiers. Cash on delivery works without either.",
-  },
-  {
-    question: "Is my data mine?",
-    answer:
-      "Yes. Orders, customers and products live in your own MongoDB database, so any MongoDB backup tool can copy them, and nothing is locked to us. Settings also has a backup and restore screen for the shop's setup — layout, templates, delivery zones and coupons.",
-  },
-  {
-    question: "What happens to an order if a payment fails halfway?",
-    answer:
-      "The payment webhook catches it. A payment taken with no order attached is flagged in the admin as an unclaimed payment so it can be refunded or matched, rather than quietly lost.",
-  },
-  {
     question: "What is Bakery CMS?",
     answer:
       "Bakery CMS is an all-in-one platform to run your bakery online — website, orders, inventory, payments, delivery, and marketing, all from a single modern dashboard.",
+  },
+  {
+    question: "Do you take a commission on my orders?",
+    answer:
+      "No. Online payments go straight into your own Razorpay account — Razorpay charges its standard payment fee, and nothing else is taken from an order. Cash on delivery costs nothing at all.",
   },
   {
     question: "Can I use it for a business other than a bakery?",
@@ -353,9 +302,9 @@ export const faqs: { question: string; answer: string }[] = [
       "Not at all. Everything is managed visually, from your homepage layout to your product catalog. If you can use a web app, you can run your bakery on Bakery CMS.",
   },
   {
-    question: "Can I customize my website design?",
+    question: "Can my staff have their own logins?",
     answer:
-      "Yes. The built-in Homepage builder lets you arrange sections, change content and backgrounds, and publish changes instantly with a live preview.",
+      "Yes. Invite each person by email and give them a role — kitchen staff see only the orders to make, delivery staff only their own drop-offs, and a manager runs the orders. You can also build roles of your own, area by area.",
   },
   {
     question: "Which payment methods are supported?",
@@ -365,7 +314,7 @@ export const faqs: { question: string; answer: string }[] = [
   {
     question: "Can I manage delivery and shipping?",
     answer:
-      "Absolutely. Configure delivery zones, time slots, and shipping rules that match exactly how your bakery operates, right down to per-area rates.",
+      "Yes. Draw delivery zones by PIN code, by city, or as an area on the map, each with its own charge, and offer the days and time slots you can actually deliver in. An address outside your zones is refused at checkout instead of becoming an order you cannot fulfil.",
   },
   {
     question: "Is it suitable for wedding and custom cakes?",
@@ -373,9 +322,29 @@ export const faqs: { question: string; answer: string }[] = [
       "Yes. Wedding cakes are a category like any other, and a product can take sizes, a message for the cake and the customer's own photo — ideal for bespoke, celebration, and made-to-order cakes.",
   },
   {
+    question: "Can I customize my website design?",
+    answer:
+      "Yes. The built-in Homepage builder lets you arrange sections, change content and backgrounds, and publish changes instantly with a live preview.",
+  },
+  {
     question: "Will my store work well on mobile?",
     answer:
       "Every page — storefront and admin — is fully responsive and optimized for desktop, tablet, and mobile straight out of the box.",
+  },
+  {
+    question: "What do I need before I can take a payment?",
+    answer:
+      "A Razorpay account for card, UPI and netbanking, and a Cloudinary account so you can upload your own photos. Both have free tiers. Cash on delivery works without either.",
+  },
+  {
+    question: "What happens to an order if a payment fails halfway?",
+    answer:
+      "The payment webhook catches it. A payment taken with no order attached is flagged in the admin as an unclaimed payment so it can be refunded or matched, rather than quietly lost.",
+  },
+  {
+    question: "Is my data mine?",
+    answer:
+      "Yes. Orders, customers and products live in your own MongoDB database, so any MongoDB backup tool can copy them, and nothing is locked to us. Settings also has a backup and restore screen for the shop's setup — layout, templates, delivery zones and coupons.",
   },
   {
     question: "How do I get started?",
@@ -428,16 +397,15 @@ export const footerColumns: {
       { label: "Documentation", href: routes.platform.docs },
       { label: "Support", href: vendorContact ?? undefined },
       { label: "FAQ", href: `${routes.platform.home}#faq` },
-      { label: "Roadmap", href: `${routes.platform.home}#roadmap` },
+      { label: "How it works", href: `${routes.platform.home}#how-it-works` },
     ],
   },
   {
     heading: "Company",
     links: [
-      { label: "About" },
       { label: "Contact", href: vendorContact ?? undefined },
-      { label: "Privacy" },
-      { label: "Terms" },
+      { label: "Book a demo", href: vendorContact ?? undefined },
+      { label: "Live store", href: routes.store.home },
     ],
   },
 ];
