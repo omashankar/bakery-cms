@@ -24,11 +24,20 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCan } from "@/features/team/lib/access-context";
 import { PERMISSION_MODULES, permissionDefinition } from "@/features/team/lib/permissions";
+import { currentLevel } from "@/features/team/lib/access-levels";
 import { deleteRole } from "@/features/team/lib/team-api";
 import type { RoleView } from "@/features/team/lib/team-types";
 import { cn } from "@/lib/utils";
 
 import { RoleEditorDialog, type RoleEditorMode } from "./role-editor-dialog";
+
+/** "Orders · kitchen only" — the area, and how much of it, in the editor's own words. */
+function withLevel(label: string, level: string | undefined): string {
+  if (level === "kitchen") return `${label} · kitchen only`;
+  if (level === "deliveries") return `${label} · own deliveries`;
+  if (level === "view") return `${label} · view only`;
+  return label;
+}
 
 export function RolesTab({
   roles,
@@ -94,9 +103,11 @@ export function RolesTab({
                 </li>
               ))
             : roles.map((role) => {
+                // Each area with HOW MUCH of it: "Orders" alone said the same for the
+                // kitchen, a rider and a manager, who see very different things.
                 const modules = PERMISSION_MODULES.filter((m) =>
                   role.permissions.some((p) => permissionDefinition(p)?.module === m.id),
-                );
+                ).map((m) => ({ id: m.id, label: withLevel(m.label, currentLevel(m.id, role.permissions)?.id) }));
                 return (
                   <li
                     key={role.slug}

@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 /** The queue in the HTML — the kitchen's view of each order, never the full one. */
 export default async function Page() {
-  const initial = await whenAllowed("orders.view_kitchen", async () =>
+  const initial = await whenAllowed(["orders.view_kitchen", "orders.view"], async () =>
     JSON.parse(JSON.stringify((await getKitchenQueue(KITCHEN_QUEUE_STATUSES)).map(toKitchenView))),
   );
   return <KitchenPage initial={initial} />;

@@ -376,9 +376,9 @@ export const updateStatusController = withErrorHandler(async (request: Request, 
   return ok(view, "Order status updated");
 });
 
-/** The kitchen queue — `orders.view_kitchen`, and only the kitchen's view of each order. */
+/** The kitchen queue — `orders.view_kitchen` (or `orders.view`, which sees more), and only the kitchen's view of each order. */
 export const kitchenQueueController = withErrorHandler(async () => {
-  await requirePermission("orders.view_kitchen");
+  await requireAnyPermission("orders.view_kitchen", "orders.view");
   const orders = await service.getKitchenQueue(KITCHEN_QUEUE_STATUSES);
   return ok(orders.map(toKitchenView), "Kitchen queue");
 });

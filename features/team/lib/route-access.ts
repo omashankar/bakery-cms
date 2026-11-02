@@ -39,7 +39,9 @@ const RULES: readonly RouteRule[] = [
   { match: `${ADMIN.profile}/`, anyOf: [] },
 
   { match: ADMIN.dashboard, anyOf: ["dashboard.view"] },
-  { match: ADMIN.kitchen, anyOf: ["orders.view_kitchen"] },
+  // The board is a narrower view of orders, so whoever sees every order (a
+  // manager) may open it too — not only kitchen staff.
+  { match: ADMIN.kitchen, anyOf: ["orders.view_kitchen", "orders.view"] },
   { match: ADMIN.deliveries, anyOf: ["orders.view_assigned"] },
 
   { match: ADMIN.orders.list, anyOf: ["orders.view"] },
