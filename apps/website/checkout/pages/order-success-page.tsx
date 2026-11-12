@@ -252,7 +252,7 @@ export function OrderSuccessPage({
 
             <p className="mt-6 text-center text-sm text-muted-foreground">
               Questions about this order?{" "}
-              <Link href={routes.store.contact} className="text-bakery-700 hover:underline">
+              <Link href={routes.store.contact} className="text-bakery-700 underline underline-offset-2">
                 Contact us
               </Link>
             </p>
@@ -269,7 +269,7 @@ export function OrderSuccessPage({
                 <button
                   type="button"
                   onClick={() => openCustomerAuthModal("signup")}
-                  className="font-medium text-bakery-700 hover:underline"
+                  className="font-medium text-bakery-700 underline underline-offset-2"
                 >
                   Create an account
                 </button>

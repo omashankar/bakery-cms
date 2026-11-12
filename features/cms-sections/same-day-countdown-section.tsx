@@ -200,7 +200,7 @@ export function SameDayCountdownSection(props: HomepageSectionRendererProps) {
               <span className="flex h-14 w-16 items-center justify-center rounded-lg bg-foreground font-heading text-3xl leading-none font-medium text-background tabular-nums shadow-sm lg:h-16 lg:w-[4.5rem] lg:text-4xl">
                 {value}
               </span>
-              <span className="text-[0.625rem] leading-none font-semibold tracking-[0.25em] text-foreground uppercase">
+              <span className="text-[0.6875rem] leading-none font-semibold tracking-[0.2em] text-foreground uppercase">
                 {label}
               </span>
             </span>

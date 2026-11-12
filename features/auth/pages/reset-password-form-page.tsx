@@ -72,7 +72,7 @@ export function ResetPasswordFormPage() {
       footer={
         <Link
           href={routes.auth.login}
-          className="block text-center text-xs text-muted-foreground hover:text-bakery-700"
+          className="flex min-h-6 items-center justify-center text-xs text-muted-foreground hover:text-bakery-700"
         >
           ← Back to login
         </Link>

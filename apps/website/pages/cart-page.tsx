@@ -386,8 +386,15 @@ export function CartPage({ catalog = [], initialItems, cartKnown = false, initia
     [items, validCoupon?.discountAmount, preferences.giftWrap, deliveryPincode, place, priceSpot, commerce]
   );
 
+  /*
+    AFTER MOUNT ONLY. The list lives in this browser's storage, which the
+    server cannot see — so the server drew no rail and the first browser
+    render drew one, and React threw its hydration error (#418) on every
+    empty cart a returning visitor opened. That could not happen while an
+    empty cart waited for the scripts; it can now that the server draws it.
+  */
   const recentlyViewed = useMemo(
-    () => getRecentlyViewedProducts(catalog),
+    () => (loaded ? getRecentlyViewedProducts(catalog) : []),
     [catalog, loaded, items.length], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
