@@ -51,7 +51,7 @@ describe("the bar", () => {
   });
 
   it("takes WhatsApp from the shop's own social link, never from the phone", () => {
-    expect(chrome).toMatch(/platform\?\.toLowerCase\(\) === "whatsapp" && isSafeSocialUrl/);
+    expect(chrome).toMatch(/platform\?\.toLowerCase\(\) === "whatsapp" &&\s*isSafeSocialUrl\(s\.href \?\? ""\) &&\s*isWhatsAppChatLink\(s\.href \?\? ""\)/);
     expect(bar).not.toMatch(/wa\.me/);
   });
 

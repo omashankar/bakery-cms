@@ -209,6 +209,19 @@ export function infoBarFrom(
 }
 
 /**
+ * A link that opens a chat WITH SOMEONE — wa.me/<number> or the send?phone=
+ * form. This shop's Social row held https://web.whatsapp.com/, which opens
+ * WhatsApp Web's own front page and no chat at all, so "Order on WhatsApp"
+ * was a button that could not reach the shop. Such a link is left out of
+ * the bar rather than offered.
+ */
+export function isWhatsAppChatLink(href: string): boolean {
+  return /^https:\/\/(wa\.me\/\+?\d{8,15}(\/|\?|$)|api\.whatsapp\.com\/send\/?\?(.*&)?phone=\+?\d{8,15})/.test(
+    href.trim(),
+  );
+}
+
+/**
  * The bar's two live facts — the shop's WhatsApp and today's same-day deadline
  * — added to a bar the shop has switched on. They never switch a bar on by
  * themselves: a shop that wrote nothing there still gets no bar.
@@ -445,8 +458,12 @@ export const getStorefrontChrome = cache(async (): Promise<StorefrontChrome> => 
         header.showBannerStrip ?? defaultHeaderSettings.showBannerStrip ?? true,
       infoBar: withInfoBarExtras(infoBarFrom(header.infoBar, contact.phone ?? ""), {
         whatsapp:
-          activeSocial.find((s) => s.platform?.toLowerCase() === "whatsapp" && isSafeSocialUrl(s.href ?? ""))
-            ?.href ?? "",
+          activeSocial.find(
+            (s) =>
+              s.platform?.toLowerCase() === "whatsapp" &&
+              isSafeSocialUrl(s.href ?? "") &&
+              isWhatsAppChatLink(s.href ?? ""),
+          )?.href ?? "",
         sameDay: (() => {
           const today = sameDayWindow(
             settings.commerce as Partial<CommerceSettings> | undefined,

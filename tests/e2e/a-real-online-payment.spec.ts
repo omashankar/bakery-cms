@@ -58,7 +58,7 @@ test.describe("paying for real, on a test key", () => {
     await page.getByRole("button", { name: /add to cart/i }).first().click();
 
     await page.goto("/store/cart");
-    await page.getByRole("button", { name: /proceed to checkout/i }).click();
+    await page.getByRole("link", { name: /proceed to checkout/i }).click();
 
     await page.getByLabel(/full name/i).fill("E2E Pay Probe");
     // Signed in, so the address step says "Ordering as" instead of asking.
