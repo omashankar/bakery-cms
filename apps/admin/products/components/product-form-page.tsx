@@ -926,7 +926,7 @@ export function ProductFormPage({
         }
       />
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(260px,320px)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(260px,320px)]">
         <Card>
           <CardContent className="pt-6">
             <Tabs defaultValue="basics">

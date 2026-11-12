@@ -61,6 +61,7 @@ import {
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { AdminSelect } from "./admin-field";
 import { DeleteProductDialog } from "./delete-product-dialog";
+import { useAccess } from "@/features/team/lib/access-context";
 import { RelativeTime } from "@/components/shared/relative-time";
 
 const PAGE_SIZE = 10;
@@ -141,6 +142,7 @@ export function ProductsListPage({
   /** The category names, for the rows' first render; see the page. */
   initialCategories?: Array<{ id: string; name: string }> | null;
 } = {}) {
+  const { can } = useAccess();
   // Two flags, not one. `loaded`: the list is here (from the server or the
   // fetch) — the table waits on this. `mounted`: this is the browser — what
   // reads this browser's caches (the category options, the stock thresholds)
@@ -332,15 +334,17 @@ export function ProductsListPage({
         description={`Manage your ${productLower} catalog`}
         className="gap-3"
         actions={
-          <Button
-            variant="bakery"
-            className="w-full sm:w-auto"
-            render={<Link href={routes.admin.cakes.add} />}
-          >
-            <Plus className="size-4" />
-            <span className="sm:hidden">Add</span>
-            <span className="hidden sm:inline">Add {labels.productWord}</span>
-          </Button>
+          can("products.create") ? (
+            <Button
+              variant="bakery"
+              className="w-full sm:w-auto"
+              render={<Link href={routes.admin.cakes.add} />}
+            >
+              <Plus className="size-4" />
+              <span className="sm:hidden">Add</span>
+              <span className="hidden sm:inline">Add {labels.productWord}</span>
+            </Button>
+          ) : undefined
         }
       />
 
@@ -525,10 +529,12 @@ export function ProductsListPage({
           title={`No ${productsLower} found`}
           description={`Try another filter, or add your first ${productLower}.`}
           action={
-            <Button variant="bakery" render={<Link href={routes.admin.cakes.add} />}>
-              <Plus className="size-4" />
-              Add {labels.productWord}
-            </Button>
+            can("products.create") ? (
+              <Button variant="bakery" render={<Link href={routes.admin.cakes.add} />}>
+                <Plus className="size-4" />
+                Add {labels.productWord}
+              </Button>
+            ) : undefined
           }
         />
       ) : (
@@ -539,20 +545,26 @@ export function ProductsListPage({
                 {selectedIds.length} selected
               </span>
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" onClick={handleBulkPublish}>
-                  Publish
-                </Button>
-                <Button size="sm" variant="outline" onClick={handleBulkArchive}>
-                  Archive
-                </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={() => setDeleteTarget({ ids: selectedIds })}
-                >
-                  <Trash2 className="size-4" />
-                  Delete
-                </Button>
+                {can("products.update") ? (
+                  <>
+                    <Button size="sm" variant="outline" onClick={handleBulkPublish}>
+                      Publish
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={handleBulkArchive}>
+                      Archive
+                    </Button>
+                  </>
+                ) : null}
+                {can("products.delete") ? (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => setDeleteTarget({ ids: selectedIds })}
+                  >
+                    <Trash2 className="size-4" />
+                    Delete
+                  </Button>
+                ) : null}
                 <Button size="sm" variant="ghost" onClick={() => setSelectedIds([])}>
                   Clear
                 </Button>
@@ -560,24 +572,24 @@ export function ProductsListPage({
             </div>
           ) : null}
 
-          <div className="hidden overflow-x-auto lg:block">
+          <div className="relative hidden overflow-x-auto xl:block">
             <table className="w-full min-w-[760px] text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                  <th className="px-4 py-3">
+                  <th className="px-3 py-3">
                     <Checkbox
                       checked={allOnPageSelected}
                       onCheckedChange={toggleSelectAllOnPage}
                       aria-label="Select all on page"
                     />
                   </th>
-                  <th className="px-4 py-3 font-medium">{labels.productWord}</th>
-                  <th className="px-4 py-3 font-medium">Category</th>
-                  <th className="px-4 py-3 font-medium">Price</th>
-                  <th className="px-4 py-3 font-medium">Stock</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Updated</th>
-                  <th className="px-4 py-3 font-medium">
+                  <th className="px-3 py-3 font-medium">{labels.productWord}</th>
+                  <th className="px-3 py-3 font-medium">Category</th>
+                  <th className="px-3 py-3 font-medium">Price</th>
+                  <th className="px-3 py-3 font-medium">Stock</th>
+                  <th className="px-3 py-3 font-medium">Status</th>
+                  <th className="px-3 py-3 font-medium">Updated</th>
+                  <th className="px-3 py-3 font-medium">
                     <span className="sr-only">Actions</span>
                   </th>
                 </tr>
@@ -588,14 +600,14 @@ export function ProductsListPage({
                     key={cake.id}
                     className="border-b border-border/70 transition-colors last:border-0 hover:bg-muted"
                   >
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3">
                       <Checkbox
                         checked={selectedIds.includes(cake.id)}
                         onCheckedChange={() => toggleSelect(cake.id)}
                         aria-label={`Select ${cake.name}`}
                       />
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3">
                       <div className="flex items-center gap-3">
                         <div className="relative size-11 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
                           {cake.images[0] ? (
@@ -629,11 +641,11 @@ export function ProductsListPage({
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">
+                    <td className="px-3 py-3 text-muted-foreground">
                       {categoryLabel(cake)}
                     </td>
-                    <td className="px-4 py-3 font-semibold">{formatCurrency(cake.price)}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3 font-semibold">{formatCurrency(cake.price)}</td>
+                    <td className="px-3 py-3">
                       <StockStatusBadge
                         status={deriveStockStatus(cake, getInventorySettings())}
                         unlimited={cake.unlimitedStock}
@@ -641,15 +653,15 @@ export function ProductsListPage({
                         showQuantity
                       />
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3">
                       <Badge variant={getStatusVariant(cake.status)}>
                         {formatStatusLabel(cake.status)}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                    <td className="px-3 py-3 whitespace-nowrap text-muted-foreground">
                       <RelativeTime date={cake.updatedAt} />
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3">
                       <DropdownMenu>
                         <DropdownMenuTrigger
                           render={
@@ -659,28 +671,34 @@ export function ProductsListPage({
                           <MoreHorizontal className="size-4" />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            render={<Link href={routes.admin.cakes.edit(cake.id)} />}
-                          >
-                            <Pencil className="size-3.5" />
-                            Edit
-                          </DropdownMenuItem>
+                          {can("products.update") ? (
+                            <DropdownMenuItem
+                              render={<Link href={routes.admin.cakes.edit(cake.id)} />}
+                            >
+                              <Pencil className="size-3.5" />
+                              Edit
+                            </DropdownMenuItem>
+                          ) : null}
                           <DropdownMenuItem
                             render={<Link href={routes.admin.cakes.preview(cake.id)} />}
                           >
                             <ExternalLink className="size-3.5" />
                             Preview
                           </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            variant="destructive"
-                            onClick={() =>
-                              setDeleteTarget({ ids: [cake.id], name: cake.name })
-                            }
-                          >
-                            <Trash2 className="size-3.5" />
-                            Delete
-                          </DropdownMenuItem>
+                          {can("products.delete") ? (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onClick={() =>
+                                  setDeleteTarget({ ids: [cake.id], name: cake.name })
+                                }
+                              >
+                                <Trash2 className="size-3.5" />
+                                Delete
+                              </DropdownMenuItem>
+                            </>
+                          ) : null}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </td>
@@ -690,7 +708,7 @@ export function ProductsListPage({
             </table>
           </div>
 
-          <ul className="divide-y divide-border lg:hidden">
+          <ul className="divide-y divide-border xl:hidden">
             {paginated.map((cake) => (
               <li key={cake.id} className="p-3 sm:p-4">
                 <div className="flex items-start gap-3">
@@ -725,14 +743,16 @@ export function ProductsListPage({
                       </Badge>
                     </div>
                     <div className="mt-2 flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 min-w-0 flex-1"
-                        render={<Link href={routes.admin.cakes.edit(cake.id)} />}
-                      >
-                        Edit
-                      </Button>
+                      {can("products.update") ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 min-w-0 flex-1"
+                          render={<Link href={routes.admin.cakes.edit(cake.id)} />}
+                        >
+                          Edit
+                        </Button>
+                      ) : null}
                       <Button
                         size="sm"
                         variant="outline"
@@ -741,18 +761,20 @@ export function ProductsListPage({
                       >
                         Preview
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 shrink-0"
-                        aria-label="Delete"
-                        onClick={() =>
-                          setDeleteTarget({ ids: [cake.id], name: cake.name })
-                        }
-                      >
-                        <Trash2 className="size-3.5" />
-                        <span className="hidden sm:inline">Delete</span>
-                      </Button>
+                      {can("products.delete") ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 shrink-0"
+                          aria-label="Delete"
+                          onClick={() =>
+                            setDeleteTarget({ ids: [cake.id], name: cake.name })
+                          }
+                        >
+                          <Trash2 className="size-3.5" />
+                          <span className="hidden sm:inline">Delete</span>
+                        </Button>
+                      ) : null}
                     </div>
                   </div>
                 </div>

@@ -32,6 +32,7 @@ import type { PlacedOrder } from "@/features/orders/lib/orders";
 import { ORDERS_UPDATED_EVENT, isOrdersCacheRefill } from "@/features/orders/lib/orders";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { type FiguresState } from "@/components/shared/panel-loading";
+import { useAccess } from "@/features/team/lib/access-context";
 
 const MAX_REFRESH_RETRIES = 4;
 const REFRESH_RETRY_BASE_MS = 5_000;
@@ -41,15 +42,26 @@ export function DashboardPage({
 }: {
   /** The default range's figures and the activity feed, read on the server. */
   initial?: {
-    analytics: OrderAnalyticsResponse;
-    activity: AuditLogEntry[];
-    recentOrders: PlacedOrder[];
+    /** Each null when this member may not see it — see the server page. */
+    analytics: OrderAnalyticsResponse | null;
+    activity: AuditLogEntry[] | null;
+    recentOrders: PlacedOrder[] | null;
   } | null;
 } = {}) {
-  const [greetingName, setGreetingName] = useState<string | null>(null);
+  /**
+   * Every card is about something a member may or may not be allowed: the
+   * figures are revenue, the feed is the activity log. A card whose data this
+   * member may not read is left out — not drawn with zeroes, which would be a
+   * claim about the shop — and its request is never made.
+   */
+  const { access, can } = useAccess();
+  const revenue = can("reports.revenue.view");
+  const [emailGreeting, setEmailGreeting] = useState<string | null>(null);
+  // A member's own first name, from their account; the email is the fallback.
+  const greetingName = access?.name ? (access.name.split(" ")[0] ?? access.name) : emailGreeting;
   const [stats, setStats] = useState(EMPTY_DASHBOARD_STATS);
   const [commerce, setCommerce] = useState(() =>
-    initial
+    initial?.analytics
       ? toDashboardCommerceAnalytics(DEFAULT_DASHBOARD_RANGE, initial.analytics)
       : EMPTY_DASHBOARD_COMMERCE_ANALYTICS,
   );
@@ -58,7 +70,7 @@ export function DashboardPage({
   const [analyticsFailed, setAnalyticsFailed] = useState(false);
   // "Nothing has loaded" and "the last refresh failed" are different things to
   // say, and the caption said the first for both.
-  const [loadedOnce, setLoadedOnce] = useState(Boolean(initial));
+  const [loadedOnce, setLoadedOnce] = useState(Boolean(initial?.analytics));
   // `stats` reads synchronously, but the effect that fills it runs after the
   // browser paints — so "New inquiries 0" was on screen for a frame regardless.
   const [statsLoaded, setStatsLoaded] = useState(false);
@@ -67,7 +79,7 @@ export function DashboardPage({
   /** Which range `attempts` is counting for — changing range starts over. */
   const loadedRange = useRef(range);
   // The server answered the default range; its first request would repeat it.
-  const analyticsFromServer = useRef(Boolean(initial));
+  const analyticsFromServer = useRef(Boolean(initial?.analytics));
 
   useEffect(() => {
     const session = getDemoSession();
@@ -75,7 +87,7 @@ export function DashboardPage({
       const localPart = session.email.split("@")[0] ?? "Admin";
       const formatted =
         localPart.charAt(0).toUpperCase() + localPart.slice(1).replace(/[._-]/g, " ");
-      setGreetingName(formatted.trim());
+      setEmailGreeting(formatted.trim());
     }
 
     function refresh() {
@@ -86,12 +98,13 @@ export function DashboardPage({
 
     refresh();
     return subscribeToAdminData(refresh);
-  }, []);
+  }, [access]);
 
   // Every commerce figure on this page is a total over the range, so it is
   // computed on the server across every matching order — and fetched ONCE here
   // rather than by each card, which would be four requests for one answer.
   useEffect(() => {
+    if (!revenue) return;
     let cancelled = false;
     let retry: ReturnType<typeof setTimeout> | undefined;
 
@@ -152,7 +165,7 @@ export function DashboardPage({
       if (retry !== undefined) clearTimeout(retry);
       window.removeEventListener(ORDERS_UPDATED_EVENT, onOrdersChanged);
     };
-  }, [range, retryKey]);
+  }, [range, retryKey, revenue]);
 
   // Label the range the FIGURES are for, not the one the selector is on — they
   // differ while a new range is loading, and captioning last month's revenue
@@ -182,11 +195,11 @@ export function DashboardPage({
 
   const description = [
     greetingName ? `Welcome back, ${greetingName}` : null,
-    rangeLabel,
+    revenue ? rangeLabel : null,
     lastUpdated || null,
-    analyticsFigures === "loading" ? "Loading figures…" : null,
+    revenue && analyticsFigures === "loading" ? "Loading figures…" : null,
     // Saying nothing would leave ₹0 reading as fact.
-    analyticsFailed
+    revenue && analyticsFailed
       ? loadedOnce
         ? "Showing the last figures — the server did not answer"
         : "Figures unavailable — the server did not answer"
@@ -195,6 +208,11 @@ export function DashboardPage({
     .filter(Boolean)
     .join(" · ");
 
+  const inquiries = can("inquiries.view");
+  const recentOrders = can("orders.view");
+  const inventory = can("inventory.view");
+  const activity = can("security.view");
+
   return (
     <AdminPage className="space-y-4 sm:space-y-5">
       <AdminPageHeader
@@ -202,83 +220,101 @@ export function DashboardPage({
         description={description || undefined}
         className="gap-3"
         actions={
-          <DashboardRangeSelect
-            value={range}
-            onChange={setRange}
-            className="w-full sm:w-40"
-          />
+          revenue ? (
+            <DashboardRangeSelect
+              value={range}
+              onChange={setRange}
+              className="w-full sm:w-40"
+            />
+          ) : undefined
         }
       />
 
       <DashboardAlertsStrip />
 
-      <section className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
-        <DashboardStatCard
-          title="Revenue"
-          value={formatCurrency(commerce.summary.revenue)}
-          change={commerce.revenueDelta.label}
-          changeTone={commerce.revenueDelta.tone}
-          icon={IndianRupee}
-          tone="gold"
-          figures={analyticsFigures}
-          href={routes.admin.reports}
-        />
-        <DashboardStatCard
-          title="Orders"
-          value={commerce.summary.orders}
-          figures={analyticsFigures}
-          change={commerce.ordersDelta.label}
-          changeTone={commerce.ordersDelta.tone}
-          icon={ShoppingBag}
-          tone="bakery"
-          href={routes.admin.orders.list}
-        />
-        <DashboardStatCard
-          title="Active orders"
-          value={commerce.activeOrders}
-          figures={analyticsFigures}
-          change={commerce.activeOrders > 0 ? "Needs fulfillment" : "All clear"}
-          changeTone={commerce.activeOrders > 0 ? "warning" : "positive"}
-          icon={Send}
-          tone="bakery"
-          href={routes.admin.orders.list}
-        />
-        <DashboardStatCard
-          title="New inquiries"
-          value={stats.newInquiries}
-          figures={statsLoaded ? "ready" : "loading"}
-          change={stats.inquiryWeeklyChange}
-          changeTone={stats.inquiryChangeTone}
-          icon={MessageSquare}
-          tone="bakery"
-          href={routes.admin.inquiries.overview}
-        />
-      </section>
+      {revenue || inquiries ? (
+        <section className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
+          {revenue ? (
+            <>
+              <DashboardStatCard
+                title="Revenue"
+                value={formatCurrency(commerce.summary.revenue)}
+                change={commerce.revenueDelta.label}
+                changeTone={commerce.revenueDelta.tone}
+                icon={IndianRupee}
+                tone="gold"
+                figures={analyticsFigures}
+                href={routes.admin.reports}
+              />
+              <DashboardStatCard
+                title="Orders"
+                value={commerce.summary.orders}
+                figures={analyticsFigures}
+                change={commerce.ordersDelta.label}
+                changeTone={commerce.ordersDelta.tone}
+                icon={ShoppingBag}
+                tone="bakery"
+                href={routes.admin.orders.list}
+              />
+              <DashboardStatCard
+                title="Active orders"
+                value={commerce.activeOrders}
+                figures={analyticsFigures}
+                change={commerce.activeOrders > 0 ? "Needs fulfillment" : "All clear"}
+                changeTone={commerce.activeOrders > 0 ? "warning" : "positive"}
+                icon={Send}
+                tone="bakery"
+                href={routes.admin.orders.list}
+              />
+            </>
+          ) : null}
+          {inquiries ? (
+            <DashboardStatCard
+              title="New inquiries"
+              value={stats.newInquiries}
+              figures={statsLoaded ? "ready" : "loading"}
+              change={stats.inquiryWeeklyChange}
+              changeTone={stats.inquiryChangeTone}
+              icon={MessageSquare}
+              tone="bakery"
+              href={routes.admin.inquiries.overview}
+            />
+          ) : null}
+        </section>
+      ) : null}
 
-      <section className="grid items-stretch gap-3 sm:gap-4 lg:grid-cols-12">
-        <div className="min-w-0 lg:col-span-8">
-          <DashboardRevenueChart analytics={commerce} figures={analyticsFigures} />
-        </div>
-        <div className="min-w-0 lg:col-span-4">
-          <DashboardOrderPipeline analytics={commerce} figures={analyticsFigures} />
-        </div>
-      </section>
+      {revenue ? (
+        <section className="grid items-stretch gap-3 sm:gap-4 lg:grid-cols-12">
+          <div className="min-w-0 lg:col-span-8">
+            <DashboardRevenueChart analytics={commerce} figures={analyticsFigures} />
+          </div>
+          <div className="min-w-0 lg:col-span-4">
+            <DashboardOrderPipeline analytics={commerce} figures={analyticsFigures} />
+          </div>
+        </section>
+      ) : null}
+
+      {recentOrders || inquiries ? (
+        <section className="grid items-stretch gap-3 sm:gap-4 lg:grid-cols-2">
+          {recentOrders ? <DashboardRecentOrders initial={initial?.recentOrders ?? null} /> : null}
+          {inquiries ? <DashboardInquiriesPanel /> : null}
+        </section>
+      ) : null}
+
+      {revenue || inventory ? (
+        <section className="grid items-stretch gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {revenue ? <DashboardTopProducts analytics={commerce} figures={analyticsFigures} /> : null}
+          {inventory ? <DashboardInventoryWidget /> : null}
+          {revenue ? (
+            <div className="sm:col-span-2 xl:col-span-1">
+              <DashboardPaymentMix analytics={commerce} figures={analyticsFigures} />
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       <section className="grid items-stretch gap-3 sm:gap-4 lg:grid-cols-2">
-        <DashboardRecentOrders initial={initial?.recentOrders ?? null} />
-        <DashboardInquiriesPanel />
-      </section>
-
-      <section className="grid items-stretch gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <DashboardTopProducts analytics={commerce} figures={analyticsFigures} />
-        <DashboardInventoryWidget />
-        <div className="sm:col-span-2 xl:col-span-1">
-          <DashboardPaymentMix analytics={commerce} figures={analyticsFigures} />
-        </div>
-      </section>
-
-      <section className="grid items-stretch gap-3 sm:gap-4 lg:grid-cols-2">
-        <DashboardActivityFeed initial={initial?.activity ?? null} />
+        {activity ? <DashboardActivityFeed initial={initial?.activity ?? null} /> : null}
         <DashboardQuickActions />
       </section>
     </AdminPage>

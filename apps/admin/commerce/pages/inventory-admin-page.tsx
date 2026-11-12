@@ -429,7 +429,7 @@ export function InventoryAdminPage({
           />
         ) : (
           <>
-            <div className="hidden overflow-x-auto lg:block">
+            <div className="relative hidden overflow-x-auto xl:block">
               <table className="w-full min-w-[920px] text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs text-muted-foreground">
@@ -538,7 +538,7 @@ export function InventoryAdminPage({
               </table>
             </div>
 
-            <ul className="divide-y divide-border lg:hidden">
+            <ul className="divide-y divide-border xl:hidden">
               {paginated.map((item) => (
                 <li key={item.cakeId} className="p-3 sm:p-4">
                   <div className="flex items-start gap-3">

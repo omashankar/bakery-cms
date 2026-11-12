@@ -50,10 +50,11 @@ const SETTINGS_REF = vi.hoisted(() => ({ value: {} as Record<string, unknown> })
 SETTINGS_REF.value = SETTINGS;
 
 vi.mock("@/features/settings/server/settings.service", () => service);
-vi.mock("@/lib/server/auth/dal", () => ({
-  requireRole: vi.fn(async () => ({ sub: "u1", email: "owner@example.com", role: "owner" })),
-  getSession: vi.fn(async () => ({ sub: "u1", email: "owner@example.com", role: "owner" })),
-}));
+vi.mock("@/lib/server/auth/access", async () => {
+  const stub = await import("@/tests/stubs/access");
+  const owner = stub.ownerActor();
+  return stub.accessStub(() => owner);
+});
 vi.mock("@/lib/server/audit/audit-log", () => ({
   requestContext: () => ({ ip: "127.0.0.1", userAgent: "test" }),
   writeAuditLog: vi.fn(async () => undefined),

@@ -131,7 +131,7 @@ describe("an unclaimed payment can be settled by refunding it", () => {
 
   it("the endpoint requires an admin and records who did it", () => {
     const route = codeOf("app/api/payments/unclaimed/[id]/refunded/route.ts");
-    expect(route).toContain("requireAdminResponse()");
+    expect(route).toContain('requirePermissionResponse("payments.refund")');
     expect(route).toContain("payment.unclaimed.refunded");
     // A no-op must not answer 200.
     expect(route).toContain("status: 409");

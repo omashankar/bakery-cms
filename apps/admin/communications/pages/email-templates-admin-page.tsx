@@ -829,7 +829,7 @@ export function EmailTemplatesAdminPage({
             <DialogTitle>Delete template?</DialogTitle>
             <p className="text-sm text-muted-foreground">
               {draft
-                ? `“${draft.name}” will be removed from this demo store.`
+                ? `“${draft.name}” will be removed from this shop.`
                 : "This template will be removed."}
             </p>
           </DialogHeader>

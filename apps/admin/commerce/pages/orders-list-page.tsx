@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
-import { isTerminalOrderStatus } from "@/features/orders/lib/order-status-meta";
+import { ORDER_STATUS_LABELS, isTerminalOrderStatus } from "@/features/orders/lib/order-status-meta";
 import {
   FilterPanel,
   FilterPanelSearch,
@@ -30,6 +30,7 @@ import {
 } from "@/apps/admin/commerce/lib/order-utils";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { adminShell } from "@/apps/admin/components/admin-shell";
+import { useAccess } from "@/features/team/lib/access-context";
 import {
   bulkUpdateOrderStatus,
   type OrderStatus,
@@ -92,6 +93,7 @@ interface OrdersListPageProps {
 }
 
 export function OrdersListPage({ initial = null }: OrdersListPageProps = {}) {
+  const { can } = useAccess();
   const router = useRouter();
   const [orders, setOrders] = useState<PlacedOrder[]>(initial?.orders ?? []);
   const [filters, setFilters] = useState<OrderListFilters>(defaultOrderFilters);
@@ -519,7 +521,7 @@ export function OrdersListPage({ initial = null }: OrdersListPageProps = {}) {
         />
       </section>
 
-      <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+      <div className="relative -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         <div className="flex w-max min-w-full gap-1.5 pb-0.5">
           {statusTabs.map((tab) => {
             const active = filters.status === tab.value;
@@ -604,32 +606,37 @@ export function OrdersListPage({ initial = null }: OrdersListPageProps = {}) {
               {selectedIds.length} selected
             </span>
             <div className="flex flex-wrap items-center gap-2">
-              <AdminSelect
-                className="w-full sm:w-44"
-                value={bulkStatus}
-                onChange={(event) => setBulkStatus(event.target.value as OrderStatus)}
-                aria-label="Bulk status"
-              >
-                {getActiveFulfillmentStatuses().map((status) => (
-                  <option key={status} value={status}>
-                    Mark {status.replace(/_/g, " ")}
-                  </option>
-                ))}
-              </AdminSelect>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleBulkStatusUpdate}
-                disabled={applying || lockedSelection.length > 0}
-              >
-                {applying ? "Applying..." : "Apply"}
-              </Button>
-              {lockedSelection.length > 0 ? (
-                <span className="text-xs text-destructive">
-                  {lockedSelection.length} cancelled or refunded order
-                  {lockedSelection.length === 1 ? " is" : "s are"} selected — their status
-                  cannot be changed.
-                </span>
+              {/* Moving orders is its own permission; selecting them for export is not. */}
+              {can("orders.update_status") ? (
+                <>
+                  <AdminSelect
+                    className="w-full sm:w-44"
+                    value={bulkStatus}
+                    onChange={(event) => setBulkStatus(event.target.value as OrderStatus)}
+                    aria-label="Bulk status"
+                  >
+                    {getActiveFulfillmentStatuses().map((status) => (
+                      <option key={status} value={status}>
+                        Mark {(ORDER_STATUS_LABELS[status] ?? status.replace(/_/g, " ")).toLowerCase()}
+                      </option>
+                    ))}
+                  </AdminSelect>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleBulkStatusUpdate}
+                    disabled={applying || lockedSelection.length > 0}
+                  >
+                    {applying ? "Applying..." : "Apply"}
+                  </Button>
+                  {lockedSelection.length > 0 ? (
+                    <span className="text-xs text-destructive">
+                      {lockedSelection.length} cancelled or refunded order
+                      {lockedSelection.length === 1 ? " is" : "s are"} selected — their status
+                      cannot be changed.
+                    </span>
+                  ) : null}
+                </>
               ) : null}
               <Button size="sm" variant="outline" onClick={handleExport}>
                 Export
@@ -661,7 +668,7 @@ export function OrdersListPage({ initial = null }: OrdersListPageProps = {}) {
           />
         ) : (
           <>
-            <div className="hidden overflow-x-auto lg:block">
+            <div className="relative hidden overflow-x-auto xl:block">
               <table className="w-full min-w-[880px] text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs text-muted-foreground">
@@ -745,7 +752,7 @@ export function OrdersListPage({ initial = null }: OrdersListPageProps = {}) {
               </table>
             </div>
 
-            <ul className="divide-y divide-border lg:hidden">
+            <ul className="divide-y divide-border xl:hidden">
               {paginated.map((order) => (
                 <li key={order.id} className="p-3 sm:p-4">
                   <div className="flex items-start gap-3">

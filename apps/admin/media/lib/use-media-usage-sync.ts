@@ -9,64 +9,39 @@ import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
  * Loads every place a media URL can be referenced that no longer lives in this
  * browser, so the library can answer "is this file in use?" truthfully.
  *
- * The homepage and wedding layouts, the CMS pages, testimonial avatars and the
- * header/footer/SEO documents are all server-held now. The usage check was still
- * looking for them in localStorage keys that were deleted with the browser stores
- * that owned them, so it reported every one of those references as absent — and
- * the library offered files that were live on the storefront under an "Unused"
- * filter.
+ * The homepage layout, the CMS pages, testimonial avatars, the header/footer/SEO
+ * documents, the logo in Settings, banners, the catalog and every product are
+ * all server-held. The server reads them WHOLE — drafts, switched-off banners
+ * and unpublished products included — and sends back only the media addresses
+ * in each (`/api/media/usage`, see features/media/server/media.usage.ts).
+ *
+ * This used to fetch the ten documents itself, through their own APIs, so each
+ * answered by the member's role: a manager was refused the pages and the
+ * homepage (the index never finished, and every delete sat on "Still
+ * checking"), and anyone without the banner permission was given a visitor's
+ * banners — a switched-off banner's photo read as unused, and could be deleted.
  *
  * Searched as raw text rather than walked field by field: these documents hold
  * URLs in a dozen shapes (a section's content, a page block, a slide's imageUrl,
- * an og:image), and a structural walk would have to be updated every time one of
- * them gains a field — which is exactly how the old check fell behind.
+ * an og:image), and a structural walk would fall behind every new field.
  */
 
-interface Source {
-  label: string;
-  context: string;
-  url: string;
+interface UsageAnswer {
+  sources: { label: string; context: string; haystack: string }[];
+  complete: boolean;
 }
 
-/*
- * No "Wedding page layout": that builder and its route were removed, and the
- * 404 made every load incomplete. The index then never called itself complete,
- * so every delete dialog sat on "Still checking" for good, and the hook re-fired
- * all seven requests three more times on every visit to Media.
- *
- * Catalog and products are read from the SERVER here. Category, occasion and
- * collection tiles were never checked at all, and the product check read this
- * browser's product cache — filled once per admin session, so a photo added
- * to a product created in the same session read as "Unused", and deleting it
- * destroyed the Cloudinary file under a live product.
- */
-const SOURCES: Source[] = [
-  /*
-    THE SHOP'S LOGO AND FAVICON live in Settings → General, and nothing here
-    read Settings — so the logo every page of the shop draws was counted as
-    unused and offered for deletion. Banners are read from the server too:
-    the check above this list reads this browser's banner cache only.
-  */
-  { label: "Settings (logo, favicon)", context: "Settings", url: "/api/settings" },
-  { label: "Banners", context: "Banner", url: "/api/content/banners" },
-  { label: "Homepage layout", context: "Builder", url: "/api/homepage-sections" },
-  { label: "Catalog", context: "Catalog", url: "/api/catalog" },
-  { label: "Products", context: "Products", url: "/api/products" },
-  { label: "CMS pages", context: "Pages", url: "/api/pages" },
-  { label: "Testimonials", context: "Content", url: "/api/content/testimonials" },
-  { label: "Header", context: "Site layout", url: "/api/site-layout/header" },
-  { label: "Footer", context: "Site layout", url: "/api/site-layout/footer" },
-  { label: "SEO", context: "Site layout", url: "/api/site-layout/seo" },
-];
+export const MEDIA_USAGE_URL = "/api/media/usage";
 
-async function loadSource(source: Source): Promise<string | null> {
+async function loadUsage(): Promise<UsageAnswer | null> {
   try {
-    const response = await fetch(source.url, { headers: { Accept: "application/json" } });
+    const response = await fetch(MEDIA_USAGE_URL, { headers: { Accept: "application/json" } });
     if (!response.ok) {
       noteAuthStatus(response.status);
       return null;
     }
-    return JSON.stringify(await response.json());
+    const json = (await response.json()) as { success?: boolean; data?: UsageAnswer | null };
+    return json.success && json.data ? json.data : null;
   } catch {
     return null;
   }
@@ -93,33 +68,21 @@ export function useMediaUsageSync(): number {
     let attempts = 0;
 
     async function load() {
-      const loaded = await Promise.all(
-        SOURCES.map(async (source) => ({ source, haystack: await loadSource(source) })),
-      );
+      const answer = await loadUsage();
       if (cancelled) return;
 
       /**
        * Every source has to answer before this index may call itself complete.
        *
-       * The failed ones were filtered out and the rest handed over as if that
-       * were the whole picture, so a single failed GET made every reference in
+       * A failed source used to be dropped and the rest handed over as if that
+       * were the whole picture, so a single failed read made every reference in
        * that document invisible. A file used only by the homepage then read as
        * "not used anywhere" — offered under the Unused filter, and deleted from
        * a dialog whose "Still checking" caveat had been switched off by the
        * flag this sets. Cloudinary destroys the asset; the homepage breaks.
        */
-      const complete = loaded.every((entry) => entry.haystack !== null);
-
-      setRemoteUsageIndex(
-        loaded
-          .filter((entry) => entry.haystack !== null)
-          .map((entry) => ({
-            label: entry.source.label,
-            context: entry.source.context,
-            haystack: entry.haystack as string,
-          })),
-        complete,
-      );
+      const complete = Boolean(answer?.complete);
+      setRemoteUsageIndex(answer?.sources ?? [], complete);
       setVersion((value) => value + 1);
 
       // An incomplete index is not a permanent state to sit in: the admin is

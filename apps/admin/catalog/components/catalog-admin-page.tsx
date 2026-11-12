@@ -470,7 +470,7 @@ export function CatalogAdminPage({
         </p>
       ) : null}
 
-      <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+      <div className="relative -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         <div className="flex w-max min-w-full gap-1.5 pb-0.5">
           {tabBar.map((tab) => {
             const isThemes = tab.id === "themes";
@@ -561,7 +561,7 @@ export function CatalogAdminPage({
           />
         ) : (
           <>
-            <div className="hidden overflow-x-auto md:block">
+            <div className="relative hidden overflow-x-auto md:block">
               <table className="w-full min-w-[560px] text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs text-muted-foreground">

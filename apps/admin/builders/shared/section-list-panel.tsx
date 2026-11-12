@@ -246,7 +246,7 @@ function SortableSectionRow<T extends BuilderSectionListItem>({
               type="button"
               variant="ghost"
               size="sm"
-              className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+              className="h-7 px-2 text-xs text-red-700 hover:text-red-700 dark:text-red-400 dark:hover:text-red-400"
               onClick={() => onRemove(section.instanceId)}
               disabled={!canRemove}
             >

@@ -10,6 +10,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { routes } from "@/constants/routes";
 import { cn } from "@/lib/utils";
+import { useAccess } from "@/features/team/lib/access-context";
+import { canOpenRoute } from "@/features/team/lib/route-access";
 
 const quickActions = [
   { label: "Orders", href: routes.admin.orders.list, icon: ShoppingBag },
@@ -21,6 +23,10 @@ const quickActions = [
 ];
 
 export function DashboardQuickActions() {
+  // Only shortcuts to screens this member can open.
+  const { can } = useAccess();
+  const actions = quickActions.filter((action) => canOpenRoute(action.href, can));
+  if (actions.length === 0) return null;
   return (
     <Card className="flex h-full flex-col shadow-sm">
       <CardHeader className="pb-2">
@@ -28,7 +34,7 @@ export function DashboardQuickActions() {
       </CardHeader>
       <CardContent className="flex flex-1 flex-col pt-0">
         <div className="grid flex-1 grid-cols-2 content-start gap-2 sm:grid-cols-3 xl:grid-cols-2">
-          {quickActions.map((action) => {
+          {actions.map((action) => {
             const Icon = action.icon;
             return (
               <Link

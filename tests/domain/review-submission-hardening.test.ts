@@ -124,7 +124,7 @@ describe("product reads do not hand out unpublished work", () => {
     const get = source.slice(source.indexOf("export async function GET"));
     const fn = get.slice(0, get.indexOf("\nexport async function POST"));
 
-    expect(fn).toContain("requireProductAdmin()");
+    expect(fn).toContain('requireProductPermission("products.view")');
     expect(fn).toMatch(/status === "published"/);
   });
 
@@ -134,7 +134,7 @@ describe("product reads do not hand out unpublished work", () => {
     const fn = get.slice(0, get.indexOf("\nexport async function PUT"));
 
     expect(fn).toMatch(/product\.status !== "published"/);
-    expect(fn).toContain("requireProductAdmin()");
+    expect(fn).toContain('requireProductPermission("products.view")');
     // 403 would confirm the product exists; the guard has to answer 404.
     expect(fn).not.toContain("403");
   });

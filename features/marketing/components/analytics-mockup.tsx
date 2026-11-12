@@ -61,7 +61,7 @@ export function AnalyticsMockup({ className }: { className?: string }) {
                 </p>
                 <p className="mt-1 font-heading text-[22px] font-semibold leading-none">₹4,82,600</p>
               </div>
-              <span className="inline-flex items-center gap-0.5 rounded-full bg-[#E9F1E4] px-2 py-0.5 text-[10px] font-semibold text-[#4f8a45]">
+              <span className="inline-flex items-center gap-0.5 rounded-full bg-[#E9F1E4] px-2 py-0.5 text-[10px] font-semibold text-[#3d6e35]">
                 <ArrowUpRightIcon className="size-2.5" /> +18.6%
               </span>
             </div>

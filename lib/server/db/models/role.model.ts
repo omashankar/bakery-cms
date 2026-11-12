@@ -4,9 +4,13 @@ import { applyBaseTransform } from "./_transform";
 import { defineModel } from "./_define-model";
 
 /**
- * Role + its permission scopes. Seeded from types/permissions.ts (Owner,
- * Store Manager, Content Editor, Viewer). `isSystem` roles cannot be deleted.
- * RBAC enforcement uses `permissions` (Phase 1 wires the base; UI comes later).
+ * A role: a named bundle of permission ids from
+ * features/team/lib/permissions.ts. Users reference it by `slug`.
+ *
+ * `isSystem` marks the five default roles (Owner, Manager, Kitchen Staff,
+ * Delivery Staff, Content Editor). They cannot be deleted; the owner's
+ * permissions cannot be changed at all, and are not even read — the owner holds
+ * every permission by definition (see `permissionsForRole`).
  */
 const roleSchema = new mongoose.Schema({
   slug: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
@@ -14,6 +18,8 @@ const roleSchema = new mongoose.Schema({
   description: { type: String, default: "" },
   isSystem: { type: Boolean, default: false },
   permissions: { type: [String], default: [] },
+  createdBy: { type: String, default: null },
+  updatedBy: { type: String, default: null },
 });
 
 applyBaseTransform(roleSchema);

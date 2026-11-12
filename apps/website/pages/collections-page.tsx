@@ -63,11 +63,25 @@ const PAGE_SLOTS = 7;
  * actually sorting.
  */
 const SORT_LABELS: Record<CollectionFilters["sort"], string> = {
+  relevance: "Best match",
   popular: "Popular",
   name: "Name",
   "price-asc": "Price: low to high",
   "price-desc": "Price: high to low",
 };
+
+/**
+ * A search orders by how well each product answers it; no search, no "Best
+ * match". Chosen for the customer when a search begins and taken back when it
+ * is cleared — a choice they made themselves (price, name) is left alone.
+ */
+function withSearchSort(previous: CollectionFilters, next: CollectionFilters): CollectionFilters {
+  const searching = next.search.trim() !== "";
+  const wasSearching = previous.search.trim() !== "";
+  if (!searching && next.sort === "relevance") return { ...next, sort: "popular" };
+  if (searching && !wasSearching && next.sort === "popular") return { ...next, sort: "relevance" };
+  return next;
+}
 
 /**
  * The page numbers to draw, with `null` where the run breaks.
@@ -289,10 +303,10 @@ export function CollectionsPage({
    * the boxes do not vanish as the customer uses them.
    */
   const optionFacets = useMemo(() => getFilterOptionFacets(inCategory), [inCategory]);
-  const [filters, setFilters] = useState<CollectionFilters>(() => ({
-    ...defaultCollectionFilters(collectionPriceCeiling(catalog)),
-    search: initialSearch,
-  }));
+  const [filters, setFilters] = useState<CollectionFilters>(() => {
+    const blank = defaultCollectionFilters(collectionPriceCeiling(catalog));
+    return withSearchSort(blank, { ...blank, search: initialSearch });
+  });
   /**
    * RE-SEEDED, NOT JUST SEEDED, AND THIS IS THE WHOLE TRAP.
    *
@@ -307,7 +321,9 @@ export function CollectionsPage({
    */
   useEffect(() => {
     setFilters((current) =>
-      current.search === initialSearch ? current : { ...current, search: initialSearch },
+      current.search === initialSearch
+        ? current
+        : withSearchSort(current, { ...current, search: initialSearch }),
     );
   }, [initialSearch]);
   const [page, setPage] = useState(1);
@@ -428,7 +444,7 @@ export function CollectionsPage({
   }, [categorySlug, filters]);
 
 
-  const updateFilters = (next: CollectionFilters) => setFilters(next);
+  const updateFilters = (next: CollectionFilters) => setFilters((current) => withSearchSort(current, next));
 
   return (
     <>
@@ -689,7 +705,9 @@ export function CollectionsPage({
                     >
                       {/* The word is the label above now — "Sort: Popular"
                           inside a cell headed "Sort by" said it twice. */}
-                      {(Object.keys(SORT_LABELS) as CollectionFilters["sort"][]).map((key) => (
+                      {(Object.keys(SORT_LABELS) as CollectionFilters["sort"][])
+                        .filter((key) => key !== "relevance" || filters.search.trim() !== "")
+                        .map((key) => (
                         <option key={key} value={key}>
                           {SORT_LABELS[key]}
                         </option>

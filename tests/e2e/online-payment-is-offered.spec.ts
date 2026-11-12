@@ -48,7 +48,7 @@ test.describe("paying online", () => {
     await page.getByRole("button", { name: /add to cart/i }).first().click();
 
     await page.goto("/store/cart");
-    await page.getByRole("button", { name: /proceed to checkout/i }).click();
+    await page.getByRole("link", { name: /proceed to checkout/i }).click();
     await expect(page).toHaveURL(/\/store\/checkout/);
 
     // ---- the address step, exactly as place-an-order does it ----

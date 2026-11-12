@@ -1,4 +1,5 @@
-import { requireRole } from "@/lib/server/auth/dal";
+import { can, getActor } from "@/lib/server/auth/access";
+import type { Permission } from "@/features/team/lib/permissions";
 
 /**
  * Is this request allowed to see the unpublished draft?
@@ -11,12 +12,13 @@ import { requireRole } from "@/lib/server/auth/dal";
  * one query string away, and `generateMetadata` returns the same metadata for
  * the preview URL, so a leaked link is indexable.
  *
- * A visitor who guesses the parameter now simply gets the live page.
+ * A visitor who guesses the parameter now simply gets the live page — and so
+ * does a team member who could not open that draft in the admin either. The
+ * session lookup only happens when the preview parameter is present.
  */
-export async function canPreviewDraft(): Promise<boolean> {
+export async function canPreviewDraft(permission: Permission): Promise<boolean> {
   try {
-    await requireRole("owner", "admin");
-    return true;
+    return can(await getActor(), permission);
   } catch {
     return false;
   }

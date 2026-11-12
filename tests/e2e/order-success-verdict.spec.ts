@@ -105,5 +105,5 @@ test("says so plainly when the order really is not there, without a success tick
   await expect(page.getByRole("heading", { name: /could not load that order/i })).toBeVisible();
   await expect(page.locator(".text-green-600")).toHaveCount(0);
   await expect(page.getByText(/thank you for your order/i)).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /^track order$/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: /^track order$/i })).toBeVisible();
 });

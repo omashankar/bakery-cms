@@ -121,9 +121,9 @@ describe("search and the filter panel read the same words", () => {
     expect(search, "the haystack is not shareable").toContain(
       "export function searchHaystack(",
     );
-    expect(filters, "the filter stopped using the shared haystack").toContain(
-      "searchHaystack(cake).includes(query)",
-    );
+    // Through the shared matcher, which reads the shared haystack.
+    expect(filters, "the filter stopped using the shared matcher").toContain("searchCatalog(query, cakes)");
+    expect(code("features/products/lib/search-match.ts")).toContain("searchHaystack(product)");
     expect(
       filters.includes("cake.optionLabels ?? []"),
       "the filter has grown its own copy of the haystack again",

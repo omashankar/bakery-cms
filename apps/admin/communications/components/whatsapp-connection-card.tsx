@@ -291,6 +291,7 @@ export function WhatsAppConnectionCard({
                 </p>
               </div>
               <Switch
+                aria-label="Send WhatsApp messages"
                 checked={form.enabled}
                 onCheckedChange={(checked) =>
                   setForm((current) => ({ ...current, enabled: checked }))

@@ -41,7 +41,9 @@ export function GatewayCard({
     <div
       className={cn(
         "flex flex-col rounded-2xl border bg-card p-5 shadow-sm transition-colors",
-        !wired ? "border-dashed border-border opacity-70" : null,
+        // Faded by its border and a muted fill, not opacity: opacity took the text
+        // below a readable contrast.
+        !wired ? "border-dashed border-border bg-muted/30" : null,
         wired && runtime.enabled ? "border-bakery-700/40" : "border-border"
       )}
     >
@@ -97,12 +99,12 @@ export function GatewayCard({
         {config.supportedCurrencies.slice(0, 4).map((cur) => (
           <span
             key={cur}
-            className="rounded-md border border-border bg-card px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground"
+            className="rounded-md border border-border bg-card px-1.5 py-0.5 text-[11px] font-semibold text-muted-foreground"
           >
             {cur}
           </span>
         ))}
-        <span className="rounded-md border border-border bg-card px-1.5 py-0.5 text-[10px] text-muted-foreground">
+        <span className="rounded-md border border-border bg-card px-1.5 py-0.5 text-[11px] text-muted-foreground">
           {config.supportedCountries.slice(0, 3).join(" · ")}
         </span>
       </div>

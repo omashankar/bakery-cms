@@ -48,6 +48,7 @@ import {
   type RecentSearch,
 } from "@/apps/website/lib/recent-searches";
 import { cn } from "@/lib/utils";
+import { thumbnailImageUrl } from "@/lib/image-url";
 
 /**
  * The sign-in modal, loaded the first time it is opened.
@@ -153,6 +154,13 @@ export function StorefrontNavbar({ chrome, initialCustomer }: StorefrontNavbarPr
   const router = useRouter();
   const [term, setTerm] = useState("");
   const [suggestions, setSuggestions] = useState<ProductSuggestion[]>([]);
+  /**
+   * The query the rows on screen ANSWER. "Nothing matches" is said only once
+   * the shop has answered for exactly what is in the box — said from the empty
+   * list alone, it would flash under every keystroke while the request was
+   * still on its way.
+   */
+  const [answeredFor, setAnsweredFor] = useState("");
   /** Read from the browser when the box is focused, so it is never stale and never in the SSR HTML. */
   const [recents, setRecents] = useState<RecentSearch[]>([]);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -175,14 +183,14 @@ export function StorefrontNavbar({ chrome, initialCustomer }: StorefrontNavbarPr
   const suggestListId = useId();
 
   /*
-    180ms, not the hook's default 300.
+    140ms, not the hook's default 300.
 
     A dropdown is read between keystrokes, so the delay is felt directly in a
     way an admin list filter is not — 300 reads as the box thinking about it.
     It is still long enough that "chocolate" costs one request rather than
     nine, which is the whole reason the debounce is here.
   */
-  const debouncedTerm = useDebouncedValue(term, 180);
+  const debouncedTerm = useDebouncedValue(term, 140);
 
   /**
    * NEW ROWS ARRIVE WITH NOTHING HIGHLIGHTED, always, in one render.
@@ -198,22 +206,23 @@ export function StorefrontNavbar({ chrome, initialCustomer }: StorefrontNavbarPr
    * Setting both together makes that window impossible rather than short, and
    * costs one render instead of two on every keystroke.
    */
-  const showSuggestions = (rows: ProductSuggestion[]) => {
+  const showSuggestions = (rows: ProductSuggestion[], forQuery: string) => {
     setSuggestions(rows);
+    setAnsweredFor(forQuery);
     setActiveRow(-1);
   };
 
   useEffect(() => {
     const query = debouncedTerm.trim();
     if (query.length < MIN_SUGGEST_CHARS) {
-      showSuggestions([]);
+      showSuggestions([], "");
       return;
     }
 
     const key = query.toLowerCase();
     const remembered = suggestCache.current.get(key);
     if (remembered) {
-      showSuggestions(remembered);
+      showSuggestions(remembered, key);
       return;
     }
 
@@ -225,7 +234,7 @@ export function StorefrontNavbar({ chrome, initialCustomer }: StorefrontNavbarPr
       .then((body: { data?: unknown } | null) => {
         const rows = Array.isArray(body?.data) ? (body.data as ProductSuggestion[]) : [];
         suggestCache.current.set(key, rows);
-        showSuggestions(rows);
+        showSuggestions(rows, key);
       })
       .catch((error: unknown) => {
         /*
@@ -235,7 +244,8 @@ export function StorefrontNavbar({ chrome, initialCustomer }: StorefrontNavbarPr
           is the previous query's products sitting under a different word.
         */
         if ((error as { name?: string })?.name === "AbortError") return;
-        showSuggestions([]);
+        // A failure is not "nothing matches", so it is not answered for.
+        showSuggestions([], "");
       });
 
     return () => controller.abort();
@@ -372,6 +382,18 @@ export function StorefrontNavbar({ chrome, initialCustomer }: StorefrontNavbarPr
   };
 
   const suggestionsShowing = panelOpen && rowCount > 0;
+  /**
+   * SAID, NOT SILENT. With no rows the panel used to simply not open, and a
+   * customer could not tell "the shop has none" from "search is broken".
+   * Enter still runs the search — the results page says the same, with the
+   * catalogue one tap away.
+   */
+  const nothingMatches =
+    panelOpen &&
+    typedEnough &&
+    suggestions.length === 0 &&
+    answeredFor !== "" &&
+    answeredFor === term.trim().toLowerCase();
 
   /**
    * The two rows the navbar renders as something other than a plain link.
@@ -1112,7 +1134,9 @@ export function StorefrontNavbar({ chrome, initialCustomer }: StorefrontNavbarPr
                         {row.image ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            src={row.image}
+                            // A 40px square — up to six per keystroke, each the
+                            // product's full main photo until it asked for its size.
+                            src={thumbnailImageUrl(row.image, 40)}
                             alt=""
                             loading="lazy"
                             decoding="async"
@@ -1140,6 +1164,14 @@ export function StorefrontNavbar({ chrome, initialCustomer }: StorefrontNavbarPr
                     </Link>
                   ))}
                 </div>
+              ) : nothingMatches ? (
+                <p
+                  role="status"
+                  className="absolute inset-x-0 top-full z-50 mt-1.5 rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground shadow-lg"
+                >
+                  Nothing matches <span className="font-medium text-foreground">“{term.trim()}”</span>. Try
+                  a shorter word.
+                </p>
               ) : null}
             </div>
           </form>

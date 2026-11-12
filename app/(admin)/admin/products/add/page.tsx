@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getServerLabels } from "@/features/settings/server/labels.server";
 import { ProductFormPage } from "@/apps/admin/products/components/product-form-page";
-import { whenAdmin } from "@/lib/server/auth/admin-initial";
+import { whenAllowed } from "@/lib/server/auth/access";
 import { getCatalog } from "@/features/catalog/server/catalog.service";
 import { readSeoForAdmin } from "@/features/site-layout/server/site-layout.initial";
 import { getSettings } from "@/features/settings/server/settings.service";
@@ -17,7 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /** The taxonomy the pickers offer and the SEO store the preview reads, with the page. */
 export default async function Page() {
-  const initial = await whenAdmin(async () => {
+  const initial = await whenAllowed("products.create", async () => {
     const [catalog, seo, settings] = await Promise.all([getCatalog(), readSeoForAdmin(), getSettings()]);
     // The delivery speeds and wording the form shows, so its HTML matches its first render.
     const commerce = (settings as { commerce?: CommerceSettings }).commerce;

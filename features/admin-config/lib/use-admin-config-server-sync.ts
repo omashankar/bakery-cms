@@ -2,20 +2,24 @@
 
 import { useEffect } from "react";
 
+import type { AdminConfigKey } from "./admin-config-api";
 import { ensureAdminConfigHydrated } from "./admin-config-hydration";
 
 /**
  * Hydrates the admin-only config blobs (admin profile, payment gateway runtime,
  * payment notification prefs, custom code) from the server once on entering the
  * admin, so they are durable and consistent across devices. Every genuine save
- * dual-writes back to the server. These endpoints are admin-guarded.
+ * dual-writes back to the server.
  *
- * The work is in `ensureAdminConfigHydrated`, which is also callable from a
- * form: this effect never re-runs after an in-app login, and it opened the gate
- * when ANY ONE of the four blobs loaded — vouching for three it had not read.
+ * `keys` is what THIS member may read (see admin-config-rules) — asking for
+ * the rest only collects refusals. The work is in `ensureAdminConfigHydrated`,
+ * which is also callable from a form: this effect never re-runs after an
+ * in-app login.
  */
-export function useAdminConfigServerSync(): void {
+export function useAdminConfigServerSync(keys: readonly AdminConfigKey[]): void {
+  const wanted = keys.join(",");
   useEffect(() => {
-    void ensureAdminConfigHydrated();
-  }, []);
+    if (!wanted) return;
+    void ensureAdminConfigHydrated(wanted.split(",") as AdminConfigKey[]);
+  }, [wanted]);
 }

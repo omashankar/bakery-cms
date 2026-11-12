@@ -2,14 +2,13 @@ import { ok } from "@/lib/server/http/response";
 import { withErrorHandler, NotFoundError, ConflictError } from "@/lib/server/http/errors";
 import { StoreConflictError } from "@/lib/server/db/cms-store";
 import { validate, readJson } from "@/lib/server/http/validate";
-import { requireRole } from "@/lib/server/auth/dal";
+import { requirePermission, requireStaff } from "@/lib/server/auth/access";
 import { requestContext } from "@/lib/server/audit/audit-log";
 
 import * as service from "./site-layout.service";
 import { siteLayoutSchemas } from "./site-layout.validators";
 import { allowlisted } from "@/lib/server/http/allowlist";
 
-const LAYOUT_ROLES = ["owner", "admin"] as const;
 type KeyContext = { params: Promise<{ key: string }> };
 
 export const getSiteLayoutController = withErrorHandler(async (_req: Request, ctx: KeyContext) => {
@@ -33,8 +32,12 @@ export const getSiteLayoutController = withErrorHandler(async (_req: Request, ct
    * `use-seo-server-sync` was written around this being closed: its doc comment
    * turns on an admin arriving from the login form, "so that read 401s and the
    * gate stays shut". It had stopped 401-ing.
+   *
+   * Any active team member may READ it: every admin screen hydrates the
+   * header, footer and appearance, and nothing here is a secret from staff.
+   * Changing it is shop configuration.
    */
-  await requireRole(...LAYOUT_ROLES);
+  await requireStaff();
   const { key } = await ctx.params;
   const { value, version } = await service.getSiteLayoutVersioned(key);
   // The version a save must carry back — the same header the content stores use.
@@ -42,7 +45,7 @@ export const getSiteLayoutController = withErrorHandler(async (_req: Request, ct
 });
 
 export const replaceSiteLayoutController = withErrorHandler(async (request: Request, ctx: KeyContext) => {
-  const session = await requireRole(...LAYOUT_ROLES);
+  const session = await requirePermission("settings.manage");
   const { key } = await ctx.params;
 
   const schema = allowlisted(siteLayoutSchemas, key);

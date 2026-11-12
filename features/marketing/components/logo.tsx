@@ -32,7 +32,7 @@ export function Logo({ className, tone = "default" }: LogoProps) {
       </span>
       <span className="font-heading text-[17px] font-bold tracking-tight">
         <span className={tone === "invert" ? "text-white" : "text-foreground"}>Bakery</span>{" "}
-        <span className="text-[#B0895F]">CMS</span>
+        <span className={tone === "invert" ? "text-[#D4A373]" : "text-[#7A4D2B]"}>CMS</span>
       </span>
     </Link>
   );

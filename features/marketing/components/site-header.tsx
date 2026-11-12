@@ -24,12 +24,12 @@ function NavItem({
     return (
       <span
         className={cn(
-          "inline-flex cursor-default items-center gap-1.5 text-sm font-medium text-muted-foreground/70",
+          "inline-flex cursor-default items-center gap-1.5 text-sm font-medium text-muted-foreground",
           className
         )}
       >
         {label}
-        <span className="rounded-full bg-[#F1EBE3] px-1.5 py-0.5 text-[10px] font-semibold text-[#a07d52]">
+        <span className="rounded-full bg-[#F1EBE3] px-1.5 py-0.5 text-[10px] font-semibold text-[#735836]">
           Soon
         </span>
       </span>
@@ -67,7 +67,7 @@ export function SiteHeader() {
       className={cn(
         "sticky top-0 z-50 border-b transition-colors duration-300",
         scrolled || open
-          ? "border-border bg-[#FAF9F7]/85 backdrop-blur-md"
+          ? "border-border bg-[#FAF9F7]/95 backdrop-blur-md"
           : "border-transparent bg-[#FAF9F7]/60 backdrop-blur-sm"
       )}
     >

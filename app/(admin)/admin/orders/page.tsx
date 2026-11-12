@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { OrdersListPage } from "@/apps/admin/commerce/pages/orders-list-page";
-import { whenAdmin } from "@/lib/server/auth/admin-initial";
+import { whenAllowed } from "@/lib/server/auth/access";
 import { getOrdersPage, getStats } from "@/features/orders/server/order.service";
 import { orderQuerySchema } from "@/features/orders/server/order.validators";
 
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
  * the same schema the API uses so the two cannot disagree.
  */
 export default async function Page() {
-  const initial = await whenAdmin(async () => {
+  const initial = await whenAllowed("orders.view", async () => {
     const query = orderQuerySchema.parse({ page: "1", limit: "10" });
     const [{ items, total }, stats] = await Promise.all([getOrdersPage(query), getStats()]);
     return { orders: items, total, stats };

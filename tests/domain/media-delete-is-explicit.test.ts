@@ -78,6 +78,7 @@ const ORIGINAL = [file("a", "cloud-a"), file("b", "cloud-b"), file("c", "cloud-c
 describe("saving the media library", () => {
   beforeEach(() => {
     cloudinary.deleted = [];
+    state.stores.delete("media-deleted");
     state.stores.set("media-files", [...ORIGINAL]);
   });
 

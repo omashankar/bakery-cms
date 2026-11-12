@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getServerLabels } from "@/features/settings/server/labels.server";
 import { ReviewsAdminPage } from "@/apps/admin/reviews/pages/reviews-admin-page";
-import { whenAdmin } from "@/lib/server/auth/admin-initial";
+import { whenAllowed } from "@/lib/server/auth/access";
 import { getReviews } from "@/features/reviews/server/review.service";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -14,6 +14,6 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /** Every review, read with the page; see `applyServerReviews`. */
 export default async function Page() {
-  const initial = await whenAdmin(async () => JSON.parse(JSON.stringify(await getReviews())));
+  const initial = await whenAllowed("reviews.manage", async () => JSON.parse(JSON.stringify(await getReviews())));
   return <ReviewsAdminPage initial={initial} />;
 }

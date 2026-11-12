@@ -21,7 +21,7 @@ import {
   type AdminProfile,
 } from "@/features/auth/lib/admin-profile";
 import { useHydratedForm } from "@/features/settings/lib/use-hydrated-form";
-import { adminConfigHydration } from "@/features/admin-config/lib/admin-config-api";
+import { adminConfigGates } from "@/features/admin-config/lib/admin-config-api";
 import {
   applyServerAdminConfig,
   ensureAdminConfigHydrated,
@@ -38,9 +38,12 @@ import { uploadFailureMessage, uploadMediaRequest } from "@/apps/admin/media/lib
 import {
   MAX_INLINE_BYTES,
   MAX_SOURCE_BYTES,
+  MAX_UPLOAD_BYTES,
 } from "@/apps/admin/media/lib/use-media-upload";
 import { shrinkImageFile } from "@/lib/images/shrink-image";
 import { thumbnailImageUrl } from "@/lib/image-url";
+import { useAccess, type ClientAccess } from "@/features/team/lib/access-context";
+import { PermissionSummary } from "@/apps/admin/team/components/permission-summary";
 
 /** Shown only while hydration is pending, behind the skeleton. */
 const EMPTY_PROFILE: AdminProfile = {
@@ -61,12 +64,55 @@ function initials(name: string) {
   return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
 }
 
-export function AdminProfilePage({
-  initial = null,
-}: {
-  /** The admin config blobs and account, read on the server; null fetches as before. */
-  initial?: Parameters<typeof applyServerAdminConfig>[0] | null;
-} = {}) {
+type ProfileInitial = Parameters<typeof applyServerAdminConfig>[0] | null;
+
+/**
+ * The OWNER edits the shop's profile (name, phone, photo — one per shop, from
+ * before there was a team). Any other member sees their own account: who they
+ * are, their role and what it allows, and where to change their password.
+ */
+export function AdminProfilePage({ initial = null }: { initial?: ProfileInitial } = {}) {
+  const { access } = useAccess();
+  if (access && !access.isOwner) return <MemberProfile access={access} />;
+  return <OwnerProfilePage initial={initial} />;
+}
+
+function MemberProfile({ access }: { access: ClientAccess }) {
+  return (
+    <AdminPage className="space-y-4">
+      <AdminPageHeader title="My Profile" description="Your account on this shop's admin." />
+      <Card>
+        <CardHeader>
+          <CardTitle>{access.name || access.email}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <dl className="grid gap-3 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="text-muted-foreground">Email</dt>
+              <dd className="font-medium text-foreground">{access.email}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Role</dt>
+              <dd className="font-medium text-foreground">{access.roleName}</dd>
+            </div>
+          </dl>
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-foreground">What your role lets you do</p>
+            <PermissionSummary permissions={access.permissions} />
+          </div>
+          <p className="text-sm text-muted-foreground">
+            To change your name, email or role, ask the shop owner.
+          </p>
+          <Button variant="outline" render={<Link href={routes.admin.changePassword} />} nativeButton={false}>
+            Change password
+          </Button>
+        </CardContent>
+      </Card>
+    </AdminPage>
+  );
+}
+
+function OwnerProfilePage({ initial = null }: { initial?: ProfileInitial }) {
   // Before the form's own hydration effect, so it finds the gate open.
   useLayoutEffect(() => {
     if (initial) applyServerAdminConfig(initial);
@@ -90,8 +136,8 @@ export function AdminProfilePage({
   } = useHydratedForm<AdminProfile>({
     read: getAdminProfile,
     fallback: EMPTY_PROFILE,
-    gate: adminConfigHydration,
-    ensureHydrated: ensureAdminConfigHydrated,
+    gate: adminConfigGates["admin-profile"],
+    ensureHydrated: () => ensureAdminConfigHydrated(["admin-profile"]),
     updatedEvent: ADMIN_PROFILE_UPDATED_EVENT,
   });
   const fileRef = useRef<HTMLInputElement>(null);
@@ -144,6 +190,13 @@ export function AdminProfilePage({
     // Cleared so choosing the same file again still fires a change.
     event.target.value = "";
 
+    // The library's own checks. Without them a PDF picked under "All files"
+    // went up as data:application/pdf and came back "check the image host
+    // account" — and a big GIF, which is not shrunk, as a bare 413.
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file");
+      return;
+    }
     if (file.size > MAX_SOURCE_BYTES) {
       toast.error("That file is too large to open");
       return;
@@ -152,6 +205,12 @@ export function AdminProfilePage({
     setUploading(true);
     try {
       const { dataUrl, bytes } = await shrinkImageFile(file);
+      if (bytes > MAX_UPLOAD_BYTES) {
+        toast.error("That photo is too large to upload", {
+          description: `Even after resizing it is over ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} MB.`,
+        });
+        return;
+      }
       const outcome = await uploadMediaRequest(dataUrl, "bakery-cms/profile");
 
       if (outcome.status === "uploaded") {

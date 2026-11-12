@@ -31,6 +31,7 @@ import {
 import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-stat-card";
 import { type FiguresState } from "@/components/shared/panel-loading";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
+import { useCan } from "@/features/team/lib/access-context";
 import { adminShell } from "@/apps/admin/components/admin-shell";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -57,6 +58,7 @@ export function CustomersListPage({
   /** Read on the server so the table is in the HTML; null fetches as before. */
   initial?: CustomerProfile[] | null;
 } = {}) {
+  const canExport = useCan("customers.export");
   const router = useRouter();
   const [mounted, setMounted] = useState(Boolean(initial));
   const [failed, setFailed] = useState(false);
@@ -140,16 +142,19 @@ export function CustomersListPage({
         description="Manage customer accounts."
         className="gap-3"
         actions={
-          <Button
-            variant="bakery"
-            className="w-full sm:w-auto"
-            onClick={handleExport}
-            disabled={filtered.length === 0}
-          >
-            <Download className="size-4" />
-            <span className="sm:hidden">Export</span>
-            <span className="hidden sm:inline">Export CSV</span>
-          </Button>
+          // Downloading the whole customer list is its own, sensitive permission.
+          canExport ? (
+            <Button
+              variant="bakery"
+              className="w-full sm:w-auto"
+              onClick={handleExport}
+              disabled={filtered.length === 0}
+            >
+              <Download className="size-4" />
+              <span className="sm:hidden">Export</span>
+              <span className="hidden sm:inline">Export CSV</span>
+            </Button>
+          ) : undefined
         }
       />
 
@@ -259,7 +264,7 @@ export function CustomersListPage({
           />
         ) : (
           <>
-            <div className="hidden overflow-x-auto lg:block">
+            <div className="relative hidden overflow-x-auto xl:block">
               <table className="w-full min-w-[760px] text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs text-muted-foreground">
@@ -299,7 +304,7 @@ export function CustomersListPage({
               </table>
             </div>
 
-            <ul className="divide-y divide-border lg:hidden">
+            <ul className="divide-y divide-border xl:hidden">
               {paginated.map((customer) => (
                 <li key={customer.id}>
                   <button

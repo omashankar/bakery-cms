@@ -36,6 +36,20 @@ type CouponFormValues = {
   categoryIds: string[];
 };
 
+/**
+ * Says which box is missing. Without it, "Create coupon" with an empty badge
+ * label only moved the cursor there — nothing on screen said why the coupon
+ * was not created.
+ */
+function Problem({ id, message }: { id: string; message?: string }) {
+  if (!message) return null;
+  return (
+    <p id={id} role="alert" className="text-xs text-destructive">
+      {message}
+    </p>
+  );
+}
+
 const emptyValues: CouponFormValues = {
   code: "",
   label: "",
@@ -72,6 +86,8 @@ export function CouponFormDialog({
   });
 
   const discountType = watch("discountType");
+  const { errors } = formState;
+  const valueError = discountType === "percent" ? errors.percentOff : errors.flatOff;
 
   useEffect(() => {
     if (!open) return;
@@ -140,17 +156,35 @@ export function CouponFormDialog({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="coupon-code">Code</Label>
-              <Input id="coupon-code" {...register("code", { required: true })} />
+              <Input
+                id="coupon-code"
+                aria-invalid={errors.code ? true : undefined}
+                aria-describedby={errors.code ? "coupon-code-error" : undefined}
+                {...register("code", { required: "Enter the code customers will type." })}
+              />
+              <Problem id="coupon-code-error" message={errors.code?.message} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="coupon-label">Badge label</Label>
-              <Input id="coupon-label" {...register("label", { required: true })} />
+              <Input
+                id="coupon-label"
+                aria-invalid={errors.label ? true : undefined}
+                aria-describedby={errors.label ? "coupon-label-error" : undefined}
+                {...register("label", { required: "Enter a short label, like \"20% off\"." })}
+              />
+              <Problem id="coupon-label-error" message={errors.label?.message} />
             </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="coupon-description">Description</Label>
-            <Textarea id="coupon-description" {...register("description", { required: true })} />
+            <Textarea
+              id="coupon-description"
+              aria-invalid={errors.description ? true : undefined}
+              aria-describedby={errors.description ? "coupon-description-error" : undefined}
+              {...register("description", { required: "Say what the coupon gives." })}
+            />
+            <Problem id="coupon-description-error" message={errors.description?.message} />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -170,11 +204,14 @@ export function CouponFormDialog({
                 type="number"
                 min="1"
                 max={discountType === "percent" ? "100" : undefined}
+                aria-invalid={valueError ? true : undefined}
+                aria-describedby={valueError ? "discount-value-error" : undefined}
                 {...register(discountType === "percent" ? "percentOff" : "flatOff", {
-                  required: true,
-                  ...(discountType === "percent" ? { max: 100 } : {}),
+                  required: "Enter the discount.",
+                  ...(discountType === "percent" ? { max: { value: 100, message: "A percentage can be at most 100." } } : {}),
                 })}
               />
+              <Problem id="discount-value-error" message={valueError?.message} />
             </div>
           </div>
 

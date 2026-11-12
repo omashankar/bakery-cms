@@ -311,6 +311,7 @@ export function FaqAdminPage({
           />
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:w-auto">
             <AdminSelect
+              aria-label="Filter by category"
               value={filters.category}
               onChange={(e) =>
                 updateFilters({ category: e.target.value as FaqListFilters["category"] })
@@ -324,6 +325,7 @@ export function FaqAdminPage({
               ))}
             </AdminSelect>
             <AdminSelect
+              aria-label="Filter by status"
               value={filters.status}
               onChange={(e) =>
                 updateFilters({ status: e.target.value as FaqListFilters["status"] })
@@ -335,6 +337,7 @@ export function FaqAdminPage({
               <option value="archived">Archived</option>
             </AdminSelect>
             <AdminSelect
+              aria-label="Sort by"
               value={filters.sort}
               onChange={(e) =>
                 updateFilters({ sort: e.target.value as FaqListFilters["sort"] })

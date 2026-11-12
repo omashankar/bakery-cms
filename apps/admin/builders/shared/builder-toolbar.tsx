@@ -102,7 +102,7 @@ export function BuilderToolbar({
                 onClick={onReset}
               >
                 <RotateCcw className="size-4" />
-                <span className="hidden sm:inline">Reset</span>
+                <span className="sr-only sm:not-sr-only">Reset</span>
               </Button>
             ) : null}
             {onOpenHistory ? (
@@ -113,7 +113,7 @@ export function BuilderToolbar({
                 onClick={onOpenHistory}
               >
                 <History className="size-4" />
-                <span className="hidden sm:inline">History</span>
+                <span className="sr-only sm:not-sr-only">History</span>
               </Button>
             ) : null}
             {onPreview ? (

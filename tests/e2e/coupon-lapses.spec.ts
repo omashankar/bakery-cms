@@ -149,7 +149,7 @@ test.describe("a coupon that stops qualifying", () => {
     // Gone, before anything downstream is asserted.
     await expect(dearRow).toHaveCount(0);
 
-    await page.getByRole("button", { name: /proceed to checkout/i }).click();
+    await page.getByRole("link", { name: /proceed to checkout/i }).click();
     await expect(page).toHaveURL(/\/store\/checkout/);
 
     // ---- the page has to admit it ----

@@ -27,6 +27,8 @@ import { RevenueChart } from "@/features/payments/components/revenue-chart";
 import { PaymentMethodBreakdown } from "@/features/payments/components/payment-method-breakdown";
 import { UnclaimedPaymentsAlert } from "@/apps/admin/commerce/components/unclaimed-payments-alert";
 import { RazorpaySummaryCard } from "@/apps/admin/commerce/components/razorpay-summary-card";
+import { useAccess } from "@/features/team/lib/access-context";
+import { canOpenRoute } from "@/features/team/lib/route-access";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { routes } from "@/constants/routes";
 import { formatCurrency } from "@/utils/format";
@@ -43,6 +45,10 @@ export function PaymentsAdminPage({
   /** The payment counters over every order, read on the server. */
   initial?: CommerceOverviewsResponse | null;
 } = {}) {
+  // The gateway card reads and changes the keys (payments.manage); the links
+  // are only to screens this member can open.
+  const { can } = useAccess();
+  const links = quickLinks.filter((link) => canOpenRoute(link.href, can));
   const [orders, setOrders] = useState<PlacedOrder[]>([]);
   const [loadedLocal, setLoadedLocal] = useState(false);
   const { overviews } = useCommerceOverviews(initial);
@@ -112,7 +118,7 @@ export function PaymentsAdminPage({
       {/* Status only. The keys FORM lives on the Razorpay gateway page — having
           it in both places meant the same three inputs twice, with nothing to
           say which one was authoritative. */}
-      <RazorpaySummaryCard />
+      {can("payments.manage") ? <RazorpaySummaryCard /> : null}
 
       {/*
         Eight stat cards used to sit here as two unlabelled rows split
@@ -249,7 +255,7 @@ export function PaymentsAdminPage({
       <section className="space-y-2.5 sm:space-y-3">
         <h2 className="font-heading text-base font-bold text-foreground">Go deeper</h2>
         <div className="grid gap-2.5 sm:grid-cols-3 sm:gap-3">
-          {quickLinks.map((link) => (
+          {links.map((link) => (
             <Link
               key={link.href}
               href={link.href}

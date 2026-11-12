@@ -65,7 +65,7 @@ export function LoginFormPage() {
        */
       markSessionRenewed();
       toast.success("Signed in", {
-        description: "Opening your dashboard…",
+        description: "Opening the admin…",
       });
       router.push(routes.admin.dashboard);
     } catch (error) {
@@ -78,12 +78,12 @@ export function LoginFormPage() {
   return (
     <AuthCard
       title="Welcome back"
-      description="Sign in with your staff account to open the dashboard."
+      description="Sign in with your own staff account."
       footer={
         <div className="flex flex-col items-center gap-3 text-center">
           <Link
             href={routes.store.home}
-            className="text-sm font-medium text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+            className="inline-flex min-h-6 items-center text-sm font-medium text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
           >
             ← Back to website
           </Link>
@@ -185,7 +185,7 @@ export function LoginFormPage() {
           </div>
           <Link
             href={routes.auth.forgotPassword}
-            className="text-[13px] font-medium text-bakery-700 underline-offset-4 transition-colors hover:underline"
+            className="inline-flex min-h-6 items-center text-[13px] font-medium text-bakery-700 underline-offset-4 transition-colors hover:underline"
           >
             Forgot password?
           </Link>

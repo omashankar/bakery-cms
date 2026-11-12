@@ -20,7 +20,9 @@ export const adminShell = {
   statCard: "rounded-xl border border-border bg-card px-4 py-3 shadow-sm",
   /** Table container with horizontal scroll on narrow viewports */
   tableCard: "overflow-hidden rounded-xl border border-border bg-card shadow-sm",
-  tableScroll: "overflow-x-auto",
+  // relative: an absolutely placed child (a button's sr-only label) is clipped
+  // here instead of widening the whole page past the screen.
+  tableScroll: "relative overflow-x-auto",
   /** Sticky save/actions bar on mobile — compensates contentWrap inset */
   mobileActionBar:
     "sticky bottom-0 z-10 -mx-4 flex flex-wrap items-start justify-between gap-4 border-t border-border bg-background px-4 py-4 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0",

@@ -12,10 +12,15 @@ interface MobileDetailDrawerProps {
   title?: string;
   children: React.ReactNode;
   className?: string;
+  /**
+   * The width from which the page shows its own side panel instead — the
+   * drawer is hidden there. `2xl` for a page whose panel only fits on a wide
+   * screen (the media grid was squeezed to 90px cards at 1280).
+   */
+  from?: "xl" | "2xl";
 }
 
-/** Matches Tailwind `xl` — drawer is hidden at this breakpoint and above. */
-const DESKTOP_MQ = "(min-width: 1280px)";
+const DESKTOP_MQ = { xl: "(min-width: 1280px)", "2xl": "(min-width: 1536px)" } as const;
 
 export function MobileDetailDrawer({
   open,
@@ -23,18 +28,19 @@ export function MobileDetailDrawer({
   title,
   children,
   className,
+  from = "xl",
 }: MobileDetailDrawerProps) {
   const [isDesktop, setIsDesktop] = useState(false);
 
   useEffect(() => {
-    const media = window.matchMedia(DESKTOP_MQ);
+    const media = window.matchMedia(DESKTOP_MQ[from]);
     function sync() {
       setIsDesktop(media.matches);
     }
     sync();
     media.addEventListener("change", sync);
     return () => media.removeEventListener("change", sync);
-  }, []);
+  }, [from]);
 
   const drawerActive = open && !isDesktop;
   useBodyScrollLock(drawerActive);
@@ -51,7 +57,7 @@ export function MobileDetailDrawer({
   if (!drawerActive) return null;
 
   return (
-    <div className="fixed inset-0 z-50 xl:hidden">
+    <div className={cn("fixed inset-0 z-50", from === "2xl" ? "2xl:hidden" : "xl:hidden")}>
       <button
         type="button"
         className="absolute inset-0 bg-black/40"

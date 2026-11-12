@@ -72,6 +72,8 @@ export interface OrderAnalytics {
   cityBreakdown: CityBreakdownItem[];
   couponBreakdown: CouponBreakdownItem[];
   recentOrders: PlacedOrder[];
+  /** False when the money was zeroed for a member without `reports.revenue.view` — hide it, do not print ₹0. */
+  includesRevenue?: boolean;
 }
 
 /** Comfortably above the longest list any screen renders. */
@@ -267,5 +269,58 @@ export async function getTransactionsPage(
       filteredSuccessCount: matching.filter((txn) => txn.collected).length,
       totalRecords: transactions.length,
     },
+  };
+}
+
+/**
+ * The analytics as one member may see them.
+ *
+ * The Reports screen opens with `reports.view`; the MONEY on it needs
+ * `reports.revenue.view` as well — "Sales totals, revenue trends and average
+ * order value". This endpoint demanded the revenue permission outright, so a
+ * role given Reports without it (the simple editor's "View" level gives exactly
+ * that) opened Reports to "Figures unavailable" and a retry loop of refusals.
+ * Without it, every amount is zeroed HERE — it never leaves the server — and
+ * `includesRevenue` tells the screen to hide those figures rather than print
+ * ₹0: orders, items, statuses, cities and top products by quantity remain.
+ *
+ * Two parts are about PEOPLE rather than money and keep their own permissions:
+ * the top customers (names and emails) and the recent orders (whole order
+ * documents). Emptied, not omitted, so every screen that reads the shape keeps
+ * working.
+ */
+export function analyticsForViewer(
+  analytics: OrderAnalytics,
+  permissions: ReadonlySet<string>,
+): OrderAnalytics {
+  const people = {
+    topCustomers: permissions.has("customers.view") ? analytics.topCustomers : [],
+    recentOrders: permissions.has("orders.view") ? analytics.recentOrders : [],
+  };
+  if (permissions.has("reports.revenue.view")) return { ...analytics, ...people, includesRevenue: true };
+
+  const noMoney = (summary: ReportsSummary): ReportsSummary => ({
+    ...summary,
+    revenue: 0,
+    averageOrderValue: 0,
+    couponDiscount: 0,
+    deliveryFees: 0,
+    taxCollected: 0,
+  });
+  const hidden = { label: "—", tone: "neutral" as const };
+  return {
+    ...analytics,
+    summary: noMoney(analytics.summary),
+    previousSummary: noMoney(analytics.previousSummary),
+    comparison: { ...analytics.comparison, revenue: hidden, averageOrderValue: hidden },
+    trend: analytics.trend.map((point) => ({ ...point, revenue: 0 })),
+    statusBreakdown: analytics.statusBreakdown.map((item) => ({ ...item, revenue: 0 })),
+    paymentBreakdown: analytics.paymentBreakdown.map((item) => ({ ...item, revenue: 0 })),
+    topProducts: analytics.topProducts.map((item) => ({ ...item, revenue: 0 })),
+    cityBreakdown: analytics.cityBreakdown.map((item) => ({ ...item, revenue: 0 })),
+    couponBreakdown: analytics.couponBreakdown.map((item) => ({ ...item, discount: 0 })),
+    topCustomers: people.topCustomers.map((item) => ({ ...item, revenue: 0 })),
+    recentOrders: people.recentOrders,
+    includesRevenue: false,
   };
 }

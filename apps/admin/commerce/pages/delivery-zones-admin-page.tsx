@@ -444,28 +444,28 @@ export function DeliveryZonesAdminPage({
           )
         ) : (
           <>
-            <div className="hidden overflow-x-auto lg:block">
-              <table className="w-full min-w-[980px] text-sm">
+            <div className="relative hidden overflow-x-auto xl:block">
+              <table className="w-full min-w-[960px] text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                    <th className="px-4 py-3 font-medium">
+                    <th className="px-3 py-3 font-medium">
                       <Checkbox
                         checked={allPageSelected}
                         onCheckedChange={toggleSelectPage}
                         aria-label="Select all on page"
                       />
                     </th>
-                    <th className="px-4 py-3 font-medium">Zone</th>
+                    <th className="px-3 py-3 font-medium">Zone</th>
                     {/* WHAT THE ZONE COVERS, in words. It was a City column and a
                         Pincode column, which said nothing about a zone covering
                         a state or the whole country, or the PINs it leaves out. */}
-                    <th className="px-4 py-3 font-medium">Covers</th>
-                    <th className="px-4 py-3 font-medium">Charge</th>
-                    <th className="px-4 py-3 font-medium">Delivery time</th>
-                    <th className="px-4 py-3 font-medium">Priority</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="px-4 py-3 font-medium">Updated</th>
-                    <th className="px-4 py-3 font-medium">Actions</th>
+                    <th className="px-3 py-3 font-medium">Covers</th>
+                    <th className="px-3 py-3 font-medium">Charge</th>
+                    <th className="px-3 py-3 font-medium">Delivery time</th>
+                    <th className="px-3 py-3 font-medium">Priority</th>
+                    <th className="px-3 py-3 font-medium">Status</th>
+                    <th className="px-3 py-3 font-medium">Updated</th>
+                    <th className="px-3 py-3 font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -474,15 +474,15 @@ export function DeliveryZonesAdminPage({
                       key={zone.id}
                       className="border-b border-border/70 transition-colors hover:bg-muted last:border-0"
                     >
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-3">
                         <Checkbox
                           checked={selectedIds.includes(zone.id)}
                           onCheckedChange={() => toggleSelect(zone.id)}
                           aria-label={`Select ${zone.name}`}
                         />
                       </td>
-                      <td className="px-4 py-3 font-medium">{zone.name}</td>
-                      <td className="max-w-xs px-4 py-3">
+                      <td className="px-3 py-3 font-medium">{zone.name}</td>
+                      <td className="max-w-xs px-3 py-3">
                         <p>{describeZoneCoverage(zone).covers}</p>
                         {!decidesDelivery(zone) ? (
                           <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
@@ -495,24 +495,24 @@ export function DeliveryZonesAdminPage({
                           </p>
                         ) : null}
                       </td>
-                      <td className="px-4 py-3 font-semibold">
+                      <td className="px-3 py-3 font-semibold">
                         {formatCurrency(zone.deliveryCharge)}
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">
+                      <td className="px-3 py-3 text-muted-foreground">
                         {formatZoneDeliveryTime(zone)}
                       </td>
-                      <td className="px-4 py-3">{zone.priority}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-3">{zone.priority}</td>
+                      <td className="px-3 py-3">
                         <Switch
                           checked={zone.isActive}
                           onCheckedChange={() => toggleActive(zone)}
                           aria-label={zone.isActive ? "Deactivate zone" : "Activate zone"}
                         />
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                      <td className="px-3 py-3 whitespace-nowrap text-muted-foreground">
                         <RelativeTime date={zone.updatedAt} />
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-3">
                         <Button size="sm" variant="outline" onClick={() => openEdit(zone)}>
                           <Pencil className="size-3.5" />
                           Edit
@@ -524,7 +524,7 @@ export function DeliveryZonesAdminPage({
               </table>
             </div>
 
-            <ul className="divide-y divide-border lg:hidden">
+            <ul className="divide-y divide-border xl:hidden">
               {paginated.map((zone) => (
                 <li key={zone.id} className="p-3 sm:p-4">
                   <div className="flex items-start gap-3">

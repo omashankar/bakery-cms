@@ -1,7 +1,7 @@
 import { ok, created } from "@/lib/server/http/response";
 import { withErrorHandler } from "@/lib/server/http/errors";
 import { validate, readJson } from "@/lib/server/http/validate";
-import { requireRole } from "@/lib/server/auth/dal";
+import { requirePermission } from "@/lib/server/auth/access";
 import { rateLimit } from "@/lib/server/http/rate-limit";
 import { requestContext } from "@/lib/server/audit/audit-log";
 
@@ -12,7 +12,6 @@ import {
   deleteInquiriesSchema,
 } from "./inquiry.validators";
 
-const INQUIRY_ROLES = ["owner", "admin"] as const;
 type IdContext = { params: Promise<{ id: string }> };
 
 // ---- Public (contact form) ----
@@ -63,12 +62,12 @@ export const createInquiryController = withErrorHandler(async (request: Request)
 // ---- Admin ----
 
 export const listInquiriesController = withErrorHandler(async () => {
-  await requireRole(...INQUIRY_ROLES);
+  await requirePermission("inquiries.view");
   return ok(await service.getInquiries(), "Inquiries");
 });
 
 export const updateInquiryController = withErrorHandler(async (request: Request, ctx: IdContext) => {
-  const session = await requireRole(...INQUIRY_ROLES);
+  const session = await requirePermission("inquiries.manage");
   const { id } = await ctx.params;
   const patch = validate(updateInquirySchema, await readJson(request));
   const inquiry = await service.updateInquiry(id, patch, {
@@ -80,7 +79,7 @@ export const updateInquiryController = withErrorHandler(async (request: Request,
 });
 
 export const deleteInquiriesController = withErrorHandler(async (request: Request) => {
-  const session = await requireRole(...INQUIRY_ROLES);
+  const session = await requirePermission("inquiries.manage");
   const { ids } = validate(deleteInquiriesSchema, await readJson(request));
   const deleted = await service.deleteInquiries(ids, {
     ...requestContext(request),

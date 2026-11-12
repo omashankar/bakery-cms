@@ -96,7 +96,11 @@ const repo = vi.hoisted(() => ({
   saved: null as Record<string, string> | null,
 }));
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
+  // The settings shell asks which screen it is on, to know whether this member may edit it.
+  usePathname: () => "/admin/settings/general",
+}));
 vi.mock("sonner", () => ({ toast: { message: vi.fn(), success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/apps/admin/settings/lib/report-settings-write", () => ({
   reportSettingsWrite: () => true,

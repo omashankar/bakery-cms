@@ -1,8 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 
-const requireRole = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/server/auth/dal", () => ({ requireRole }));
+// Only WHO is signed in is faked; the permission check itself is the real one.
+const getActor = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/server/auth/access", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/server/auth/access")>()),
+  getActor,
+}));
 
 const getSettings = vi.hoisted(() => vi.fn());
 vi.mock("@/features/settings/server/settings.service", () => ({ getSettings }));
@@ -11,44 +15,46 @@ import { canPreviewDraft } from "@/apps/website/lib/preview-access.server";
 import { getStorefrontLocation } from "@/apps/website/lib/storefront-location.server";
 import { contactInfo, businessHours } from "@/constants/landing-data";
 
+function member(permissions: string[]) {
+  return { sub: "u1", email: "m@example.com", name: "M", role: "x", roleName: "X", isOwner: false, permissions: new Set(permissions) };
+}
+
 /**
  * `/store?cmsPreview=1` and `/store/wedding-cakes?cmsPreview=wedding` rendered
  * the unpublished draft to anybody who put the parameter on the URL — no session
  * check anywhere in the path. Preview links open in an ordinary tab and get
  * pasted into chats, and `generateMetadata` returns the same metadata for the
  * preview URL, so a leaked link is indexable with draft content in it.
+ *
+ * Since roles: a team member sees a draft only if they could open it in the
+ * admin — the homepage draft needs the homepage builder, a page draft needs
+ * pages. Kitchen staff signed in to the admin do not get either.
  */
 describe("who may see an unpublished draft", () => {
   beforeEach(() => {
-    requireRole.mockReset();
+    getActor.mockReset();
   });
 
-  it("lets an owner or admin through", async () => {
-    requireRole.mockResolvedValue({ sub: "u1", role: "admin" });
+  it("lets a member through to the draft they may edit", async () => {
+    getActor.mockResolvedValue(member(["homepage.manage"]));
+    expect(await canPreviewDraft("homepage.manage")).toBe(true);
+  });
 
-    expect(await canPreviewDraft()).toBe(true);
-    expect(requireRole).toHaveBeenCalledWith("owner", "admin");
+  it("turns away a member who may not edit THAT draft", async () => {
+    getActor.mockResolvedValue(member(["orders.view_kitchen", "orders.update_status"]));
+    expect(await canPreviewDraft("homepage.manage")).toBe(false);
+    expect(await canPreviewDraft("pages.view")).toBe(false);
   });
 
   it("turns a signed-out visitor away", async () => {
-    requireRole.mockRejectedValue(new Error("Unauthorized"));
-
-    expect(await canPreviewDraft()).toBe(false);
-  });
-
-  it("turns away a signed-in customer who is not staff", async () => {
-    requireRole.mockRejectedValue(new Error("Forbidden"));
-
-    expect(await canPreviewDraft()).toBe(false);
+    getActor.mockResolvedValue(null);
+    expect(await canPreviewDraft("pages.view")).toBe(false);
   });
 
   it("fails closed when the session check itself breaks", async () => {
     // A session store that is down must not open the draft to the world.
-    requireRole.mockImplementation(() => {
-      throw new Error("session store unreachable");
-    });
-
-    expect(await canPreviewDraft()).toBe(false);
+    getActor.mockRejectedValue(new Error("session store unreachable"));
+    expect(await canPreviewDraft("pages.view")).toBe(false);
   });
 });
 

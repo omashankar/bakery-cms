@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
+import { reportClientError } from "@/features/error-log/lib/report-client-error";
 
 /**
  * The storefront's last line of defence.
@@ -18,6 +20,7 @@ import { useBusinessLabels } from "@/hooks/use-business-labels";
  * render standing between a customer and a blank error screen.
  */
 export default function StorefrontError({
+  error,
   reset,
 }: {
   error: Error & { digest?: string };
@@ -25,6 +28,8 @@ export default function StorefrontError({
 }) {
   const labels = useBusinessLabels();
   const router = useRouter();
+  // Recorded where the shop can see it (Settings → Error log).
+  useEffect(() => reportClientError(error), [error]);
 
   /**
    * `reset` alone cannot recover from the failure this page exists for.

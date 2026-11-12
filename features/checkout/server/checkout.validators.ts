@@ -1,5 +1,27 @@
 import { z } from "zod";
 
+import { resolveCloudinaryCloudName } from "@/lib/images/image-hosts";
+
+/**
+ * A photo-cake picture this shop's own upload put on its own image host.
+ *
+ * It was any string up to 500 characters, and it travels: onto the kitchen
+ * card every staff browser loads, the admin order view and the order email's
+ * "Photo to print". An order naming a third party's image had each staff
+ * browser fetch it — telling that host who works here — and the picture could
+ * be swapped after the order was placed. Checked by place rather than by row,
+ * because an ordered photo's upload row is retired once the order holds it,
+ * and a re-order carries the same link.
+ *
+ * With no image host configured there is no photo upload to have come from,
+ * and nothing to compare with — then the check stands aside.
+ */
+function isShopPhoto(url: string): boolean {
+  const cloud = resolveCloudinaryCloudName();
+  if (!cloud) return true;
+  return url.startsWith(`https://res.cloudinary.com/${cloud}/image/upload/`) && url.includes("/bakery-cms/photo-cakes/");
+}
+
 /**
  * The customer's map pin: two numbers in range and, when they picked a
  * suggestion, Google's place id. Nothing else survives — a caller who adds
@@ -28,7 +50,12 @@ export const quoteLineSchema = z.object({
   shape: z.string().trim().optional(),
   message: z.string().trim().max(500).optional(),
   // A URL this server minted, so it is length-bounded and never rendered as HTML.
-  photoUrl: z.string().trim().max(500).optional(),
+  photoUrl: z
+    .string()
+    .trim()
+    .max(500)
+    .refine(isShopPhoto, "That photo was not uploaded to this shop. Please upload it again.")
+    .optional(),
   deliveryDate: z.string().trim().optional(),
   deliveryTime: z.string().trim().optional(),
   variantSelections: z.record(z.string(), z.string()).optional(),

@@ -2,14 +2,28 @@ import { ok } from "@/lib/server/http/response";
 import { withErrorHandler, ConflictError, NotFoundError } from "@/lib/server/http/errors";
 import { StoreConflictError } from "@/lib/server/db/cms-store";
 import { validate, readJson } from "@/lib/server/http/validate";
-import { getSession, requireRole } from "@/lib/server/auth/dal";
+import { can, getActor, requirePermission } from "@/lib/server/auth/access";
+import type { Permission } from "@/features/team/lib/permissions";
 import { requestContext } from "@/lib/server/audit/audit-log";
 
 import * as service from "./content.service";
 import { contentSchemas } from "./content.validators";
 import { allowlisted } from "@/lib/server/http/allowlist";
 
-const CONTENT_ROLES = ["owner", "admin"] as const;
+/**
+ * The permission that makes someone an EDITOR of each collection: they read the
+ * whole stored list (switched-off banners, unapproved testimonials) and may save
+ * it. Everyone else gets what a visitor gets.
+ */
+const EDITOR_OF: Record<string, Permission> = {
+  banners: "banners.manage",
+  testimonials: "testimonials.manage",
+  faq: "faq.manage",
+};
+
+function editorPermission(key: string): Permission | null {
+  return Object.hasOwn(EDITOR_OF, key) ? EDITOR_OF[key] : null;
+}
 type KeyContext = { params: Promise<{ key: string }> };
 
 export const getContentController = withErrorHandler(async (_req: Request, ctx: KeyContext) => {
@@ -19,8 +33,8 @@ export const getContentController = withErrorHandler(async (_req: Request, ctx: 
   // banners that were switched off, expired or scheduled, complete with the
   // launch time of a campaign the shop had not announced.
   const { key } = await ctx.params;
-  const session = await getSession();
-  const isStaff = Boolean(session && CONTENT_ROLES.includes(session.role as never));
+  const permission = editorPermission(key);
+  const isStaff = permission !== null && can(await getActor(), permission);
 
   // The version travels in a header so the response body keeps its shape for
   // every existing reader, including the storefront hydration.
@@ -53,11 +67,12 @@ export const getContentController = withErrorHandler(async (_req: Request, ctx: 
 });
 
 export const replaceContentController = withErrorHandler(async (request: Request, ctx: KeyContext) => {
-  const session = await requireRole(...CONTENT_ROLES);
   const { key } = await ctx.params;
 
   const schema = allowlisted(contentSchemas, key);
-  if (!schema) throw new NotFoundError("Unknown content collection");
+  const permission = editorPermission(key);
+  if (!schema || !permission) throw new NotFoundError("Unknown content collection");
+  const session = await requirePermission(permission);
 
   const items = validate(schema, await readJson(request));
   const header = request.headers.get("X-Content-Version");

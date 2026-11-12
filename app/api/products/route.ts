@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createProduct, getProducts } from "@/features/products/data/products-service";
 import { productFormSchema } from "@/features/products/server/product.validators";
-import { requireProductAdmin } from "@/features/products/server/guard";
+import { requireProductPermission } from "@/features/products/server/guard";
 import { isDuplicateSlugError } from "@/features/products/server/product.repository";
 import { validate, readJson } from "@/lib/server/http/validate";
 import { AppError } from "@/lib/server/http/errors";
@@ -40,7 +40,7 @@ import type { ProductFormData } from "@/types/product";
 export async function GET() {
   try {
     const products = await getProducts();
-    const auth = await requireProductAdmin();
+    const auth = await requireProductPermission("products.view");
     if (auth instanceof NextResponse) {
       return NextResponse.json({
         products: products.filter((product) => product.status === "published"),
@@ -53,7 +53,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireProductAdmin();
+  const auth = await requireProductPermission("products.create");
   if (auth instanceof NextResponse) return auth;
 
   let body: ProductFormData;

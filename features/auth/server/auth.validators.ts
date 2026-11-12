@@ -23,7 +23,7 @@ const email = z.string().trim().toLowerCase().pipe(z.email("Please enter a valid
  * Applied to the paths that SET a password — registration, reset, change —
  * and never to login, where an existing password must keep working.
  */
-const strongPassword = z
+export const strongPassword = z
   .string()
   .min(8, "Password must be at least 8 characters")
   .max(100, "Password is too long")

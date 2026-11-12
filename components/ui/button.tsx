@@ -1,3 +1,4 @@
+import { cloneElement, isValidElement } from "react"
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"
 
@@ -58,8 +59,33 @@ function Button({
   size = "default",
   ...props
 }: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
-  const usesCustomRender =
-    "render" in props && Boolean((props as { render?: unknown }).render)
+  const render = (props as { render?: unknown }).render
+  const usesCustomRender = "render" in props && Boolean(render)
+
+  /*
+    A LINK DRESSED AS A BUTTON IS STILL A LINK.
+
+    \`render={<Link href=… />}\` went through Base UI's Button, which gives any
+    element that is not a <button> \`role="button"\`. So the header's Wishlist
+    and Cart, and some ninety other link-buttons across the shop and the
+    admin, were <a href> elements announced as buttons: a screen reader said
+    "Wishlist, button", the rotor's list of links left them out, and the
+    shop's own browser checks could not find them as links. Anything with an
+    \`href\` is rendered as itself, with the button's look and nothing else.
+  */
+  if (
+    isValidElement<{ href?: unknown; className?: string }>(render) &&
+    render.props.href !== undefined
+  ) {
+    const { render: _render, nativeButton: _native, ...rest } = props as typeof props & {
+      nativeButton?: boolean
+    }
+    return cloneElement(render, {
+      "data-slot": "button",
+      ...rest,
+      className: cn(buttonVariants({ variant, size, className }), render.props.className),
+    } as Record<string, unknown>)
+  }
 
   return (
     <ButtonPrimitive

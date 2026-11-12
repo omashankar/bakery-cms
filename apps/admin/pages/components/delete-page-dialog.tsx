@@ -33,7 +33,7 @@ export function DeletePageDialog({
         <DialogHeader>
           <DialogTitle>Delete {count > 1 ? "pages" : "page"}?</DialogTitle>
           <DialogDescription>
-            Delete {label}? System pages cannot be removed. This cannot be undone in the demo CMS.
+            Delete {label}? System pages cannot be removed. This cannot be undone.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="gap-2 sm:justify-end">

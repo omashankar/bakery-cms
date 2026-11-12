@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireAdminResponse } from "@/lib/server/auth/guard";
+import { requirePermissionResponse } from "@/lib/server/auth/guard";
 import { getGatewayConfig, isGatewayWired } from "@/features/payments/registry/gateways";
 import {
   clearGatewayCredentials,
@@ -24,7 +24,7 @@ import {
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_request: Request, ctx: Ctx) {
-  const auth = await requireAdminResponse();
+  const auth = await requirePermissionResponse("payments.manage");
   if (auth instanceof NextResponse) return auth;
 
   const { id } = await ctx.params;
@@ -34,7 +34,7 @@ export async function GET(_request: Request, ctx: Ctx) {
 }
 
 export async function POST(request: Request, ctx: Ctx) {
-  const auth = await requireAdminResponse();
+  const auth = await requirePermissionResponse("payments.manage");
   if (auth instanceof NextResponse) return auth;
 
   const { id } = await ctx.params;
@@ -83,7 +83,7 @@ export async function POST(request: Request, ctx: Ctx) {
 }
 
 export async function DELETE(_request: Request, ctx: Ctx) {
-  const auth = await requireAdminResponse();
+  const auth = await requirePermissionResponse("payments.manage");
   if (auth instanceof NextResponse) return auth;
 
   const { id } = await ctx.params;

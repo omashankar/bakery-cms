@@ -313,6 +313,7 @@ export function PagesListPage({
           />
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:w-auto">
             <AdminSelect
+              aria-label="Filter by status"
               value={filters.status}
               onChange={(e) =>
                 updateFilters({ status: e.target.value as PageListFilters["status"] })
@@ -324,6 +325,7 @@ export function PagesListPage({
               <option value="archived">Archived</option>
             </AdminSelect>
             <AdminSelect
+              aria-label="Filter by template"
               value={filters.template}
               onChange={(e) =>
                 updateFilters({ template: e.target.value as PageListFilters["template"] })
@@ -334,6 +336,7 @@ export function PagesListPage({
               <option value="about">About layout</option>
             </AdminSelect>
             <AdminSelect
+              aria-label="Sort by"
               value={filters.sort}
               onChange={(e) => updateFilters({ sort: e.target.value as PageListFilters["sort"] })}
             >

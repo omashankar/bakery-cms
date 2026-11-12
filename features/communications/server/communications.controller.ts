@@ -1,7 +1,7 @@
 import { ok } from "@/lib/server/http/response";
 import { withErrorHandler, AppError, NotFoundError } from "@/lib/server/http/errors";
 import { validate, readJson } from "@/lib/server/http/validate";
-import { requireRole } from "@/lib/server/auth/dal";
+import { requirePermission, requireStaff } from "@/lib/server/auth/access";
 import { requestContext, writeAuditLog } from "@/lib/server/audit/audit-log";
 
 import * as service from "./communications.service";
@@ -21,18 +21,17 @@ import {
   whatsappConnectionSchema,
 } from "./communications.validators";
 
-const COMMS_ROLES = ["owner", "admin"] as const;
 type KeyContext = { params: Promise<{ key: string }> };
 
 export const getTemplatesController = withErrorHandler(async (_req: Request, ctx: KeyContext) => {
   // Admin-only — templates are back-office config, not storefront content.
-  await requireRole(...COMMS_ROLES);
+  await requirePermission("settings.view");
   const { key } = await ctx.params;
   return ok(await service.getTemplates(key), key);
 });
 
 export const replaceTemplatesController = withErrorHandler(async (request: Request, ctx: KeyContext) => {
-  const session = await requireRole(...COMMS_ROLES);
+  const session = await requirePermission("settings.manage");
   const { key } = await ctx.params;
 
   const schema = allowlisted(templateSchemas, key);
@@ -59,12 +58,12 @@ export const replaceTemplatesController = withErrorHandler(async (request: Reque
 });
 
 export const getNotificationSettingsController = withErrorHandler(async () => {
-  await requireRole(...COMMS_ROLES);
+  await requireStaff();
   return ok(await service.getNotificationSettings(), "notification-settings");
 });
 
 export const saveNotificationSettingsController = withErrorHandler(async (request: Request) => {
-  const session = await requireRole(...COMMS_ROLES);
+  const session = await requirePermission("settings.manage");
   const settings = validate(notificationSettingsSchema, await readJson(request));
   const result = await service.saveNotificationSettings(settings, {
     ...requestContext(request),
@@ -83,12 +82,12 @@ export const saveNotificationSettingsController = withErrorHandler(async (reques
  * shop, and logging every read would bury the entries that matter.
  */
 export const getNotificationStateController = withErrorHandler(async () => {
-  const session = await requireRole(...COMMS_ROLES);
+  const session = await requireStaff();
   return ok(await notificationState.getNotificationState(session.sub), "notification-state");
 });
 
 export const patchNotificationStateController = withErrorHandler(async (request: Request) => {
-  const session = await requireRole(...COMMS_ROLES);
+  const session = await requireStaff();
   const patch = validate(notificationStatePatchSchema, await readJson(request));
   return ok(
     await notificationState.patchNotificationState(session.sub, patch),
@@ -113,7 +112,7 @@ export const patchNotificationStateController = withErrorHandler(async (request:
  * the admin was shown in the live preview.
  */
 export const sendTemplateTestController = withErrorHandler(async (request: Request) => {
-  const session = await requireRole(...COMMS_ROLES);
+  const session = await requirePermission("settings.manage");
   const { slug } = validate(templateTestSchema, await readJson(request));
 
   const result = await service.sendTemplateTest(slug, session.email);
@@ -133,12 +132,12 @@ export const sendTemplateTestController = withErrorHandler(async (request: Reque
  * reason not to.
  */
 export const getWhatsAppConnectionController = withErrorHandler(async () => {
-  await requireRole(...COMMS_ROLES);
+  await requirePermission("settings.view");
   return ok(await readWhatsAppConnectionStatus(), "WhatsApp connection");
 });
 
 export const saveWhatsAppConnectionController = withErrorHandler(async (request: Request) => {
-  const session = await requireRole(...COMMS_ROLES);
+  const session = await requirePermission("settings.manage");
   const input = validate(whatsappConnectionSchema, await readJson(request));
 
   const status = await saveWhatsAppConnection(input);
@@ -170,7 +169,7 @@ export const saveWhatsAppConnectionController = withErrorHandler(async (request:
  * told it was fine and found out on a customer's order.
  */
 export const verifyWhatsAppController = withErrorHandler(async () => {
-  await requireRole(...COMMS_ROLES);
+  await requirePermission("settings.manage");
 
   const result = await verifyWhatsAppConnection();
   if (!result.ok) throw new AppError(result.error, 502);
@@ -180,7 +179,7 @@ export const verifyWhatsAppController = withErrorHandler(async () => {
 
 /** Pulls Meta's approval statuses onto the local templates. */
 export const syncWhatsAppTemplatesController = withErrorHandler(async (request: Request) => {
-  const session = await requireRole(...COMMS_ROLES);
+  const session = await requirePermission("settings.manage");
 
   const result = await whatsapp.syncMetaApprovals({
     ...requestContext(request),
@@ -201,7 +200,7 @@ export const syncWhatsAppTemplatesController = withErrorHandler(async (request: 
  * number at all, which is the same reason the email test only mails the caller.
  */
 export const sendWhatsAppTestController = withErrorHandler(async (request: Request) => {
-  await requireRole(...COMMS_ROLES);
+  await requirePermission("settings.manage");
   const { slug } = validate(templateTestSchema, await readJson(request));
 
   const result = await whatsapp.sendWhatsAppTest(slug);

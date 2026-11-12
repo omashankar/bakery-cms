@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireAdminResponse } from "@/lib/server/auth/guard";
+import { requirePermissionResponse } from "@/lib/server/auth/guard";
 import * as orderService from "@/features/orders/server/order.service";
 
 /**
@@ -17,7 +17,7 @@ import * as orderService from "@/features/orders/server/order.service";
  * problem is the one who triggers the fix), and available to a scheduler.
  */
 export async function POST() {
-  const auth = await requireAdminResponse();
+  const auth = await requirePermissionResponse("orders.refund");
   if (auth instanceof NextResponse) return auth;
 
   try {

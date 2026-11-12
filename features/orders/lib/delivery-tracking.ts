@@ -137,10 +137,20 @@ export function getDeliveryTrackingSnapshot(order: PlacedOrder): DeliveryTrackin
   const destinationLabel = `${order.address.city}, ${order.address.pincode}`;
 
   if (order.status === "delivered") {
+    /*
+      The day it ACTUALLY arrived, from the delivered event — not the booked
+      slot. A cake delivered early read "arrived on Thursday, 5 November" on
+      the 31st of October: a delivery dated in the future.
+    */
+    const deliveredAt = [...(order.statusHistory ?? [])].reverse().find((e) => e.status === "delivered")?.at;
+    const arrived =
+      deliveredAt && !Number.isNaN(new Date(deliveredAt).getTime())
+        ? formatDate(deliveredAt, { weekday: "long", day: "numeric", month: "long" })
+        : deliveryDate;
     return {
       progressPercent: 100,
       etaHeadline: "Delivered",
-      etaDetail: `Your order arrived on ${deliveryDate}.`,
+      etaDetail: `Your order arrived on ${arrived}.`,
       etaWindow,
       // It arrived. The line above says when; a second 'estimated' one
       // beside it would be predicting the past.

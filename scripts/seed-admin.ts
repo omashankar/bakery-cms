@@ -5,7 +5,8 @@
  * Env:  ADMIN_EMAIL and ADMIN_PASSWORD — REQUIRED when the owner account does
  *       not exist yet (see below). Not read at all once it does.
  *
- * Idempotent — re-running updates roles and leaves an existing admin untouched.
+ * Idempotent — re-running creates only what is missing; existing roles and the
+ * existing admin are left untouched.
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -34,29 +35,32 @@ async function main() {
   const { UserModel } = await import("@/lib/server/db/models/user.model");
   const { RoleModel } = await import("@/lib/server/db/models/role.model");
   const { hashPassword } = await import("@/lib/server/auth/password");
-  const { placeholderRoles } = await import("@/types/permissions");
+  const { SYSTEM_ROLES } = await import("@/features/team/lib/permissions");
   const mongoose = (await import("mongoose")).default;
 
   await connectDB();
   console.info("[seed] connected to MongoDB");
 
-  // 1. Roles — upsert by slug (derived from "role-owner" -> "owner").
-  for (const role of placeholderRoles) {
-    const slug = role.id.replace(/^role-/, "");
-    await RoleModel.updateOne(
-      { slug },
+  // 1. The default roles — CREATED if missing, never overwritten. A shop that
+  //    has renamed "Manager" or changed what Kitchen Staff may do keeps that
+  //    on a re-run. (The app puts missing ones back by itself too: see
+  //    `loadRoles` in lib/server/auth/access.ts.) Old roles from before the
+  //    permission registry are converted by scripts/migrate-rbac.ts.
+  for (const role of SYSTEM_ROLES) {
+    const result = await RoleModel.updateOne(
+      { slug: role.slug },
       {
-        $set: {
-          slug,
+        $setOnInsert: {
+          slug: role.slug,
           name: role.name,
           description: role.description,
-          isSystem: role.isSystem,
-          permissions: role.permissions,
+          isSystem: true,
+          permissions: [...role.permissions],
         },
       },
       { upsert: true },
     );
-    console.info(`[seed] role ready: ${slug}`);
+    console.info(`[seed] role ${result.upsertedCount ? "created" : "already present"}: ${role.slug}`);
   }
 
   // 2. Admin user — create only if missing.

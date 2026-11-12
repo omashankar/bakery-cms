@@ -68,6 +68,15 @@ export function BrandMark({ logo, logoLetter, siteName, size = "default" }: Bran
         // designer exported — measured here at 293 KB for a 50px-tall mark.
         src={optimizedImageUrl(logo, { height: drawn.height })}
         alt={siteName}
+        // The footer's copy is at the bottom of every page, but an <img> with no
+        // `loading` is fetched the moment the HTML is read — 18 KB racing the
+        // stylesheet for the first paint on a phone's 4G. `lazy` alone is not
+        // enough on a short page: Chrome fetches lazy images within ~1250px of
+        // the screen at once. LOW priority puts it behind the stylesheet.
+        // The header's stays eager and normal.
+        loading={size === "footer" ? "lazy" : undefined}
+        fetchPriority={size === "footer" ? "low" : undefined}
+        decoding={size === "footer" ? "async" : undefined}
         onError={() => setLogoBroken(true)}
         // The logo is in the SERVER-rendered HTML, so a 404 can resolve before
         // the bundle has even downloaded — and React does not replay load/error

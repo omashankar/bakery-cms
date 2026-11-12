@@ -102,7 +102,7 @@ describe("the endpoint behind it", () => {
     // Customer notes are the admin's private annotations — who is a repeat
     // buyer, who complained — and this endpoint lists all of them.
     expect(fn, "anyone can read the shop's private notes on its customers").toContain(
-      "requireRole(",
+      'requirePermission("customers.view")',
     );
   });
 

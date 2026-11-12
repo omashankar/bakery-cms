@@ -270,8 +270,17 @@ export async function setAvatar(id: string, file: File): Promise<CustomerIdentit
     `data:${mime};base64,${buffer.toString("base64")}`,
     "bakery-cms/avatars",
   );
-  const previous = await repo.replaceAvatar(id, { url: asset.url, publicId: asset.publicId });
-  const identity = await identityAfterWrite(id);
+  // If recording it fails, nothing will ever name this file again — so it
+  // goes now, rather than staying on the image host for good.
+  let previous: Awaited<ReturnType<typeof repo.replaceAvatar>>;
+  let identity: CustomerIdentity;
+  try {
+    previous = await repo.replaceAvatar(id, { url: asset.url, publicId: asset.publicId });
+    identity = await identityAfterWrite(id);
+  } catch (error) {
+    await deleteFromCloudinary(asset.publicId);
+    throw error;
+  }
   /**
    * READ BACK BEFORE SAYING YES. A model compiled before these fields existed
    * drops them from the write without an error, and this answered "Photo

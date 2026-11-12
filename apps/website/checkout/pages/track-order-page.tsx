@@ -132,7 +132,7 @@ export function TrackOrderPage() {
 
               <p className="mt-6 text-center text-sm text-muted-foreground">
                 Just placed an order?{" "}
-                <Link href={routes.store.orderSuccess} className="text-bakery-700 hover:underline">
+                <Link href={routes.store.orderSuccess} className="text-bakery-700 underline underline-offset-2">
                   View confirmation
                 </Link>
               </p>

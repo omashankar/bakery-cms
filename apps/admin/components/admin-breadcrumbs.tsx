@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { Fragment, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import {
   Breadcrumb,
@@ -15,6 +15,9 @@ import { getAdminBreadcrumbs } from "@/lib/admin-breadcrumbs";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { useIsMobile } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
+import { routes } from "@/constants/routes";
+import { useAccess } from "@/features/team/lib/access-context";
+import { canOpenRoute } from "@/features/team/lib/route-access";
 
 function getVisibleCrumbs<T extends { label: string; href?: string }>(
   crumbs: T[],
@@ -34,7 +37,18 @@ export function AdminBreadcrumbs({ className }: AdminBreadcrumbsProps) {
   const labels = useBusinessLabels();
   // `labels` in the deps, or the trail keeps the wording from first paint and
   // never picks up the shop’s own after the settings fetch lands.
-  const crumbs = useMemo(() => getAdminBreadcrumbs(pathname, labels), [pathname, labels]);
+  // A crumb is a link only to a screen this member can open: the trail is
+  // "Dashboard › Settings › Payments" for everyone, and for a manager or the
+  // kitchen two of those are Access Denied pages. The root is dropped for a
+  // member without the dashboard; the rest stay as plain words.
+  const { access, can } = useAccess();
+  const crumbs = useMemo(() => {
+    const all = getAdminBreadcrumbs(pathname, labels);
+    if (!access) return all;
+    return all
+      .filter((crumb, index) => !(index === 0 && crumb.href === routes.admin.dashboard && !can("dashboard.view") && all.length > 1))
+      .map((crumb) => (crumb.href && !canOpenRoute(crumb.href, can) ? { ...crumb, href: undefined } : crumb));
+  }, [pathname, labels, access, can]);
   const visibleCrumbs = useMemo(
     () => getVisibleCrumbs(crumbs, isMobile),
     [crumbs, isMobile]
@@ -49,7 +63,9 @@ export function AdminBreadcrumbs({ className }: AdminBreadcrumbsProps) {
           const showEllipsis = collapsed && index === 0;
 
           return (
-            <span key={`${crumb.label}-${index}`} className="contents">
+            // A Fragment, not a wrapper: an <ol> may hold only <li>, and a span
+            // around each pair made the trail an invalid list for screen readers.
+            <Fragment key={`${crumb.label}-${index}`}>
               {index > 0 ? <BreadcrumbSeparator /> : null}
               {showEllipsis ? (
                 <>
@@ -88,7 +104,7 @@ export function AdminBreadcrumbs({ className }: AdminBreadcrumbsProps) {
                   )}
                 </BreadcrumbItem>
               )}
-            </span>
+            </Fragment>
           );
         })}
       </BreadcrumbList>

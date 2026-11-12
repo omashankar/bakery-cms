@@ -22,6 +22,7 @@ import {
   saveSmtpSettings,
 } from "@/features/settings/lib/settings-repository";
 import { SettingsSectionShell } from "./settings-section-shell";
+import { MailDeliveryCheck } from "./mail-delivery-check";
 import { SettingsHydrationNotice } from "./settings-field-error";
 import { useSettingsSection } from "@/features/settings/lib/use-settings-section";
 
@@ -275,7 +276,7 @@ export function SmtpSettingsPage() {
               <button
                 type="button"
                 onClick={() => setShowPassword((s) => !s)}
-                className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground after:absolute after:-inset-2.5 after:content-[''] hover:text-foreground"
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -320,6 +321,8 @@ export function SmtpSettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <MailDeliveryCheck />
     </SettingsSectionShell>
   );
 }
