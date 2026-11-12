@@ -178,7 +178,7 @@ export function WhatsAppMetaBindingFields({
           {!linked && slots > 0 ? (
             <button
               type="button"
-              className="text-xs font-medium text-primary hover:underline"
+              className="inline-flex min-h-6 items-center text-xs font-medium text-primary hover:underline"
               onClick={() => onPatch({ metaParameters: parameters.slice(0, -1) })}
             >
               Remove last
@@ -218,7 +218,7 @@ export function WhatsAppMetaBindingFields({
         {!linked ? (
           <button
             type="button"
-            className="text-xs font-medium text-primary hover:underline"
+            className="inline-flex min-h-6 items-center text-xs font-medium text-primary hover:underline"
             onClick={() => onPatch({ metaParameters: [...parameters, ""] })}
           >
             Add a placeholder

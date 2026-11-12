@@ -481,7 +481,7 @@ export function ReviewsAdminPage({
                       <p className="text-sm font-medium">
                         <Link
                           href={routes.store.cake(review.productSlug)}
-                          className="text-primary hover:underline"
+                          className="inline-flex min-h-6 items-center text-primary hover:underline"
                         >
                           {review.cakeName}
                         </Link>

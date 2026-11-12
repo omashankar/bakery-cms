@@ -194,7 +194,7 @@ export function PhotoField({
           </label>
           <button
             type="button"
-            className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            className="flex min-h-6 shrink-0 items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
             onClick={() => setAdvancedChoice(!showAdvanced)}
             aria-expanded={showAdvanced}
             aria-controls={`${id}-advanced`}

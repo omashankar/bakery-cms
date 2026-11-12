@@ -21,7 +21,7 @@ export function RevenueChart({ data, className }: RevenueChartProps) {
           const isLast = i === data.length - 1;
           return (
             <div key={point.label} className="group flex h-full flex-1 flex-col items-center justify-end gap-1.5">
-              <span className="text-[10px] font-semibold text-foreground opacity-0 transition-opacity group-hover:opacity-100">
+              <span className="text-[11px] font-semibold text-foreground opacity-0 transition-opacity group-hover:opacity-100">
                 {point.amount > 0 ? formatCurrency(point.amount) : ""}
               </span>
               <div
@@ -38,7 +38,7 @@ export function RevenueChart({ data, className }: RevenueChartProps) {
       </div>
       <div className="flex gap-2 sm:gap-3">
         {data.map((point) => (
-          <span key={point.label} className="flex-1 text-center text-[10px] text-muted-foreground">
+          <span key={point.label} className="flex-1 text-center text-[11px] text-muted-foreground">
             {point.label}
           </span>
         ))}

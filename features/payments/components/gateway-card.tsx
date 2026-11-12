@@ -99,12 +99,12 @@ export function GatewayCard({
         {config.supportedCurrencies.slice(0, 4).map((cur) => (
           <span
             key={cur}
-            className="rounded-md border border-border bg-card px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground"
+            className="rounded-md border border-border bg-card px-1.5 py-0.5 text-[11px] font-semibold text-muted-foreground"
           >
             {cur}
           </span>
         ))}
-        <span className="rounded-md border border-border bg-card px-1.5 py-0.5 text-[10px] text-muted-foreground">
+        <span className="rounded-md border border-border bg-card px-1.5 py-0.5 text-[11px] text-muted-foreground">
           {config.supportedCountries.slice(0, 3).join(" · ")}
         </span>
       </div>
