@@ -68,7 +68,6 @@ import { settingsHydration } from "@/features/settings/lib/settings-api";
 import { chosenFavicon } from "@/features/settings/lib/settings-utils";
 import {
   getGeneralSettings,
-  getModuleSettings,
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
 import { useBusinessLabels } from "@/hooks/use-business-labels";

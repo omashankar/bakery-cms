@@ -76,11 +76,16 @@ export const typographyPresets = {
  * for its homepage to draw closer, and that component now reads it from here,
  * so the homepage and the pages behind it cannot part company again.
  */
+/*
+ * SEMIBOLD, NOT BOLD (2026-11-13). The shop asked for a large marketplace's
+ * plain, even look; there a page's title and a rail's heading are set at 600,
+ * and at 700 in Inter a product name sat on the page like a poster.
+ */
 export const storefrontHeading = {
   /** The name of the thing the whole page is about. */
-  page: "font-heading text-2xl font-bold tracking-tight sm:text-3xl",
+  page: "font-heading text-2xl font-semibold tracking-tight sm:text-[1.75rem] sm:leading-tight",
   /** Over a grid or a rail: a little larger than the product names beneath it. */
-  row: "font-heading text-2xl font-bold tracking-tight sm:text-[1.75rem] sm:leading-tight",
+  row: "font-heading text-2xl font-semibold tracking-tight sm:text-[1.75rem] sm:leading-tight",
   /** Inside a bordered box — a form, a panel, a step of checkout. */
   card: "font-heading text-lg font-semibold",
 } as const;

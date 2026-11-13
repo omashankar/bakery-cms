@@ -209,7 +209,7 @@ async function endSession(sessionId: string | null, message: string): Promise<ne
  */
 const ROTATION_RACE_MS = 15_000;
 
-export async function refresh(refreshCookie: string | undefined, ctx: RequestCtx): Promise<PublicUser> {
+export async function refresh(refreshCookie: string | undefined, _ctx: RequestCtx): Promise<PublicUser> {
   if (!refreshCookie) throw new AuthError("No refresh token");
 
   const claims = await verifyRefreshToken(refreshCookie);

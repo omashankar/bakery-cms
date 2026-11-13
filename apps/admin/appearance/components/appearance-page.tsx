@@ -348,8 +348,8 @@ export function AppearancePage({
             <CardHeader>
               <CardTitle className="text-base">Shape &amp; typography</CardTitle>
               <CardDescription>
-                Border radius applies to the storefront. Typography uses Plus Jakarta Sans +
-                Inter.
+                Border radius applies to the storefront. Typography uses Inter for
+                headings and text.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -378,8 +378,8 @@ export function AppearancePage({
                   </p>
                   {/* The shop’s own headings, so the specimen shows the type at
                       the words it will actually render. */}
-                  <p className="mt-2 font-heading text-2xl font-bold">{labels.collectionsTitle}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Plus Jakarta Sans</p>
+                  <p className="mt-2 font-heading text-2xl font-semibold">{labels.collectionsTitle}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Inter</p>
                 </div>
                 <div className="rounded-xl border border-border bg-card p-4">
                   <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">

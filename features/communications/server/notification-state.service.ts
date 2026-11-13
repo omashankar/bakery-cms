@@ -84,7 +84,7 @@ export async function patchNotificationState(
       ? await AdminNotificationStateModel.findOneAndUpdate(
           { _id: userId },
           { $addToSet: additions },
-          { upsert: true, new: true, setDefaultsOnInsert: true },
+          { upsert: true, returnDocument: "after", setDefaultsOnInsert: true },
         ).lean()
       : await AdminNotificationStateModel.findById(userId).lean();
 
@@ -98,7 +98,7 @@ export async function patchNotificationState(
       await AdminNotificationStateModel.findOneAndUpdate(
         { _id: userId },
         { $push: overflow },
-        { new: true },
+        { returnDocument: "after" },
       ).lean(),
     );
   }

@@ -3,8 +3,6 @@ import { chosenList, hoursIdentity } from "@/apps/website/lib/shipped-placeholde
 import {
   getActiveSocialLinks,
   getContactSettings,
-  getGeneralSettings,
-  getLabelSettings,
 } from "@/features/settings/lib/settings-repository";
 import {
   isSafeSocialUrl,
@@ -12,11 +10,6 @@ import {
   normalizeMapEmbedUrl,
 } from "@/features/settings/lib/settings-utils";
 import { chosen } from "./shipped-placeholder";
-import {
-  getBusinessLabels,
-  resolveLabels,
-  type BusinessLabels,
-} from "@/config/business-labels";
 
 /*
  * `getStorefrontBrandInfo` was here, and it is gone rather than merely unused.

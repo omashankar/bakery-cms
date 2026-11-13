@@ -52,7 +52,7 @@ export function GatewayCard({
           <GatewayLogo mark={config.mark} size="md" />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="font-heading font-bold text-foreground">{config.name}</h3>
+              <h3 className="font-heading font-semibold text-foreground">{config.name}</h3>
             </div>
             <p className="text-xs capitalize text-muted-foreground">{config.category}</p>
           </div>

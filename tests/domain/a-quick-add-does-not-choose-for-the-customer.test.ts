@@ -44,7 +44,6 @@ const { addToCart, cartLineId, clearCart, getCartItems } = await import(
 );
 const { reorderFromOrder } = await import("@/apps/website/lib/reorder");
 const { ProductCard } = await import("@/components/storefront/product-card");
-const { routes } = await import("@/constants/routes");
 
 type LandingProduct = Record<string, unknown>;
 type PlacedOrder = Record<string, unknown>;
@@ -129,17 +128,6 @@ const CHARGER: LandingProduct = {
   price: 1499,
   image: "/charger.jpg",
   category: "Chargers",
-  inStock: true,
-};
-
-const BUN: LandingProduct = {
-  id: "p-bun",
-  name: "Plain Bun",
-  slug: "plain-bun",
-  description: "",
-  price: 40,
-  image: "/bun.jpg",
-  category: "Bakes",
   inStock: true,
 };
 

@@ -215,7 +215,7 @@ export function CustomerAuthModal({
           </span>
           {/* text-white said again: every heading takes text-foreground from
               the base styles, so it does not inherit the band's white. */}
-          <h2 className="font-heading text-xl font-bold text-white">
+          <h2 className="font-heading text-xl font-semibold text-white">
             {step === "code" ? "Enter your code" : "Sign in"}
           </h2>
           <p className="mt-1 text-sm text-white/85">

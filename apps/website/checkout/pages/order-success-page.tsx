@@ -139,7 +139,7 @@ export function OrderSuccessPage({
                 </span>
               )}
             </div>
-            <h2 className="font-heading text-2xl font-bold" aria-live="polite">
+            <h2 className="font-heading text-2xl font-semibold" aria-live="polite">
               {heading}
             </h2>
             <p className="mx-auto mt-3 max-w-md text-muted-foreground">

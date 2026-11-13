@@ -20,7 +20,7 @@ export function AuthCard({
     <section className={cn("space-y-8", className)}>
       <header className="space-y-2">
         {/* The page heading on every auth screen: the brand panel beside it is hidden on a phone. */}
-        <h1 className="font-heading text-[2rem] leading-tight font-bold tracking-tight text-foreground">
+        <h1 className="font-heading text-[2rem] leading-tight font-semibold tracking-tight text-foreground">
           {title}
         </h1>
         <p className="text-[15px] leading-relaxed text-muted-foreground">{description}</p>

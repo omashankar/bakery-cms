@@ -24,7 +24,7 @@ import { layoutSpacing } from "@/constants/spacing";
 import { routes } from "@/constants/routes";
 import { getCartItemCount } from "@/features/cart/lib/cart";
 import { navRowOpensNothing, panelShift } from "@/features/site-layout/lib/menu-links";
-import { getWishlistCount } from "@/apps/website/lib/wishlist";
+import { getWishlistCount, syncWishlistCookie } from "@/apps/website/lib/wishlist";
 import {
   getCustomerDisplayName,
   getCustomerSession,
@@ -471,6 +471,10 @@ export function StorefrontNavbar({ chrome, initialCustomer }: StorefrontNavbarPr
     // only the client-only cart, wishlist and customer session are read here.
     setCartCount(getCartItemCount());
     setWishlistCount(getWishlistCount());
+    // The wishlist page reads a copy of the saved list from a cookie so it can
+    // draw at once (wishlist-cookie.ts); a list saved before that copy existed
+    // gets it here, on the first store page this browser opens.
+    syncWishlistCookie();
     // Only when the page did not bring the answer. This effect runs before
     // StorefrontCacheSeed has written the session, so on a first visit the
     // browser's copy is still empty and would put the guest icon back; the
@@ -502,6 +506,8 @@ export function StorefrontNavbar({ chrome, initialCustomer }: StorefrontNavbarPr
     const refreshCounts = () => {
       setCartCount(getCartItemCount());
       setWishlistCount(getWishlistCount());
+      // Sign-out empties the wishlist without going through its own writes.
+      syncWishlistCookie();
       setSignedIn(hasCustomerSession());
       setCustomerName(getCustomerDisplayName());
       setCustomerPhone(getCustomerSession()?.phone ?? "");

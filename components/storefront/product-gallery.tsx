@@ -283,6 +283,23 @@ export function ProductGallery({ images, productName, badge }: ProductGalleryPro
                   fill
                   className="object-cover"
                   sizes="(max-width: 1024px) 25vw, 96px"
+                  /*
+                    EAGER for the four the strip shows, which are on the first
+                    screen on every layout. Lazy, the first one — the SAME src
+                    as the big photo above — overwrote that photo in next/image's
+                    src-keyed registry, and every product page logged "was
+                    detected as the LCP, add loading=eager" about a photo that
+                    already was eager.
+
+                    LOW PRIORITY, so React does not preload them. Server-
+                    rendered, a non-lazy <img> gets an automatic <link
+                    rel=preload> — and on a second visit the browser drew the
+                    thumbnail from the larger copy it had cached for the big
+                    photo, leaving the preload unused and the console saying so.
+                    It also keeps them from taking bandwidth from that photo.
+                  */
+                  loading={index < 4 ? "eager" : "lazy"}
+                  fetchPriority="low"
                 />
               </button>
             ))}

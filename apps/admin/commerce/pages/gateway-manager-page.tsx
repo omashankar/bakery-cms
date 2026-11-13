@@ -181,7 +181,7 @@ export function GatewayManagerPage() {
       {wiredGateways.length > 0 ? (
         <section className="space-y-3">
           <div>
-            <h2 className="font-heading text-base font-bold text-foreground">Available now</h2>
+            <h2 className="font-heading text-base font-semibold text-foreground">Available now</h2>
             <p className="text-sm text-muted-foreground">
               These can take money and appear at checkout.
             </p>
@@ -214,7 +214,7 @@ export function GatewayManagerPage() {
       {notYetGateways.length > 0 ? (
         <section className="space-y-3">
           <div>
-            <h2 className="font-heading text-base font-bold text-foreground">Not available yet</h2>
+            <h2 className="font-heading text-base font-semibold text-foreground">Not available yet</h2>
             <p className="text-sm text-muted-foreground">
               In the catalogue, but not connected to a payment path — they cannot take money and do
               not appear at checkout. Nothing to configure until they are built.

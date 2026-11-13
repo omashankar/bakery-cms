@@ -165,12 +165,20 @@ export function BannerStripSection(props: HomepageSectionRendererProps) {
           title={contentString(c, "title")}
           description={contentString(c, "subtitle")}
           className="mb-6 items-center"
+          /*
+            Only when there IS a link. `ViewAllLink` draws nothing without
+            one, but an element that renders null is still a truthy prop, and
+            the row then held an empty slot and its 16px gap open — a heading
+            set to the right stopped 16px short of the edge.
+          */
           trailing={
-            <ViewAllLink
-              href={contentString(c, "ctaHref")}
-              label={contentString(c, "ctaLabel")}
-              on={props.section.background}
-            />
+            contentString(c, "ctaHref") && contentString(c, "ctaLabel") ? (
+              <ViewAllLink
+                href={contentString(c, "ctaHref")}
+                label={contentString(c, "ctaLabel")}
+                on={props.section.background}
+              />
+            ) : null
           }
         />
       ) : null}

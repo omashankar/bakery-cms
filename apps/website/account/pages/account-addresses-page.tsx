@@ -419,7 +419,7 @@ export function AccountAddressesPage() {
         </div>
         ) : null}
         <div className={cn("flex flex-wrap items-center justify-between gap-3", showForm && "pt-2")}>
-          <h2 className="flex items-center gap-2 font-heading text-lg font-bold text-foreground">
+          <h2 className="flex items-center gap-2 font-heading text-lg font-semibold text-foreground">
             <MapPin className="size-5 text-bakery-700" aria-hidden />
             Saved addresses{addresses.length > 0 ? ` (${addresses.length})` : ""}
           </h2>
@@ -441,7 +441,7 @@ export function AccountAddressesPage() {
               <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-cream-100">
                 <MapPin className="size-6 text-bakery-700" />
               </div>
-              <p className="mt-4 font-heading font-bold text-foreground">No saved addresses</p>
+              <p className="mt-4 font-heading font-semibold text-foreground">No saved addresses</p>
               <p className="mt-1 text-sm text-muted-foreground">
                 Add your first delivery address above.
               </p>

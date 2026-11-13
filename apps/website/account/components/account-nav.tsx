@@ -80,7 +80,7 @@ export function AccountNav({ className, onNavigate }: AccountNavProps) {
           className="size-20 bg-white/15 text-xl ring-4 ring-white/20"
         />
         <input {...avatar.inputProps} />
-        <p className="mt-3 w-full truncate font-heading text-base font-bold">
+        <p className="mt-3 w-full truncate font-heading text-base font-semibold">
           {mounted ? name : ""}
         </p>
         {mounted && phone ? (

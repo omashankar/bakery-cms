@@ -22,6 +22,12 @@ interface ProductRailSectionProps {
    * requested. Off by default: on the product page this row is far below.
    */
   firstEager?: boolean;
+  /**
+   * `card` inside a page that is about something else — the cart, whose own
+   * heading is 20px: at the row size "Recently viewed" outranked "Shopping
+   * Cart" and the "Saved for later" heading beside it.
+   */
+  headingSize?: "row" | "card";
 }
 
 export function ProductRailSection({
@@ -32,6 +38,7 @@ export function ProductRailSection({
   viewAllLabel = "View all",
   className,
   firstEager = false,
+  headingSize = "row",
 }: ProductRailSectionProps) {
   if (cakes.length === 0) return null;
 
@@ -39,7 +46,7 @@ export function ProductRailSection({
     <section className={className}>
       <ScrollReveal className="mb-6 flex items-center justify-between gap-4">
         <div>
-          <h2 className={storefrontHeading.row}>{title}</h2>
+          <h2 className={storefrontHeading[headingSize]}>{title}</h2>
           {description ? (
             <p className="mt-1 text-sm text-muted-foreground">{description}</p>
           ) : null}

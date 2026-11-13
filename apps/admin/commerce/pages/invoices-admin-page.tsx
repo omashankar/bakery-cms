@@ -540,7 +540,7 @@ export function InvoicesAdminPage({
                             />
                           </td>
                           <td
-                            className="cursor-pointer px-4 py-3 font-medium text-foreground"
+                            className="cursor-pointer px-4 py-3 font-medium whitespace-nowrap text-foreground"
                             onClick={() =>
                               router.push(routes.admin.orders.detail(order.id))
                             }

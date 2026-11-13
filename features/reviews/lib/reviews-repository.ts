@@ -1,5 +1,4 @@
 import { safeSetItem } from "@/lib/safe-storage";
-import { loadProducts } from "@/features/products/lib/products-repository";
 import type {
   ProductReview,
   ProductReviewFormData,

@@ -572,7 +572,7 @@ export function CollectionsPage({
                       32px word beside two 14px controls outweighed the filters. */}
                   <h1
                     className={
-                      heading ? "font-heading text-xl font-bold tracking-tight sm:text-2xl" : "sr-only"
+                      heading ? "font-heading text-xl font-semibold tracking-tight sm:text-2xl" : "sr-only"
                     }
                   >
                     {pageTitle}

@@ -140,7 +140,7 @@ export async function countWrongGuess(id: string): Promise<number> {
   const updated = await CustomerLoginCodeModel.findOneAndUpdate(
     { _id: id },
     { $inc: { attempts: 1 } },
-    { new: true },
+    { returnDocument: "after" },
   );
   return updated?.attempts ?? 0;
 }

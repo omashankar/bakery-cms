@@ -22,11 +22,17 @@ const WISHLIST_GRID = "grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-co
 interface WishlistPageProps {
   /** Catalogue fetched on the server; the saved slugs themselves are browser-local. */
   catalog: LandingProduct[];
+  /** The saved slugs as the cookie mirror had them (wishlist-cookie.ts). */
+  initialSlugs?: string[];
+  /** False when the server could not tell — draw the skeleton, as before. */
+  initialKnown?: boolean;
 }
 
-export function WishlistPage({ catalog }: WishlistPageProps) {
-  const [slugs, setSlugs] = useState<string[]>([]);
-  const [loaded, setLoaded] = useState(false);
+export function WishlistPage({ catalog, initialSlugs = [], initialKnown = false }: WishlistPageProps) {
+  // Drawn from the server's copy at once; the effect below then reads the
+  // browser's own list, which stays the truth.
+  const [slugs, setSlugs] = useState<string[]>(initialSlugs);
+  const [loaded, setLoaded] = useState(initialKnown);
   const labels = useBusinessLabels();
 
   useEffect(() => {
@@ -71,7 +77,7 @@ export function WishlistPage({ catalog }: WishlistPageProps) {
             the reference heads the page. The heading was screen-reader only,
             so the page opened on a grid with nothing saying what it was.
           */}
-          <h1 className="mb-6 text-center font-heading text-2xl font-bold tracking-tight sm:mb-8 sm:text-3xl">
+          <h1 className="mb-6 text-center font-heading text-2xl font-semibold tracking-tight sm:mb-8 sm:text-3xl">
             My Wishlist{loaded && cakes.length > 0 ? ` (${cakes.length})` : ""}
           </h1>
           {!loaded ? (

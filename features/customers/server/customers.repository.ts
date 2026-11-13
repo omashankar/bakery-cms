@@ -36,7 +36,7 @@ export async function upsertMeta(email: string, fields: Partial<CustomerAdminMet
   const doc = (await CustomerMetaModel.findOneAndUpdate(
     { email: key },
     { $set: { ...fields, email: key } },
-    { new: true, upsert: true },
+    { returnDocument: "after", upsert: true },
   ).lean()) as Record<string, unknown> | null;
   return toMeta(doc, key);
 }

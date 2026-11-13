@@ -544,7 +544,7 @@ export function DesignSystemPage() {
               <DesignSection
                 id="typography"
                 title="Typography"
-                description="Plus Jakarta Sans for headings, Inter for body. One hierarchy — use presets, don’t invent sizes."
+                description="Inter for headings and body. One hierarchy — use presets, don’t invent sizes."
               >
                 <Card className="shadow-none">
                   <CardContent className="space-y-0 divide-y divide-border p-0">

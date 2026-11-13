@@ -60,6 +60,10 @@ export function SafeImage({ src, alt, className, fill = true, width, eager = fal
   }
 
   return (
+    // A plain <img> on purpose: this draws whatever URL the record holds —
+    // asked for at its drawn size through thumbnailImageUrl — and its own
+    // placeholder when there is none, without next/image's loader rules.
+    // eslint-disable-next-line @next/next/no-img-element
     <img
       key={resolvedSrc}
       src={resolvedSrc}

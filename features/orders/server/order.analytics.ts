@@ -225,8 +225,6 @@ export interface TransactionsOverview {
   totalRecords: number;
 }
 
-const SUCCESS_STATUSES = ["captured", "paid", "cod_paid"];
-
 export async function getTransactionsPage(
   filters: TransactionFilters,
   page: number,

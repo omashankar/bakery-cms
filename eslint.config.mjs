@@ -247,6 +247,8 @@ const eslintConfig = defineConfig([
     ".next/**",
     // A side-by-side production build (NEXT_DIST_DIR=.next-prod).
     ".next-prod/**",
+    // Local probe scripts and fixtures — gitignored, never part of the app.
+    ".data/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

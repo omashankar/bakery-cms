@@ -44,7 +44,6 @@ import type {
   AdminNotification,
   NotificationListFilters,
   NotificationSettings,
-  NotificationType,
 } from "@/types/notification";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

@@ -33,7 +33,7 @@ export async function subscribe(sub: NewsletterSubscriber): Promise<NewsletterSu
         createdAt: sub.createdAt ?? now,
       },
     },
-    { upsert: true, new: true },
+    { upsert: true, returnDocument: "after" },
   ).lean()) as unknown as Raw;
   return toSub(doc);
 }
@@ -70,7 +70,7 @@ export async function patch(
   const doc = (await NewsletterModel.findByIdAndUpdate(
     id,
     { $set: { ...rest, updatedAt: new Date().toISOString() } },
-    { new: true },
+    { returnDocument: "after" },
   ).lean()) as unknown as Raw | null;
   return doc ? toSub(doc) : null;
 }

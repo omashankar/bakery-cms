@@ -165,7 +165,7 @@ export async function updateMember(
   fields: { role?: string; status?: string },
   session: ClientSession,
 ): Promise<MemberRecord | null> {
-  const doc = await UserModel.findByIdAndUpdate(id, { $set: fields }, { new: true, session })
+  const doc = await UserModel.findByIdAndUpdate(id, { $set: fields }, { returnDocument: "after", session })
     .select(MEMBER_FIELDS)
     .lean();
   return doc ? toMember(doc as unknown as RawUser) : null;
@@ -261,7 +261,7 @@ export async function updateRole(
   fields: { name?: string; description?: string; permissions?: string[]; updatedBy: string },
 ): Promise<RoleRecord | null> {
   await connectDB();
-  const doc = await RoleModel.findOneAndUpdate({ slug }, { $set: fields }, { new: true }).lean();
+  const doc = await RoleModel.findOneAndUpdate({ slug }, { $set: fields }, { returnDocument: "after" }).lean();
   return doc ? toRole(doc as unknown as RawRole) : null;
 }
 
@@ -397,7 +397,7 @@ export async function reissueInvitation(
   const doc = await TeamInvitationModel.findOneAndUpdate(
     { _id: id, status: "pending" },
     { $set: { tokenHash, expiresAt, lastSentAt: new Date() }, $inc: { sentCount: 1 } },
-    { new: true },
+    { returnDocument: "after" },
   )
     .select(INVITATION_FIELDS)
     .lean();
@@ -409,7 +409,7 @@ export async function revokeInvitation(id: string): Promise<InvitationRecord | n
   const doc = await TeamInvitationModel.findOneAndUpdate(
     { _id: id, status: "pending" },
     { $set: { status: "revoked", revokedAt: new Date() } },
-    { new: true },
+    { returnDocument: "after" },
   )
     .select(INVITATION_FIELDS)
     .lean();
@@ -431,7 +431,7 @@ export async function claimInvitation(
   const doc = await TeamInvitationModel.findOneAndUpdate(
     { tokenHash, status: "pending", expiresAt: { $gt: now } },
     { $set: { status: "accepted", acceptedAt: now } },
-    { new: true, session },
+    { returnDocument: "after", session },
   )
     .select(INVITATION_FIELDS)
     .lean();

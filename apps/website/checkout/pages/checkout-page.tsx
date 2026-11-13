@@ -517,7 +517,6 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
 
   const {
     register,
-    control,
     handleSubmit,
     reset,
     setValue,
@@ -1716,7 +1715,12 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                     */}
                     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-xl border border-border bg-cream-50 px-4 py-3 text-sm">
                       <span className="text-muted-foreground">Ordering as</span>
-                      <span className="font-medium break-all">{accountEmail}</span>
+                      {/* One line, cut with an ellipsis: `break-all` split a long
+                          address at any letter ("…apps.co" / "m"). The title
+                          still gives the whole of it. */}
+                      <span className="max-w-full min-w-0 truncate font-medium" title={accountEmail}>
+                        {accountEmail}
+                      </span>
                     </div>
                     <input type="hidden" {...register("email")} />
 

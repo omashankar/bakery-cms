@@ -382,8 +382,13 @@ export function CartPage({ catalog = [], initialItems, cartKnown = false, initia
             }
           : undefined,
         commerceOverride: commerce,
+        // The zones this page was rendered with. Without them the server
+        // render (a cart drawn from its cookie) asked the browser-only zone
+        // cache, which has nothing on the server: it logged a warning per
+        // render and priced the first paint with no zones at all.
+        zonesOverride: initialZones,
       }),
-    [items, validCoupon?.discountAmount, preferences.giftWrap, deliveryPincode, place, priceSpot, commerce]
+    [items, validCoupon?.discountAmount, preferences.giftWrap, deliveryPincode, place, priceSpot, commerce, initialZones]
   );
 
   /*
@@ -495,6 +500,7 @@ export function CartPage({ catalog = [], initialItems, cartKnown = false, initia
               {recentlyViewed.length > 0 ? (
                 <ProductRailSection
                   title="Recently viewed"
+                  headingSize="card"
                   description="Pick up where you left off."
                   cakes={recentlyViewed.slice(0, 4)}
                   firstEager
@@ -516,7 +522,7 @@ export function CartPage({ catalog = [], initialItems, cartKnown = false, initia
                 The steps are in the header now, as the reference has them;
                 the page opens on its own heading.
               */}
-              <h1 className="font-heading text-xl font-bold tracking-tight">
+              <h1 className="font-heading text-xl font-semibold tracking-tight">
                 Shopping Cart ({itemCount})
               </h1>
 
@@ -784,6 +790,7 @@ export function CartPage({ catalog = [], initialItems, cartKnown = false, initia
                 {recentlyViewed.length > 0 ? (
                   <ProductRailSection
                     title="Recently viewed"
+                    headingSize="card"
                     description="You might also want to add these."
                     cakes={recentlyViewed.slice(0, 4)}
                     firstEager

@@ -5,7 +5,7 @@ import { requirePermission } from "@/lib/server/auth/access";
 import { requestContext } from "@/lib/server/audit/audit-log";
 
 import * as service from "./catalog.service";
-import { catalogSectionSchemas, type CatalogSection } from "./catalog.validators";
+import { catalogSectionSchemas } from "./catalog.validators";
 import { allowlisted } from "@/lib/server/http/allowlist";
 
 

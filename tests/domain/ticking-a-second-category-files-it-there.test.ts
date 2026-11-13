@@ -26,8 +26,8 @@
  * thing it is named for cannot fail, and a green suite is not coverage.
  */
 import { createElement } from "react";
-import { createRoot } from "react-dom/client";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Product } from "@/types/product";
 import {
@@ -104,10 +104,24 @@ vi.mock("next/navigation", () => ({
 
 const { ProductFormPage } = await import("@/apps/admin/products/components/product-form-page");
 
+/*
+  EVERY FORM IS TAKEN DOWN AFTER ITS TEST. They were left mounted, so the form
+  went on loading and updating after the last assertion — and React's report
+  of those updates reached the console after the worker had closed: 11
+  "unhandled errors" on a run where every test passed.
+*/
+const mounted: Root[] = [];
+afterEach(() => {
+  for (const root of mounted.splice(0)) root.unmount();
+  document.body.replaceChildren();
+});
+
 async function openTheCake(): Promise<HTMLElement> {
   const container = document.createElement("div");
   document.body.append(container);
-  createRoot(container).render(
+  const root = createRoot(container);
+  mounted.push(root);
+  root.render(
     createElement(ProductFormPage as never, { mode: "edit", cakeId: "cake-1" }),
   );
 

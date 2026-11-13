@@ -10,7 +10,7 @@ import { rateLimit } from "@/lib/server/http/rate-limit";
 
 import * as service from "./settings.service";
 import { StaleSectionError } from "./settings.repository";
-import { sectionSchemas, type SettingsSection } from "./settings.validators";
+import { sectionSchemas } from "./settings.validators";
 import { allowlisted } from "@/lib/server/http/allowlist";
 
 /**

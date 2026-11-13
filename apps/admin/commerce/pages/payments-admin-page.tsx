@@ -128,7 +128,7 @@ export function PaymentsAdminPage({
         anything wrong with it.
       */}
       <section className="space-y-2.5 sm:space-y-3">
-        <h2 className="font-heading text-base font-bold text-foreground">Collection</h2>
+        <h2 className="font-heading text-base font-semibold text-foreground">Collection</h2>
         <div className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
           <DashboardStatCard
             title="Today's collection"
@@ -173,7 +173,7 @@ export function PaymentsAdminPage({
       </section>
 
       <section className="space-y-2.5 sm:space-y-3">
-        <h2 className="font-heading text-base font-bold text-foreground">Health</h2>
+        <h2 className="font-heading text-base font-semibold text-foreground">Health</h2>
         <div className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
           <DashboardStatCard
             title="Success rate"
@@ -253,7 +253,7 @@ export function PaymentsAdminPage({
         Stack on mobile — three across at 390px clips the labels.
       */}
       <section className="space-y-2.5 sm:space-y-3">
-        <h2 className="font-heading text-base font-bold text-foreground">Go deeper</h2>
+        <h2 className="font-heading text-base font-semibold text-foreground">Go deeper</h2>
         <div className="grid gap-2.5 sm:grid-cols-3 sm:gap-3">
           {links.map((link) => (
             <Link
