@@ -71,7 +71,9 @@ describe("where it is written and read", () => {
     expect(route).toContain("cartFromCookie(jar.get(CART_COOKIE)?.value)");
     expect(route).toContain("cartKnown={cartKnown}");
     const page = source("apps/website/pages/cart-page.tsx");
-    expect(page).toContain("useState<CartLineItem[]>(() => initialItems ?? [])");
+    // The server's lines are what the server and hydrating render draw…
+    expect(page).toContain("items: initialItems ?? [],");
+    expect(page).toContain("useExternalValue(readCartScreen, cartScreenChanges, serverScreen)");
     expect(page).toContain("{!loaded && items.length === 0 && !cartKnown ? (");
   });
 

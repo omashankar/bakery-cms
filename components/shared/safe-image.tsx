@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { fixBrokenImageUrl } from "@/constants/demo-images";
 import { thumbnailImageUrl } from "@/lib/image-url";
 import { cn } from "@/lib/utils";
@@ -49,11 +49,10 @@ export function SafeImage({ src, alt, className, fill = true, width, eager = fal
     return width ? thumbnailImageUrl(fixed, width) : fixed;
   }, [src, width]);
 
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    setFailed(false);
-  }, [resolvedSrc]);
+  // WHICH source failed, not whether one did: a new source is not a failed
+  // one, with no effect needed to say so.
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const failed = failedSrc === resolvedSrc;
 
   if (!resolvedSrc || resolvedSrc.startsWith("blob:") || failed) {
     return <ImagePlaceholder alt={alt} className={className} fill={fill} />;
@@ -72,7 +71,7 @@ export function SafeImage({ src, alt, className, fill = true, width, eager = fal
       loading={eager ? "eager" : "lazy"}
       decoding="async"
       referrerPolicy="no-referrer"
-      onError={() => setFailed(true)}
+      onError={() => setFailedSrc(resolvedSrc)}
     />
   );
 }

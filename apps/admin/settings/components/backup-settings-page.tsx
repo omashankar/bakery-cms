@@ -8,7 +8,7 @@ import { useNewsletterServerSync } from "@/features/inquiries/lib/use-newsletter
 import { useOrdersServerSync } from "@/features/orders/lib/use-orders-server-sync";
 import { useSecurityCenterServerSync } from "@/features/settings/lib/use-security-center-server-sync";
 import { Download, History, RotateCcw, Trash2, Upload } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import type { BackupSnapshot } from "@/types/backup";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
 import { knownStorageKeys } from "@/features/settings/lib/settings-utils";
 import {
   BACKUP_UPDATED_EVENT,
@@ -41,6 +43,9 @@ import {
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
 import { RelativeTime } from "@/components/shared/relative-time";
 
+const backupChanges = windowEvents(BACKUP_UPDATED_EVENT, "storage");
+const NO_SNAPSHOTS: BackupSnapshot[] = [];
+
 export function BackupSettingsPage() {
   // An export copies these browser caches verbatim, so they must hold the
   // server's rows, not a cold browser's seeds. The admin layout loaded them on
@@ -53,8 +58,11 @@ export function BackupSettingsPage() {
   useOrdersServerSync();
   useSecurityCenterServerSync();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [mounted, setMounted] = useState(false);
-  const [history, setHistory] = useState<BackupSnapshot[]>([]);
+  const mounted = useHydrated();
+  // The snapshots this browser keeps, followed as they change; a render after
+  // a write here re-reads them too (`refresh`).
+  const history = useExternalValue(loadBackupHistory, backupChanges, NO_SNAPSHOTS);
+  const [, setReadTick] = useState(0);
   const [backupLabel, setBackupLabel] = useState("");
   const [restoreTarget, setRestoreTarget] = useState<BackupSnapshot | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BackupSnapshot | null>(null);
@@ -66,18 +74,8 @@ export function BackupSettingsPage() {
   const [busy, setBusy] = useState(false);
 
   function refresh() {
-    setHistory(loadBackupHistory());
+    setReadTick((tick) => tick + 1);
   }
-
-  useEffect(() => {
-    refresh();
-    setMounted(true);
-    function handleUpdate() {
-      refresh();
-    }
-    window.addEventListener(BACKUP_UPDATED_EVENT, handleUpdate);
-    return () => window.removeEventListener(BACKUP_UPDATED_EVENT, handleUpdate);
-  }, []);
 
   async function handleExport() {
     setBusy(true);

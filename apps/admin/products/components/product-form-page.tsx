@@ -4,7 +4,7 @@ import { useSeoServerSync } from "@/features/seo/lib/use-seo-server-sync";
 import Link from "next/link";
 import { PhotoField } from "@/apps/admin/media/components/photo-field";
 import { useRouter } from "next/navigation";
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useEffectEvent, useLayoutEffect, useState } from "react";
 import { applyServerCatalog } from "@/components/shared/catalog-server-sync";
 import { applyServerSeo } from "@/features/site-layout/lib/site-layout-hydration";
 import type { CatalogStore } from "@/types/catalog";
@@ -360,6 +360,13 @@ export function ProductFormPage({
    */
   const [collectionIds, setCollectionIds] = useState<string[]>([]);
 
+  // What a missing product does: said, and sent back to the list — read at
+  // the moment it happens, so the wording is the shop's current one.
+  const onProductMissing = useEffectEvent(() => {
+    toast.error(`${labels.productWord} not found`);
+    router.replace(routes.admin.cakes.list);
+  });
+
   useEffect(() => {
     if (mode !== "edit" || !cakeId) return;
     // Already filled from the server's read; see the page.
@@ -378,8 +385,7 @@ export function ProductFormPage({
         setIsLoading(false);
       } catch {
         if (cancelled) return;
-        toast.error(`${labels.productWord} not found`);
-        router.replace(routes.admin.cakes.list);
+        onProductMissing();
       }
     }
 
@@ -388,7 +394,7 @@ export function ProductFormPage({
     return () => {
       cancelled = true;
     };
-  }, [mode, cakeId, router]);
+  }, [mode, cakeId, initialProduct]);
 
   /**
    * The collections this product is already in.

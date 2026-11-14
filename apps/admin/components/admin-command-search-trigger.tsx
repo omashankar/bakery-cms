@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
 
 /**
  * The search box in the header, and the ⌘K / Ctrl K shortcut that opens it.
@@ -13,18 +14,20 @@ import { cn } from "@/lib/utils";
  * screen used to download and run it before showing its own content.
  */
 
+const platformNeverChanges = windowEvents();
+function readShortcut(): string {
+  const isMac = /Mac|iPhone|iPad/.test(navigator.platform) || navigator.userAgent.includes("Mac");
+  return isMac ? "⌘K" : "Ctrl K";
+}
+
 interface AdminCommandSearchTriggerProps {
   onOpen: () => void;
   className?: string;
 }
 
 export function AdminCommandSearchTrigger({ onOpen, className }: AdminCommandSearchTriggerProps) {
-  const [shortcut, setShortcut] = useState("Ctrl K");
-
-  useEffect(() => {
-    const isMac = /Mac|iPhone|iPad/.test(navigator.platform) || navigator.userAgent.includes("Mac");
-    setShortcut(isMac ? "⌘K" : "Ctrl K");
-  }, []);
+  // The key this platform uses — read from the browser, "Ctrl K" on the server.
+  const shortcut = useExternalValue(readShortcut, platformNeverChanges, "Ctrl K");
 
   return (
     <button

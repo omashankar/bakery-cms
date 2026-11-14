@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
 import { CreditCard, Landmark, Layers } from "lucide-react";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import {
@@ -22,31 +24,31 @@ import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 
 type Category = "all" | "online" | "offline";
 
+const gatewayChanges = windowEvents(GATEWAYS_UPDATED_EVENT, SETTINGS_UPDATED_EVENT, "storage");
+
 export function GatewayManagerPage() {
-  const [gateways, setGateways] = useState(() => getAllGatewayStates());
-  const [mounted, setMounted] = useState(false);
+  /*
+    Credential status comes from the SERVER. It used to be derived from
+    whether this browser's localStorage held the required fields, so the same
+    gateway read "Configured" on the laptop it was set up on and "Not
+    configured" everywhere else. The rest of each gateway's state is this
+    browser's, read as an external value and followed as it changes.
+  */
+  const [statuses, setStatuses] = useState<Record<string, GatewayCredentialStatus | null>>({});
+  const readGateways = useCallback(() => getAllGatewayStates(statuses), [statuses]);
+  const [serverGateways] = useState(() => getAllGatewayStates());
+  const gateways = useExternalValue(readGateways, gatewayChanges, serverGateways);
+  const mounted = useHydrated();
   const [category, setCategory] = useState<Category>("all");
   const [search, setSearch] = useState("");
   const [razorpayStatus, setRazorpayStatus] = useState<ConnectionStatus | null>(null);
 
   useEffect(() => {
-    // Credential status comes from the SERVER now. It used to be derived from
-    // whether this browser's localStorage held the required fields, so the same
-    // gateway read "Configured" on the laptop it was set up on and "Not
-    // configured" everywhere else.
-    let statuses: Record<string, GatewayCredentialStatus | null> = {};
-    const refresh = () => setGateways(getAllGatewayStates(statuses));
-    refresh();
-    setMounted(true);
-
     void Promise.all(
       PAYMENT_GATEWAYS.filter((g) => g.id !== "razorpay" && g.category !== "offline").map(
         async (g) => [g.id, await fetchGatewayCredentialStatus(g.id)] as const,
       ),
-    ).then((entries) => {
-      statuses = Object.fromEntries(entries);
-      refresh();
-    });
+    ).then((entries) => setStatuses(Object.fromEntries(entries)));
 
     // `verify=1`, like the two detail screens. Without it this list asked only
     // "are the variables non-empty" and printed a green Connected for keys
@@ -64,12 +66,6 @@ export function GatewayManagerPage() {
       })
       .catch(() => setRazorpayStatus("not_configured"));
 
-    window.addEventListener(GATEWAYS_UPDATED_EVENT, refresh);
-    window.addEventListener(SETTINGS_UPDATED_EVENT, refresh);
-    return () => {
-      window.removeEventListener(GATEWAYS_UPDATED_EVENT, refresh);
-      window.removeEventListener(SETTINGS_UPDATED_EVENT, refresh);
-    };
   }, []);
 
   const filtered = useMemo(() => {

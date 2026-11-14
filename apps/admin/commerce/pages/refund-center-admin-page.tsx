@@ -268,11 +268,12 @@ export function RefundCenterAdminPage({
     JSON.stringify({ filters, page: currentPage }),
     250
   );
-  const request = JSON.parse(requestKey) as {
-    filters: Record<string, unknown>;
-    page: number;
-  };
   useEffect(() => {
+    // Read from the key this effect runs on, so it uses nothing it does not list.
+    const request = JSON.parse(requestKey) as {
+      filters: Record<string, unknown>;
+      page: number;
+    };
     if (listFromServer.current) {
       listFromServer.current = false;
       return;
@@ -324,11 +325,11 @@ export function RefundCenterAdminPage({
   const paginated = orders;
   const selected = orders.find((order) => order.id === selectedId) ?? null;
 
-  useEffect(() => {
-    if (selectedId && !orders.some((order) => order.id === selectedId)) {
-      setSelectedId(null);
-    }
-  }, [orders, selectedId]);
+  // A case that has left the list (filtered out, or settled elsewhere) is no
+  // longer selected — let go while rendering, the moment it is gone.
+  if (selectedId && !orders.some((order) => order.id === selectedId)) {
+    setSelectedId(null);
+  }
 
   function updateFilters(patch: Partial<RefundListFilters>) {
     setFilters((prev) => ({ ...prev, ...patch }));

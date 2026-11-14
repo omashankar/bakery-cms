@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
 import { LogOut, MapPin, Package, User } from "lucide-react";
 import {
   getCustomerDisplayName,
@@ -14,6 +15,14 @@ import { displayNameOf, useAccountProfile } from "@/apps/website/account/compone
 import { useAvatarEditor } from "@/apps/website/account/hooks/use-avatar-editor";
 import { routes } from "@/constants/routes";
 import { cn } from "@/lib/utils";
+
+const sessionChanges = windowEvents("bakery-customer-session-updated", "storage");
+/** What the nav shows from this browser's session; null until it has one. */
+function readNavSession(): { name: string; phone: string; avatarUrl?: string } | null {
+  const session = getCustomerSession();
+  if (!session) return null;
+  return { name: getCustomerDisplayName(), phone: session.phone ?? "", avatarUrl: session.avatarUrl };
+}
 
 const navItems = [
   { href: routes.account.dashboard, label: "My Profile", icon: User },
@@ -31,28 +40,16 @@ export function AccountNav({ className, onNavigate }: AccountNavProps) {
   const router = useRouter();
   const profile = useAccountProfile();
   // The server's answer first, so the avatar and name are in the first paint;
-  // the browser session updates them after an edit.
-  const [mounted, setMounted] = useState(Boolean(profile));
-  const [name, setName] = useState(profile ? displayNameOf(profile) : "");
-  const [phone, setPhone] = useState(profile?.phone ?? "");
-  const [avatarUrl, setAvatarUrl] = useState(profile?.avatarUrl ?? "");
+  // the browser session takes over once it has one, and follows every edit.
+  const hydrated = useHydrated();
+  const session = useExternalValue(readNavSession, sessionChanges, null);
+  const mounted = hydrated || Boolean(profile);
+  const name = session ? session.name : profile ? displayNameOf(profile) : "";
+  const phone = session ? session.phone : (profile?.phone ?? "");
+  // A copy cached before photos existed has no field at all; "" is a removal.
+  const avatarUrl =
+    session && session.avatarUrl !== undefined ? session.avatarUrl : (profile?.avatarUrl ?? "");
   const avatar = useAvatarEditor();
-
-  useEffect(() => {
-    const load = () => {
-      // Only when the browser has one: before it does, the server's stands.
-      const session = getCustomerSession();
-      if (!session) return;
-      setName(getCustomerDisplayName());
-      setPhone(session.phone ?? "");
-      // A copy cached before photos existed has no field at all; "" is a removal.
-      if (session.avatarUrl !== undefined) setAvatarUrl(session.avatarUrl);
-    };
-    load();
-    setMounted(true);
-    window.addEventListener("bakery-customer-session-updated", load);
-    return () => window.removeEventListener("bakery-customer-session-updated", load);
-  }, []);
 
   async function handleLogout() {
     // Same path as the header menu: the server ends the session, and this

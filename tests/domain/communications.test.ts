@@ -257,7 +257,8 @@ describe("the template forms hold their fields closed until hydration", () => {
     // The draft effect ran on every change to `templates` — hydration included
     // — and replaced the editor's contents outright.
     expect(code).not.toMatch(/\?\? null;\s*\r?\n\s*setDraft\(next\);/);
-    expect(code).toContain("setDraft((current) => {");
+    // The saved copy is adopted only when the open draft is untouched.
+    expect(code).toMatch(/!isEdited\(draft, draftOrigin\)\)\s*\{\s*setDraft\(next\);/);
   });
 });
 
@@ -290,7 +291,7 @@ describe("the editor's draft", () => {
     // changes", and offered to Save it over the shop's real template.
     //
     // The draft has to be compared with the copy it was DERIVED from.
-    expect(page).toContain("isEdited(current, draftOriginRef.current)");
+    expect(page).toContain("isEdited(draft, draftOrigin)");
     expect(page).toContain("setDraftOrigin(");
     expect(page).not.toMatch(
       /const baseline = templates\.find\(\(template\) => template\.id === current\.id\)/,

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowDownUp, ChevronDown, IndianRupee, SearchX, X } from "lucide-react";
 import { StaggerReveal } from "@/components/shared/scroll-reveal";
@@ -319,14 +319,33 @@ export function CollectionsPage({
    * shape a bug can have. The page this replaces had exactly this effect
    * for exactly this reason.
    */
-  useEffect(() => {
+  // A new search in the address (the header's box, a link) becomes the
+  // filter's search — adjusted while rendering, the moment it is new.
+  const [searchSeen, setSearchSeen] = useState(initialSearch);
+  if (searchSeen !== initialSearch) {
+    setSearchSeen(initialSearch);
     setFilters((current) =>
       current.search === initialSearch
         ? current
         : withSearchSort(current, { ...current, search: initialSearch }),
     );
-  }, [initialSearch]);
-  const [page, setPage] = useState(1);
+  }
+  /*
+    THE PAGE NUMBER BELONGS TO ONE LIST — this category, these filters — and
+    any other list starts on page 1. Kept with the list it was chosen in, so
+    changing a filter cannot show page 3 of a list with one page, even for a
+    render. (This was an effect that reset it a render later.)
+  */
+  const [paging, setPaging] = useState<{ filters: CollectionFilters; category?: string; page: number }>(
+    () => ({ filters, category: categorySlug, page: 1 }),
+  );
+  const page = paging.filters === filters && paging.category === categorySlug ? paging.page : 1;
+  const setPage = (next: number | ((current: number) => number)) =>
+    setPaging({
+      filters,
+      category: categorySlug,
+      page: typeof next === "function" ? next(page) : next,
+    });
   /**
    * The shared hook, not a local copy of it.
    *
@@ -438,10 +457,6 @@ export function CollectionsPage({
   // Nothing here at all, versus nothing that matches what was ticked. "Try
   // adjusting your filters" is useless advice when no filter is the reason.
   const categoryIsEmpty = Boolean(categorySlug) && inCategory.length === 0;
-
-  useEffect(() => {
-    setPage(1);
-  }, [categorySlug, filters]);
 
 
   const updateFilters = (next: CollectionFilters) => setFilters((current) => withSearchSort(current, next));

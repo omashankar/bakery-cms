@@ -24,6 +24,23 @@ import {
   type DashboardDateRange,
 } from "./lib/dashboard-analytics";
 import { EMPTY_DASHBOARD_STATS, getDashboardStats } from "./lib/dashboard-data";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
+
+const otherTabChanges = windowEvents("storage");
+
+/** The signed-in email's first part, as a name: "om.suman" reads "Om suman". */
+function readEmailGreeting(): string | null {
+  const email = getDemoSession()?.email;
+  if (!email) return null;
+  const localPart = email.split("@")[0] ?? "Admin";
+  return (localPart.charAt(0).toUpperCase() + localPart.slice(1).replace(/[._-]/g, " ")).trim();
+}
+
+const EMPTY_LOCAL_STATS = { stats: EMPTY_DASHBOARD_STATS, lastUpdated: "" };
+// A DAY, not a time: the snapshot stays the same object until the data or the
+// date changes, which is what lets React tell a change from a re-read.
+const readLocalStats = () => ({ stats: getDashboardStats(), lastUpdated: formatDate(new Date()) });
 import { DEFAULT_DASHBOARD_RANGE } from "./lib/dashboard-defaults";
 import { subscribeToAdminData } from "@/apps/admin/lib/admin-data-events";
 import { fetchOrderAnalytics, type OrderAnalyticsResponse } from "@/features/orders/lib/orders-api";
@@ -56,24 +73,25 @@ export function DashboardPage({
    */
   const { access, can } = useAccess();
   const revenue = can("reports.revenue.view");
-  const [emailGreeting, setEmailGreeting] = useState<string | null>(null);
+  const emailGreeting = useExternalValue(readEmailGreeting, otherTabChanges, null);
   // A member's own first name, from their account; the email is the fallback.
   const greetingName = access?.name ? (access.name.split(" ")[0] ?? access.name) : emailGreeting;
-  const [stats, setStats] = useState(EMPTY_DASHBOARD_STATS);
+  // This browser's counts, and the day they were read, followed as the admin's
+  // data changes. Nothing on the server render; 'statsLoaded' says so.
+  const { stats, lastUpdated } = useExternalValue(readLocalStats, subscribeToAdminData, EMPTY_LOCAL_STATS);
   const [commerce, setCommerce] = useState(() =>
     initial?.analytics
       ? toDashboardCommerceAnalytics(DEFAULT_DASHBOARD_RANGE, initial.analytics)
       : EMPTY_DASHBOARD_COMMERCE_ANALYTICS,
   );
   const [range, setRange] = useState<DashboardDateRange>(DEFAULT_DASHBOARD_RANGE);
-  const [lastUpdated, setLastUpdated] = useState("");
   const [analyticsFailed, setAnalyticsFailed] = useState(false);
   // "Nothing has loaded" and "the last refresh failed" are different things to
   // say, and the caption said the first for both.
   const [loadedOnce, setLoadedOnce] = useState(Boolean(initial?.analytics));
   // `stats` reads synchronously, but the effect that fills it runs after the
   // browser paints — so "New inquiries 0" was on screen for a frame regardless.
-  const [statsLoaded, setStatsLoaded] = useState(false);
+  const statsLoaded = useHydrated();
   const [retryKey, setRetryKey] = useState(0);
   const attempts = useRef(0);
   /** Which range `attempts` is counting for — changing range starts over. */
@@ -81,24 +99,6 @@ export function DashboardPage({
   // The server answered the default range; its first request would repeat it.
   const analyticsFromServer = useRef(Boolean(initial?.analytics));
 
-  useEffect(() => {
-    const session = getDemoSession();
-    if (session?.email) {
-      const localPart = session.email.split("@")[0] ?? "Admin";
-      const formatted =
-        localPart.charAt(0).toUpperCase() + localPart.slice(1).replace(/[._-]/g, " ");
-      setEmailGreeting(formatted.trim());
-    }
-
-    function refresh() {
-      setStats(getDashboardStats());
-      setLastUpdated(formatDate(new Date()));
-      setStatsLoaded(true);
-    }
-
-    refresh();
-    return subscribeToAdminData(refresh);
-  }, [access]);
 
   // Every commerce figure on this page is a total over the range, so it is
   // computed on the server across every matching order — and fetched ONCE here

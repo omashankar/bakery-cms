@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, FileText, Mail, Printer } from "lucide-react";
 import { toast } from "@/lib/lazy-toast";
 import { canViewOrder, readOrderLookupEmail } from "@/features/orders/lib/order-access";
@@ -9,9 +9,32 @@ import { getCustomerSession } from "@/apps/website/account/lib/customer-session"
 import { emailInvoiceRequest, fetchOrderByNumber } from "@/features/orders/lib/orders-api";
 import {
   getOrderByNumber,
+  ORDERS_UPDATED_EVENT,
   type PlacedOrder,
 } from "@/features/orders/lib/orders";
-import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
+import { SETTINGS_UPDATED_EVENT } from "@/features/settings/lib/settings-repository";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
+
+/** The orders, the session and the shop's labels this page reads from the browser. */
+const orderChanges = windowEvents(
+  ORDERS_UPDATED_EVENT,
+  SETTINGS_UPDATED_EVENT,
+  "bakery-customer-session-updated",
+  "storage",
+);
+const readSessionEmail = () => getCustomerSession()?.email ?? null;
+const NO_LABELS = { tax: "", platform: "", giftwrap: "", taxRate: 0 };
+function readInvoiceLabels() {
+  const c = peekCommerceSettings();
+  return {
+    tax: c.taxLabel,
+    platform: c.platformChargeLabel,
+    giftwrap: c.giftWrapLabel,
+    taxRate: c.taxRate,
+  };
+}
+import { peekCommerceSettings } from "@/features/settings/lib/settings-repository";
 import { InvoiceDocument } from "@/components/shared/invoice-document";
 import { runBrowserPrint } from "@/features/commerce/lib/print-invoice";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
@@ -34,58 +57,43 @@ interface CustomerInvoicePageProps {
 }
 
 export function CustomerInvoicePage({ orderNumber, settings }: CustomerInvoicePageProps) {
-  const [order, setOrder] = useState<PlacedOrder | null>(null);
-  const [allowed, setAllowed] = useState(false);
-  const [labels, setLabels] = useState({ tax: "", platform: "", giftwrap: "", taxRate: 0 });
-  const [ready, setReady] = useState(false);
+  const hydrated = useHydrated();
   const [printing, setPrinting] = useState(false);
   const [emailing, setEmailing] = useState(false);
 
+  // Decided locally where we can, so the page does not flash a stranger's
+  // order while the request is in flight — the same rule the order page uses.
+  const readLocal = useCallback(() => getOrderByNumber(orderNumber), [orderNumber]);
+  const local = useExternalValue(readLocal, orderChanges, null);
+  const sessionEmail = useExternalValue(readSessionEmail, orderChanges, null);
+  const localAllowed = local ? canViewOrder(local, sessionEmail ?? undefined) : false;
+  const labels = useExternalValue(readInvoiceLabels, orderChanges, NO_LABELS);
+
+  // Prefer the SERVER's copy. An invoice is the document a customer keeps, and
+  // this browser's cache is frozen at placement — so after a refund it printed
+  // the full original total with no mention of the money that had gone back.
+  const readLookupEmail = useCallback(() => readOrderLookupEmail(orderNumber), [orderNumber]);
+  const email = useExternalValue(readLookupEmail, orderChanges, null) ?? sessionEmail;
+  const [server, setServer] = useState<{ for: string; order: PlacedOrder | null } | null>(null);
+  const answer = server && server.for === orderNumber ? server : null;
+  const order = answer?.order ?? local;
+  const allowed = answer?.order ? true : localAllowed;
+  // Not ready until the server has answered, unless there is nothing to ask
+  // with. Settling early rendered "Invoice not found" for a moment on an
+  // order that was about to arrive — including any order the WEBHOOK placed,
+  // which was never in this browser at all.
+  const ready = Boolean(answer) || (hydrated && !email);
+
   useEffect(() => {
+    if (!email) return;
     let cancelled = false;
-
-    // Decided locally where we can, so the page does not flash a stranger's
-    // order while the request is in flight — the same rule the order page uses.
-    const local = getOrderByNumber(orderNumber);
-    const sessionEmail = getCustomerSession()?.email;
-    const localAllowed = local ? canViewOrder(local, sessionEmail) : false;
-
-    setOrder(local);
-    setAllowed(localAllowed);
-
-    const c = getCommerceSettings();
-    setLabels({
-      tax: c.taxLabel,
-      platform: c.platformChargeLabel,
-      giftwrap: c.giftWrapLabel,
-      taxRate: c.taxRate,
+    void fetchOrderByNumber(orderNumber, { email }).then((fresh) => {
+      if (!cancelled) setServer({ for: orderNumber, order: fresh });
     });
-
-    // Prefer the SERVER's copy. An invoice is the document a customer keeps, and
-    // this browser's cache is frozen at placement — so after a refund it printed
-    // the full original total with no mention of the money that had gone back.
-    const email = readOrderLookupEmail(orderNumber) ?? sessionEmail;
-    // Not ready until the server has answered, unless there is nothing to ask
-    // with. Settling early rendered "Invoice not found" for a moment on an
-    // order that was about to arrive — including any order the WEBHOOK placed,
-    // which was never in this browser at all.
-    if (!email) setReady(true);
-
-    if (email) {
-      void fetchOrderByNumber(orderNumber, { email }).then((fresh) => {
-        if (cancelled) return;
-        if (fresh) {
-          setOrder(fresh);
-          setAllowed(true);
-        }
-        setReady(true);
-      });
-    }
-
     return () => {
       cancelled = true;
     };
-  }, [orderNumber]);
+  }, [orderNumber, email]);
 
   useEffect(() => {
     if (!printing) return;

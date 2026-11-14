@@ -17,6 +17,12 @@ import {
   type DashboardActivityItem,
 } from "../lib/dashboard-data";
 import { RelativeTime } from "@/components/shared/relative-time";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
+
+const otherTabChanges = windowEvents("storage");
+const NO_ACTIVITY: DashboardActivityItem[] = [];
+const readLocalFeed = () => getDashboardActivities().slice(0, DASHBOARD_FEED_LIMIT);
 
 export function DashboardActivityFeed({
   initial = null,
@@ -24,37 +30,32 @@ export function DashboardActivityFeed({
   /** The audit trail's newest entries, read on the server; null fetches as before. */
   initial?: AuditLogEntry[] | null;
 } = {}) {
-  const [activities, setActivities] = useState<DashboardActivityItem[]>(() =>
-    initial ? initial.map((entry) => formatActivityEntry(auditToActivity(entry))) : [],
+  // The server's durable trail: with the page, or once it answers.
+  const [serverFeed, setServerFeed] = useState<DashboardActivityItem[] | null>(() =>
+    initial ? initial.map((entry) => formatActivityEntry(auditToActivity(entry))) : null,
   );
-  /**
-   * Whether the first effect has run.
-   *
-   * The read below is synchronous, but `useEffect` fires after the browser
-   * paints — so without this there is a real frame stating the shop has none of
-   * these. It cannot be read eagerly instead: this renders on the server too,
-   * where the browser-held store is empty, and seeding from it would be a
-   * hydration mismatch.
-   */
-  const [loaded, setLoaded] = useState(Boolean(initial));
+  /*
+    Until it answers, this browser's own log — so the card is never blank
+    while the request is in flight. It only records what this browser did;
+    the audit trail spans every device, and replaces it when it lands.
+
+    Not on the server or in the hydrating render: there the browser-held log
+    is empty, and drawing from it would be a hydration mismatch. `loaded` says
+    whether there is anything to state yet, so no frame claims "none".
+  */
+  const hydrated = useHydrated();
+  const localFeed = useExternalValue(readLocalFeed, otherTabChanges, NO_ACTIVITY);
+  const activities = serverFeed ?? (hydrated ? localFeed : NO_ACTIVITY);
+  const loaded = Boolean(initial) || hydrated;
 
   useEffect(() => {
     // The server already read the durable trail for this page.
     if (initial) return;
     let cancelled = false;
-
-    // Show the local log first so the card is never blank while the request is
-    // in flight, then replace it with the server's durable trail. The local log
-    // only records what this browser did; the audit trail spans every device.
-    setActivities(getDashboardActivities().slice(0, DASHBOARD_FEED_LIMIT));
-    setLoaded(true);
-
-    (async () => {
-      const result = await fetchAuditLogs({ limit: DASHBOARD_FEED_LIMIT });
+    void fetchAuditLogs({ limit: DASHBOARD_FEED_LIMIT }).then((result) => {
       if (cancelled || !result) return;
-      setActivities(result.items.map((entry) => formatActivityEntry(auditToActivity(entry))));
-    })();
-
+      setServerFeed(result.items.map((entry) => formatActivityEntry(auditToActivity(entry))));
+    });
     return () => {
       cancelled = true;
     };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
   MapPin,
@@ -36,9 +36,11 @@ import {
   toggleDeliveryZoneActive,
 } from "@/features/commerce/lib/delivery-zones-repository";
 import {
-  getCommerceSettings,
+  peekCommerceSettings,
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
 import {
   FilterPanel,
   FilterPanelSearch,
@@ -56,6 +58,9 @@ import { formatCurrency } from "@/utils/format";
 import { RelativeTime } from "@/components/shared/relative-time";
 
 const PAGE_SIZE = 10;
+/** The zones, the shop settings beside them, and another tab. */
+const zoneChanges = windowEvents(DELIVERY_ZONES_UPDATED_EVENT, SETTINGS_UPDATED_EVENT, "storage");
+const NO_ZONES: DeliveryZone[] = [];
 
 const EMPTY_STATS = {
   total: 0,
@@ -117,8 +122,12 @@ export function DeliveryZonesAdminPage({
     if (initial) applyServerZones(initial);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
   }, []);
-  const [mounted, setMounted] = useState(false);
-  const [zones, setZones] = useState<DeliveryZone[]>([]);
+  const mounted = useHydrated();
+  // The zones, read from this browser and followed as they change; a render
+  // after a write here re-reads them too (`rereadZones`).
+  const zones = useExternalValue(loadDeliveryZones, zoneChanges, NO_ZONES);
+  const [, setReadTick] = useState(0);
+  const rereadZones = () => setReadTick((tick) => tick + 1);
   const [filters, setFilters] = useState<DeliveryZoneListFilters>(defaultDeliveryZoneFilters);
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -145,7 +154,7 @@ export function DeliveryZonesAdminPage({
       }
     }
     void toggleDeliveryZoneActive(zone.id).then(({ persisted }) => {
-      setZones(loadDeliveryZones());
+      rereadZones();
       // A zone active on the server but shown inactive
       // here decides whether the shop delivers there.
       reportWrite(persisted, zone.isActive ? "Zone deactivated" : "Zone activated");
@@ -154,23 +163,8 @@ export function DeliveryZonesAdminPage({
 
   // Whether any of this reaches a customer. The master switch lives on Shipping
   // Rules and is OFF by default, so a zone map built here can be entirely inert.
-  const [commerce, setCommerce] = useState<CommerceSettings | null>(null);
+  const commerce = useExternalValue<CommerceSettings | null>(peekCommerceSettings, zoneChanges, null);
   const zonePricingOn = Boolean(commerce?.useZoneBasedDelivery);
-
-  useEffect(() => {
-    function refresh() {
-      setZones(loadDeliveryZones());
-      setCommerce(getCommerceSettings());
-    }
-    refresh();
-    setMounted(true);
-    window.addEventListener(DELIVERY_ZONES_UPDATED_EVENT, refresh);
-    window.addEventListener(SETTINGS_UPDATED_EVENT, refresh);
-    return () => {
-      window.removeEventListener(DELIVERY_ZONES_UPDATED_EVENT, refresh);
-      window.removeEventListener(SETTINGS_UPDATED_EVENT, refresh);
-    };
-  }, []);
 
   const stats = useMemo(
     () => (mounted ? getDeliveryZoneStats(zones) : EMPTY_STATS),
@@ -228,7 +222,7 @@ export function DeliveryZonesAdminPage({
 
     const { value: count, persisted } = await deleteDeliveryZones(selectedIds);
     setSelectedIds([]);
-    setZones(loadDeliveryZones());
+    rereadZones();
     reportWrite(persisted, `Deleted ${count} zone${count === 1 ? "" : "s"}`, {
       failure: "Could not delete — the server rejected it",
     });
@@ -597,7 +591,7 @@ export function DeliveryZonesAdminPage({
         allZones={zones}
         onSaved={() => {
           setSelectedIds([]);
-          setZones(loadDeliveryZones());
+          rereadZones();
         }}
       />
     </AdminPage>

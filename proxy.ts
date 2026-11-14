@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { isKnownStorePath, STORE_NOT_FOUND_PATH } from "@/lib/store-routes";
 
 /**
  * Route protection (Next.js 16 renamed Middleware -> Proxy; same behaviour).
@@ -32,6 +33,13 @@ export function proxy(request: NextRequest): NextResponse {
   // Already-signed-in visitor hitting an auth page → send to the dashboard.
   if (isAuthPage && hasSession) {
     return NextResponse.redirect(new URL("/admin/dashboard", request.url));
+  }
+
+  // A /store URL no page answers → the shop's not-found screen with a REAL
+  // 404 (under /store the status is already 200 by the time a page could say
+  // so). A table lookup, no database — see `lib/store-routes.ts`.
+  if (pathname.startsWith("/store/") && !isKnownStorePath(pathname)) {
+    return NextResponse.rewrite(new URL(STORE_NOT_FOUND_PATH, request.url));
   }
 
   return NextResponse.next();

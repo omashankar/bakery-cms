@@ -517,9 +517,13 @@ export function AdminSidebar({ collapsed, inDrawer, onNavigate, className }: Adm
       .filter((section) => section.items.length > 0);
   }, [labels, access, can]);
 
-  useEffect(() => {
+  // A new page opens the menu it belongs to — adjusted while rendering, the
+  // moment the path is new, rather than by an effect a render later.
+  const [menuPath, setMenuPath] = useState(pathname);
+  if (menuPath !== pathname) {
+    setMenuPath(pathname);
     setOpenMenu(findOpenMenuHref(pathname));
-  }, [pathname]);
+  }
 
   const handleToggle = (href: string) => {
     setOpenMenu((current) => (current === href ? null : href));

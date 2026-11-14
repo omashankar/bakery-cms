@@ -22,23 +22,38 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { useExternalValue } from "@/hooks/use-external-value";
 import { adminShell } from "@/apps/admin/components/admin-shell";
 import { NotificationListItem } from "./notification-list-item";
 
+const EMPTY_BELL = { notifications: [] as AdminNotification[], unreadCount: 0 };
+const readBell = () => ({
+  notifications: getRecentNotifications(6),
+  unreadCount: countUnreadNotifications(),
+});
+
 export function AdminNotificationBell() {
   const [open, setOpen] = useState(false);
-  const [notifications, setNotifications] = useState<AdminNotification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  // What the bell shows, read from the stored notifications and followed as
+  // the admin's data changes; a render after a mark here re-reads it too.
+  const { notifications, unreadCount } = useExternalValue(readBell, subscribeToAdminData, EMPTY_BELL);
+  const [, setReadTick] = useState(0);
 
   function refresh() {
-    syncNotifications();
-    setNotifications(getRecentNotifications(6));
-    setUnreadCount(countUnreadNotifications());
+    setReadTick((tick) => tick + 1);
   }
 
+  /*
+    The notifications are BUILT from the orders, stock and inquiries — on
+    mount and whenever those change. That writes the store (only when
+    something is new), and the read above follows the write; it is kept out
+    of the read itself, which runs while rendering and must not write.
+  */
   useEffect(() => {
-    refresh();
-    return subscribeToAdminData(() => refresh());
+    syncNotifications();
+    return subscribeToAdminData(() => {
+      syncNotifications();
+    });
   }, []);
 
   function handleMarkRead(id: string) {

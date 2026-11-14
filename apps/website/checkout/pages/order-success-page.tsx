@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, Download, Loader2, Package, SearchX } from "lucide-react";
-import { getOrderByNumber, type PlacedOrder } from "@/features/orders/lib/orders";
+import { getOrderByNumber, ORDERS_UPDATED_EVENT, type PlacedOrder } from "@/features/orders/lib/orders";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
 import { fetchOrderByNumber } from "@/features/orders/lib/orders-api";
 import { readOrderLookupEmail } from "@/features/orders/lib/order-access";
 import { hasCustomerSession } from "@/apps/website/account/lib/customer-session";
@@ -37,6 +39,9 @@ const paymentLabels = {
  */
 type Lookup = "looking" | "found" | "missing";
 
+const sessionChanges = windowEvents("bakery-customer-session-updated", "storage");
+const orderChanges = windowEvents(ORDERS_UPDATED_EVENT, "storage");
+
 export function OrderSuccessPage({
   orderNumber,
 }: {
@@ -48,23 +53,40 @@ export function OrderSuccessPage({
    */
   orderNumber: string | null;
 }) {
-  const [order, setOrder] = useState<PlacedOrder | null>(null);
-  const [lookup, setLookup] = useState<Lookup>("looking");
-  const [signedIn, setSignedIn] = useState(false);
+  const hydrated = useHydrated();
+  const signedIn = useExternalValue(hasCustomerSession, sessionChanges, false);
+
+  // This device's copy of the order, and the address it was placed with.
+  const readLocal = useCallback(
+    () => (orderNumber ? getOrderByNumber(orderNumber) : null),
+    [orderNumber],
+  );
+  const local = useExternalValue(readLocal, orderChanges, null);
+  const readEmail = useCallback(
+    () => (orderNumber ? readOrderLookupEmail(orderNumber) : null),
+    [orderNumber],
+  );
+  const email = useExternalValue(readEmail, orderChanges, null) ?? local?.address?.email ?? null;
+
+  // The server's answer, kept with the order it answers.
+  const [server, setServer] = useState<{ for: string; order: PlacedOrder | null } | null>(null);
+  const answer = server && server.for === orderNumber ? server : null;
+  const order = answer?.order ?? local;
+
+  /*
+    THE VERDICT, worked out from what is known rather than kept in step by an
+    effect. A link with no order on it is knowable at once; "not found" is
+    said only when nothing is left to try — no copy here, and either no
+    address to ask the server with or an empty answer from it.
+  */
+  let lookup: Lookup;
+  if (!orderNumber) lookup = "missing";
+  else if (order) lookup = "found";
+  else if (answer) lookup = "missing";
+  else if (hydrated && !email) lookup = "missing";
+  else lookup = "looking";
 
   useEffect(() => {
-    // A link with no order on it is the one case that is knowable immediately.
-    if (!orderNumber) {
-      setLookup("missing");
-      return;
-    }
-
-    const local = getOrderByNumber(orderNumber);
-    if (local) {
-      setOrder(local);
-      setLookup("found");
-    }
-
     // Re-read from the server once.
     //
     // The payment status shown here is the one the browser recorded, and it can
@@ -72,34 +94,17 @@ export function OrderSuccessPage({
     // confirm lands as `pending`, and the gateway's webhook corrects it moments
     // later. This is exactly the screen where a customer who has just paid reads
     // "pending" and worries.
-    const email = readOrderLookupEmail(orderNumber) ?? local?.address?.email;
-    if (!email) {
-      // Nothing left to try. Only now is "we could not find it" true — and only
-      // if the device had no copy either.
-      if (!local) setLookup("missing");
-      return;
-    }
-
+    if (!orderNumber || !email) return;
     let cancelled = false;
+    // `fetchOrderByNumber` answers null for a network failure too, so an empty
+    // answer reads "could not load", never "your order does not exist".
     void fetchOrderByNumber(orderNumber, { email }).then((fresh) => {
-      if (cancelled) return;
-      if (fresh) {
-        setOrder(fresh);
-        setLookup("found");
-      } else if (!local) {
-        // `fetchOrderByNumber` answers null for a network failure too, so this
-        // says "could not load", never "your order does not exist".
-        setLookup("missing");
-      }
+      if (!cancelled) setServer({ for: orderNumber, order: fresh });
     });
     return () => {
       cancelled = true;
     };
-  }, [orderNumber]);
-
-  useEffect(() => {
-    setSignedIn(hasCustomerSession());
-  }, []);
+  }, [orderNumber, email]);
 
   const looking = lookup === "looking";
   // The heading, the icon and the page title are one verdict, so they are

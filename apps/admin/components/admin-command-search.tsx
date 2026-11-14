@@ -298,17 +298,28 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
     [onOpenChange, router]
   );
 
-  useEffect(() => {
+  // Closing starts the next opening afresh — adjusted while rendering, the
+  // moment it closes, rather than by an effect a render later.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
     if (!open) {
       setQuery("");
       setActiveIndex(0);
       setGroupFilter("all");
     }
-  }, [open]);
+  }
 
-  useEffect(() => {
+  // A new query or group is a new list: the highlight goes back to its top,
+  // in the same change rather than a render later.
+  const changeQuery = (next: string) => {
+    setQuery(next);
     setActiveIndex(0);
-  }, [query, groupFilter]);
+  };
+  const changeGroup = (next: GlobalSearchGroup | "all") => {
+    setGroupFilter(next);
+    setActiveIndex(0);
+  };
 
   // ⌘K / Ctrl K lives in the header (useCommandSearchShortcut), which is
   // always loaded; this palette is loaded lazily.
@@ -345,7 +356,7 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
             <Input
               autoFocus
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => changeQuery(event.target.value)}
               onKeyDown={handleInputKeyDown}
               placeholder="Search or type order:, product:, inquiry:, stock:, zone:, >action…"
               className="h-10 border-border bg-muted/50 pl-9 shadow-none"
@@ -356,7 +367,7 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
               <button
                 key={filter}
                 type="button"
-                onClick={() => setGroupFilter(filter)}
+                onClick={() => changeGroup(filter)}
                 className={cn(
                   "rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
                   effectiveGroupFilter === filter
@@ -383,7 +394,7 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
                     key={hint.prefix}
                     type="button"
                     className="rounded-full border border-border bg-muted px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground"
-                    onClick={() => setQuery(hint.prefix)}
+                    onClick={() => changeQuery(hint.prefix)}
                   >
                     <span className="font-mono">{hint.prefix}</span> {hint.label}
                   </button>
@@ -485,7 +496,7 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
                       key={hint.prefix}
                       type="button"
                       className="rounded-full border border-border bg-card px-2 py-0.5 font-mono text-[11px] hover:text-foreground"
-                      onClick={() => setQuery(hint.prefix)}
+                      onClick={() => changeQuery(hint.prefix)}
                     >
                       {hint.prefix}
                     </button>

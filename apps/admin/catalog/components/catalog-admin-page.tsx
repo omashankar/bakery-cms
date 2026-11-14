@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useState } from "react";
 import { applyServerCatalog } from "@/components/shared/catalog-server-sync";
 import {
   Palette,
@@ -44,8 +44,21 @@ import {
 import {
   countByCategory,
   loadProducts,
+  PRODUCTS_UPDATED_EVENT,
   productsLeftUnfiled,
 } from "@/features/products/lib/products-repository";
+import type { Product } from "@/types/product";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
+
+const catalogChanges = windowEvents(
+  CATALOG_UPDATED_EVENT,
+  CATALOG_HYDRATION_EVENT,
+  PRODUCTS_UPDATED_EVENT,
+  "storage",
+);
+const NO_PRODUCTS: Product[] = [];
+const readPublishedProducts = () => loadProducts().filter((cake) => cake.status === "published");
 import { CatalogFormDialog } from "./catalog-form-dialog";
 import { useBusinessLabels, type ShopLabels } from "@/hooks/use-business-labels";
 
@@ -116,17 +129,23 @@ export function CatalogAdminPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
   }, []);
   const labels = useBusinessLabels();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHydrated();
   const tabs = tabsFor(labels);
   const tabBar = tabBarFor(labels);
   const [activeTab, setActiveTab] = useState<CatalogTab>("categories");
   const [showThemes, setShowThemes] = useState(false);
   const [search, setSearch] = useState("");
-  const [refreshKey, setRefreshKey] = useState(0);
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [hydration, setHydration] = useState<"pending" | "ready" | "unavailable">("pending");
+  /*
+    The taxonomy arrives from the server AFTER this screen first renders.
+    Read as external values — subscribed, and re-checked by React the moment
+    the subscription starts — these follow it, and the shipped defaults on a
+    fresh browser are never what is drawn or what a selection addresses.
+  */
+  const hydration = useExternalValue(catalogHydrationStatus, catalogChanges, "pending");
+  const hasCache = useExternalValue(hasCatalogCache, catalogChanges, false);
 
   /**
    * Every section here is a replace-all, so nothing may be published until the
@@ -144,36 +163,18 @@ export function CatalogAdminPage({
     whole table jumped (CLS 0.244 on a production build). Now the table holds
     its place with a loading panel until the server answers.
   */
-  const waiting = !mounted || (hydration === "pending" && !hasCatalogCache());
+  const waiting = !mounted || (hydration === "pending" && !hasCache);
 
-  const store = useMemo(
-    () => (waiting ? EMPTY_STORE : loadCatalogStore()),
-    [waiting, refreshKey]
-  );
+  const cached = useExternalValue(loadCatalogStore, catalogChanges, EMPTY_STORE);
+  const store = waiting ? EMPTY_STORE : cached;
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // The taxonomy arrives from the server AFTER this screen has already read
-  // localStorage. Without these listeners the page rendered whatever the cache
-  // held at mount for the whole visit — the shipped defaults on a fresh
-  // browser — and selecting a row from that list addressed an id the server had
-  // never heard of.
-  useEffect(() => {
-    const sync = () => {
-      setHydration(catalogHydrationStatus());
-      setRefreshKey((value) => value + 1);
-      setSelectedIds([]);
-    };
-    sync();
-    window.addEventListener(CATALOG_UPDATED_EVENT, sync);
-    window.addEventListener(CATALOG_HYDRATION_EVENT, sync);
-    return () => {
-      window.removeEventListener(CATALOG_UPDATED_EVENT, sync);
-      window.removeEventListener(CATALOG_HYDRATION_EVENT, sync);
-    };
-  }, []);
+  // A different taxonomy is a different list: a selection made in the old one
+  // must not address rows in the new one. Cleared the moment it changes.
+  const [selectionFor, setSelectionFor] = useState(store);
+  if (selectionFor !== store) {
+    setSelectionFor(store);
+    setSelectedIds([]);
+  }
 
   /*
     A module gate stood here, and Flavours was the only tab it hid.
@@ -241,11 +242,7 @@ export function CatalogAdminPage({
    * a category leaves something filed nowhere depends on what else that
    * product holds, which a count per category cannot answer.
    */
-  const publishedProducts = useMemo(
-    () => (mounted ? loadProducts().filter((cake) => cake.status === "published") : []),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [mounted, refreshKey],
-  );
+  const publishedProducts = useExternalValue(readPublishedProducts, catalogChanges, NO_PRODUCTS);
 
   // How many published products are really in each category. `cakeCount` on the
   // category is a hand-typed number that agreed with nothing: the seed claimed
@@ -269,8 +266,9 @@ export function CatalogAdminPage({
   const allSelected =
     items.length > 0 && items.every((item) => selectedIds.includes(item.id));
 
+  // After a write: the lists re-read themselves (the repository announces
+  // it); what was selected is done with.
   function refresh() {
-    setRefreshKey((value) => value + 1);
     setSelectedIds([]);
   }
 

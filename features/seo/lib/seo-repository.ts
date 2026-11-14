@@ -200,6 +200,27 @@ function persist(store: SeoStore): void {
 
 let serverStore: SeoStore = seedStore();
 
+/**
+ * The routes this browser holds, READ ONLY — none when there is no copy,
+ * rather than seeding the shipped ones. For reads made while rendering,
+ * which must not write (`loadSeoStore` seeds a cold cache and announces it).
+ */
+export function peekSeoRoutes(): SeoRouteEntry[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Partial<SeoStore>) : null;
+    if (!parsed || !Array.isArray(parsed.routes)) return [];
+    return parsed.routes.map((entry) => ({
+      ...entry,
+      metaKeywords: entry.metaKeywords ?? [],
+      noFollow: entry.noFollow ?? false,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 export function loadSeoStore(): SeoStore {
   if (typeof window === "undefined") return serverStore;
 

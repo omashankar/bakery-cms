@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { useEffect } from "react";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
@@ -19,7 +19,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toExpiryInputValue, toExpiryInstant } from "@/lib/expiry-date";
-import { createCoupon, loadCoupons, updateCoupon } from "@/features/commerce/lib/coupons-repository";
+import {
+  COUPONS_UPDATED_EVENT,
+  createCoupon,
+  loadCoupons,
+  updateCoupon,
+  type StoredCoupon,
+} from "@/features/commerce/lib/coupons-repository";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+
+const couponChanges = windowEvents(COUPONS_UPDATED_EVENT, "storage");
+const NO_COUPONS: StoredCoupon[] = [];
 import { adminCategories } from "@/features/products/lib/catalog-options";
 
 type CouponFormValues = {
@@ -76,16 +86,16 @@ export function CouponFormDialog({
   onOpenChange,
   onSaved,
 }: CouponFormDialogProps) {
-  const editingCoupon = useMemo(
-    () => (editingId ? loadCoupons().find((coupon) => coupon.id === editingId) ?? null : null),
-    [editingId, open]
-  );
+  // The coupon being edited, from the store as it is now — followed as it
+  // changes, so reopening the dialog never shows a stale copy.
+  const coupons = useExternalValue(loadCoupons, couponChanges, NO_COUPONS);
+  const editingCoupon = editingId ? (coupons.find((coupon) => coupon.id === editingId) ?? null) : null;
 
-  const { register, control, handleSubmit, reset, watch, formState } = useForm<CouponFormValues>({
+  const { register, control, handleSubmit, reset, formState } = useForm<CouponFormValues>({
     defaultValues: emptyValues,
   });
 
-  const discountType = watch("discountType");
+  const discountType = useWatch({ control, name: "discountType" });
   const { errors } = formState;
   const valueError = discountType === "percent" ? errors.percentOff : errors.flatOff;
 

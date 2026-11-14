@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
@@ -48,26 +48,28 @@ export function TestimonialFormDialog({
   const isEdit = Boolean(testimonialId);
   const isDirty = useMemo(() => serializeForm(form) !== baseline, [form, baseline]);
 
-  useEffect(() => {
+  // Filled when the dialog opens (the testimonial's values, or empty for a
+  // new one); the discard prompt put away when it closes. Adjusted while
+  // rendering, the moment `open` or the testimonial changes.
+  const formKey = open ? `open:${testimonialId ?? ""}` : "closed";
+  const [formFor, setFormFor] = useState<string | null>(null);
+  if (formFor !== formKey) {
+    setFormFor(formKey);
     if (!open) {
       setDiscardOpen(false);
-      return;
-    }
-
-    if (testimonialId) {
+    } else if (testimonialId) {
       const existing = getTestimonialById(testimonialId);
       if (existing) {
         const { id: _id, createdAt: _c, updatedAt: _u, ...data } = existing;
         setForm(data);
         setBaseline(serializeForm(data));
       }
-      return;
+    } else {
+      const empty = createEmptyTestimonialForm();
+      setForm(empty);
+      setBaseline(serializeForm(empty));
     }
-
-    const empty = createEmptyTestimonialForm();
-    setForm(empty);
-    setBaseline(serializeForm(empty));
-  }, [open, testimonialId]);
+  }
 
   function patch(next: Partial<TestimonialFormData>) {
     setForm((prev) => ({ ...prev, ...next }));

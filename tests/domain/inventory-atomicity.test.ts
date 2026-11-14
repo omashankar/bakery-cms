@@ -178,7 +178,8 @@ describe("the stat cards", () => {
   it("come from the server, with the local computation only as a fallback", () => {
     const page = read("apps/admin/commerce/pages/inventory-admin-page.tsx");
     expect(page).toContain("fetchInventoryOverview()");
-    expect(page).toContain("serverOverview ?? (mounted ? getInventoryOverview() : EMPTY_OVERVIEW)");
+    expect(page).toContain("useExternalValue(getInventoryOverview, inventoryChanges, EMPTY_OVERVIEW)");
+    expect(page).toContain("serverOverview ?? localOverview");
   });
 
   it("are re-read after every adjustment, not just on mount", () => {

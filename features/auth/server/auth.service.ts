@@ -190,8 +190,10 @@ async function endSession(sessionId: string | null, message: string): Promise<ne
      * `security.repository.revokeSession` has always done both. This is the
      * same pair, in the place the auth service ends sessions.
      */
-    await repo.revokeRefreshTokensBySession(sessionId).catch(() => undefined);
+    // Row first: a token revoked while its row still stands looks like a
+    // rotation race to `refresh`, which re-issues inside ROTATION_RACE_MS.
     await repo.deleteSession(sessionId).catch(() => undefined);
+    await repo.revokeRefreshTokensBySession(sessionId).catch(() => undefined);
   }
   await clearAuthCookies();
   throw new AuthError(message);
@@ -203,9 +205,21 @@ async function endSession(sessionId: string | null, message: string): Promise<ne
  *
  * Long enough to cover a second tab whose request was already in flight when
  * the first one answered — a few round trips on a slow connection — and short
- * enough that reuse detection still means something. Inside it the loser is
- * given no new credential, so the window hands an attacker nothing it does not
- * hand the honest second tab: an answer, and no token.
+ * enough that reuse detection still means something.
+ *
+ * Inside it the old token is exchanged AGAIN, for a fresh pair (a reuse
+ * interval, the same leeway Auth0 and Okta give). It used to be answered with
+ * success and no token, on the theory that the browser already held the
+ * successor — and that is false whenever the answer never arrived: a reload,
+ * a closed tab or a dropped connection while the mount refresh was in flight.
+ * The server had rotated, the browser still held the old token, and its next
+ * refresh after the window was read as a replay and signed the admin out.
+ * Reproduced 2026-11-14 on a production build.
+ *
+ * The cost is bounded: the window never slides (the raced token is not
+ * re-stamped), every check a rotation makes still applies — live account, live
+ * session row, idle timeout — and whoever holds a token within fifteen seconds
+ * of its honest use was already on the wire for the successor.
  */
 const ROTATION_RACE_MS = 15_000;
 
@@ -234,17 +248,21 @@ export async function refresh(refreshCookie: string | undefined, _ctx: RequestCt
      * over their unsaved work. Before the chain was revoked here the loser
      * merely deleted the row and the winner carried on.
      *
-     * So: a token revoked within the rotation window is that race. Answer
-     * success and mint NOTHING — the browser already holds the successor, and
-     * a replayer inside the same window gains no credential either, which is
-     * why the window costs little. Anything older, or never issued at all, is
-     * a replay and still ends the session.
+     * So: a token revoked within the rotation window is that race, and it is
+     * rotated again below like any live token (see `ROTATION_RACE_MS` for why
+     * it gets a fresh pair rather than an empty answer). Anything older, or
+     * never issued at all, is a replay and still ends the session.
      */
     const seen = await repo.findRefreshToken(tokenHash);
     const revokedAt = seen?.revokedAt ? new Date(seen.revokedAt).getTime() : 0;
 
+    if (!revokedAt || Date.now() - revokedAt >= ROTATION_RACE_MS) {
+      return endSession(claims.sid, "Refresh token is no longer valid");
+    }
+
     /**
-     * And the SESSION must still exist, or this is not a race at all.
+     * And the SESSION must still exist, or this is not a race at all — checked
+     * by the rotation path below, which every raced token now walks.
      *
      * `revokedAt` is stamped by every revocation path, not only by rotation:
      * `revokeRefreshTokensBySession` runs for "Revoke session" and "Log out
@@ -261,17 +279,9 @@ export async function refresh(refreshCookie: string | undefined, _ctx: RequestCt
      * The two are distinguishable right here: the honest loser of a two-tab
      * race still has its session row — the WINNER rotated that same session and
      * touched it — while every deliberate revocation deletes the row before
-     * stamping the chain.
+     * stamping the chain. A raced token whose row is gone ends the session at
+     * "Session no longer exists", and clears this device's cookies there.
      */
-    if (revokedAt && Date.now() - revokedAt < ROTATION_RACE_MS) {
-      const [owner, session] = await Promise.all([
-        repo.findUserById(claims.sub),
-        repo.findSessionById(claims.sid),
-      ]);
-      if (session && owner && owner.status === "active") return toPublicUser(owner);
-    }
-
-    return endSession(claims.sid, "Refresh token is no longer valid");
   }
 
   const user = await repo.findUserById(claims.sub);
@@ -320,8 +330,9 @@ export async function refresh(refreshCookie: string | undefined, _ctx: RequestCt
     return endSession(claims.sid, "Session timed out");
   }
 
-  // Rotate: revoke the used token, issue a fresh pair.
-  await repo.revokeRefreshToken(String(stored._id));
+  // Rotate: revoke the used token, issue a fresh pair. A raced token is already
+  // revoked — stamping it again would slide its window forward for ever.
+  if (stored) await repo.revokeRefreshToken(String(stored._id));
   await repo.touchSession(claims.sid).catch(() => undefined);
 
   const accessTtl = accessTokenTtl(policy);
@@ -379,8 +390,9 @@ export async function logout(refreshCookie: string | undefined, ctx: RequestCtx)
      * "could not sign you out".
      */
     if (claims?.sid) {
-      await repo.revokeRefreshTokensBySession(claims.sid);
+      // Row first — see `endSession`.
       await repo.deleteSession(claims.sid);
+      await repo.revokeRefreshTokensBySession(claims.sid);
     } else {
       // No readable claims, so no session to name: revoke what was presented,
       // which is all there is to go on.
@@ -471,8 +483,9 @@ export async function resetPassword(input: ResetPasswordInput, ctx: RequestCtx):
   await repo.markResetUsed(String(reset._id));
 
   // Security: invalidate every existing session/token after a password reset.
-  await repo.revokeRefreshTokensByUser(String(user._id));
+  // Rows first — see `endSession`.
   await repo.deleteSessionsByUser(String(user._id));
+  await repo.revokeRefreshTokensByUser(String(user._id));
 
   await writeAuditLog({
     action: "auth.reset_password",
@@ -500,7 +513,6 @@ export async function changePassword(
   }
 
   await repo.updateUserPassword(userId, await hashPassword(input.newPassword));
-  await repo.revokeRefreshTokensByUser(userId);
   /**
    * And the session ROWS, exactly as `resetPassword` does — its comment says
    * "invalidate every existing session/token after a password reset" and it
@@ -512,8 +524,11 @@ export async function changePassword(
    * self-cleans, so after changing their password an admin went on being shown
    * phones and laptops as "active" on the one screen they would check to
    * confirm the change had taken effect.
+   *
+   * Rows BEFORE the chain — see `endSession`.
    */
   await repo.deleteSessionsByUser(userId);
+  await repo.revokeRefreshTokensByUser(userId);
 
   await writeAuditLog({
     action: "auth.change_password",

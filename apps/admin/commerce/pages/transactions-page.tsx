@@ -89,11 +89,12 @@ export function TransactionsPage({
     JSON.stringify({ filters, page: currentPage }),
     250
   );
-  const request = JSON.parse(requestKey) as {
-    filters: Record<string, unknown>;
-    page: number;
-  };
   useEffect(() => {
+    // Read from the key this effect runs on, so it uses nothing it does not list.
+    const request = JSON.parse(requestKey) as {
+      filters: Record<string, unknown>;
+      page: number;
+    };
     if (listFromServer.current) {
       listFromServer.current = false;
       return;

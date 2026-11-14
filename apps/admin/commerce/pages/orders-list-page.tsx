@@ -142,11 +142,12 @@ export function OrdersListPage({ initial = null }: OrdersListPageProps = {}) {
   // returns nothing and hides the pager, stranding them with no way back.
   const liveKey = JSON.stringify({ filters: query, page: currentPage });
   const requestKey = useDebouncedValue(liveKey, 250);
-  const request = JSON.parse(requestKey) as {
-    filters: Record<string, unknown>;
-    page: number;
-  };
   useEffect(() => {
+    // Read from the key this effect runs on, so it uses nothing it does not list.
+    const request = JSON.parse(requestKey) as {
+      filters: Record<string, unknown>;
+      page: number;
+    };
     if (listFromServer.current) {
       listFromServer.current = false;
       return;
@@ -353,7 +354,8 @@ export function OrdersListPage({ initial = null }: OrdersListPageProps = {}) {
     setExporting(true);
     // The DEBOUNCED filters, matching the rows on screen and the count beside
     // them — not the live inputs, which may be a keystroke ahead of both.
-    const result = await fetchOrdersPage({ ...request.filters, page: 1, limit: EXPORT_LIMIT });
+    const { filters } = JSON.parse(requestKey) as { filters: Record<string, unknown> };
+    const result = await fetchOrdersPage({ ...filters, page: 1, limit: EXPORT_LIMIT });
     setExporting(false);
     return result;
   }

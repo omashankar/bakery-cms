@@ -216,19 +216,20 @@ describe("deleting a product takes its traces with it", () => {
 });
 
 describe("the preview screen shows what was just saved", () => {
-  const fn = bodyOf(read("apps/admin/products/components/product-preview-page.tsx"), "useEffect(");
+  const page = read("apps/admin/products/components/product-preview-page.tsx");
+  const fn = bodyOf(page, "useEffect(");
 
   it("always asks the server, using the cache only to fill the gap", () => {
     // It returned as soon as localStorage had the product — and product saves do
     // not write that cache, so the screen whose job is "show me what I changed"
     // showed the version from before the edit.
-    expect(fn).toContain("if (cached) setCake(cached)");
+    expect(page).toMatch(/fetched\.cake : null\) \?\? cached;/);
     expect(fn).toContain("fetchProduct(cakeId)");
-    expect(fn).not.toMatch(/if \(cached\) \{[\s\S]*?return;/);
+    expect(fn).not.toMatch(/cached[\s\S]*?return;/);
   });
 
   it("only redirects away when there was nothing to show at all", () => {
-    expect(fn).toContain("if (!cancelled && !cached) router.replace");
+    expect(fn).toContain("if (!cancelled && !getProductById(cakeId)) router.replace");
   });
 });
 

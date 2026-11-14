@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useState } from "react";
 import {
   FolderInput,
   Grid3x3,
@@ -28,6 +28,8 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import type { MediaFile, MediaFolder } from "@/types/media";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
 import {
   bulkMoveMediaToFolder,
   countMediaUsage,
@@ -62,6 +64,9 @@ import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { RelativeTime } from "@/components/shared/relative-time";
 
 const PAGE_SIZE = 12;
+const mediaChanges = windowEvents(MEDIA_UPDATED_EVENT, "storage");
+const NO_FILES: MediaFile[] = [];
+const NO_FOLDERS: MediaFolder[] = [];
 
 const EMPTY_STATS = {
   total: 0,
@@ -118,9 +123,15 @@ export function MediaLibraryPage({
   const usageVersion = useMediaUsageSync();
   const usageKnown = usageVersion > 0 && isUsageIndexReady();
 
-  const [files, setFiles] = useState<MediaFile[]>([]);
-  const [folders, setFolders] = useState<ReturnType<typeof loadMediaFolders>>([]);
-  const [ready, setReady] = useState(false);
+  /*
+    The library and its folders, read from the browser's cache and followed
+    as it changes (an upload, a delete, another tab); a render after a write
+    here re-reads them too (`refresh`). Nothing on the server render.
+  */
+  const files = useExternalValue(loadMediaFiles, mediaChanges, NO_FILES);
+  const folders = useExternalValue(loadMediaFolders, mediaChanges, NO_FOLDERS);
+  const [, setReadTick] = useState(0);
+  const ready = useHydrated();
   const [filters, setFilters] = useState<MediaListFilters>(defaultMediaFilters);
   const [view, setView] = useState<"grid" | "list">("grid");
   const [page, setPage] = useState(1);
@@ -129,7 +140,9 @@ export function MediaLibraryPage({
   const [uploadOpen, setUploadOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
-  const [moveFolderId, setMoveFolderId] = useState("");
+  // The folder chosen to move into; until one is chosen, the first folder.
+  const [chosenMoveFolderId, setMoveFolderId] = useState("");
+  const moveFolderId = chosenMoveFolderId || folders[0]?.id || "";
   const [deleteTarget, setDeleteTarget] = useState<{
     ids: string[];
     name?: string;
@@ -180,23 +193,8 @@ export function MediaLibraryPage({
     filters.folderId !== "all";
 
   function refresh() {
-    const nextFolders = loadMediaFolders();
-    setFiles(loadMediaFiles());
-    setFolders(nextFolders);
-    setMoveFolderId((current) => current || nextFolders[0]?.id || "");
+    setReadTick((tick) => tick + 1);
   }
-
-  useEffect(() => {
-    refresh();
-    setReady(true);
-
-    function handleMediaUpdated() {
-      refresh();
-    }
-
-    window.addEventListener(MEDIA_UPDATED_EVENT, handleMediaUpdated);
-    return () => window.removeEventListener(MEDIA_UPDATED_EVENT, handleMediaUpdated);
-  }, []);
 
   function updateFilters(patch: Partial<MediaListFilters>) {
     setFilters((prev) => ({ ...prev, ...patch }));

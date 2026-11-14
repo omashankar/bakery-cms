@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Heart, X } from "lucide-react";
 import { ProductCard } from "@/components/storefront/product-card";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -14,6 +14,10 @@ import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
 import type { LandingProduct } from "@/constants/landing-data";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
+
+const wishlistChanges = windowEvents("bakery-wishlist-updated", "storage");
 
 // Two across on a phone (it was ONE, a full-width card per saved item), up to
 // five on a wide screen, as the reference lays its wishlist out.
@@ -29,10 +33,11 @@ interface WishlistPageProps {
 }
 
 export function WishlistPage({ catalog, initialSlugs = [], initialKnown = false }: WishlistPageProps) {
-  // Drawn from the server's copy at once; the effect below then reads the
-  // browser's own list, which stays the truth.
-  const [slugs, setSlugs] = useState<string[]>(initialSlugs);
-  const [loaded, setLoaded] = useState(initialKnown);
+  // Drawn from the server's copy at once; after hydration, the browser's own
+  // list — which stays the truth — followed on every change.
+  const slugs = useExternalValue(getWishlistSlugs, wishlistChanges, initialSlugs);
+  const hydrated = useHydrated();
+  const loaded = initialKnown || hydrated;
   const labels = useBusinessLabels();
 
   useEffect(() => {
@@ -54,12 +59,6 @@ export function WishlistPage({ catalog, initialSlugs = [], initialKnown = false 
         } been removed from your wishlist.`,
       );
     }
-
-    const load = () => setSlugs(getWishlistSlugs());
-    load();
-    setLoaded(true);
-    window.addEventListener("bakery-wishlist-updated", load);
-    return () => window.removeEventListener("bakery-wishlist-updated", load);
   }, [catalog]);
 
   const bySlug = new Map(catalog.map((cake) => [cake.slug, cake]));

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { SafeImage } from "@/components/shared/safe-image";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ExternalLink, Loader2, Pencil } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,11 @@ import { formatStatusLabel } from "@/features/products/lib/product-utils";
 import {
   categoriesOf,
   getProductById,
+  PRODUCTS_UPDATED_EVENT,
 } from "@/features/products/lib/products-repository";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+
+const productChanges = windowEvents(PRODUCTS_UPDATED_EVENT, "storage");
 import { fetchProduct } from "@/features/products/data/products-client";
 
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
@@ -29,28 +33,30 @@ interface ProductPreviewPageProps {
 export function ProductPreviewPage({ cakeId }: ProductPreviewPageProps) {
   const labels = useBusinessLabels();
   const router = useRouter();
-  const [cake, setCake] = useState<Product | null>(null);
+  /*
+    The cache is a starting point, never the answer.
+
+    This once returned as soon as localStorage had the product, and product
+    saves do not write that cache — so the screen whose whole job is "show me
+    what I just changed" showed the version from before the edit. The server
+    is asked every time; the cached copy only fills the gap while the request
+    is in flight, so the page does not flash empty.
+  */
+  const readCached = useCallback(() => getProductById(cakeId), [cakeId]);
+  const cached = useExternalValue(readCached, productChanges, null);
+  const [fetched, setFetched] = useState<{ id: string; cake: Product | null } | null>(null);
+  const cake = (fetched && fetched.id === cakeId ? fetched.cake : null) ?? cached;
 
   useEffect(() => {
     let cancelled = false;
 
-    // The cache is a starting point, never the answer.
-    //
-    // This returned as soon as localStorage had the product, and product saves
-    // do not write that cache — so the screen whose whole job is "show me what I
-    // just changed" showed the version from before the edit. The server is asked
-    // every time; the cached copy only fills the gap while the request is in
-    // flight, so the page does not flash empty.
-    const cached = getProductById(cakeId);
-    if (cached) setCake(cached);
-
     fetchProduct(cakeId)
       .then((found) => {
-        if (!cancelled) setCake(found);
+        if (!cancelled) setFetched({ id: cakeId, cake: found });
       })
       .catch(() => {
         // Only give up if there was nothing to show in the first place.
-        if (!cancelled && !cached) router.replace(routes.admin.cakes.list);
+        if (!cancelled && !getProductById(cakeId)) router.replace(routes.admin.cakes.list);
       });
 
     return () => {

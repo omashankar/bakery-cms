@@ -22,6 +22,9 @@ import { ADMIN_CONFIG_KEYS } from "@/features/admin-config/lib/admin-config-api"
 import { mayUseAdminConfigBlob } from "@/features/admin-config/lib/admin-config-rules";
 import { ensureSiteLayoutHydrated } from "@/components/shared/site-layout-server-sync";
 import { useIdle } from "@/hooks/use-idle";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { useHydrated } from "@/hooks/use-hydrated";
 import { applyServerSettings } from "@/features/settings/lib/settings-repository";
 import { applyServerInquiries } from "@/features/inquiries/lib/use-inquiries-server-sync";
 import type { Inquiry } from "@/types/inquiry";
@@ -30,6 +33,15 @@ import { AccessProvider, useAccess, type ClientAccess } from "@/features/team/li
 import { RouteAccessGate } from "@/apps/admin/components/route-access-gate";
 
 const SIDEBAR_COLLAPSED_KEY = "bakery-cms-sidebar-collapsed";
+const SIDEBAR_COLLAPSED_EVENT = "bakery-sidebar-collapsed-updated";
+const sidebarCollapsedChanges = windowEvents(SIDEBAR_COLLAPSED_EVENT, "storage");
+function readSidebarCollapsed(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
 
 interface AdminLayoutShellProps {
   children: React.ReactNode;
@@ -191,18 +203,29 @@ export function AdminLayoutShell({
   // One builder now; the wedding one was removed along with the page it published.
   const isBuilder = pathname === routes.admin.builders.homepage;
   const mobileNavId = useId();
-  // Must match the server render. The persisted preference is applied after
-  // mount (below) — reading localStorage during the first render would disagree
-  // with the server HTML and force React to discard the whole tree.
-  const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
+  // Must match the server render: expanded on the server and in the hydrating
+  // render, then this browser's stored preference (useExternalValue) —
+  // reading localStorage during the first render would disagree with the
+  // server HTML and force React to discard the whole tree.
+  const collapsed = useExternalValue(readSidebarCollapsed, sidebarCollapsedChanges, false);
+  const hydrated = useHydrated();
+
+  /*
+    THE DRAWER REMEMBERS WHICH PAGE IT WAS OPENED ON, so following a link in
+    it closes it — the page it belongs to is gone — without an effect that
+    watched the path. Reaching the desktop width closes it too: the sidebar is
+    on screen there and an open drawer would sit over it.
+  */
+  const [drawerOpenOn, setDrawerOpenOn] = useState<string | null>(null);
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
+  if (isDesktop && drawerOpenOn !== null) setDrawerOpenOn(null);
+  const mobileOpen = drawerOpenOn !== null && drawerOpenOn === pathname;
   const drawerRef = useRef<HTMLElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const wasMobileOpen = useRef(false);
 
-  const closeMobile = () => setMobileOpen(false);
-  const toggleMobile = () => setMobileOpen((open) => !open);
+  const closeMobile = () => setDrawerOpenOn(null);
+  const toggleMobile = () => setDrawerOpenOn(mobileOpen ? null : pathname);
 
   useBodyScrollLock(mobileOpen);
 
@@ -220,23 +243,6 @@ export function AdminLayoutShell({
     };
   }, []);
 
-  useEffect(() => {
-    try {
-      setCollapsed(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true");
-    } catch {
-      // ignore storage errors
-    }
-    setHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    try {
-      safeSetItem(SIDEBAR_COLLAPSED_KEY, String(collapsed));
-    } catch {
-      // ignore storage errors
-    }
-  }, [collapsed, hydrated]);
 
   useEffect(() => {
     if (!mobileOpen) {
@@ -278,23 +284,10 @@ export function AdminLayoutShell({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [mobileOpen]);
 
-  // Close mobile drawer when viewport reaches desktop sidebar breakpoint
-  useEffect(() => {
-    const media = window.matchMedia("(min-width: 1024px)");
-    function onChange(event: MediaQueryListEvent) {
-      if (event.matches) setMobileOpen(false);
-    }
-    media.addEventListener("change", onChange);
-    if (media.matches) setMobileOpen(false);
-    return () => media.removeEventListener("change", onChange);
-  }, []);
-
-  // Close drawer on route change
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
-
-  const handleSidebarToggle = () => setCollapsed((prev) => !prev);
+  const handleSidebarToggle = () => {
+    safeSetItem(SIDEBAR_COLLAPSED_KEY, String(!collapsed));
+    window.dispatchEvent(new Event(SIDEBAR_COLLAPSED_EVENT));
+  };
 
   return (
     <AccessProvider access={access}>

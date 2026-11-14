@@ -1,6 +1,8 @@
 import { safeSetItem } from "@/lib/safe-storage";
 const HELPFUL_MARKS_KEY = "bakery-cms-helpful-reviews";
 const UNHELPFUL_MARKS_KEY = "bakery-cms-unhelpful-reviews";
+/** Said whenever a mark is added, so a screen reading the marks follows them. */
+export const REVIEW_MARKS_UPDATED_EVENT = "bakery-review-marks-updated";
 
 /**
  * The reviews THIS browser has already said were helpful.
@@ -47,6 +49,7 @@ function rememberMark(key: string, reviewId: string): void {
   if (marks.includes(reviewId)) return;
   try {
     safeSetItem(key, JSON.stringify([...marks, reviewId]));
+    window.dispatchEvent(new Event(REVIEW_MARKS_UPDATED_EVENT));
   } catch {
     // Nothing to do: the press already reached the server, and the worst case
     // is that this browser offers the button again.

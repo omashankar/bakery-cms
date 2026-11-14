@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import {
   ArrowRight,
   Banknote,
@@ -32,6 +31,11 @@ import { canOpenRoute } from "@/features/team/lib/route-access";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { routes } from "@/constants/routes";
 import { formatCurrency } from "@/utils/format";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
+
+const orderChanges = windowEvents(ORDERS_UPDATED_EVENT, "storage");
+const NO_ORDERS: PlacedOrder[] = [];
 
 const quickLinks = [
   { href: routes.admin.commerce.gateways, label: "Gateways", icon: Layers },
@@ -49,27 +53,12 @@ export function PaymentsAdminPage({
   // are only to screens this member can open.
   const { can } = useAccess();
   const links = quickLinks.filter((link) => canOpenRoute(link.href, can));
-  const [orders, setOrders] = useState<PlacedOrder[]>([]);
-  const [loadedLocal, setLoadedLocal] = useState(false);
+  // This browser's order cache, followed as it changes. (The gateway status
+  // belongs to `RazorpaySummaryCard`, which fetches it itself — fetching it
+  // here too would be a second request for one answer.)
+  const orders = useExternalValue(getOrders, orderChanges, NO_ORDERS);
+  const loadedLocal = useHydrated();
   const { overviews } = useCommerceOverviews(initial);
-
-  useEffect(() => {
-    setLoadedLocal(true);
-
-    function refresh() {
-      setOrders(getOrders());
-    }
-
-    refresh();
-    window.addEventListener(ORDERS_UPDATED_EVENT, refresh);
-
-    // The gateway status belongs to `RazorpaySummaryCard`, which fetches it
-    // itself. Fetching it here too would be a second request for one answer.
-
-    return () => {
-      window.removeEventListener(ORDERS_UPDATED_EVENT, refresh);
-    };
-  }, []);
 
   // Collection totals span every order, which the local cache cannot answer —
   // it only holds the most recent slice. Until the server replies (and if it

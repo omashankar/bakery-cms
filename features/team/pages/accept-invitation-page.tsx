@@ -54,7 +54,7 @@ export function AcceptInvitationPage() {
   const [stage, setStage] = useState<Stage>({ kind: "checking" });
   const [showPassword, setShowPassword] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const { register, handleSubmit, watch, reset, formState } = useForm<JoinForm>();
+  const { register, handleSubmit, getValues, reset, formState } = useForm<JoinForm>();
 
   /**
    * Read ONCE and kept. The URL is cleared the moment the token is taken, so a
@@ -226,7 +226,7 @@ export function AcceptInvitationPage() {
             autoComplete="new-password"
             {...register("confirmPassword", {
               required: "Type the password again",
-              validate: (value) => value === watch("password") || "Passwords do not match",
+              validate: (value) => value === getValues("password") || "Passwords do not match",
             })}
           />
           {formState.errors.confirmPassword ? (

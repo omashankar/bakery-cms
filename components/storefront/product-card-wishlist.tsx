@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback } from "react";
 import { Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { isInWishlist, toggleWishlist } from "@/apps/website/lib/wishlist";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
 import { cn } from "@/lib/utils";
+
+const wishlistChanges = windowEvents("bakery-wishlist-updated", "storage");
 
 /**
  * The card's wishlist heart — the only part of a product card that runs in
@@ -12,17 +15,15 @@ import { cn } from "@/lib/utils";
  * on the server hydrates a heart per card instead of the whole card.
  */
 export function ProductCardWishlist({ slug }: { slug: string }) {
-  const [wishlisted, setWishlisted] = useState(false);
-
-  useEffect(() => {
-    setWishlisted(isInWishlist(slug));
-  }, [slug]);
+  // Read from the wishlist itself and kept in step with it, so two cards for
+  // the same cake on one page (a rail and the grid) agree after either is pressed.
+  const readHearted = useCallback(() => isInWishlist(slug), [slug]);
+  const wishlisted = useExternalValue(readHearted, wishlistChanges, false);
 
   const handleWishlist = (event: React.MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
     const added = toggleWishlist(slug);
-    setWishlisted(added);
     // Loaded on the click: this card is on every listing, and the toast library
     // was in their first download for a message only a click can raise.
     void import("sonner").then(({ toast }) =>

@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
 import { reportSettingsWrite } from "@/apps/admin/settings/lib/report-settings-write";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { TaxBreakdown } from "@/components/shared/tax-breakdown";
@@ -43,6 +45,8 @@ const SAMPLE_ITEM = {
 };
 
 const EMPTY_ZONE_STATS = { total: 0, active: 0, inactive: 0, needsArea: 0 };
+const zoneChanges = windowEvents(DELIVERY_ZONES_UPDATED_EVENT, "storage");
+const readZoneStats = () => getDeliveryZoneStats(loadDeliveryZones());
 
 export function ShippingRulesAdminPage() {
   // The shared section form — same reasoning as the Taxes screen. The
@@ -64,22 +68,12 @@ export function ShippingRulesAdminPage() {
    */
   const liveZonePricing = saved.useZoneBasedDelivery;
   const zonePricingPending = settings.useZoneBasedDelivery !== saved.useZoneBasedDelivery;
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHydrated();
   const [previewPincode, setPreviewPincode] = useState("400001");
   const [previewCity, setPreviewCity] = useState("Mumbai");
-  const [zoneStats, setZoneStats] = useState(EMPTY_ZONE_STATS);
-
-  useEffect(() => {
-    // Zone stats are display-only, and have their own store and event — the
-    // settings form above is no longer this effect's business.
-    function loadStats() {
-      setZoneStats(getDeliveryZoneStats(loadDeliveryZones()));
-    }
-    loadStats();
-    setMounted(true);
-    window.addEventListener(DELIVERY_ZONES_UPDATED_EVENT, loadStats);
-    return () => window.removeEventListener(DELIVERY_ZONES_UPDATED_EVENT, loadStats);
-  }, []);
+  // Zone stats are display-only, and have their own store and event — the
+  // settings form above is not their business. Followed as zones change.
+  const zoneStats = useExternalValue(readZoneStats, zoneChanges, EMPTY_ZONE_STATS);
 
   const stats = mounted ? zoneStats : EMPTY_ZONE_STATS;
 

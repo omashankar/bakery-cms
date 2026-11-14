@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useHydrated } from "@/hooks/use-hydrated";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ExternalLink, Image as ImageIcon, Loader2, Mail, MapPin, Phone, Printer } from "lucide-react";
@@ -143,24 +144,32 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [refundOpen, setRefundOpen] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
+  /*
+    The cache is a starting point, never the answer.
 
-    // The cache is a starting point, never the answer.
-    //
-    // This returned as soon as localStorage had the order, and that cache holds
-    // only the most recent page of orders written by whatever this browser last
-    // did. So an order refunded on another device, settled by a webhook, or
-    // cancelled by a colleague rendered here in its old state for the whole
-    // visit — on the one screen an operator opens to find out what happened to
-    // it. The server is asked every time; the cached copy only fills the gap
-    // while the request is in flight, so the page does not flash empty.
+    This once returned as soon as localStorage had the order, and that cache
+    holds only the most recent page of orders written by whatever this browser
+    last did. So an order refunded on another device, settled by a webhook, or
+    cancelled by a colleague rendered here in its old state for the whole
+    visit — on the one screen an operator opens to find out what happened to
+    it. The server is asked every time (the effect below); the cached copy
+    only fills the gap while the request is in flight, so the page does not
+    flash empty. Taken while rendering, once per order, after hydration.
+  */
+  const hydrated = useHydrated();
+  const [cacheTakenFor, setCacheTakenFor] = useState<string | null>(null);
+  if (hydrated && cacheTakenFor !== orderId) {
+    setCacheTakenFor(orderId);
     const current = getOrderById(orderId);
     if (current) {
       setOrder(current);
       setAdminNotes(current.adminNotes ?? "");
       setPartner(toPartnerForm(current));
     }
+  }
+
+  useEffect(() => {
+    let cancelled = false;
 
     // `fetchOrder` resolves null on any failure, so it cannot reject.
     void fetchOrder(orderId).then((fetched) => {
