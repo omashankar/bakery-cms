@@ -1,5 +1,5 @@
 import type { LandingProduct } from "@/constants/landing-data";
-import { getCommerceSettings } from "@/features/settings/lib/settings-repository";
+import { getCommerceSettings, peekCommerceSettings } from "@/features/settings/lib/settings-repository";
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
 import { earliestDeliveryDateString } from "@/features/orders/lib/delivery-date";
 import {
@@ -170,9 +170,10 @@ export function getMinDeliveryDate(): string {
  * loses is the one they had already decided to trust.
  */
 export function getDeliveryPromise(): string {
+  // Read only: this is read while rendering (see `peekSettings`).
   const leadDays =
     typeof window !== "undefined"
-      ? getCommerceSettings().deliveryLeadDays
+      ? peekCommerceSettings().deliveryLeadDays
       : defaultCommerceSettings.deliveryLeadDays;
 
   return deliveryPromiseFor(leadDays);

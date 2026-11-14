@@ -126,15 +126,14 @@ export function PagesListPage({
     title?: string;
   } | null>(null);
 
-  async function refresh() {
-    try {
-      setPages(await fetchPages());
-    } catch {
-      // Leave the previous list on screen rather than blanking the table.
-      toast.error("Could not load pages");
-    } finally {
-      setMounted(true);
-    }
+  // Every state change here lands when the request answers, never before.
+  function refresh(): Promise<void> {
+    return fetchPages()
+      .then(setPages, () => {
+        // Leave the previous list on screen rather than blanking the table.
+        toast.error("Could not load pages");
+      })
+      .finally(() => setMounted(true));
   }
 
   useEffect(() => {

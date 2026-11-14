@@ -138,8 +138,19 @@ export function CatalogFormDialog({
   const [categorySearch, setCategorySearch] = useState("");
   const [productSearch, setProductSearch] = useState("");
 
-  useEffect(() => {
-    if (!open) return;
+  /*
+    Filled each time the dialog opens — from the row being edited, or empty
+    for a new one. Adjusted while rendering, the moment it opens or the row
+    or list changes; forgotten when it closes, so the next opening fills again.
+  */
+  const formKey = open ? `${tab}:${itemId ?? ""}` : null;
+  const [formFor, setFormFor] = useState<string | null>(null);
+  if (formFor !== formKey) {
+    setFormFor(formKey);
+    if (formKey !== null) fillForm();
+  }
+
+  function fillForm() {
     if (!itemId) {
       setName("");
       setSlug("");
@@ -196,7 +207,7 @@ export function CatalogFormDialog({
         setProductIds(item.productIds ?? []);
       }
     }
-  }, [open, itemId, tab]);
+  }
 
   async function handleSubmit() {
 

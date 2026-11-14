@@ -597,7 +597,7 @@ export async function patch(id: string, fields: Partial<PlacedOrder>): Promise<P
   const doc = (await OrderModel.findByIdAndUpdate(
     id,
     Object.keys(unset).length > 0 ? { $set: set, $unset: unset } : { $set: set },
-    { new: true },
+    { returnDocument: "after" },
   ).lean()) as unknown as Raw | null;
   return doc ? toOrder(doc) : null;
 }
@@ -665,7 +665,7 @@ export async function patchIfStatus(
       ...(assignedTo ? { "deliveryPartner.userId": assignedTo } : {}),
     },
     { $set: { ...fields, updatedAt: new Date().toISOString() } },
-    { new: true },
+    { returnDocument: "after" },
   ).lean()) as unknown as Raw | null;
   return doc ? toOrder(doc) : null;
 }
@@ -678,7 +678,7 @@ export async function cancelIfActive(
   const doc = (await OrderModel.findOneAndUpdate(
     { _id: id, status: { $nin: ["cancelled", "refunded", "delivered"] } },
     { $set: { ...fields, updatedAt: new Date().toISOString() } },
-    { new: true },
+    { returnDocument: "after" },
   ).lean()) as unknown as Raw | null;
   return doc ? toOrder(doc) : null;
 }
@@ -723,7 +723,7 @@ export async function claimRefundAttempt(
         updatedAt: new Date().toISOString(),
       },
     },
-    { new: true },
+    { returnDocument: "after" },
   ).lean()) as unknown as Raw | null;
   return doc ? toOrder(doc) : null;
 }
@@ -780,7 +780,7 @@ export async function setRefundNotes(id: string, notes: string | undefined): Pro
     notes
       ? { $set: { "refundRecord.notes": notes, updatedAt: new Date().toISOString() } }
       : { $unset: { "refundRecord.notes": "" }, $set: { updatedAt: new Date().toISOString() } },
-    { new: true },
+    { returnDocument: "after" },
   ).lean()) as unknown as Raw | null;
   return doc ? toOrder(doc) : null;
 }
@@ -797,7 +797,7 @@ export async function compareAndSetRefund(
       $expr: { $eq: [{ $ifNull: ["$refundRecord.version", 0] }, expectedVersion] },
     },
     { $set: { ...fields, updatedAt: new Date().toISOString() } },
-    { new: true },
+    { returnDocument: "after" },
   ).lean()) as unknown as Raw | null;
   return doc ? toOrder(doc) : null;
 }

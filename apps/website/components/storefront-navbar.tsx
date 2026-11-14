@@ -24,7 +24,7 @@ import { layoutSpacing } from "@/constants/spacing";
 import { routes } from "@/constants/routes";
 import { getCartItemCount } from "@/features/cart/lib/cart";
 import { navRowOpensNothing, panelShift } from "@/features/site-layout/lib/menu-links";
-import { getWishlistCount } from "@/apps/website/lib/wishlist";
+import { getWishlistCount, syncWishlistCookie } from "@/apps/website/lib/wishlist";
 import {
   getCustomerDisplayName,
   getCustomerSession,
@@ -37,6 +37,8 @@ import type { StorefrontCacheSeedData } from "@/apps/website/components/storefro
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { useBodyScrollLock } from "@/hooks/use-body-scroll-lock";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import {
   MIN_SUGGEST_CHARS,
   type ProductSuggestion,
@@ -118,6 +120,61 @@ const BAND_ANSWERS_AFTER = 64;
 const BAND_SLIDE_MS = 200;
 const BAND_CLIP_MS = BAND_SLIDE_MS + 60;
 
+/** Every change the header shows: the cart, the wishlist, the session, another tab. */
+const headerStoreChanges = windowEvents(
+  "storage",
+  "bakery-cart-updated",
+  "bakery-wishlist-updated",
+  "bakery-customer-session-updated",
+);
+
+interface CustomerMark {
+  signedIn: boolean;
+  name: string;
+  phone: string;
+  avatar: string;
+}
+const GUEST_MARK: CustomerMark = { signedIn: false, name: "", phone: "", avatar: "" };
+function readCustomerMark(): CustomerMark {
+  const session = getCustomerSession();
+  return {
+    signedIn: hasCustomerSession(),
+    name: getCustomerDisplayName(),
+    phone: session?.phone ?? "",
+    avatar: session?.avatarUrl ?? "",
+  };
+}
+
+/**
+ * The address the page is at. Next's own navigation fires no event, and the
+ * render it causes can run before the address has been updated — so the
+ * header announces its own once the new page has committed (see the effect
+ * on `pathname`); "popstate" covers Back and Forward.
+ */
+const URL_SETTLED_EVENT = "bakery-url-settled";
+const urlChanges = windowEvents("popstate", URL_SETTLED_EVENT);
+const readSearchedFor = () => new URLSearchParams(window.location.search).get("q")?.trim() ?? "";
+const readLoginAsked = () => new URLSearchParams(window.location.search).get("login") === "1";
+
+/** The shop's answer for one query; `failed` when it could not be asked. */
+interface SuggestAnswer {
+  key: string;
+  rows: ProductSuggestion[];
+  failed?: boolean;
+}
+
+/**
+ * Answers already paid for, until the next full page load.
+ *
+ * Backspacing is most of what typing in a search box is, and without this
+ * every deleted character is a fresh request for an answer the browser had a
+ * moment ago. Deliberately NOT a cache header on the endpoint: a shop that
+ * unpublishes a product should stop suggesting it on the next page load, not
+ * when a CDN decides to let go. Written only in the browser, by the effect
+ * that fetches.
+ */
+const suggestCache = new Map<string, ProductSuggestion[]>();
+
 interface StorefrontNavbarProps {
   chrome: StorefrontChrome;
   /** The server's answer to "who is signed in": null for nobody, undefined for unknown. */
@@ -152,34 +209,40 @@ export function StorefrontNavbar({ chrome, initialCustomer }: StorefrontNavbarPr
    * ------------------------------------------------------------------ */
   const pathname = usePathname();
   const router = useRouter();
-  const [term, setTerm] = useState("");
-  const [suggestions, setSuggestions] = useState<ProductSuggestion[]>([]);
   /**
-   * The query the rows on screen ANSWER. "Nothing matches" is said only once
-   * the shop has answered for exactly what is in the box — said from the empty
-   * list alone, it would flash under every keystroke while the request was
-   * still on its way.
+   * THE BOX SHOWS WHAT WAS SEARCHED FOR, on the page the search landed on —
+   * until the customer types. A customer searched "butterscotch", arrived at
+   * "Showing 3 of 27 for butterscotch", and found the header box empty above
+   * it, so refining meant typing the whole word again.
+   *
+   * `typed` is null until they type; then it is theirs, even when they empty
+   * it. The page's `?q=` is read as an external value: "" on the server and in
+   * the hydrating render, the query straight after. (It was an effect that
+   * seeded the box after hydration, through an updater so nothing typed
+   * before then was overwritten — which is what `typed` winning does here.)
    */
-  const [answeredFor, setAnsweredFor] = useState("");
+  const [typed, setTerm] = useState<string | null>(null);
+  const searchedFor = useExternalValue(readSearchedFor, urlChanges, "");
+  const term = typed ?? searchedFor;
+  /**
+   * The shop's answer for one query, kept with the query it answers. "Nothing
+   * matches" is said only once the shop has answered for exactly what is in
+   * the box — said from the empty list alone, it would flash under every
+   * keystroke while the request was still on its way.
+   */
+  const [answer, setAnswer] = useState<SuggestAnswer | null>(null);
   /** Read from the browser when the box is focused, so it is never stale and never in the SSR HTML. */
   const [recents, setRecents] = useState<RecentSearch[]>([]);
   const [panelOpen, setPanelOpen] = useState(false);
-  /** -1 is "nothing highlighted", which is the state Enter must submit in. */
-  const [activeRow, setActiveRow] = useState(-1);
+  /**
+   * The highlighted row, and WHICH LIST it is a row of. -1 is "nothing
+   * highlighted", which is the state Enter must submit in.
+   */
+  const [active, setActive] = useState<{ list: string; row: number }>({ list: "", row: -1 });
   /** Phones have no room for the box, so the icon reveals one. */
   const [phoneSearchOpen, setPhoneSearchOpen] = useState(false);
   const searchFormRef = useRef<HTMLFormElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
-  /**
-   * Answers already paid for, for this page's lifetime only.
-   *
-   * Backspacing is most of what typing in a search box is, and without this
-   * every deleted character is a fresh request for an answer the browser had
-   * a moment ago. Deliberately NOT a cache header on the endpoint: a shop
-   * that unpublishes a product should stop suggesting it on the next page
-   * load, not when a CDN decides to let go.
-   */
-  const suggestCache = useRef(new Map<string, ProductSuggestion[]>());
   const suggestListId = useId();
 
   /*
@@ -192,49 +255,77 @@ export function StorefrontNavbar({ chrome, initialCustomer }: StorefrontNavbarPr
   */
   const debouncedTerm = useDebouncedValue(term, 140);
 
+  const debouncedQuery = debouncedTerm.trim();
+  const debouncedKey = debouncedQuery.toLowerCase();
+  const debouncedReady = debouncedQuery.length >= MIN_SUGGEST_CHARS;
+  const remembered = debouncedReady ? suggestCache.get(debouncedKey) : undefined;
+
+  /*
+    WHAT THE PANEL SHOWS, worked out from the query rather than copied into
+    state by an effect: nothing below the threshold; the remembered answer
+    when there is one; the shop's answer when it is for this query; and while
+    that is on its way, the last answer — the rows on screen belong to what was
+    in the box a moment ago, not to nothing.
+  */
+  let suggestions: ProductSuggestion[];
+  let answeredFor: string;
+  if (!debouncedReady) {
+    suggestions = [];
+    answeredFor = "";
+  } else if (remembered) {
+    suggestions = remembered;
+    answeredFor = debouncedKey;
+  } else if (answer && answer.key === debouncedKey) {
+    suggestions = answer.rows;
+    // A failure is not "nothing matches", so it is not answered for.
+    answeredFor = answer.failed ? "" : answer.key;
+  } else {
+    suggestions = answer && !answer.failed ? answer.rows : [];
+    answeredFor = answer && !answer.failed ? answer.key : "";
+  }
+
+  /*
+    BEFORE A LETTER IS TYPED, WHAT WAS SEARCHED BEFORE — as the reference
+    does it. Below the suggestion threshold the panel lists this browser's
+    recent searches, narrowed to those that begin with what is in the box;
+    from the threshold on it is the shop's products, as it always was.
+  */
+  const typedEnough = term.trim().length >= MIN_SUGGEST_CHARS;
+  const recentRows = typedEnough ? [] : recentSearchesFor(recents, term);
+  const rowCount = typedEnough ? suggestions.length : recentRows.length;
+
   /**
-   * NEW ROWS ARRIVE WITH NOTHING HIGHLIGHTED, always, in one render.
+   * NEW ROWS ARRIVE WITH NOTHING HIGHLIGHTED, always, in the same render.
    *
-   * This was an effect on `[suggestions]` that reset the highlight afterwards,
-   * and "afterwards" is the whole problem: between the rows changing and the
-   * effect running there is a render in which `activeRow` still points into
-   * the list that has just been replaced. A customer who has walked down to
-   * row four and then types one more letter is, for that render, highlighting
-   * whichever product has landed in position four of a different list — and
-   * Enter opens it.
-   *
-   * Setting both together makes that window impossible rather than short, and
-   * costs one render instead of two on every keystroke.
+   * A highlight belongs to the list it was made in. A customer who has walked
+   * down to row four and then types one more letter must not, for even one
+   * render, be highlighting whichever product has landed in position four of
+   * a different list — Enter would open it. So the row is kept with the name
+   * of its list, and any other list reads "nothing highlighted". (This was a
+   * reset after the rows changed, which left exactly that one-render window.)
    */
-  const showSuggestions = (rows: ProductSuggestion[], forQuery: string) => {
-    setSuggestions(rows);
-    setAnsweredFor(forQuery);
-    setActiveRow(-1);
-  };
+  const listKey = typedEnough ? `s:${answeredFor}:${suggestions.length}` : "recent";
+  const activeRow = active.list === listKey ? active.row : -1;
+  const setActiveRow = (next: number | ((current: number) => number)) =>
+    setActive((previous) => {
+      const current = previous.list === listKey ? previous.row : -1;
+      return { list: listKey, row: typeof next === "function" ? next(current) : next };
+    });
 
   useEffect(() => {
-    const query = debouncedTerm.trim();
-    if (query.length < MIN_SUGGEST_CHARS) {
-      showSuggestions([], "");
-      return;
-    }
+    // Nothing to ask for below the threshold, nor for an answer already held.
+    if (!debouncedReady || suggestCache.has(debouncedKey)) return;
 
-    const key = query.toLowerCase();
-    const remembered = suggestCache.current.get(key);
-    if (remembered) {
-      showSuggestions(remembered, key);
-      return;
-    }
-
+    const key = debouncedKey;
     const controller = new AbortController();
-    fetch(`/api/products/suggest?q=${encodeURIComponent(query)}`, {
+    fetch(`/api/products/suggest?q=${encodeURIComponent(debouncedQuery)}`, {
       signal: controller.signal,
     })
-      .then((answer) => (answer.ok ? answer.json() : null))
+      .then((reply) => (reply.ok ? reply.json() : null))
       .then((body: { data?: unknown } | null) => {
         const rows = Array.isArray(body?.data) ? (body.data as ProductSuggestion[]) : [];
-        suggestCache.current.set(key, rows);
-        showSuggestions(rows, key);
+        suggestCache.set(key, rows);
+        setAnswer({ key, rows });
       })
       .catch((error: unknown) => {
         /*
@@ -244,12 +335,11 @@ export function StorefrontNavbar({ chrome, initialCustomer }: StorefrontNavbarPr
           is the previous query's products sitting under a different word.
         */
         if ((error as { name?: string })?.name === "AbortError") return;
-        // A failure is not "nothing matches", so it is not answered for.
-        showSuggestions([], "");
+        setAnswer({ key, rows: [], failed: true });
       });
 
     return () => controller.abort();
-  }, [debouncedTerm]);
+  }, [debouncedReady, debouncedKey, debouncedQuery]);
 
   useEffect(() => {
     if (!panelOpen) return;
@@ -265,32 +355,8 @@ export function StorefrontNavbar({ chrome, initialCustomer }: StorefrontNavbarPr
   }, [panelOpen]);
 
   useEffect(() => {
-    setPanelOpen(false);
-    setPhoneSearchOpen(false);
-  }, [pathname]);
-
-  useEffect(() => {
     if (phoneSearchOpen) searchInputRef.current?.focus();
   }, [phoneSearchOpen]);
-
-  /**
-   * THE BOX SHOWS WHAT WAS SEARCHED FOR, on the page the search landed on.
-   *
-   * It did not. A customer searched "butterscotch", arrived at a results page
-   * saying "Showing 3 of 27 for butterscotch", and found the header box empty
-   * above it — so refining the search meant typing the whole word again.
-   *
-   * Seeded through the updater rather than assigned, and that is not a style
-   * choice: this runs after hydration, and anything already typed into the
-   * box before then — by a fast customer or by a test — would otherwise be
-   * thrown away by a stale query string.
-   */
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const searched = new URLSearchParams(window.location.search).get("q")?.trim() ?? "";
-    if (!searched) return;
-    setTerm((typed) => (typed ? typed : searched));
-  }, [pathname]);
 
   const openSuggestion = (row: ProductSuggestion) => {
     rememberSearch({ term: row.name, slug: row.slug, category: row.category });
@@ -298,16 +364,6 @@ export function StorefrontNavbar({ chrome, initialCustomer }: StorefrontNavbarPr
     setPhoneSearchOpen(false);
     router.push(routes.store.cake(row.slug));
   };
-
-  /*
-    BEFORE A LETTER IS TYPED, WHAT WAS SEARCHED BEFORE — as the reference
-    does it. Below the suggestion threshold the panel lists this browser's
-    recent searches, narrowed to those that begin with what is in the box;
-    from the threshold on it is the shop's products, as it always was.
-  */
-  const typedEnough = term.trim().length >= MIN_SUGGEST_CHARS;
-  const recentRows = typedEnough ? [] : recentSearchesFor(recents, term);
-  const rowCount = typedEnough ? suggestions.length : recentRows.length;
 
   /** A product picked before goes back to it; a typed word runs the search again. */
   const recentHref = (entry: RecentSearch) =>
@@ -428,25 +484,36 @@ export function StorefrontNavbar({ chrome, initialCustomer }: StorefrontNavbarPr
       nothing between them.
     */
     .filter((item) => !navRowOpensNothing(item));
-  const [cartCount, setCartCount] = useState(0);
-  const [wishlistCount, setWishlistCount] = useState(0);
+  // The browser's cart and wishlist: 0 on the server and in the hydrating
+  // render, then what this browser holds, following every change.
+  const cartCount = useExternalValue(getCartItemCount, headerStoreChanges, 0);
+  const wishlistCount = useExternalValue(getWishlistCount, headerStoreChanges, 0);
   /*
     THE ACCOUNT MARK IN THE FIRST PAINT, from the server's read of the cookie.
     These started empty and were filled from localStorage after mount, so the
     header drew the guest icon on every load and swapped the customer's
     initials or photo in a moment later. Same naming rule as
     `getCustomerDisplayName`.
+
+    The browser's copy takes over once it has spoken — a session, cart or
+    wishlist event, a sign-in or a sign-out here — or at once when the page
+    brought no answer. Not before: on a first visit the browser's copy is
+    still empty until StorefrontCacheSeed writes it, and reading it would put
+    the guest icon back.
   */
-  const [signedIn, setSignedIn] = useState(Boolean(initialCustomer));
-  const [customerName, setCustomerName] = useState(
-    initialCustomer
-      ? initialCustomer.name || initialCustomer.email.split("@")[0] || "Customer"
-      : "",
-  );
-  const [customerPhone, setCustomerPhone] = useState(initialCustomer?.phone ?? "");
-  const [customerAvatar, setCustomerAvatar] = useState(initialCustomer?.avatarUrl ?? "");
-  // Fixed at mount: whether the page brought that answer, for the effect below.
-  const customerFromServer = useRef(initialCustomer !== undefined);
+  const [trustBrowser, setTrustBrowser] = useState(initialCustomer === undefined);
+  const browserMark = useExternalValue(readCustomerMark, headerStoreChanges, GUEST_MARK);
+  const mark: CustomerMark = trustBrowser
+    ? browserMark
+    : initialCustomer
+      ? {
+          signedIn: true,
+          name: initialCustomer.name || initialCustomer.email.split("@")[0] || "Customer",
+          phone: initialCustomer.phone ?? "",
+          avatar: initialCustomer.avatarUrl ?? "",
+        }
+      : GUEST_MARK;
+  const { signedIn, name: customerName, phone: customerPhone, avatar: customerAvatar } = mark;
   const [scrolled, setScrolled] = useState(false);
   /*
     THE HANDLES THE SCROLL EFFECT WRITES THROUGH.
@@ -466,21 +533,38 @@ export function StorefrontNavbar({ chrome, initialCustomer }: StorefrontNavbarPr
   if (authOpen && !authRequested) setAuthRequested(true);
   const [authStep, setAuthStep] = useState<"phone" | "signup">("phone");
 
+  /*
+    A NEW PAGE CLOSES WHAT THE OLD ONE OPENED — the suggestion panel, the
+    phone's search box and the drawer — and a box the customer had emptied
+    takes the new page's search again. Adjusted while rendering, the moment
+    the path is new, rather than by an effect a render later.
+  */
+  const [pathSeen, setPathSeen] = useState(pathname);
+  if (pathSeen !== pathname) {
+    setPathSeen(pathname);
+    setPanelOpen(false);
+    setPhoneSearchOpen(false);
+    setMobileOpen(false);
+    if (typed === "") setTerm(null);
+  }
+
+  // The drawer is for the phone layout; reaching the desktop width closes it.
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
+  if (isDesktop && mobileOpen) setMobileOpen(false);
+
+  // Protected pages redirect here with ?login=1 when there's no session: the
+  // sign-in opens, and the effect below takes the flag out of the address.
+  const loginAsked = useExternalValue(readLoginAsked, urlChanges, false);
+  if (loginAsked && !authOpen) {
+    setAuthStep("phone");
+    setAuthOpen(true);
+  }
+
   useEffect(() => {
-    // Store name / logo / nav / search come from the server chrome prop above;
-    // only the client-only cart, wishlist and customer session are read here.
-    setCartCount(getCartItemCount());
-    setWishlistCount(getWishlistCount());
-    // Only when the page did not bring the answer. This effect runs before
-    // StorefrontCacheSeed has written the session, so on a first visit the
-    // browser's copy is still empty and would put the guest icon back; the
-    // seed's session event refreshes these through the listener below.
-    if (!customerFromServer.current) {
-      setSignedIn(hasCustomerSession());
-      setCustomerName(getCustomerDisplayName());
-      setCustomerPhone(getCustomerSession()?.phone ?? "");
-      setCustomerAvatar(getCustomerSession()?.avatarUrl ?? "");
-    }
+    // The wishlist page reads a copy of the saved list from a cookie so it can
+    // draw at once (wishlist-cookie.ts); a list saved before that copy existed
+    // gets it here, on the first store page this browser opens.
+    syncWishlistCookie();
 
     /**
      * Ask the SERVER who is signed in.
@@ -498,26 +582,15 @@ export function StorefrontNavbar({ chrome, initialCustomer }: StorefrontNavbarPr
     if (!hasCustomerSessionSettled()) void syncCustomerSession();
   }, []);
 
-  useEffect(() => {
-    const refreshCounts = () => {
-      setCartCount(getCartItemCount());
-      setWishlistCount(getWishlistCount());
-      setSignedIn(hasCustomerSession());
-      setCustomerName(getCustomerDisplayName());
-      setCustomerPhone(getCustomerSession()?.phone ?? "");
-      setCustomerAvatar(getCustomerSession()?.avatarUrl ?? "");
-    };
-    window.addEventListener("storage", refreshCounts);
-    window.addEventListener("bakery-cart-updated", refreshCounts);
-    window.addEventListener("bakery-wishlist-updated", refreshCounts);
-    window.addEventListener("bakery-customer-session-updated", refreshCounts);
-    return () => {
-      window.removeEventListener("storage", refreshCounts);
-      window.removeEventListener("bakery-cart-updated", refreshCounts);
-      window.removeEventListener("bakery-wishlist-updated", refreshCounts);
-      window.removeEventListener("bakery-customer-session-updated", refreshCounts);
-    };
-  }, [pathname]);
+  useEffect(
+    () =>
+      headerStoreChanges(() => {
+        // Sign-out empties the wishlist without going through its own writes.
+        syncWishlistCookie();
+        setTrustBrowser(true);
+      }),
+    [],
+  );
 
   // Any page can request the login modal via openCustomerAuthModal().
   useEffect(() => {
@@ -530,18 +603,21 @@ export function StorefrontNavbar({ chrome, initialCustomer }: StorefrontNavbarPr
     return () => window.removeEventListener(OPEN_AUTH_MODAL_EVENT, onOpen);
   }, []);
 
-  // Protected pages redirect here with ?login=1 when there's no session.
+  // The new page has committed and the address is its own: say so, so the
+  // search box and the sign-in flag read it (urlChanges).
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("login") === "1") {
-      setAuthStep("phone");
-      setAuthOpen(true);
-      params.delete("login");
-      const query = params.toString();
-      window.history.replaceState(null, "", window.location.pathname + (query ? `?${query}` : ""));
-    }
+    window.dispatchEvent(new Event(URL_SETTLED_EVENT));
   }, [pathname]);
+
+  // The sign-in is open (above); take ?login=1 out of the address so a reload
+  // or a shared link does not ask again.
+  useEffect(() => {
+    if (!loginAsked) return;
+    const params = new URLSearchParams(window.location.search);
+    params.delete("login");
+    const query = params.toString();
+    window.history.replaceState(null, "", window.location.pathname + (query ? `?${query}` : ""));
+  }, [loginAsked]);
 
   const accountHref = signedIn ? routes.account.dashboard : routes.store.home;
 
@@ -689,10 +765,6 @@ export function StorefrontNavbar({ chrome, initialCustomer }: StorefrontNavbarPr
   }, [pathname]);
 
   useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
-
-  useEffect(() => {
     if (!mobileOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setMobileOpen(false);
@@ -700,16 +772,6 @@ export function StorefrontNavbar({ chrome, initialCustomer }: StorefrontNavbarPr
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [mobileOpen]);
-
-  useEffect(() => {
-    const media = window.matchMedia("(min-width: 1024px)");
-    function onChange(event: MediaQueryListEvent) {
-      if (event.matches) setMobileOpen(false);
-    }
-    media.addEventListener("change", onChange);
-    if (media.matches) setMobileOpen(false);
-    return () => media.removeEventListener("change", onChange);
-  }, []);
 
   /**
    * WHERE EACH MEGA PANEL ACTUALLY OPENS — measured, not guessed from an index.
@@ -1024,6 +1086,9 @@ export function StorefrontNavbar({ chrome, initialCustomer }: StorefrontNavbarPr
                 value={term}
                 onChange={(event) => {
                   setTerm(event.target.value);
+                  // Below the threshold the last answer is forgotten, so a new
+                  // word does not show the old word's products while it is asked.
+                  if (event.target.value.trim().length < MIN_SUGGEST_CHARS) setAnswer(null);
                   setActiveRow(-1);
                   setPanelOpen(true);
                 }}
@@ -1245,12 +1310,8 @@ export function StorefrontNavbar({ chrome, initialCustomer }: StorefrontNavbarPr
                 name={customerName}
                 phone={customerPhone}
                 avatarUrl={customerAvatar}
-                onSignOut={() => {
-                  setSignedIn(false);
-                  setCustomerName("");
-                  setCustomerPhone("");
-                  setCustomerAvatar("");
-                }}
+                // The session is already cleared from this browser; read it.
+                onSignOut={() => setTrustBrowser(true)}
               />
             </div>
           ) : (
@@ -1751,10 +1812,8 @@ export function StorefrontNavbar({ chrome, initialCustomer }: StorefrontNavbarPr
       open={authOpen}
       onOpenChange={setAuthOpen}
       initialStep={authStep}
-      onAuthenticated={() => {
-        setSignedIn(true);
-        setCustomerName(getCustomerDisplayName());
-      }}
+      // The session is saved in this browser by now; read it.
+      onAuthenticated={() => setTrustBrowser(true)}
     />
     ) : null}
     </>

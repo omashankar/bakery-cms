@@ -23,7 +23,7 @@ export async function findUserById(id: string) {
 
 export async function updateUserPassword(userId: string, passwordHash: string) {
   await connectDB();
-  return UserModel.findByIdAndUpdate(userId, { passwordHash }, { new: true });
+  return UserModel.findByIdAndUpdate(userId, { passwordHash }, { returnDocument: "after" });
 }
 
 export async function touchLastLogin(userId: string) {
@@ -169,7 +169,7 @@ export async function claimResetAttempt(id: string, max: number): Promise<boolea
 
 export async function incrementResetAttempts(id: string) {
   await connectDB();
-  return PasswordResetModel.findByIdAndUpdate(id, { $inc: { attempts: 1 } }, { new: true });
+  return PasswordResetModel.findByIdAndUpdate(id, { $inc: { attempts: 1 } }, { returnDocument: "after" });
 }
 
 export async function markResetUsed(id: string) {

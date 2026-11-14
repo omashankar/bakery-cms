@@ -84,7 +84,7 @@ export const resolveErrorController = withErrorHandler(async (_request: Request,
   const { id } = await ctx.params;
   if (!/^[0-9a-f]{24}$/i.test(id)) throw new NotFoundError("That error is not in the log.");
   await connectDB();
-  const doc = await ErrorLogModel.findByIdAndUpdate(id, { $set: { resolvedAt: new Date() } }, { new: true }).lean();
+  const doc = await ErrorLogModel.findByIdAndUpdate(id, { $set: { resolvedAt: new Date() } }, { returnDocument: "after" }).lean();
   if (!doc) throw new NotFoundError("That error is not in the log.");
   return ok(toErrorLogView(doc), "Marked as fixed");
 });

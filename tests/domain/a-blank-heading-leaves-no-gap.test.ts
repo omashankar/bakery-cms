@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { join } from "node:path";
 
 import { sectionHeaderDraws } from "@/components/shared/section-header";
 import { readSource } from "../renderer-source";

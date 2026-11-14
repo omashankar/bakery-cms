@@ -2,15 +2,19 @@
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { ArrowLeft, Info } from "lucide-react";
 import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { getGatewayConfig } from "@/features/payments/registry/gateways";
 import {
+  GATEWAYS_UPDATED_EVENT,
   getGatewayRuntime,
   setGatewayEnabled,
 } from "@/features/payments/lib/payment-gateway-settings";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+
+const gatewayChanges = windowEvents(GATEWAYS_UPDATED_EVENT, "storage");
 import { GatewayLogo } from "@/features/payments/components/gateway-logo";
 import {
   RazorpayKeysForm,
@@ -42,16 +46,15 @@ const METHOD_NAMES: Record<string, string> = {
 
 export function GatewayConfigPage({ gatewayId }: GatewayConfigPageProps) {
   const config = getGatewayConfig(gatewayId);
-  const [enabled, setEnabled] = useState(false);
+  // Whether it is on, as this browser holds it — false on the server — with
+  // the switch's own answer laid over it while a toggle is being sent.
+  const readEnabled = useCallback(() => (config ? getGatewayRuntime(config.id).enabled : false), [config]);
+  const storedEnabled = useExternalValue(readEnabled, gatewayChanges, false);
+  const [pending, setPending] = useState<{ id: string; value: boolean } | null>(null);
+  const enabled = pending && pending.id === config?.id ? pending.value : storedEnabled;
   // Reported up by the Razorpay form so the card header can show one badge,
   // instead of the form drawing a second one inside its own card.
   const [razorpayStatus, setRazorpayStatus] = useState<RazorpayStatus | null>(null);
-
-  useEffect(() => {
-    if (!config) return;
-    const runtime = getGatewayRuntime(config.id);
-    setEnabled(runtime.enabled);
-  }, [config]);
 
   if (!config) return notFound();
 
@@ -63,14 +66,14 @@ export function GatewayConfigPage({ gatewayId }: GatewayConfigPageProps) {
   // SERVER copy. A local-only change means the admin believes they switched
   // gateways and nothing switched.
   async function handleToggle(next: boolean) {
-    setEnabled(next);
+    setPending({ id: config!.id, value: next });
     const persisted = await setGatewayEnabled(config!.id, next);
     // Put the switch back where the SERVER has it. The optimistic flip stood
     // whatever the answer, so a refused write left the screen saying Cash on
     // Delivery was off while every customer's checkout still offered it — and
     // the toast underneath it said the write had failed. A switch is not
     // typing to be preserved for a retry; it is a claim about the shop.
-    if (!persisted) setEnabled(!next);
+    setPending(persisted ? null : { id: config!.id, value: !next });
     reportWrite(persisted, next ? "Gateway enabled" : "Gateway disabled");
   }
 

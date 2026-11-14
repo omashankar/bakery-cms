@@ -12,9 +12,17 @@ interface RevenueChartProps {
 /** Lightweight 7-day revenue bar chart — pure CSS bars, no external library. */
 export function RevenueChart({ data, className }: RevenueChartProps) {
   const max = Math.max(1, ...data.map((d) => d.amount));
+  // A week with nothing taken drew seven 2% stubs — a chart that looked broken
+  // rather than one that said "nothing yet".
+  const empty = data.every((d) => d.amount <= 0);
 
   return (
-    <div className={cn("space-y-3", className)}>
+    <div className={cn("relative space-y-3", className)}>
+      {empty ? (
+        <p className="absolute inset-x-0 top-14 text-center text-sm text-muted-foreground">
+          No payments in these days yet.
+        </p>
+      ) : null}
       <div className="flex h-40 items-end gap-2 sm:gap-3">
         {data.map((point, i) => {
           const heightPct = Math.round((point.amount / max) * 100);

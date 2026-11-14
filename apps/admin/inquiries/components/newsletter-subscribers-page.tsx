@@ -28,6 +28,7 @@ import { DashboardStatCard } from "@/apps/admin/dashboard/components/dashboard-s
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { adminShell } from "@/apps/admin/components/admin-shell";
 import type { NewsletterSubscriber } from "@/types/inquiry";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
 import {
   defaultNewsletterFilters,
   deleteNewsletterSubscribers,
@@ -46,6 +47,8 @@ import {
 import { RelativeTime } from "@/components/shared/relative-time";
 
 const PAGE_SIZE = 12;
+const newsletterChanges = windowEvents(NEWSLETTER_UPDATED_EVENT, "storage");
+const NO_SUBSCRIBERS: NewsletterSubscriber[] = [];
 
 export function NewsletterSubscribersPage({
   embedded = false,
@@ -84,21 +87,18 @@ export function NewsletterSubscribersPage({
    */
   const [figures, setFigures] = useState<FiguresState>("loading");
   const known = figures === "ready";
-  const [subscribers, setSubscribers] = useState<NewsletterSubscriber[]>([]);
+  // This browser's copy of the list, followed as it changes; a render after
+  // a write here re-reads it too (`refresh`).
+  const subscribers = useExternalValue(loadNewsletterSubscribers, newsletterChanges, NO_SUBSCRIBERS);
+  const [, setReadTick] = useState(0);
   const [filters, setFilters] = useState<NewsletterFilters>(defaultNewsletterFilters);
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   function refresh() {
-    setSubscribers(loadNewsletterSubscribers());
+    setReadTick((tick) => tick + 1);
   }
-
-  useEffect(() => {
-    refresh();
-    window.addEventListener(NEWSLETTER_UPDATED_EVENT, refresh);
-    return () => window.removeEventListener(NEWSLETTER_UPDATED_EVENT, refresh);
-  }, []);
 
   useEffect(() => {
     let cancelled = false;

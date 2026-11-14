@@ -17,10 +17,8 @@ import type { Product, ProductFormData } from "@/types/product";
 import {
   defaultProductUnitPrice,
   displayCompareAtPrice,
-  formatVariantSummary,
 } from "@/features/products/lib/product-pricing";
 import {
-  getDefaultVariantSelections,
   variantGroupsEnabledBy,
 } from "@/features/products/lib/variant-utils";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";

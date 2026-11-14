@@ -5,13 +5,12 @@ import {
   useCallback,
   useContext,
   useLayoutEffect,
-  useEffect,
   useMemo,
-  useState,
   type Dispatch,
   type SetStateAction,
 } from "react";
 import { usePathname } from "next/navigation";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
 import { applyAppearanceSettings } from "@/features/site-layout/lib/appearance-utils";
 import { loadAppearanceSettings } from "@/features/site-layout/lib/appearance-repository";
 import {
@@ -41,6 +40,10 @@ interface ThemeProviderProps {
   storageKey?: string;
 }
 
+/** Said in this tab when the theme is chosen; another tab says "storage". */
+const THEME_CHANGED_EVENT = "bakery-theme-changed";
+const themeChanges = windowEvents("storage", THEME_CHANGED_EVENT);
+
 function commitTheme(resolved: ResolvedTheme, forceStorefrontLight: boolean) {
   if (forceStorefrontLight) {
     applyThemeToDocument("light");
@@ -59,51 +62,44 @@ export function ThemeProvider({
 }: ThemeProviderProps) {
   const pathname = usePathname() ?? "";
   const lightLocked = isLightLockedPath(pathname);
-  const [theme, setThemeState] = useState<ThemeSetting | undefined>(undefined);
-  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme | undefined>(
-    undefined
+  /*
+    THE CHOSEN THEME LIVES IN STORAGE and is read from there: undefined on the
+    server and in the hydrating render, as before, then the stored choice. A
+    choice made here, or in another tab, is written to storage and announced,
+    and the read follows it. (It was a copy in state, filled by an effect after
+    the first render and by a second effect listening for "storage".)
+  */
+  const readTheme = useCallback(
+    (): ThemeSetting | undefined => readStoredTheme(storageKey, defaultTheme),
+    [storageKey, defaultTheme]
   );
-
-  useEffect(() => {
-    const stored = readStoredTheme(storageKey, defaultTheme);
-    setThemeState(stored);
-    setResolvedTheme(resolveTheme(stored));
-  }, [defaultTheme, storageKey]);
+  const theme = useExternalValue(readTheme, themeChanges, undefined);
+  const resolvedTheme: ResolvedTheme | undefined = theme
+    ? lightLocked
+      ? "light"
+      : resolveTheme(theme)
+    : undefined;
 
   // useLayoutEffect: apply before paint so UI + DOM never disagree (no flicker).
   useLayoutEffect(() => {
     if (!theme) return;
 
     if (lightLocked) {
-      setResolvedTheme("light");
       commitTheme("light", true);
       return;
     }
 
-    const resolved = resolveTheme(theme);
-    setResolvedTheme(resolved);
-    commitTheme(resolved, false);
+    commitTheme(resolveTheme(theme), false);
     persistTheme(storageKey, theme);
   }, [storageKey, theme, lightLocked]);
 
-  useEffect(() => {
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key !== storageKey) return;
-      const nextTheme = readStoredTheme(storageKey, defaultTheme);
-      setThemeState(nextTheme);
-    };
-
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
-  }, [defaultTheme, storageKey]);
-
   const setTheme = useCallback<Dispatch<SetStateAction<ThemeSetting>>>(
     (value) => {
-      setThemeState((current) =>
-        typeof value === "function" ? value(current ?? defaultTheme) : value
-      );
+      const current = readStoredTheme(storageKey, defaultTheme);
+      persistTheme(storageKey, typeof value === "function" ? value(current) : value);
+      window.dispatchEvent(new Event(THEME_CHANGED_EVENT));
     },
-    [defaultTheme]
+    [defaultTheme, storageKey]
   );
 
   const value = useMemo(

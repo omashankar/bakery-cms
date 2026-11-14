@@ -314,7 +314,7 @@ export function AccountOrdersPage() {
               <header className="flex items-start justify-between gap-4 border-b border-border bg-cream-50 px-5 py-4 sm:px-6">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="font-heading text-base font-bold text-foreground">
+                    <h2 className="font-heading text-base font-semibold text-foreground">
                       {order.orderNumber}
                     </h2>
                     <AccountOrderStatusBadge status={order.status} />

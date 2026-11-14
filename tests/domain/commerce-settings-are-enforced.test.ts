@@ -182,13 +182,12 @@ describe("a payment method the shop switched off", () => {
     // The old effect handled exactly one case — the Razorpay gateway having no
     // keys — and left the general one, so the selection could sit on a method
     // that was no longer on the list.
-    expect(page).toContain(
-      "if (availablePaymentOptions.some((option) => option.value === paymentMethod)) return;",
-    );
-    expect(page).toContain("setPaymentMethod(availablePaymentOptions[0].value);");
+    // Adjusted during render, so there is no frame showing the stale choice.
     // And it must not fire during the pre-hydration instant, when the list is
     // legitimately empty.
-    expect(page).toContain("if (availablePaymentOptions.length === 0) return;");
+    expect(page).toMatch(
+      /availablePaymentOptions\.length > 0 &&\s*!availablePaymentOptions\.some\(\(option\) => option\.value === paymentMethod\)\s*\)\s*\{\s*setPaymentMethod\(availablePaymentOptions\[0\]\.value\);/,
+    );
   });
 });
 

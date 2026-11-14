@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
@@ -61,6 +61,8 @@ export function CustomersListPage({
   const canExport = useCan("customers.export");
   const router = useRouter();
   const [mounted, setMounted] = useState(Boolean(initial));
+  // Whether the page arrived with the list — fixed at mount, for the effect below.
+  const sentWithPage = useRef(Boolean(initial));
   const [failed, setFailed] = useState(false);
   const [customers, setCustomers] = useState<CustomerProfile[]>(initial ?? []);
   const [filters, setFilters] = useState<CustomerListFilters>(defaultCustomerFilters);
@@ -83,7 +85,7 @@ export function CustomersListPage({
     }
 
     // The server already sent the list; the listener still refreshes it.
-    if (!initial) void refresh();
+    if (!sentWithPage.current) void refresh();
     window.addEventListener(CUSTOMERS_UPDATED_EVENT, refresh);
     return () => {
       cancelled = true;

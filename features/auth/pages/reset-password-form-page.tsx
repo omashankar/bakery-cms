@@ -13,27 +13,27 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { routes } from "@/constants/routes";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
 
 type ResetPasswordForm = {
   password: string;
   confirmPassword: string;
 };
 
+const readVerified = () => getResetFlow()?.verified === true;
+const resetFlowNeverAnnounces = windowEvents();
+
 export function ResetPasswordFormPage() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [allowed, setAllowed] = useState(false);
-  const { register, handleSubmit, watch, formState } = useForm<ResetPasswordForm>();
+  // Only reachable once the OTP step passed: read from this browser (false on
+  // the server); without it, the flow restarts.
+  const allowed = useExternalValue(readVerified, resetFlowNeverAnnounces, false);
+  const { register, handleSubmit, getValues, formState } = useForm<ResetPasswordForm>();
 
-  // Only reachable once the OTP step passed — otherwise restart the flow.
   useEffect(() => {
-    const flow = getResetFlow();
-    if (!flow?.verified) {
-      router.replace(routes.auth.forgotPassword);
-      return;
-    }
-    setAllowed(true);
+    if (!getResetFlow()?.verified) router.replace(routes.auth.forgotPassword);
   }, [router]);
 
   const onSubmit = async (data: ResetPasswordForm) => {
@@ -124,7 +124,7 @@ export function ResetPasswordFormPage() {
               {...register("confirmPassword", {
                 required: "Please confirm your password",
                 validate: (value) =>
-                  value === watch("password") || "Passwords do not match",
+                  value === getValues("password") || "Passwords do not match",
               })}
             />
             <button

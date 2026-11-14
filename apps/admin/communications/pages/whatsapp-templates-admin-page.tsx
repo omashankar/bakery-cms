@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { applyServerCommunications } from "@/apps/admin/communications/lib/use-communications-server-sync";
 import {
   CheckCircle2,
@@ -131,8 +131,6 @@ export function WhatsAppTemplatesAdminPage({
    * real copy. Strictly worse than the clobber it replaced.
    */
   const [draftOrigin, setDraftOrigin] = useState<WhatsAppTemplateRecord | null>(null);
-  // Read inside the updater below, which must not re-run on every keystroke.
-  const draftOriginRef = useRef<WhatsAppTemplateRecord | null>(null);
   const [filters, setFilters] = useState<WhatsAppTemplateListFilters>(
     defaultWhatsAppTemplateFilters
   );
@@ -211,41 +209,27 @@ export function WhatsAppTemplatesAdminPage({
     [templates, selectedId]
   );
 
-  useEffect(() => {
-    if (!selectedId) {
-      setDraft(null);
-      setDraftOrigin(null);
-      return;
+  /*
+    The editor follows the chosen template and the saved list — adjusted while
+    rendering, the moment either changes, rather than by an effect a render
+    later. Never over an edit in progress: an admin part-way through a message
+    must not lose it to server hydration or a save from another tab, so a
+    draft that differs from the copy it was loaded from is kept.
+  */
+  const [editorFor, setEditorFor] = useState<{
+    id: string | null;
+    templates: typeof templates;
+  } | null>(null);
+  if (!editorFor || editorFor.id !== selectedId || editorFor.templates !== templates) {
+    setEditorFor({ id: selectedId, templates });
+    const next = selectedId
+      ? (templates.find((template) => template.id === selectedId) ?? null)
+      : null;
+    if (!selectedId || !draft || draft.id !== selectedId || !isEdited(draft, draftOrigin)) {
+      setDraft(next);
+      setDraftOrigin(next);
     }
-    const next = templates.find((template) => template.id === selectedId) ?? null;
-    // Never over an edit in progress.
-    //
-    // This ran on EVERY change to `templates` — including server hydration and
-    // any save from another tab — and replaced the editor's contents outright.
-    // An admin part-way through rewriting a subject line lost it with no
-    // warning and nothing on screen to say why. Comparing against the saved
-    // copy is how the shared settings form decides the same question.
-    setDraft((current) => {
-      // A different template, or nothing open: adopt outright.
-      if (!current || current.id !== selectedId) {
-        setDraftOrigin(next);
-        return next;
-      }
-      // Untouched since it was loaded — take the server's newer copy.
-      if (!isEdited(current, draftOriginRef.current)) {
-        setDraftOrigin(next);
-        return next;
-      }
-      // Genuinely mid-edit. Keep what the admin typed; `isDirty` below
-      // compares against the new baseline, so the header and Save button
-      // describe the difference that actually matters.
-      return current;
-    });
-  }, [selectedId, templates]);
-
-  useEffect(() => {
-    draftOriginRef.current = draftOrigin;
-  }, [draftOrigin]);
+  }
 
   /**
    * Against the WHATSAPP contract, which the missing fourth argument did not.

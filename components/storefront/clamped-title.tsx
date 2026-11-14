@@ -32,11 +32,22 @@ export function ClampedTitle({
   useEffect(() => {
     const node = ref.current;
     if (!node || expanded || typeof ResizeObserver === "undefined") return;
+    /*
+      CUT MEANS A HIDDEN LINE, NOT A HIDDEN PIXEL. A face may draw its accents
+      and descenders a few pixels outside its line box (Poppins did: a one-line
+      name measured 39px of content in a 36px box and wore "…more" with nothing
+      to reveal). Half a line is the least a clamped line can hide.
+    */
+    const measure = () => {
+      const line = parseFloat(getComputedStyle(node).lineHeight) || 24;
+      setCut(node.scrollHeight - node.clientHeight > line / 2);
+    };
     // Fires once on observe and again whenever the width changes.
-    const observer = new ResizeObserver(() => {
-      setCut(node.scrollHeight > node.clientHeight + 1);
-    });
+    const observer = new ResizeObserver(measure);
     observer.observe(node);
+    // And when the heading font arrives: the text reflows inside a box that
+    // may not change size, which a ResizeObserver never reports.
+    void document.fonts?.ready.then(measure);
     return () => observer.disconnect();
   }, [expanded, text]);
 

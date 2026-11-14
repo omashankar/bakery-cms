@@ -24,17 +24,17 @@ describe("each choice", () => {
   });
 
   it("View never includes a write", () => {
-    for (const module of PERMISSION_MODULES) {
-      const view = level(module.id, "view").permissions;
-      expect(view.length, module.id).toBeGreaterThan(0);
-      expect(view.every((p) => /\.view/.test(p) || p === "dashboard.view"), module.id).toBe(true);
+    for (const area of PERMISSION_MODULES) {
+      const view = level(area.id, "view").permissions;
+      expect(view.length, area.id).toBeGreaterThan(0);
+      expect(view.every((p) => /\.view/.test(p) || p === "dashboard.view"), area.id).toBe(true);
     }
   });
 
   it("every choice is a valid permission set on its own", () => {
-    for (const module of PERMISSION_MODULES) {
-      for (const l of accessLevels(module.id)) {
-        expect(permissionProblems(applyLevel([], module.id, l)), `${module.id}/${l.id}`).toEqual([]);
+    for (const area of PERMISSION_MODULES) {
+      for (const l of accessLevels(area.id)) {
+        expect(permissionProblems(applyLevel([], area.id, l)), `${area.id}/${l.id}`).toEqual([]);
       }
     }
   });

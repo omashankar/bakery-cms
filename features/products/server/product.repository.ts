@@ -339,7 +339,7 @@ export async function patchFields(
   const doc = (await ProductModel.findByIdAndUpdate(
     id,
     { $set: { ...fields, updatedAt: new Date().toISOString() } },
-    { new: true },
+    { returnDocument: "after" },
   ).lean()) as unknown as Raw | null;
   return doc ? toProduct(doc) : null;
 }

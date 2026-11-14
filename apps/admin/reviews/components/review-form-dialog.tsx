@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -20,6 +20,11 @@ import { PRODUCTS_UPDATED_EVENT } from "@/features/products/lib/products-reposit
 import { toast } from "sonner";
 import type { Product } from "@/types/product";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+
+const productChanges = windowEvents(PRODUCTS_UPDATED_EVENT, "storage");
+const NO_PRODUCTS: Product[] = [];
+const readPublishedProducts = () => loadProducts().filter((cake) => cake.status === "published");
 
 interface ReviewFormDialogProps {
   open: boolean;
@@ -48,16 +53,9 @@ export function ReviewFormDialog({
    * a review of a draft, archived or since-deleted product had no matching
    * option, and `handleSubmit` below then returned without a word.
    */
-  const [published, setPublished] = useState<Product[]>([]);
-
-  useEffect(() => {
-    const read = () => setPublished(loadProducts().filter((cake) => cake.status === "published"));
-    read();
-    window.addEventListener(PRODUCTS_UPDATED_EVENT, read);
-    return () => window.removeEventListener(PRODUCTS_UPDATED_EVENT, read);
-    // `open` re-reads when the dialog is reopened, in case the catalogue moved
-    // on while it was closed.
-  }, [open]);
+  // Read as an external value: it follows the catalogue whenever it moves,
+  // open or closed, with nothing to re-read on opening.
+  const published = useExternalValue(readPublishedProducts, productChanges, NO_PRODUCTS);
 
   const cakes = useMemo(() => {
     if (!initial) return published;
@@ -82,19 +80,31 @@ export function ReviewFormDialog({
   const [status, setStatus] = useState<ProductReview["status"]>("pending");
   const [isFeatured, setIsFeatured] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
-    const cake = cakes.find((item) => item.slug === (initial?.productSlug ?? cakes[0]?.slug));
-    setCakeSlug(initial?.productSlug ?? cakes[0]?.slug ?? "");
-    setAuthorName(initial?.authorName ?? "");
-    setAuthorEmail(initial?.authorEmail ?? "");
-    setRating(initial?.rating ?? 5);
-    setTitle(initial?.title ?? "");
-    setBody(initial?.body ?? "");
-    setStatus(initial?.status ?? "pending");
-    setIsFeatured(initial?.isFeatured ?? false);
-    if (!initial && cake) setCakeSlug(cake.slug);
-  }, [open, initial, cakes]);
+  /*
+    Filled when the dialog opens — from the review being edited, or blank on
+    the first product — and again if that review or the product list changes
+    while open. Adjusted while rendering rather than by an effect a render later.
+  */
+  const [formFor, setFormFor] = useState<{
+    open: boolean;
+    initial: typeof initial;
+    cakes: Product[];
+  } | null>(null);
+  if (formFor?.open !== open || formFor.initial !== initial || formFor.cakes !== cakes) {
+    setFormFor({ open, initial, cakes });
+    if (open) {
+      const cake = cakes.find((item) => item.slug === (initial?.productSlug ?? cakes[0]?.slug));
+      setCakeSlug(initial?.productSlug ?? cakes[0]?.slug ?? "");
+      setAuthorName(initial?.authorName ?? "");
+      setAuthorEmail(initial?.authorEmail ?? "");
+      setRating(initial?.rating ?? 5);
+      setTitle(initial?.title ?? "");
+      setBody(initial?.body ?? "");
+      setStatus(initial?.status ?? "pending");
+      setIsFeatured(initial?.isFeatured ?? false);
+      if (!initial && cake) setCakeSlug(cake.slug);
+    }
+  }
 
   function handleSubmit() {
     /**

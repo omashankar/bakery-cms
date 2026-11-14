@@ -172,7 +172,7 @@ export function AppearancePreview({
               <p className="text-xs font-semibold tracking-widest text-[var(--primary)] uppercase">
                 Featured {labels.productWord}
               </p>
-              <h3 className="mt-2 font-heading text-xl font-bold">Chocolate Truffle</h3>
+              <h3 className="mt-2 font-heading text-xl font-semibold">Chocolate Truffle</h3>
               <p className="mt-1 text-sm text-muted-foreground">
                 Rich Belgian chocolate layers with silky ganache.
               </p>

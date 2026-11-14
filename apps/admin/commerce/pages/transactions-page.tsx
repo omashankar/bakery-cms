@@ -31,7 +31,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/utils/format";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import { reportedAsSignedOut, reportedAsSignedOutOnRead } from "@/apps/admin/lib/report-write";
+import { reportedAsSignedOutOnRead } from "@/apps/admin/lib/report-write";
 import { RelativeTime } from "@/components/shared/relative-time";
 
 const PAGE_SIZE = 12;
@@ -89,11 +89,12 @@ export function TransactionsPage({
     JSON.stringify({ filters, page: currentPage }),
     250
   );
-  const request = JSON.parse(requestKey) as {
-    filters: Record<string, unknown>;
-    page: number;
-  };
   useEffect(() => {
+    // Read from the key this effect runs on, so it uses nothing it does not list.
+    const request = JSON.parse(requestKey) as {
+      filters: Record<string, unknown>;
+      page: number;
+    };
     if (listFromServer.current) {
       listFromServer.current = false;
       return;
@@ -331,8 +332,9 @@ export function TransactionsPage({
                         onClick={() => void openDetail(t.orderId)}
                         className="cursor-pointer border-b border-border/70 transition-colors hover:bg-muted"
                       >
-                        <td className="px-4 py-3 font-medium text-foreground">{t.id}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{t.orderNumber}</td>
+                        {/* One line each: "BK-20261026-" over "5635" is two numbers to the eye. */}
+                        <td className="px-4 py-3 font-medium whitespace-nowrap text-foreground">{t.id}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{t.orderNumber}</td>
                         <td className="max-w-[180px] px-4 py-3">
                           <p className="truncate">{t.customerName}</p>
                           <p className="truncate text-xs text-muted-foreground">{t.customerEmail}</p>

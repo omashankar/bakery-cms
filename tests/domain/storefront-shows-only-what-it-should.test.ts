@@ -156,12 +156,16 @@ describe("refreshing an order", () => {
     // empty for any order this browser did not write — a webhook-placed order,
     // or one opened from a tracking link. One failed request turned a loaded
     // order into "Order Not Found".
-    const page = read("apps/website/checkout/pages/order-detail-page.tsx");
+    const page = stripComments(read("apps/website/checkout/pages/order-detail-page.tsx"));
     const fn = page.slice(page.indexOf("async function refreshOrder"));
     const body = fn.slice(0, fn.indexOf("\n  }"));
 
-    expect(body).not.toContain("setOrder(getOrderByNumber(orderNumber));");
-    expect(body).toContain("if (local)");
+    // A refresh only ever replaces the server's answer with a NEWER one…
+    expect(body).toMatch(/if \(fresh\) \{\s*setFetched\(\{ for: orderNumber, order: fresh \}\);/);
+    expect(body.match(/setFetched\(/g)).toHaveLength(1);
+    // …and what is shown falls back to this browser's copy only while there
+    // is no answer at all, never because a request failed.
+    expect(page).toContain("const order = answer?.order ?? local;");
   });
 });
 

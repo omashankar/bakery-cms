@@ -30,7 +30,6 @@ import { Switch } from "@/components/ui/switch";
 import { routes } from "@/constants/routes";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { reportedAsSignedOut } from "@/apps/admin/lib/report-write";
-import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { useCan } from "@/features/team/lib/access-context";
 import { RelativeTime } from "@/components/shared/relative-time";
 
@@ -39,7 +38,6 @@ interface CustomerDetailPageProps {
 }
 
 export function CustomerDetailPage({ customerId }: CustomerDetailPageProps) {
-  const labels = useBusinessLabels();
   const canEdit = useCan("customers.update");
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [orders, setOrders] = useState<PlacedOrder[]>([]);

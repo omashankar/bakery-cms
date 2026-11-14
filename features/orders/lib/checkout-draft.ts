@@ -237,9 +237,14 @@ export function saveCheckoutDraft(draft: Omit<CheckoutDraft, "version">): void {
     CHECKOUT_DRAFT_KEY,
     JSON.stringify({ ...draft, version: CHECKOUT_FLOW_VERSION }),
   );
+  window.dispatchEvent(new Event(CHECKOUT_DRAFT_UPDATED_EVENT));
 }
 
 export function clearCheckoutDraft(): void {
   if (typeof window === "undefined") return;
   sessionStorage.removeItem(CHECKOUT_DRAFT_KEY);
+  window.dispatchEvent(new Event(CHECKOUT_DRAFT_UPDATED_EVENT));
 }
+
+/** Said on every write, so a screen reading the draft (the cart's coupon) follows it. */
+export const CHECKOUT_DRAFT_UPDATED_EVENT = "bakery-checkout-draft-updated";

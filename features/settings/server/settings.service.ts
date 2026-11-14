@@ -91,6 +91,7 @@ export async function getSettings() {
 export async function getPublicSettings() {
   const doc = await readSettingsDoc();
   // Loosely typed on purpose — we cherry-pick storefront-safe fields below.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const json = doc.toJSON() as Record<string, any>;
   return {
     general: {

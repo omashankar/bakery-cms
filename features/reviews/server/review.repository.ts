@@ -133,7 +133,7 @@ async function incrementVote(
   const doc = await ReviewModel.findOneAndUpdate(
     { _id: id, status: "approved" },
     { $inc: { [field]: 1 } },
-    { new: true, projection: { [field]: 1 } },
+    { returnDocument: "after", projection: { [field]: 1 } },
   ).lean();
   if (!doc) return null;
   return (doc as Partial<Record<typeof field, number>>)[field] ?? 0;
@@ -235,7 +235,7 @@ export async function patch(
   if (Object.keys(unset).length > 0) update.$unset = unset;
 
   const doc = (await ReviewModel.findByIdAndUpdate(id, update, {
-    new: true,
+    returnDocument: "after",
   }).lean()) as unknown as Raw | null;
   return doc ? toReview(doc) : null;
 }

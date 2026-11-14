@@ -99,6 +99,26 @@ export function loadSettings(): AppSettings {
   return parseSettings(raw) ?? defaultAppSettings;
 }
 
+/**
+ * The settings this browser holds, READ ONLY — the defaults when there are
+ * none, without writing them. For reads made while rendering: `loadSettings`
+ * seeds a cold cache and announces it, and a render that writes to a store
+ * it is subscribed to is a render that schedules another.
+ */
+export function peekSettings(): AppSettings {
+  if (typeof window === "undefined") return defaultAppSettings;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? (parseSettings(raw) ?? defaultAppSettings) : defaultAppSettings;
+  } catch {
+    return defaultAppSettings;
+  }
+}
+
+export function peekCommerceSettings(): CommerceSettings {
+  return peekSettings().commerce;
+}
+
 export function saveSettings(settings: AppSettings): AppSettings {
   const next: AppSettings = {
     ...settings,

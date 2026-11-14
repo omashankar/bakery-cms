@@ -1,7 +1,7 @@
 "use client";
 
 import { fromScheduleInputValue, toScheduleInputValue } from "@/lib/datetime-local";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
@@ -92,25 +92,30 @@ export function BannerFormDialog({
 
   const isDirty = useMemo(() => serializeForm(form) !== baseline, [form, baseline]);
 
-  useEffect(() => {
+  /*
+    The form is filled when the dialog opens — empty for a new banner, the
+    banner's own values for an edit — and the discard prompt is put away when
+    it closes. Adjusted while rendering, the moment `open` or the banner
+    changes, rather than by an effect a render later.
+  */
+  const formKey = open ? `open:${bannerId ?? ""}` : "closed";
+  const [formFor, setFormFor] = useState<string | null>(null);
+  if (formFor !== formKey) {
+    setFormFor(formKey);
     if (!open) {
       setDiscardOpen(false);
-      return;
-    }
-
-    if (!bannerId) {
+    } else if (!bannerId) {
       setForm(EMPTY_FORM);
       setBaseline(serializeForm(EMPTY_FORM));
-      return;
+    } else {
+      const existing = loadBanners().find((item) => item.id === bannerId);
+      if (existing) {
+        const next = bannerToForm(existing);
+        setForm(next);
+        setBaseline(serializeForm(next));
+      }
     }
-
-    const existing = loadBanners().find((item) => item.id === bannerId);
-    if (existing) {
-      const next = bannerToForm(existing);
-      setForm(next);
-      setBaseline(serializeForm(next));
-    }
-  }, [open, bannerId]);
+  }
 
   function patchForm(patch: Partial<BannerFormState>) {
     setForm((prev) => ({ ...prev, ...patch }));

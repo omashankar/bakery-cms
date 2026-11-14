@@ -17,7 +17,17 @@ import { Input } from "@/components/ui/input";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import type { ActivityLog } from "@/types/settings";
 import type { AuditLogEntry } from "@/types/audit";
-import { clearActivityLog, getActivityLog } from "@/features/settings/lib/settings-repository";
+import {
+  clearActivityLog,
+  peekSettings,
+  SETTINGS_UPDATED_EVENT,
+} from "@/features/settings/lib/settings-repository";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
+
+const settingsChanges = windowEvents(SETTINGS_UPDATED_EVENT, "storage");
+const readLocalActivity = () => peekSettings().activity;
+const NO_ACTIVITY: ActivityLog[] = [];
 import { fetchAuditLogs } from "@/features/audit/lib/audit-api";
 import { auditToActivity, mergeActivity } from "@/features/audit/lib/audit-activity";
 import { ACTIVITY_AUDIT_LIMIT } from "@/apps/admin/settings/lib/activity-defaults";
@@ -41,7 +51,7 @@ export function ActivitySettingsPage({
   /** The audit trail's newest rows, read on the server; null fetches as before. */
   initial?: AuditLogEntry[] | null;
 } = {}) {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHydrated();
   // Kept apart, because only ONE of them can be cleared.
   //
   // Both were merged into a single `entries` list, and the confirm dialog then
@@ -49,17 +59,15 @@ export function ActivitySettingsPage({
   // undone", where 100 of the 137 were server AUDIT rows that Clear does not
   // touch and that reappear on the next load. Clearing also dropped them from
   // the list, so the screen agreed with the lie until someone reloaded.
-  const [localEntries, setLocalEntries] = useState<ActivityLog[]>([]);
+  // This browser's settings activity, followed as it changes (a clear here
+  // writes the store, which announces it). Read only — see `peekSettings`.
+  const localEntries = useExternalValue(readLocalActivity, settingsChanges, NO_ACTIVITY);
   const [serverEntries, setServerEntries] = useState<ActivityLog[]>(() =>
     initial ? initial.map(auditToActivity) : [],
   );
   const [search, setSearch] = useState("");
   const [clearOpen, setClearOpen] = useState(false);
 
-  useEffect(() => {
-    setLocalEntries(getActivityLog());
-    setMounted(true);
-  }, []);
 
   // Hydrate the durable server audit trail (every admin/customer action, across
   // devices) into the same list, merged with the local settings activity.
@@ -110,11 +118,10 @@ export function ActivitySettingsPage({
   }, [entries, search]);
 
   async function confirmClear() {
-    const { value, persisted } = await clearActivityLog();
-    // Only the local slice moves. The server audit rows stay on screen because
+    const { persisted } = await clearActivityLog();
+    // Only the local slice moves (read above, from the store this wrote). The server audit rows stay on screen because
     // they stay in the database — they used to disappear here and come back on
     // reload, which made a partial clear look like a complete one.
-    setLocalEntries(value);
     setClearOpen(false);
 
     if (!persisted) {

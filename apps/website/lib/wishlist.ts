@@ -1,6 +1,27 @@
 
 import { safeSetItem } from "@/lib/safe-storage";
+import { writeWishlistCookie } from "./wishlist-cookie";
 const WISHLIST_STORAGE_KEY = "bakery-cms-wishlist";
+
+/**
+ * Every write goes through here, so the copy the server reads
+ * (wishlist-cookie.ts) can never fall behind the one in localStorage.
+ */
+function saveWishlist(next: string[]): void {
+  safeSetItem(WISHLIST_STORAGE_KEY, JSON.stringify(next));
+  writeWishlistCookie(next);
+  window.dispatchEvent(new Event("bakery-wishlist-updated"));
+}
+
+/**
+ * Bring the server-readable copy up to date with this browser. Called by the
+ * header on every store page and on every wishlist change — which covers a
+ * wishlist saved before the copy existed, and the sign-out that clears it.
+ */
+export function syncWishlistCookie(): void {
+  if (typeof window === "undefined") return;
+  writeWishlistCookie(getWishlistSlugs());
+}
 
 export function getWishlistSlugs(): string[] {
   if (typeof window === "undefined") return [];
@@ -24,10 +45,7 @@ export function toggleWishlist(slug: string): boolean {
   const exists = current.includes(slug);
   const next = exists ? current.filter((item) => item !== slug) : [...current, slug];
 
-  if (typeof window !== "undefined") {
-    safeSetItem(WISHLIST_STORAGE_KEY, JSON.stringify(next));
-    window.dispatchEvent(new Event("bakery-wishlist-updated"));
-  }
+  if (typeof window !== "undefined") saveWishlist(next);
 
   return !exists;
 }
@@ -36,10 +54,7 @@ export function addToWishlist(slug: string): boolean {
   const current = getWishlistSlugs();
   if (current.includes(slug)) return false;
 
-  if (typeof window !== "undefined") {
-    safeSetItem(WISHLIST_STORAGE_KEY, JSON.stringify([...current, slug]));
-    window.dispatchEvent(new Event("bakery-wishlist-updated"));
-  }
+  if (typeof window !== "undefined") saveWishlist([...current, slug]);
 
   return true;
 }
@@ -70,7 +85,6 @@ export function pruneWishlist(availableSlugs: Iterable<string>): number {
   const next = current.filter((slug) => available.has(slug));
   if (next.length === current.length) return 0;
 
-  safeSetItem(WISHLIST_STORAGE_KEY, JSON.stringify(next));
-  window.dispatchEvent(new Event("bakery-wishlist-updated"));
+  saveWishlist(next);
   return current.length - next.length;
 }

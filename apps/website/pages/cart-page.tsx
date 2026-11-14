@@ -34,12 +34,17 @@ import { publishCheckoutStep } from "@/apps/website/checkout/lib/checkout-step-s
 import { applyCouponCode, type AppliedCoupon } from "@/features/orders/lib/coupons";
 import { offersForCart } from "@/features/commerce/lib/coupon-offers";
 import {
-  getActiveCoupons,
+  COUPONS_UPDATED_EVENT,
+  peekActiveCoupons,
   type StoredCoupon,
 } from "@/features/commerce/lib/coupons-repository";
 import { getFreeDeliveryThreshold } from "@/features/orders/lib/cart-totals";
 import { getDeliveryPromise } from "@/apps/website/lib/product-details";
-import { getCheckoutDraft, saveCheckoutDraft } from "@/features/orders/lib/checkout-draft";
+import {
+  CHECKOUT_DRAFT_UPDATED_EVENT,
+  getCheckoutDraft,
+  saveCheckoutDraft,
+} from "@/features/orders/lib/checkout-draft";
 import { OrderSummaryPanel } from "@/apps/website/checkout/components/order-summary-panel";
 import { calculateCartTotals, compareAtSavings } from "@/features/orders/lib/cart-totals";
 import {
@@ -49,7 +54,7 @@ import {
 import { ProductRailSection } from "@/apps/website/components/product-rail-section";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import {
-  getCommerceSettings,
+  peekCommerceSettings,
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
 import { defaultCommerceSettings } from "@/features/settings/lib/settings-utils";
@@ -60,13 +65,13 @@ import {
   addToCart,
   cartLineToAddInput,
   CART_PREFERENCES_UPDATED_EVENT,
+  CART_UPDATED_EVENT,
   getCartPreferences,
   getCartItems,
   cartLineChoices,
   moveCartItemToSavedForLater,
   removeCartItem,
   restoreSavedItemToCart,
-  subscribeToCart,
   updateCartItemQuantity,
   updateCartPreferences,
   type CartLineItem,
@@ -87,6 +92,55 @@ import { layoutSpacing } from "@/constants/spacing";
 import { formatCurrency } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import type { LandingProduct } from "@/constants/landing-data";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
+
+/** What the cart screen reads from the browser — see `readCartScreen`. */
+interface CartScreen {
+  items: CartLineItem[];
+  savedItems: CartLineItem[];
+  preferences: CartPreferences;
+  commerce: CommerceSettings;
+  signedIn: boolean;
+  /**
+   * The coupon, read from the checkout draft rather than a second store.
+   *
+   * There is exactly one place a chosen code lives — the sessionStorage
+   * checkout draft — and checkout already reads and writes it there. A cart
+   * that kept its own copy would be a second source of truth for the one
+   * field on the page that changes what the customer pays.
+   */
+  coupon: AppliedCoupon | undefined;
+  liveCoupons: StoredCoupon[];
+}
+
+/**
+ * Every read here is READ ONLY (`peek…`): this runs while rendering, and the
+ * ordinary getters seed a cold cache and announce it — a render that writes
+ * to a store it is subscribed to schedules its own next render.
+ */
+function readCartScreen(): CartScreen {
+  return {
+    items: getCartItems(),
+    savedItems: getSavedForLaterItems(),
+    preferences: getCartPreferences(),
+    commerce: peekCommerceSettings(),
+    signedIn: hasCustomerSession(),
+    coupon: getCheckoutDraft().coupon,
+    liveCoupons: peekActiveCoupons(),
+  };
+}
+
+const cartScreenChanges = windowEvents(
+  CART_UPDATED_EVENT,
+  SAVED_FOR_LATER_UPDATED_EVENT,
+  CART_PREFERENCES_UPDATED_EVENT,
+  SETTINGS_UPDATED_EVENT,
+  COUPONS_UPDATED_EVENT,
+  CHECKOUT_DRAFT_UPDATED_EVENT,
+  "bakery-customer-session-updated",
+  "storage",
+);
 
 interface CartPageProps {
   /** The shop's published catalogue, read on the server — see `getRecentlyViewedProducts`. */
@@ -106,67 +160,33 @@ interface CartPageProps {
 }
 
 export function CartPage({ catalog = [], initialItems, cartKnown = false, initialCommerce, initialZones }: CartPageProps) {
-  const [items, setItems] = useState<CartLineItem[]>(() => initialItems ?? []);
-  const [savedItems, setSavedItems] = useState<CartLineItem[]>([]);
-  const [preferences, setPreferences] = useState<CartPreferences>({
-    giftWrap: false,
-    specialInstructions: "",
-  });
-  const [commerce, setCommerce] = useState(() => initialCommerce ?? defaultCommerceSettings);
-  const [loaded, setLoaded] = useState(false);
-  const [signedIn, setSignedIn] = useState(false);
-  /**
-   * The coupon, read from the checkout draft rather than a second store.
-   *
-   * There is exactly one place a chosen code lives — the sessionStorage
-   * checkout draft — and checkout already reads and writes it there. A cart
-   * that kept its own copy would be a second source of truth for the one
-   * field on the page that changes what the customer pays.
-   */
-  const [coupon, setCoupon] = useState<AppliedCoupon | undefined>(undefined);
-  /**
-   * The shop's live coupons, read in `refresh` beside every other store.
-   *
-   * Not read during render: `getActiveCoupons` seeds localStorage and fires an
-   * event on a cold cache, and a render that writes is a render that can
-   * schedule its own next one. `refresh` already runs on mount and on every
-   * settings, cart and session event, which is exactly when this can change.
-   */
-  const [liveCoupons, setLiveCoupons] = useState<StoredCoupon[]>([]);
+  /*
+    EVERYTHING THIS SCREEN READS FROM THE BROWSER, as one snapshot: the lines
+    and saved-for-later, the preferences, the shop's settings, the session,
+    the coupon in the checkout draft and the live coupons. The server and the
+    hydrating render get what the server knew (the lines from the cart cookie,
+    the shop's settings); then the browser's copy, followed on every change —
+    another tab included. (This was seven pieces of state, filled by an effect
+    after the first render and refreshed by six listeners.)
+  */
+  const [serverScreen] = useState<CartScreen>(() => ({
+    items: initialItems ?? [],
+    savedItems: [],
+    preferences: { giftWrap: false, specialInstructions: "" },
+    commerce: initialCommerce ?? defaultCommerceSettings,
+    signedIn: false,
+    coupon: undefined,
+    liveCoupons: [],
+  }));
+  const screen = useExternalValue(readCartScreen, cartScreenChanges, serverScreen);
+  const { items, savedItems, preferences, commerce, signedIn, coupon, liveCoupons } = screen;
+  const loaded = useHydrated();
   const labels = useBusinessLabels();
 
-  function refresh() {
-    setItems(getCartItems());
-    setSavedItems(getSavedForLaterItems());
-    setPreferences(getCartPreferences());
-    setCommerce(getCommerceSettings());
-    setSignedIn(hasCustomerSession());
-    setCoupon(getCheckoutDraft().coupon);
-    setLiveCoupons(getActiveCoupons());
-  }
-
   useEffect(() => {
-    refresh();
-    setLoaded(true);
     // A cart from before the cookie existed gets one now, so its next visit
     // is drawn on the server too.
     writeCartCookie(getCartItems());
-
-    // subscribeToCart also listens for the browser storage event, so a cart
-    // edited in another tab is reflected here too.
-    const unsubscribeCart = subscribeToCart(refresh);
-    window.addEventListener(SAVED_FOR_LATER_UPDATED_EVENT, refresh);
-    window.addEventListener(CART_PREFERENCES_UPDATED_EVENT, refresh);
-    window.addEventListener(SETTINGS_UPDATED_EVENT, refresh);
-    window.addEventListener("bakery-customer-session-updated", refresh);
-
-    return () => {
-      unsubscribeCart();
-      window.removeEventListener(SAVED_FOR_LATER_UPDATED_EVENT, refresh);
-      window.removeEventListener(CART_PREFERENCES_UPDATED_EVENT, refresh);
-      window.removeEventListener(SETTINGS_UPDATED_EVENT, refresh);
-      window.removeEventListener("bakery-customer-session-updated", refresh);
-    };
   }, []);
 
 
@@ -265,8 +285,8 @@ export function CartPage({ catalog = [], initialItems, cartKnown = false, initia
   const validCoupon = couponCheck?.ok ? couponCheck.coupon : null;
   const couponLapsedReason = couponCheck && !couponCheck.ok ? couponCheck.message : null;
 
+  // The draft announces the write, and the snapshot above follows it.
   function applyCoupon(next: AppliedCoupon | undefined) {
-    setCoupon(next);
     saveCheckoutDraft({ ...getCheckoutDraft(), coupon: next });
   }
 
@@ -382,8 +402,13 @@ export function CartPage({ catalog = [], initialItems, cartKnown = false, initia
             }
           : undefined,
         commerceOverride: commerce,
+        // The zones this page was rendered with. Without them the server
+        // render (a cart drawn from its cookie) asked the browser-only zone
+        // cache, which has nothing on the server: it logged a warning per
+        // render and priced the first paint with no zones at all.
+        zonesOverride: initialZones,
       }),
-    [items, validCoupon?.discountAmount, preferences.giftWrap, deliveryPincode, place, priceSpot, commerce]
+    [items, validCoupon?.discountAmount, preferences.giftWrap, deliveryPincode, place, priceSpot, commerce, initialZones]
   );
 
   /*
@@ -495,6 +520,7 @@ export function CartPage({ catalog = [], initialItems, cartKnown = false, initia
               {recentlyViewed.length > 0 ? (
                 <ProductRailSection
                   title="Recently viewed"
+                  headingSize="card"
                   description="Pick up where you left off."
                   cakes={recentlyViewed.slice(0, 4)}
                   firstEager
@@ -516,7 +542,7 @@ export function CartPage({ catalog = [], initialItems, cartKnown = false, initia
                 The steps are in the header now, as the reference has them;
                 the page opens on its own heading.
               */}
-              <h1 className="font-heading text-xl font-bold tracking-tight">
+              <h1 className="font-heading text-xl font-semibold tracking-tight">
                 Shopping Cart ({itemCount})
               </h1>
 
@@ -784,6 +810,7 @@ export function CartPage({ catalog = [], initialItems, cartKnown = false, initia
                 {recentlyViewed.length > 0 ? (
                   <ProductRailSection
                     title="Recently viewed"
+                    headingSize="card"
                     description="You might also want to add these."
                     cakes={recentlyViewed.slice(0, 4)}
                     firstEager

@@ -51,11 +51,16 @@ import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { cn } from "@/lib/utils";
 import {
   ensureSettingsHydrated,
-  getGeneralSettings,
-  getMaintenanceSettings,
+  peekSettings,
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
 import { settingsHydration } from "@/features/settings/lib/settings-api";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
+
+const settingsChanges = windowEvents(SETTINGS_UPDATED_EVENT, "storage");
+const readSiteName = () => peekSettings().general.siteName;
+const readMaintenanceOn = () => peekSettings().maintenance.isEnabled;
 
 type SettingsItem = {
   title: string;
@@ -333,41 +338,30 @@ export function SettingsOverviewPage() {
   //    job is avoiding a server/client mismatch on first paint.
   //  - `hydrated`: has the SERVER's copy arrived? Only the two CLAIMS wait on
   //    this — the shop's name, and whether maintenance mode is on.
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHydrated();
   // Only the screens this member can open; a group left empty is not drawn.
   const { can } = useAccess();
   const visibleGroups = groups
     .map((group) => ({ ...group, items: group.items.filter((item) => canOpenRoute(item.href, can)) }))
     .filter((group) => group.items.length > 0);
   const [hydrated, setHydrated] = useState(settingsHydration.hasSettled());
-  const [siteName, setSiteName] = useState("");
-  const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
+  // Read from this browser's settings and followed as they change; shown only
+  // once `hydrated` says they are the server's (read only — `peekSettings`).
+  const siteName = useExternalValue(readSiteName, settingsChanges, "");
+  const maintenanceEnabled = useExternalValue(readMaintenanceOn, settingsChanges, false);
 
   useEffect(() => {
     let cancelled = false;
-
-    function read() {
-      setSiteName(getGeneralSettings().siteName);
-      setMaintenanceEnabled(getMaintenanceSettings().isEnabled);
-    }
-
-    read();
-    setMounted(true);
-    window.addEventListener(SETTINGS_UPDATED_EVENT, read);
-
     void ensureSettingsHydrated().then((settled) => {
       if (cancelled) return;
-      if (settled) read();
       // Only a SUCCESSFUL read may unlock the claims. `ensureSettingsHydrated`
       // reports false when the FULL admin read failed even if the public subset
       // landed — so this legitimately stays false, and the claims stay generic
       // rather than reporting this browser's defaults as fact.
       setHydrated(settled);
     });
-
     return () => {
       cancelled = true;
-      window.removeEventListener(SETTINGS_UPDATED_EVENT, read);
     };
   }, []);
 

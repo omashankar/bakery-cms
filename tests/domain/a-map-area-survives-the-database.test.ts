@@ -40,8 +40,10 @@ describe("a zone's map area", () => {
     ]);
   });
 
-  it("refuses a coverage the app does not know", () => {
+  it("refuses a coverage the app does not know", async () => {
     const zone = new DeliveryZoneModel({ _id: "z3", name: "X", coverage: "hexagon" });
-    expect(zone.validateSync()?.errors.coverage).toBeDefined();
+    // `validate()`, not `validateSync()` — deprecated in Mongoose 9, removed in 10.
+    const error = await zone.validate().then(() => null, (e: { errors?: Record<string, unknown> }) => e);
+    expect(error?.errors?.coverage).toBeDefined();
   });
 });

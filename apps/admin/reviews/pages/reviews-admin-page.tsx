@@ -17,7 +17,9 @@ import { SafeImage } from "@/components/shared/safe-image";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { adminShell } from "@/apps/admin/components/admin-shell";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
-import { loadProducts } from "@/features/products/lib/products-repository";
+import { loadProducts, PRODUCTS_UPDATED_EVENT } from "@/features/products/lib/products-repository";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import type { Product } from "@/types/product";
 import {
   FilterPanel,
   FilterPanelSearch,
@@ -61,6 +63,10 @@ import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { RelativeTime } from "@/components/shared/relative-time";
 
 const PAGE_SIZE = 10;
+const reviewChanges = windowEvents(REVIEWS_UPDATED_EVENT, PRODUCTS_UPDATED_EVENT, "storage");
+const NO_REVIEWS: ProductReview[] = [];
+const NO_PRODUCTS: Product[] = [];
+const readPublishedProducts = () => loadProducts().filter((cake) => cake.status === "published");
 
 const EMPTY_OVERVIEW: ProductReviewOverview = {
   total: 0,
@@ -86,7 +92,10 @@ export function ReviewsAdminPage({
   }, []);
   const labels = useBusinessLabels();
   const [mounted, setMounted] = useState(false);
-  const [reviews, setReviews] = useState<ProductReview[]>([]);
+  // This browser's copy of the reviews, followed as it changes; a render
+  // after a write here re-reads it too (`refresh`).
+  const reviews = useExternalValue(loadReviews, reviewChanges, NO_REVIEWS);
+  const [, setReadTick] = useState(0);
   const [filters, setFilters] = useState<ReviewListFilters>(defaultReviewFilters);
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -94,10 +103,8 @@ export function ReviewsAdminPage({
   const [editingReview, setEditingReview] = useState<ProductReview | null>(null);
   const [replyReview, setReplyReview] = useState<ProductReview | null>(null);
 
-  const cakes = useMemo(() => {
-    if (!mounted) return [];
-    return loadProducts().filter((cake) => cake.status === "published");
-  }, [mounted, reviews.length]);
+  const published = useExternalValue(readPublishedProducts, reviewChanges, NO_PRODUCTS);
+  const cakes = mounted ? published : NO_PRODUCTS;
 
   const filtered = useMemo(() => filterReviews(reviews, filters), [reviews, filters]);
   const overview = useMemo(
@@ -129,11 +136,10 @@ export function ReviewsAdminPage({
   useReviewsServerSync();
 
   function refresh() {
-    setReviews(loadReviews());
+    setReadTick((tick) => tick + 1);
   }
 
   useEffect(() => {
-    refresh();
     /**
      * `mounted` waits for the SERVER, not for the local read.
      *
@@ -144,8 +150,6 @@ export function ReviewsAdminPage({
      * them, and it settles this gate when it lands.
      */
     void reviewsHydration.waitForSettled().then(() => setMounted(true));
-    window.addEventListener(REVIEWS_UPDATED_EVENT, refresh);
-    return () => window.removeEventListener(REVIEWS_UPDATED_EVENT, refresh);
   }, []);
 
   function updateFilters(patch: Partial<ReviewListFilters>) {

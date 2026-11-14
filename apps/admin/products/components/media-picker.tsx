@@ -1,9 +1,14 @@
 "use client";
 
 import { useMediaServerSync } from "@/apps/admin/media/lib/use-media-server-sync";
-import { useMemo, useRef, useState, useEffect } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ImageIcon, Loader2, Search, Upload } from "lucide-react";
 import { loadMediaFiles, MEDIA_UPDATED_EVENT } from "@/apps/admin/media/lib/media-repository";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import type { MediaFile } from "@/types/media";
+
+const mediaChanges = windowEvents(MEDIA_UPDATED_EVENT, "storage");
+const NO_FILES: MediaFile[] = [];
 import { useMediaUpload } from "@/apps/admin/media/lib/use-media-upload";
 import { SafeImage } from "@/components/shared/safe-image";
 import { thumbnailImageUrl } from "@/lib/image-url";
@@ -41,7 +46,6 @@ export function MediaPicker({
   // gate, and only this read opens it.
   useMediaServerSync();
   const [search, setSearch] = useState("");
-  const [refreshKey, setRefreshKey] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   // Dragging over a child fires dragleave on the parent, so a plain boolean
@@ -93,25 +97,18 @@ export function MediaPicker({
     }
   }
 
+  // The library, followed as it changes (an upload here, another screen).
+  const library = useExternalValue(loadMediaFiles, mediaChanges, NO_FILES);
   const files = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return loadMediaFiles().filter((file) => {
+    return library.filter((file) => {
       if (!query) return true;
       return (
         file.name.toLowerCase().includes(query) ||
         file.alt?.toLowerCase().includes(query)
       );
     });
-  }, [open, search, refreshKey]);
-
-  useEffect(() => {
-    if (!open) return;
-    function handleMediaUpdated() {
-      setRefreshKey((value) => value + 1);
-    }
-    window.addEventListener(MEDIA_UPDATED_EVENT, handleMediaUpdated);
-    return () => window.removeEventListener(MEDIA_UPDATED_EVENT, handleMediaUpdated);
-  }, [open]);
+  }, [library, search]);
 
 
   return (

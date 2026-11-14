@@ -36,6 +36,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { FaqItem } from "@/types/content";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { adminShell } from "@/apps/admin/components/admin-shell";
 import { bulkUpdateFaqStatus, deleteFaqs, loadFaqs } from "@/features/content/lib/faq-repository";
@@ -55,6 +57,9 @@ import { FaqFormDialog } from "./faq-form-dialog";
 import { RelativeTime } from "@/components/shared/relative-time";
 
 const PAGE_SIZE = 10;
+/** Another tab writing; this tab's own writes re-render through `refresh`. */
+const otherTabChanges = windowEvents("storage");
+const NO_ITEMS: FaqItem[] = [];
 
 const EMPTY_OVERVIEW: FaqOverview = {
   total: 0,
@@ -111,8 +116,11 @@ export function FaqAdminPage({
     if (initial) applyServerFaqs(initial);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
   }, []);
-  const [mounted, setMounted] = useState(false);
-  const [items, setItems] = useState<FaqItem[]>([]);
+  const mounted = useHydrated();
+  // A render after a write or once the server's copy lands, so the list
+  // below reads the store again (the store announces nothing itself).
+  const [, setReadTick] = useState(0);
+  const items = useExternalValue(loadFaqs, otherTabChanges, NO_ITEMS);
   const [filters, setFilters] = useState<FaqListFilters>(defaultFaqFilters);
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -124,8 +132,7 @@ export function FaqAdminPage({
   } | null>(null);
 
   function refresh() {
-    setItems(loadFaqs());
-    setMounted(true);
+    setReadTick((tick) => tick + 1);
   }
 
   useEffect(() => {
@@ -140,7 +147,7 @@ export function FaqAdminPage({
     // list, the admin's next save then pushed those demo rows to the server and
     // destroyed the shop's real ones. The hydration gate already refuses a write
     // sent BEFORE the server copy arrives; this is the other half of it.
-    refresh();
+    // (The first read is the external value above.)
     let cancelled = false;
     void faqsWritable.waitForSettled().then((settled) => {
       if (settled && !cancelled) refresh();

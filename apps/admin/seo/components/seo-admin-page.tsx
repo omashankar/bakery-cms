@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useState } from "react";
 import {
   ExternalLink,
   FileText,
@@ -47,10 +47,12 @@ import {
 import { SettingsHydrationNotice } from "@/apps/admin/settings/components/settings-field-error";
 import {
   loadSeoStore,
+  peekSeoRoutes,
   resetSeoStore,
   saveGlobalSeo,
   SEO_UPDATED_EVENT,
 } from "@/features/seo/lib/seo-repository";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
 import {
   DESCRIPTION_IDEAL_MAX,
   TITLE_IDEAL_MAX,
@@ -67,6 +69,11 @@ import {
 } from "@/features/seo/lib/seo-metadata";
 import { SeoRouteEditDialog } from "./seo-route-edit-dialog";
 import { RelativeTime } from "@/components/shared/relative-time";
+
+const seoChanges = windowEvents(SEO_UPDATED_EVENT, "storage");
+// Read only: this runs while rendering (see `peekSeoRoutes`).
+const readSeoRoutes = () => peekSeoRoutes();
+const NO_ROUTES: SeoRouteEntry[] = [];
 
 const EMPTY_OVERVIEW: SeoOverview = {
   total: 0,
@@ -171,7 +178,11 @@ export function SeoAdminPage({
   });
   const global = form.global;
   const keywordsInput = form.keywords;
-  const [seoRoutes, setSeoRoutes] = useState<SeoRouteEntry[]>([]);
+  // The routes, read from the browser's SEO store and followed as it changes.
+  // The global form resyncs through its own hook, which already listens and
+  // already refuses to clobber an edit in progress.
+  const seoRoutes = useExternalValue(readSeoRoutes, seoChanges, NO_ROUTES);
+  const [, setReadTick] = useState(0);
   const [filters, setFilters] = useState<SeoRouteListFilters>(defaultSeoRouteFilters);
   const [editingEntry, setEditingEntry] = useState<SeoRouteEntry | null>(null);
 
@@ -185,19 +196,10 @@ export function SeoAdminPage({
     edit((prev) => ({ ...prev, keywords }));
   }
 
+  // After a write here: a render, so the routes above read the store again.
   function refreshRoutes() {
-    setSeoRoutes(loadSeoStore().routes);
+    setReadTick((tick) => tick + 1);
   }
-
-  useEffect(() => {
-    // Routes only. The global form resyncs through the hook, which already
-    // listens on this event and already refuses to clobber an edit in
-    // progress — the ref-mirrored dirty check this replaces existed to do
-    // exactly that by hand.
-    refreshRoutes();
-    window.addEventListener(SEO_UPDATED_EVENT, refreshRoutes);
-    return () => window.removeEventListener(SEO_UPDATED_EVENT, refreshRoutes);
-  }, []);
 
   const overview = useMemo(
     () => (hydration === "pending" ? EMPTY_OVERVIEW : getSeoOverview(seoRoutes, global)),

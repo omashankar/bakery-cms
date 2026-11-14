@@ -38,9 +38,9 @@ describe("the coupon redemption counter is the server's", () => {
   });
 
   it("the client coupon module exposes no usage recorder", () => {
-    const module = codeOf("features/orders/lib/coupons.ts");
-    expect(module).not.toContain("recordCouponUsage");
-    expect(module).not.toContain("incrementCouponUsage");
+    const source = codeOf("features/orders/lib/coupons.ts");
+    expect(source).not.toContain("recordCouponUsage");
+    expect(source).not.toContain("incrementCouponUsage");
   });
 
   it("placing an order still counts it, on the server", () => {

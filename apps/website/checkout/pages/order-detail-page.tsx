@@ -3,7 +3,7 @@
 import { toast } from "@/lib/lazy-toast";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useMemo, useState } from "react";
 import { MapPin, Package, RefreshCw } from "lucide-react";
 import { DeliveryEstimatedCard } from "@/apps/website/checkout/components/delivery-estimated-card";
 import { DeliveryPartnerCard } from "@/apps/website/checkout/components/delivery-partner-card";
@@ -14,7 +14,13 @@ import { getOrderTimeline } from "@/features/orders/lib/order-tracking";
 import { formatOrderStatus } from "@/features/orders/lib/order-status-meta";
 import { canViewOrder, readOrderLookupEmail } from "@/features/orders/lib/order-access";
 import { getCustomerSession } from "@/apps/website/account/lib/customer-session";
-import { getOrderByNumber, type PlacedOrder } from "@/features/orders/lib/orders";
+import { getOrderByNumber, ORDERS_UPDATED_EVENT, type PlacedOrder } from "@/features/orders/lib/orders";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
+
+const orderChanges = windowEvents(ORDERS_UPDATED_EVENT, "bakery-customer-session-updated", "storage");
+const localOrderWrites = windowEvents(ORDERS_UPDATED_EVENT);
+const readSessionEmail = () => getCustomerSession()?.email ?? null;
 import { fetchOrderByNumber } from "@/features/orders/lib/orders-api";
 import { StorePageHeader } from "@/apps/website/components/store-page-header";
 import { Badge } from "@/components/ui/badge";
@@ -47,9 +53,39 @@ const paymentLabels = {
 export function OrderDetailPage() {
   const params = useParams<{ orderNumber: string }>();
   const orderNumber = decodeURIComponent(params.orderNumber ?? "");
-  const [order, setOrder] = useState<PlacedOrder | null>(null);
-  const [allowed, setAllowed] = useState(false);
-  const [ready, setReady] = useState(false);
+  const hydrated = useHydrated();
+  // Access is still decided locally where we can, so the page does not flash
+  // a stranger's details while a request is in flight.
+  const readLocal = useCallback(
+    () => (orderNumber ? getOrderByNumber(orderNumber) : null),
+    [orderNumber],
+  );
+  const local = useExternalValue(readLocal, orderChanges, null);
+  const sessionEmail = useExternalValue(readSessionEmail, orderChanges, null);
+  const readLookupEmail = useCallback(
+    () => (orderNumber ? readOrderLookupEmail(orderNumber) : null),
+    [orderNumber],
+  );
+  const lookupEmail = useExternalValue(readLookupEmail, orderChanges, null) ?? sessionEmail;
+  const localAllowed = local ? canViewOrder(local, sessionEmail ?? undefined) : false;
+
+  /*
+    The SERVER's copy is the real one. The local copy is frozen at the moment
+    this browser stored it, so a refund, a cancellation or a payment correction
+    never showed here — and an order the WEBHOOK placed was not in this browser
+    at all, leaving the customer who most needed to track it with nothing.
+
+    `fetched` is the newest answer, kept with the order it answers; a refresh
+    that fails leaves it as it was (see `refreshOrder`).
+  */
+  const [fetched, setFetched] = useState<{ for: string; order: PlacedOrder | null } | null>(null);
+  const answer = fetched && fetched.for === orderNumber ? fetched : null;
+  const order = answer?.order ?? local;
+  const allowed = answer?.order ? true : localAllowed;
+  // Not ready until the server has answered, unless there is nothing to ask
+  // with — otherwise the page renders "not found" for a webhook-placed order
+  // a moment before its data arrives.
+  const ready = !orderNumber || Boolean(answer) || (hydrated && !lookupEmail);
 
   /**
    * Re-read the order — from the server when we can prove ownership.
@@ -61,11 +97,10 @@ export function OrderDetailPage() {
    */
   async function refreshOrder() {
     if (!orderNumber) return;
-    const email = readOrderLookupEmail(orderNumber) ?? getCustomerSession()?.email;
-    if (email) {
-      const fresh = await fetchOrderByNumber(orderNumber, { email });
+    if (lookupEmail) {
+      const fresh = await fetchOrderByNumber(orderNumber, { email: lookupEmail });
       if (fresh) {
-        setOrder(fresh);
+        setFetched({ for: orderNumber, order: fresh });
         return;
       }
     }
@@ -88,15 +123,10 @@ export function OrderDetailPage() {
      * request dropping silently reverted the page to "Confirmed · Total paid
      * ₹1,200". The customer asked for the newest state and got an older one,
      * with nothing to say so.
+     *
+     * Both hold by construction now: a failed refresh leaves `fetched` as it
+     * was, and the local copy is shown only while there is no server answer.
      */
-    if (!order) {
-      const local = getOrderByNumber(orderNumber);
-      if (local) {
-        setOrder(local);
-        return;
-      }
-    }
-
     toast.error("Could not refresh this order", {
       description: order
         ? "Showing the details we already have. Please try again in a moment."
@@ -105,49 +135,19 @@ export function OrderDetailPage() {
   }
 
   useEffect(() => {
-    if (!orderNumber) {
-      setReady(true);
-      return;
-    }
-
-    // Access is still decided locally where we can, so the page does not flash
-    // a stranger's details while a request is in flight.
-    const local = getOrderByNumber(orderNumber);
-    const sessionEmail = getCustomerSession()?.email;
-    const lookupEmail = readOrderLookupEmail(orderNumber) ?? sessionEmail ?? undefined;
-    const localAllowed = local ? canViewOrder(local, sessionEmail) : false;
-
-    setOrder(local);
-    setAllowed(localAllowed);
-    // Not ready until the server has answered, unless there is nothing to ask
-    // with — otherwise the page renders "not found" for a webhook-placed order
-    // a moment before its data arrives.
-    if (!lookupEmail) setReady(true);
-
+    if (!orderNumber || !lookupEmail) return;
     let cancelled = false;
-    if (lookupEmail) {
-      // The SERVER's copy is the real one. The local copy is frozen at the
-      // moment this browser stored it, so a refund, a cancellation or a payment
-      // correction never showed here — and an order the WEBHOOK placed was not
-      // in this browser at all, leaving the customer who most needed to track it
-      // with nothing.
-      void fetchOrderByNumber(orderNumber, { email: lookupEmail }).then((fresh) => {
-        if (cancelled) return;
-        if (fresh) {
-          setOrder(fresh);
-          setAllowed(true);
-        }
-        setReady(true);
-      });
-    }
-
-    const onLocalChange = () => void refreshOrder();
-    window.addEventListener("bakery-orders-updated", onLocalChange);
+    void fetchOrderByNumber(orderNumber, { email: lookupEmail }).then((fresh) => {
+      if (!cancelled) setFetched({ for: orderNumber, order: fresh });
+    });
     return () => {
       cancelled = true;
-      window.removeEventListener("bakery-orders-updated", onLocalChange);
     };
-  }, [orderNumber]);
+  }, [orderNumber, lookupEmail]);
+
+  // This browser changed an order (a cancel, a payment): ask the server again.
+  const onOrdersChanged = useEffectEvent(() => void refreshOrder());
+  useEffect(() => localOrderWrites(() => onOrdersChanged()), []);
 
   const timeline = useMemo(() => (order ? getOrderTimeline(order) : []), [order]);
   const tracking = useMemo(

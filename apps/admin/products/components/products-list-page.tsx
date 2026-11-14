@@ -55,9 +55,15 @@ import {
 import type { ModuleSettings } from "@/types/settings";
 import { defaultModuleSettings } from "@/features/settings/lib/settings-utils";
 import {
-  getModuleSettings,
+  peekSettings,
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
+
+const settingsChanges = windowEvents(SETTINGS_UPDATED_EVENT, "storage");
+// Read only: this runs while rendering (see `peekSettings`).
+const readModules = (): ModuleSettings => peekSettings().modules;
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { AdminSelect } from "./admin-field";
 import { DeleteProductDialog } from "./delete-product-dialog";
@@ -147,11 +153,11 @@ export function ProductsListPage({
   // fetch) — the table waits on this. `mounted`: this is the browser — what
   // reads this browser's caches (the category options, the stock thresholds)
   // waits on this, so the first render matches the server's HTML.
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHydrated();
   const [loaded, setLoaded] = useState(Boolean(initial));
   const [loadError, setLoadError] = useState<string | null>(null);
   const [cakes, setCakes] = useState<CakeEntity[]>(initial ?? []);
-  const [modules, setModules] = useState<ModuleSettings>(defaultModuleSettings);
+  const modules = useExternalValue(readModules, settingsChanges, defaultModuleSettings);
   const labels = useBusinessLabels();
   const productLower = labels.productWord.toLowerCase();
   const productsLower = labels.productWordPlural.toLowerCase();
@@ -173,34 +179,30 @@ export function ProductsListPage({
     name?: string;
   } | null>(null);
 
-  async function refresh() {
-    try {
-      setCakes(await fetchProducts());
-      setLoadError(null);
-    } catch (error) {
-      // Leave the previous list on screen rather than blanking the table.
-      setLoadError(
-        error instanceof Error ? error.message : `Failed to load ${productsLower}`,
-      );
-    } finally {
-      setLoaded(true);
-    }
+  // Every state change here lands when the request answers, never before.
+  function refresh(): Promise<void> {
+    return fetchProducts()
+      .then(
+        (list) => {
+          setCakes(list);
+          setLoadError(null);
+        },
+        (error: unknown) => {
+          // Leave the previous list on screen rather than blanking the table.
+          setLoadError(
+            error instanceof Error ? error.message : `Failed to load ${productsLower}`,
+          );
+        },
+      )
+      .finally(() => setLoaded(true));
   }
 
   useEffect(() => {
-    setMounted(true);
     // The server already sent the list; asking again on mount is the request
     // this page used to wait on.
     if (initial) return;
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only
-  }, []);
-
-  useEffect(() => {
-    const sync = () => setModules(getModuleSettings());
-    sync();
-    window.addEventListener(SETTINGS_UPDATED_EVENT, sync);
-    return () => window.removeEventListener(SETTINGS_UPDATED_EVENT, sync);
   }, []);
 
   const filtered = useMemo(() => filterProducts(cakes, filters), [cakes, filters]);

@@ -8,7 +8,6 @@ import {
   ADMIN_PROFILE_UPDATED_EVENT,
   getAdminProfile,
 } from "@/features/auth/lib/admin-profile";
-import { getDemoSession } from "@/features/auth/lib/session";
 import { useAccess } from "@/features/team/lib/access-context";
 import { canOpenRoute } from "@/features/team/lib/route-access";
 import { ThemeToggle } from "@/components/theme-toggle";

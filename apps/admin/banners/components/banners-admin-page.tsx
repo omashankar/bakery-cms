@@ -47,6 +47,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import type { Banner } from "@/types/media";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { adminShell } from "@/apps/admin/components/admin-shell";
 import {
@@ -73,6 +75,9 @@ import { DeleteBannerDialog } from "./delete-banner-dialog";
 import { RelativeTime } from "@/components/shared/relative-time";
 
 const PAGE_SIZE = 10;
+/** Another tab writing; this tab's own writes re-render through `refresh`. */
+const otherTabChanges = windowEvents("storage");
+const NO_BANNERS: Banner[] = [];
 
 const EMPTY_OVERVIEW: BannerOverview = {
   total: 0,
@@ -135,8 +140,11 @@ export function BannersAdminPage({
     if (initial) applyServerBanners(initial);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
   }, []);
-  const [mounted, setMounted] = useState(false);
-  const [banners, setBanners] = useState<Banner[]>([]);
+  const mounted = useHydrated();
+  // A render after a write or once the server's copy lands, so the list
+  // below reads the store again (the store announces nothing itself).
+  const [, setReadTick] = useState(0);
+  const banners = useExternalValue(loadBanners, otherTabChanges, NO_BANNERS);
   const [filters, setFilters] = useState<BannerListFilters>(defaultBannerFilters);
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -149,8 +157,7 @@ export function BannersAdminPage({
   const [resetOpen, setResetOpen] = useState(false);
 
   function refresh() {
-    setBanners(loadBanners());
-    setMounted(true);
+    setReadTick((tick) => tick + 1);
   }
 
   useEffect(() => {
@@ -165,7 +172,7 @@ export function BannersAdminPage({
     // list, the admin's next save then pushed those demo rows to the server and
     // destroyed the shop's real ones. The hydration gate already refuses a write
     // sent BEFORE the server copy arrives; this is the other half of it.
-    refresh();
+    // (The first read is the external value above.)
     let cancelled = false;
     void bannersWritable.waitForSettled().then((settled) => {
       if (settled && !cancelled) refresh();

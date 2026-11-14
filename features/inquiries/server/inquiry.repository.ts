@@ -92,7 +92,7 @@ export async function patch(id: string, fields: Partial<Inquiry>): Promise<Inqui
   const doc = (await InquiryModel.findByIdAndUpdate(
     id,
     { $set: { ...rest, updatedAt: new Date().toISOString() } },
-    { new: true },
+    { returnDocument: "after" },
   ).lean()) as unknown as Raw | null;
   return doc ? toInquiry(doc) : null;
 }

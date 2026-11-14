@@ -233,6 +233,26 @@ export function loadCoupons(): StoredCoupon[] {
   return readCoupons();
 }
 
+/**
+ * The live coupons this browser holds, READ ONLY — none when there is no
+ * copy, rather than seeding the shipped demo codes. For reads made while
+ * rendering, which must not write (see `peekSettings`).
+ */
+export function peekActiveCoupons(): StoredCoupon[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(COUPONS_STORAGE_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) return [];
+    const now = Date.now();
+    return (parsed as StoredCoupon[]).filter(
+      (coupon) => coupon.isActive && !hasExpired(coupon.expiresAt, now),
+    );
+  } catch {
+    return [];
+  }
+}
+
 export function getActiveCoupons(): StoredCoupon[] {
   const now = Date.now();
   return readCoupons().filter((coupon) => {
