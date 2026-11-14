@@ -4,6 +4,7 @@ import { useId } from "react";
 
 import { frameShape, framePathData } from "@/lib/images/photo-print-layout";
 import type { PhotoFrameShapeId } from "@/types/product";
+import { thumbnailImageUrl } from "@/lib/image-url";
 import { cn } from "@/lib/utils";
 
 interface FrameThumbnailProps {
@@ -61,10 +62,12 @@ export function FrameThumbnail({ src, shape, size = 36, className }: FrameThumbn
         customer uploaded seconds ago at a size measured in dozens of pixels —
         the loader's work costs more than it saves, and `fill` would need a
         positioned parent that the clip then has to be applied around.
+        But it asks Cloudinary for its own size: the stored file is the
+        2400px print master, and a 36px cart thumbnail was downloading it.
       */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={src}
+        src={thumbnailImageUrl(src, Math.max(width, height))}
         alt=""
         loading="lazy"
         className="size-full object-cover"

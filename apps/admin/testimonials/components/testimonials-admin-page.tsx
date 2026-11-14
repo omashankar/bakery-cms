@@ -37,6 +37,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { Testimonial } from "@/types/content";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { adminShell } from "@/apps/admin/components/admin-shell";
 import {
@@ -58,6 +60,9 @@ import { TestimonialFormDialog } from "./testimonial-form-dialog";
 import { RelativeTime } from "@/components/shared/relative-time";
 
 const PAGE_SIZE = 10;
+/** Another tab writing; this tab's own writes re-render through `refresh`. */
+const otherTabChanges = windowEvents("storage");
+const NO_ITEMS: Testimonial[] = [];
 
 const EMPTY_OVERVIEW: TestimonialOverview = {
   total: 0,
@@ -115,8 +120,11 @@ export function TestimonialsAdminPage({
     if (initial) applyServerTestimonials(initial);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
   }, []);
-  const [mounted, setMounted] = useState(false);
-  const [items, setItems] = useState<Testimonial[]>([]);
+  const mounted = useHydrated();
+  // A render after a write or once the server's copy lands, so the list
+  // below reads the store again (the store announces nothing itself).
+  const [, setReadTick] = useState(0);
+  const items = useExternalValue(loadTestimonials, otherTabChanges, NO_ITEMS);
   const [filters, setFilters] = useState<TestimonialListFilters>(defaultTestimonialFilters);
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -128,8 +136,7 @@ export function TestimonialsAdminPage({
   } | null>(null);
 
   function refresh() {
-    setItems(loadTestimonials());
-    setMounted(true);
+    setReadTick((tick) => tick + 1);
   }
 
   useEffect(() => {
@@ -144,7 +151,7 @@ export function TestimonialsAdminPage({
     // list, the admin's next save then pushed those demo rows to the server and
     // destroyed the shop's real ones. The hydration gate already refuses a write
     // sent BEFORE the server copy arrives; this is the other half of it.
-    refresh();
+    // (The first read is the external value above.)
     let cancelled = false;
     void testimonialsWritable.waitForSettled().then((settled) => {
       if (settled && !cancelled) refresh();
@@ -308,6 +315,7 @@ export function TestimonialsAdminPage({
           />
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:w-auto">
             <AdminSelect
+              aria-label="Filter by status"
               value={filters.status}
               onChange={(e) =>
                 updateFilters({ status: e.target.value as TestimonialListFilters["status"] })
@@ -319,6 +327,7 @@ export function TestimonialsAdminPage({
               <option value="archived">Archived</option>
             </AdminSelect>
             <AdminSelect
+              aria-label="Filter by featured"
               value={filters.featured}
               onChange={(e) =>
                 updateFilters({
@@ -330,6 +339,7 @@ export function TestimonialsAdminPage({
               <option value="featured">Featured only</option>
             </AdminSelect>
             <AdminSelect
+              aria-label="Sort by"
               value={filters.sort}
               onChange={(e) =>
                 updateFilters({ sort: e.target.value as TestimonialListFilters["sort"] })

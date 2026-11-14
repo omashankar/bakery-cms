@@ -1,5 +1,4 @@
 import { writeAuditLog } from "@/lib/server/audit/audit-log";
-import { NotFoundError } from "@/lib/server/http/errors";
 import * as orderRepo from "@/features/orders/server/order.repository";
 import {
   buildCustomerProfiles,

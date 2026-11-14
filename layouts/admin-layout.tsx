@@ -18,14 +18,30 @@ import { useOrdersServerSync } from "@/features/orders/lib/use-orders-server-syn
 import { useCommunicationsServerSync } from "@/apps/admin/communications/lib/use-communications-server-sync";
 import { useInquiriesServerSync } from "@/features/inquiries/lib/use-inquiries-server-sync";
 import { useAdminConfigServerSync } from "@/features/admin-config/lib/use-admin-config-server-sync";
+import { ADMIN_CONFIG_KEYS } from "@/features/admin-config/lib/admin-config-api";
+import { mayUseAdminConfigBlob } from "@/features/admin-config/lib/admin-config-rules";
 import { ensureSiteLayoutHydrated } from "@/components/shared/site-layout-server-sync";
 import { useIdle } from "@/hooks/use-idle";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { useHydrated } from "@/hooks/use-hydrated";
 import { applyServerSettings } from "@/features/settings/lib/settings-repository";
 import { applyServerInquiries } from "@/features/inquiries/lib/use-inquiries-server-sync";
 import type { Inquiry } from "@/types/inquiry";
 import { cn } from "@/lib/utils";
+import { AccessProvider, useAccess, type ClientAccess } from "@/features/team/lib/access-context";
+import { RouteAccessGate } from "@/apps/admin/components/route-access-gate";
 
 const SIDEBAR_COLLAPSED_KEY = "bakery-cms-sidebar-collapsed";
+const SIDEBAR_COLLAPSED_EVENT = "bakery-sidebar-collapsed-updated";
+const sidebarCollapsedChanges = windowEvents(SIDEBAR_COLLAPSED_EVENT, "storage");
+function readSidebarCollapsed(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
 
 interface AdminLayoutShellProps {
   children: React.ReactNode;
@@ -34,6 +50,12 @@ interface AdminLayoutShellProps {
   initialSettings?: Record<string, unknown> | null;
   /** Every enquiry, read on the server for this page; see `applyServerInquiries`. */
   initialInquiries?: unknown[] | null;
+  /**
+   * Who is signed in and what they may do, read from the database for this
+   * request. Null when the account is no longer active — the session guard
+   * then signs them out.
+   */
+  access?: ClientAccess | null;
 }
 
 /**
@@ -60,22 +82,64 @@ interface AdminLayoutShellProps {
  * stock-dismissal prune reads the product cache, and without it a cold browser
  * would prune against the shipped demo products.
  */
-function AdminDataHydration(): null {
-  // Refresh the browser product cache from the server, for the admin screens
-  // that still read it synchronously (inventory, dashboard, global search).
+function AdminDataHydration() {
+  /**
+   * Each cache only for a member who may read it. Every one of these reads is
+   * refused by its API otherwise — mounting them all for kitchen staff was a
+   * burst of 403s on every screen, each still costing the server a request.
+   */
+  const { can, canAny } = useAccess();
+  return (
+    <>
+      <SharedHydration />
+      {canAny(["products.view", "inventory.view"]) ? <ProductHydration /> : null}
+      {can("inventory.view") ? <InventoryHydration /> : null}
+      {can("orders.view") ? <OrdersHydration /> : null}
+      {can("inquiries.view") ? <InquiriesHydration /> : null}
+      {/* Only the blobs this member may read — none at all for kitchen staff. */}
+      <AdminConfigHydration />
+    </>
+  );
+}
+
+// Refresh the browser product cache from the server, for the admin screens
+// that still read it synchronously (inventory, dashboard, global search).
+function ProductHydration(): null {
   useProductCacheSync();
-  // Hydrate inventory stock history + settings from the server.
+  return null;
+}
+// Hydrate inventory stock history + settings from the server.
+function InventoryHydration(): null {
   useInventoryServerSync();
-  // Hydrate all orders from the server (so admin sees orders from any device).
+  return null;
+}
+// Hydrate all orders from the server (so admin sees orders from any device).
+function OrdersHydration(): null {
   useOrdersServerSync();
-  // Email/WhatsApp templates + notification settings: the bell filters by
-  // the settings and reads the read/dismissed state.
-  useCommunicationsServerSync();
-  // Inquiries (contact-form submissions): the sidebar's "new" badge.
+  return null;
+}
+// Inquiries (contact-form submissions): the sidebar's "new" badge.
+function InquiriesHydration(): null {
   useInquiriesServerSync();
-  // Admin-only config blobs: the header's profile, and the payment screens'
-  // gateway and notification switches, which have no read of their own.
-  useAdminConfigServerSync();
+  return null;
+}
+// Admin-only config blobs: the owner's profile, and the payment screens'
+// gateway and notification switches, which have no read of their own.
+function AdminConfigHydration(): null {
+  const { access, can } = useAccess();
+  useAdminConfigServerSync(
+    ADMIN_CONFIG_KEYS.filter((key) =>
+      mayUseAdminConfigBlob({ isOwner: Boolean(access?.isOwner), has: can }, key, "read"),
+    ),
+  );
+  return null;
+}
+
+function SharedHydration(): null {
+  // Notification settings and this member's own read/dismissed state: the bell
+  // filters by them. The templates come only with settings.view.
+  const { can } = useAccess();
+  useCommunicationsServerSync({ templates: can("settings.view") });
   /**
    * Header, footer and appearance — moved off the ROOT providers.
    *
@@ -97,6 +161,7 @@ export function AdminLayoutShell({
   className,
   initialSettings = null,
   initialInquiries = null,
+  access = null,
 }: AdminLayoutShellProps) {
   // A LAYOUT effect: it runs after the first render, so nothing reads the
   // seeded cache while hydrating (rendering it then put a status line in the
@@ -138,18 +203,29 @@ export function AdminLayoutShell({
   // One builder now; the wedding one was removed along with the page it published.
   const isBuilder = pathname === routes.admin.builders.homepage;
   const mobileNavId = useId();
-  // Must match the server render. The persisted preference is applied after
-  // mount (below) — reading localStorage during the first render would disagree
-  // with the server HTML and force React to discard the whole tree.
-  const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
+  // Must match the server render: expanded on the server and in the hydrating
+  // render, then this browser's stored preference (useExternalValue) —
+  // reading localStorage during the first render would disagree with the
+  // server HTML and force React to discard the whole tree.
+  const collapsed = useExternalValue(readSidebarCollapsed, sidebarCollapsedChanges, false);
+  const hydrated = useHydrated();
+
+  /*
+    THE DRAWER REMEMBERS WHICH PAGE IT WAS OPENED ON, so following a link in
+    it closes it — the page it belongs to is gone — without an effect that
+    watched the path. Reaching the desktop width closes it too: the sidebar is
+    on screen there and an open drawer would sit over it.
+  */
+  const [drawerOpenOn, setDrawerOpenOn] = useState<string | null>(null);
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
+  if (isDesktop && drawerOpenOn !== null) setDrawerOpenOn(null);
+  const mobileOpen = drawerOpenOn !== null && drawerOpenOn === pathname;
   const drawerRef = useRef<HTMLElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const wasMobileOpen = useRef(false);
 
-  const closeMobile = () => setMobileOpen(false);
-  const toggleMobile = () => setMobileOpen((open) => !open);
+  const closeMobile = () => setDrawerOpenOn(null);
+  const toggleMobile = () => setDrawerOpenOn(mobileOpen ? null : pathname);
 
   useBodyScrollLock(mobileOpen);
 
@@ -167,23 +243,6 @@ export function AdminLayoutShell({
     };
   }, []);
 
-  useEffect(() => {
-    try {
-      setCollapsed(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true");
-    } catch {
-      // ignore storage errors
-    }
-    setHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    try {
-      safeSetItem(SIDEBAR_COLLAPSED_KEY, String(collapsed));
-    } catch {
-      // ignore storage errors
-    }
-  }, [collapsed, hydrated]);
 
   useEffect(() => {
     if (!mobileOpen) {
@@ -225,147 +284,136 @@ export function AdminLayoutShell({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [mobileOpen]);
 
-  // Close mobile drawer when viewport reaches desktop sidebar breakpoint
-  useEffect(() => {
-    const media = window.matchMedia("(min-width: 1024px)");
-    function onChange(event: MediaQueryListEvent) {
-      if (event.matches) setMobileOpen(false);
-    }
-    media.addEventListener("change", onChange);
-    if (media.matches) setMobileOpen(false);
-    return () => media.removeEventListener("change", onChange);
-  }, []);
-
-  // Close drawer on route change
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
-
-  const handleSidebarToggle = () => setCollapsed((prev) => !prev);
+  const handleSidebarToggle = () => {
+    safeSetItem(SIDEBAR_COLLAPSED_KEY, String(!collapsed));
+    window.dispatchEvent(new Event(SIDEBAR_COLLAPSED_EVENT));
+  };
 
   return (
-    <div
-      className={cn(
-        // min-h-0: body is a flex column — without it, tall sidebar content expands this shell past 100dvh and creates a second (document) scrollbar.
-        "flex h-dvh min-h-0 overflow-hidden print:h-auto print:min-h-0 print:overflow-visible print:bg-white",
-        adminShell.pageBg,
-        className
-      )}
-    >
-      {/* Renders nothing; it exists to own the background hydration effects. */}
-      {backgroundDataReady ? <AdminDataHydration /> : null}
-
-      <aside
-        className={cn(
-          "hidden min-h-0 shrink-0 overflow-hidden border-r lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col print:hidden",
-          // Only animate user-driven toggles — restoring the saved state on load
-          // should snap, not play a collapse animation on every page view.
-          hydrated && "transition-[width] duration-200 ease-out",
-          adminShell.border,
-          adminShell.sidebarBg,
-          collapsed ? adminShell.sidebarCollapsedWidth : adminShell.sidebarWidth
-        )}
-      >
-        <AdminSidebar collapsed={collapsed} className="w-full min-h-0" />
-      </aside>
-
-      {/* Keep mounted for slide animation; z-[100] stays above header (z-40) */}
+    <AccessProvider access={access}>
       <div
         className={cn(
-          "fixed inset-0 z-[100] print:hidden lg:hidden",
-          mobileOpen ? "pointer-events-auto" : "pointer-events-none"
+          // min-h-0: body is a flex column — without it, tall sidebar content expands this shell past 100dvh and creates a second (document) scrollbar.
+          "flex h-dvh min-h-0 overflow-hidden print:h-auto print:min-h-0 print:overflow-visible print:bg-white",
+          adminShell.pageBg,
+          className
         )}
-        aria-hidden={!mobileOpen}
       >
-        <button
-          type="button"
-          tabIndex={mobileOpen ? 0 : -1}
-          className={cn(
-            "absolute inset-0 bg-black/45 transition-opacity duration-200",
-            mobileOpen ? "opacity-100" : "opacity-0"
-          )}
-          onClick={closeMobile}
-          aria-label="Close menu overlay"
-        />
+        {/* Renders nothing; it exists to own the background hydration effects. */}
+        {backgroundDataReady ? <AdminDataHydration /> : null}
+
         <aside
-          id={mobileNavId}
-          ref={drawerRef}
-          tabIndex={-1}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Admin navigation"
-          inert={!mobileOpen ? true : undefined}
           className={cn(
-            "relative flex h-full max-h-dvh w-[min(100%,20rem)] max-w-[85vw] flex-col border-r shadow-sm outline-none transition-transform duration-200 ease-out",
-            "pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)]",
+            "hidden min-h-0 shrink-0 overflow-hidden border-r lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col print:hidden",
+            // Only animate user-driven toggles — restoring the saved state on load
+            // should snap, not play a collapse animation on every page view.
+            hydrated && "transition-[width] duration-200 ease-out",
             adminShell.border,
             adminShell.sidebarBg,
-            mobileOpen ? "translate-x-0" : "-translate-x-full"
+            collapsed ? adminShell.sidebarCollapsedWidth : adminShell.sidebarWidth
           )}
         >
-          <div className="absolute top-2.5 right-2.5 z-10">
-            <Button
-              variant="ghost"
-              size="icon"
-              className={adminShell.iconButton}
-              onClick={closeMobile}
-              tabIndex={mobileOpen ? 0 : -1}
-              aria-label="Close menu"
-            >
-              <X className="size-4" />
-            </Button>
-          </div>
-          <AdminSidebar collapsed={false} inDrawer onNavigate={closeMobile} />
+          <AdminSidebar collapsed={collapsed} className="w-full min-h-0" />
         </aside>
-      </div>
 
-      {/*
-        Inside the shell so it is present on every admin screen, and mounted
-        once: the session belongs to the browser, not to a page.
-      */}
-      <SessionGuard />
-
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden print:overflow-visible">
-        <div className="shrink-0 print:hidden">
-          <AdminHeader
-            collapsed={collapsed}
-            mobileOpen={mobileOpen}
-            mobileNavId={mobileNavId}
-            menuButtonRef={menuButtonRef}
-            onMobileMenuToggle={toggleMobile}
-            onSidebarToggle={handleSidebarToggle}
-          />
-        </div>
-
-        <main
+        {/* Keep mounted for slide animation; z-[100] stays above header (z-40) */}
+        <div
           className={cn(
-            "min-h-0 flex-1",
-            // Builders fill the viewport; list/settings pages scroll by content height only.
-            // flex-1 + overflow-y-auto on the same node inflates scrollHeight (empty gap on SEO etc.).
-            // Builder pages full-bleed via -my-* on their root; that padding must live on the SAME
-            // element as overflow-hidden (contentWrap), else the negative margin overshoots the clip
-            // box and the toolbar title gets cut off. So keep vertical padding off <main> for builders.
-            isBuilder
-              ? "flex flex-col overflow-hidden"
-              : cn("overflow-y-auto panel-scroll", adminShell.mainPadding),
-            "print:overflow-visible print:p-0"
+            "fixed inset-0 z-[100] print:hidden lg:hidden",
+            mobileOpen ? "pointer-events-auto" : "pointer-events-none"
           )}
+          aria-hidden={!mobileOpen}
         >
-          <div
+          <button
+            type="button"
+            tabIndex={mobileOpen ? 0 : -1}
             className={cn(
-              adminShell.contentWrap,
-              isBuilder &&
-                cn(
-                  "flex min-h-0 flex-1 flex-col overflow-hidden",
-                  adminShell.mainPadding
-                ),
-              "print:max-w-none print:overflow-visible print:px-0"
+              "absolute inset-0 bg-black/45 transition-opacity duration-200",
+              mobileOpen ? "opacity-100" : "opacity-0"
+            )}
+            onClick={closeMobile}
+            aria-label="Close menu overlay"
+          />
+          <aside
+            id={mobileNavId}
+            ref={drawerRef}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Admin navigation"
+            inert={!mobileOpen ? true : undefined}
+            className={cn(
+              "relative flex h-full max-h-dvh w-[min(100%,20rem)] max-w-[85vw] flex-col border-r shadow-sm outline-none transition-transform duration-200 ease-out",
+              "pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)]",
+              adminShell.border,
+              adminShell.sidebarBg,
+              mobileOpen ? "translate-x-0" : "-translate-x-full"
             )}
           >
-            {children}
+            <div className="absolute top-2.5 right-2.5 z-10">
+              <Button
+                variant="ghost"
+                size="icon"
+                className={adminShell.iconButton}
+                onClick={closeMobile}
+                tabIndex={mobileOpen ? 0 : -1}
+                aria-label="Close menu"
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
+            <AdminSidebar collapsed={false} inDrawer onNavigate={closeMobile} />
+          </aside>
+        </div>
+
+        {/*
+          Inside the shell so it is present on every admin screen, and mounted
+          once: the session belongs to the browser, not to a page.
+        */}
+        <SessionGuard />
+
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden print:overflow-visible">
+          <div className="shrink-0 print:hidden">
+            <AdminHeader
+              collapsed={collapsed}
+              mobileOpen={mobileOpen}
+              mobileNavId={mobileNavId}
+              menuButtonRef={menuButtonRef}
+              onMobileMenuToggle={toggleMobile}
+              onSidebarToggle={handleSidebarToggle}
+            />
           </div>
-        </main>
+
+          <main
+            className={cn(
+              "min-h-0 flex-1",
+              // Builders fill the viewport; list/settings pages scroll by content height only.
+              // flex-1 + overflow-y-auto on the same node inflates scrollHeight (empty gap on SEO etc.).
+              // Builder pages full-bleed via -my-* on their root; that padding must live on the SAME
+              // element as overflow-hidden (contentWrap), else the negative margin overshoots the clip
+              // box and the toolbar title gets cut off. So keep vertical padding off <main> for builders.
+              isBuilder
+                ? "flex flex-col overflow-hidden"
+                : cn("overflow-y-auto panel-scroll", adminShell.mainPadding),
+              "print:overflow-visible print:p-0"
+            )}
+          >
+            <div
+              className={cn(
+                adminShell.contentWrap,
+                isBuilder &&
+                  cn(
+                    "flex min-h-0 flex-1 flex-col overflow-hidden",
+                    adminShell.mainPadding
+                  ),
+                "print:max-w-none print:overflow-visible print:px-0"
+              )}
+            >
+              <RouteAccessGate>{children}</RouteAccessGate>
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </AccessProvider>
   );
 }

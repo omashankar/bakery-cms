@@ -62,6 +62,7 @@ import {
   getUnhelpfulMarks,
   rememberHelpfulMark,
   rememberUnhelpfulMark,
+  REVIEW_MARKS_UPDATED_EVENT,
 } from "@/features/reviews/lib/helpful-marks";
 import {
   getProductGalleryImages,
@@ -118,6 +119,15 @@ import { DetailSection } from "@/components/storefront/detail-section";
 import { ClampedTitle } from "@/components/storefront/clamped-title";
 import { OptionButton, OptionGroup } from "@/components/storefront/option-group";
 import { RelativeTime } from "@/components/shared/relative-time";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
+
+// What this page reads from the browser, and the events that say it changed.
+const reviewMarkChanges = windowEvents(REVIEW_MARKS_UPDATED_EVENT, "storage");
+const wishlistChanges = windowEvents("bakery-wishlist-updated", "storage");
+const cartChanges = windowEvents("bakery-cart-updated", "storage");
+const settingsChanges = windowEvents(SETTINGS_UPDATED_EVENT, "storage");
+const NO_MARKS: string[] = [];
 
 /**
  * The photo editor, loaded when a customer opens it.
@@ -251,10 +261,8 @@ export function ProductDetailPage({
    * this browser and nowhere else. That one genuinely cannot render until it
    * has one.
    */
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const hydrated = useHydrated();
+  const mounted = hydrated;
   /**
    * No mount gate any more, because there is nothing left to gate.
    *
@@ -314,12 +322,13 @@ export function ProductDetailPage({
    * list is re-fetched whenever a review is submitted, and merging would mean
    * deciding which of the two numbers is newer on every re-read.
    */
-  const [helpfulMarks, setHelpfulMarks] = useState<string[]>([]);
+  // The reviews this browser has already voted on — none on the server.
+  const helpfulMarks = useExternalValue(getHelpfulMarks, reviewMarkChanges, NO_MARKS);
   /** Answered questions only — see `listAnsweredForProduct`. */
   const [questions, setQuestions] = useState<Inquiry[]>([]);
   const [helpfulCounts, setHelpfulCounts] = useState<Record<string, number>>({});
   /** The other thumb, held apart for the same reason. */
-  const [unhelpfulMarks, setUnhelpfulMarks] = useState<string[]>([]);
+  const unhelpfulMarks = useExternalValue(getUnhelpfulMarks, reviewMarkChanges, NO_MARKS);
   const [unhelpfulCounts, setUnhelpfulCounts] = useState<Record<string, number>>({});
   /** The sideways row of review cards, and whether more of it is off to the right. */
   const reviewRowRef = useRef<HTMLDivElement>(null);
@@ -346,7 +355,12 @@ export function ProductDetailPage({
   // The count the SERVER knows, so the heading and the empty state do not
   // contradict the star rating beside them before the fetch lands.
   const reviewCount = reviews.length || cake.reviewCount || 0;
-  const [deliveryPromise, setDeliveryPromise] = useState("");
+  /*
+    The shop's own delivery promise, for the "Timely Delivery" card — read
+    from the browser's settings copy, "" on the server. (This once also read
+    the slot list and the earliest date for two fields above the buy button.)
+  */
+  const deliveryPromise = useExternalValue(getDeliveryPromise, settingsChanges, "");
   /**
    * What this shop is offering, said where the decision is made.
    *
@@ -390,7 +404,8 @@ export function ProductDetailPage({
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoDraft, setPhotoDraft] = useState<PhotoPrintDraft>(emptyPhotoPrintDraft);
   const [quantity, setQuantity] = useState(1);
-  const [wishlisted, setWishlisted] = useState(false);
+  const readHearted = useCallback(() => isInWishlist(cake.slug), [cake.slug]);
+  const wishlisted = useExternalValue(readHearted, wishlistChanges, false);
 
   /**
    * Seeded from the SERVER, then kept live.
@@ -705,14 +720,6 @@ export function ProductDetailPage({
   const showPhotoUpload = cake.allowsPhotoUpload === true && modules.photoCake;
   const isOutOfStock = cake.inStock === false;
 
-  /*
-    This also read the slot list and the earliest date, to fill the two
-    delivery fields that stood above the buy button. Only the shop's own
-    promise is left — one string, for the “Timely Delivery” card.
-  */
-  useEffect(() => {
-    setDeliveryPromise(getDeliveryPromise());
-  }, []);
 
   /**
    * The offers, RE-READ when the caches they come from land.
@@ -774,50 +781,33 @@ export function ProductDetailPage({
    * id alone travels in the URL — putting the choices there instead would
    * mean a link that can assert a size or an option the shop does not sell.
    */
-  const [editingLine, setEditingLine] = useState<CartLineItem | null>(null);
+  const readEditingLine = useCallback(
+    (): CartLineItem | null =>
+      editLineId
+        ? (getCartItems().find(
+            (item) => item.id === editLineId && item.productSlug === cake.slug,
+          ) ?? null)
+        : null,
+    [editLineId, cake.slug],
+  );
+  const editingLine = useExternalValue(readEditingLine, cartChanges, null);
 
-  // A link to #reviews or #questions — from this page or from outside it —
-  // opens the folded section it names instead of landing on a closed heading.
-  // OPEN ON A DESKTOP. The folded sections are the phone's answer to a long
-  // page (the shop's Flipkart reference); on a wide screen the reference it
-  // sent next reads them open, beside a photo that stays in view. Below the
-  // fold there, so opening them moves nothing a customer is looking at.
-  useEffect(() => {
-    // Optional: jsdom and some old browsers have no matchMedia, and a
-    // closed section is the safe default there.
-    if (!window.matchMedia?.("(min-width: 1024px)").matches) return;
-    for (const details of document.querySelectorAll<HTMLDetailsElement>("details[data-detail-section]")) {
-      details.open = true;
-    }
-  }, []);
+  /*
+    THE FORM TAKES THE LINE'S CHOICES ONCE — when the browser is first read,
+    and again only for a different cake or a different line. Adjusted while
+    rendering, so the first browser render already shows them (this was an
+    effect, a render behind); never again for the same line, so a customer
+    changing a size is not overruled by the line they are in the middle of
+    editing.
+  */
+  const restoreKey = hydrated ? `${cake.slug}|${editingLine?.id ?? ""}` : null;
+  const [restoredFor, setRestoredFor] = useState<string | null>(null);
+  if (restoreKey !== null && restoredFor !== restoreKey) {
+    setRestoredFor(restoreKey);
+    restoreChoices(editingLine);
+  }
 
-  useEffect(() => {
-    const openFromHash = () => openDetailSection(window.location.hash.slice(1));
-    openFromHash();
-    window.addEventListener("hashchange", openFromHash);
-    return () => window.removeEventListener("hashchange", openFromHash);
-  }, []);
-
-  useEffect(() => {
-    setWishlisted(isInWishlist(cake.slug));
-    setHelpfulMarks(getHelpfulMarks());
-    setUnhelpfulMarks(getUnhelpfulMarks());
-    /*
-      Fetched, not server-rendered: this is one more round trip on a page
-      whose first paint matters, and a question nobody has answered yet is
-      the common case — there is usually nothing here to render at all.
-    */
-    void fetchProductQuestions(cake.slug).then((answered) => {
-      if (answered) setQuestions(answered);
-    });
-
-    const line = editLineId
-      ? getCartItems().find(
-          (item) => item.id === editLineId && item.productSlug === cake.slug,
-        )
-      : undefined;
-    setEditingLine(line ?? null);
-
+  function restoreChoices(line: CartLineItem | null) {
     if (!line) {
       setVariantSelections(getDefaultVariantSelections(getProductVariantGroups(cake)));
       setSelectedWeight(0);
@@ -862,10 +852,7 @@ export function ProductDetailPage({
       const mapped = mapLegacyChoice(group, legacy, carried);
       if (mapped) carried[mapped.groupId] = mapped.optionId;
     }
-    // Defaults UNDER the line's own answers: a group the shop has added since
-    // this line was made has no answer on it, and an unanswered group is
-    // priced at its default anyway — so leaving it out would show the customer
-    // one thing and charge them for another.
+    // Defaults UNDER the line's own answers (see above).
     setVariantSelections({ ...getDefaultVariantSelections(groups), ...carried });
     const tier = getProductWeightOptions(cake).findIndex(
       (option) => option.label === line.weight,
@@ -880,7 +867,40 @@ export function ProductDetailPage({
       picker is already defaulted to the earliest date the shop can actually
       manage, which is the honest answer to a question being asked again.
     */
-  }, [cake, editLineId]);
+  }
+
+  // A link to #reviews or #questions — from this page or from outside it —
+  // opens the folded section it names instead of landing on a closed heading.
+  // OPEN ON A DESKTOP. The folded sections are the phone's answer to a long
+  // page (the shop's Flipkart reference); on a wide screen the reference it
+  // sent next reads them open, beside a photo that stays in view. Below the
+  // fold there, so opening them moves nothing a customer is looking at.
+  useEffect(() => {
+    // Optional: jsdom and some old browsers have no matchMedia, and a
+    // closed section is the safe default there.
+    if (!window.matchMedia?.("(min-width: 1024px)").matches) return;
+    for (const details of document.querySelectorAll<HTMLDetailsElement>("details[data-detail-section]")) {
+      details.open = true;
+    }
+  }, []);
+
+  useEffect(() => {
+    const openFromHash = () => openDetailSection(window.location.hash.slice(1));
+    openFromHash();
+    window.addEventListener("hashchange", openFromHash);
+    return () => window.removeEventListener("hashchange", openFromHash);
+  }, []);
+
+  useEffect(() => {
+    /*
+      Fetched, not server-rendered: this is one more round trip on a page
+      whose first paint matters, and a question nobody has answered yet is
+      the common case — there is usually nothing here to render at all.
+    */
+    void fetchProductQuestions(cake.slug).then((answered) => {
+      if (answered) setQuestions(answered);
+    });
+  }, [cake.slug]);
 
   // Same-category first, then top up from the wider catalogue so this row always
   // shows a full set of 4 — never a lone card floating in an empty grid.
@@ -1112,7 +1132,6 @@ export function ProductDetailPage({
      */
     if (votedOn(review.id)) return;
     rememberHelpfulMark(review.id);
-    setHelpfulMarks((current) => [...current, review.id]);
     setHelpfulCounts((current) => ({
       ...current,
       [review.id]: (current[review.id] ?? review.helpfulCount ?? 0) + 1,
@@ -1128,7 +1147,6 @@ export function ProductDetailPage({
   const handleUnhelpful = async (review: ProductReview) => {
     if (votedOn(review.id)) return;
     rememberUnhelpfulMark(review.id);
-    setUnhelpfulMarks((current) => [...current, review.id]);
     setUnhelpfulCounts((current) => ({
       ...current,
       [review.id]: (current[review.id] ?? review.unhelpfulCount ?? 0) + 1,
@@ -1142,7 +1160,6 @@ export function ProductDetailPage({
 
   const handleWishlist = () => {
     const added = toggleWishlist(cake.slug);
-    setWishlisted(added);
     toast.success(added ? "Added to wishlist" : "Removed from wishlist");
   };
 

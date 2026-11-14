@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { CatalogAdminPage } from "@/apps/admin/catalog/components/catalog-admin-page";
-import { whenAdmin } from "@/lib/server/auth/admin-initial";
+import { whenAllowed } from "@/lib/server/auth/access";
 import { getCatalog } from "@/features/catalog/server/catalog.service";
 
 export const metadata: Metadata = {
@@ -10,6 +10,6 @@ export const metadata: Metadata = {
 
 /** The whole taxonomy, read with the page. */
 export default async function Page() {
-  const initial = await whenAdmin(async () => JSON.parse(JSON.stringify(await getCatalog())));
+  const initial = await whenAllowed("catalog.manage", async () => JSON.parse(JSON.stringify(await getCatalog())));
   return <CatalogAdminPage initial={initial} />;
 }

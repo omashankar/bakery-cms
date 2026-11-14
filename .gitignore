@@ -64,3 +64,9 @@ scripts/.snapshots/
 
 # Banner artwork dropped here to be uploaded to the CDN, not to be committed.
 banners/
+
+# scripts/migrate-rbac.ts backups — contain role data, kept out of git
+rbac-backup-*.json
+
+# Removed test orders (customer addresses inside) — kept out of git
+orders-backup-*.json

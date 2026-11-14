@@ -92,7 +92,7 @@ export function TabbedRailTabs({
                   rounded bottom corner leaves a notch of rule showing
                   through beside it.
                 */
-                "relative -mb-px shrink-0 rounded-t-md border px-5 py-2.5 text-base font-semibold",
+                "relative -mb-px shrink-0 rounded-t-md border px-5 py-2.5 text-base font-medium",
                 index === current
                   ? "border-foreground bg-foreground text-background"
                   : "border-border border-b-transparent bg-card text-foreground"

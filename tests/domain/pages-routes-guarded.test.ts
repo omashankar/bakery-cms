@@ -23,7 +23,7 @@ import type { CmsPage } from "@/types/content";
  *   behind them.
  */
 
-const guard = vi.hoisted(() => ({ requireAdminResponse: vi.fn() }));
+const guard = vi.hoisted(() => ({ requirePermissionResponse: vi.fn() }));
 vi.mock("@/lib/server/auth/guard", () => guard);
 
 const store = vi.hoisted(() => ({
@@ -70,16 +70,16 @@ function body(value: unknown, method: string) {
 const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
 
 function signedOut() {
-  guard.requireAdminResponse.mockResolvedValue(
+  guard.requirePermissionResponse.mockResolvedValue(
     NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
   );
 }
 function signedIn() {
-  guard.requireAdminResponse.mockResolvedValue({ sub: "u1", role: "admin" });
+  guard.requirePermissionResponse.mockResolvedValue({ sub: "u1", role: "admin" });
 }
 
 beforeEach(() => {
-  guard.requireAdminResponse.mockReset();
+  guard.requirePermissionResponse.mockReset();
   store.pages = [
     page({ id: "page-about", slug: "about", isSystem: true }),
     page({ id: "page-draft", slug: "corporate-catering", status: "draft" }),
@@ -111,6 +111,24 @@ describe("the CMS page endpoints", () => {
 
     expect((await collection.GET()).status).toBe(200);
     expect((await item.GET(body(null, "GET"), ctx("page-about"))).status).toBe(200);
+  });
+
+  it("reads need pages.view, and every write needs pages.manage", async () => {
+    signedOut();
+
+    await collection.GET();
+    await item.GET(body(null, "GET"), ctx("page-draft"));
+    await collection.POST(body({ title: "x", slug: "x" }, "POST"));
+    await item.PUT(body({ title: "x" }, "PUT"), ctx("page-careers"));
+    await item.DELETE(body(null, "DELETE"), ctx("page-careers"));
+
+    expect(guard.requirePermissionResponse.mock.calls).toEqual([
+      ["pages.view"],
+      ["pages.view"],
+      ["pages.manage"],
+      ["pages.manage"],
+      ["pages.manage"],
+    ]);
   });
 
   it("still refuses every write from a signed-out caller", async () => {

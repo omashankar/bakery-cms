@@ -16,22 +16,22 @@ import {
 } from "@/features/auth/lib/auth-api";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/constants/routes";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+
+/** The address step one sent a code to; null until the browser is read. */
+const readResetEmail = () => getResetFlow()?.email ?? null;
+const resetFlowNeverAnnounces = windowEvents();
 
 export function OtpFormPage() {
   const router = useRouter();
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [email, setEmail] = useState<string | null>(null);
+  const email = useExternalValue(readResetEmail, resetFlowNeverAnnounces, null);
 
   // Reached without asking for a code? Send them back to step one.
   useEffect(() => {
-    const flow = getResetFlow();
-    if (!flow) {
-      router.replace(routes.auth.forgotPassword);
-      return;
-    }
-    setEmail(flow.email);
+    if (!getResetFlow()) router.replace(routes.auth.forgotPassword);
   }, [router]);
 
   async function handleSubmit(event: React.FormEvent) {
@@ -66,7 +66,7 @@ export function OtpFormPage() {
       footer={
         <Link
           href={routes.auth.login}
-          className="block text-center text-xs text-muted-foreground hover:text-bakery-700"
+          className="flex min-h-6 items-center justify-center text-xs text-muted-foreground hover:text-bakery-700"
         >
           ← Back to login
         </Link>

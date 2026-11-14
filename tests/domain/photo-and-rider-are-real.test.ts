@@ -276,11 +276,13 @@ describe("assigning a rider", () => {
     expect(deliveryPartnerSchema.safeParse({ name: "Imran", phone: "98123" }).success).toBe(true);
   });
 
-  it("is an admin-only write", () => {
+  it("needs the assign-delivery permission, and checks a named member against the team", () => {
     const controller = read("features/orders/server/order.controller.ts");
     const fn = controller.slice(controller.indexOf("export const deliveryPartnerController"));
+    const body = fn.slice(0, fn.indexOf("\n});"));
 
-    expect(fn.slice(0, fn.indexOf("});"))).toContain("requireRole(...ORDER_ROLES)");
+    expect(body).toContain('requirePermission("orders.assign_delivery")');
+    expect(body).toContain("deliveryMemberById(input.userId)");
   });
 });
 

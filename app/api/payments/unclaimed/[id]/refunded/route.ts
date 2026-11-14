@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireAdminResponse } from "@/lib/server/auth/guard";
+import { requirePermissionResponse } from "@/lib/server/auth/guard";
 import { markUnclaimedPaymentRefunded } from "@/features/payments/server/unclaimed-payment.repository";
 import { writeAuditLog, requestContext } from "@/lib/server/audit/audit-log";
 
@@ -20,7 +20,7 @@ import { writeAuditLog, requestContext } from "@/lib/server/audit/audit-log";
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(request: Request, ctx: Ctx) {
-  const auth = await requireAdminResponse();
+  const auth = await requirePermissionResponse("payments.refund");
   if (auth instanceof NextResponse) return auth;
 
   const { id } = await ctx.params;

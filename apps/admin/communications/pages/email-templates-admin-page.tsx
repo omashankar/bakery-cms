@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { applyServerCommunications } from "@/apps/admin/communications/lib/use-communications-server-sync";
 import {
   CheckCircle2,
@@ -122,8 +122,6 @@ export function EmailTemplatesAdminPage({
    * real copy. Strictly worse than the clobber it replaced.
    */
   const [draftOrigin, setDraftOrigin] = useState<EmailTemplateRecord | null>(null);
-  // Read inside the updater below, which must not re-run on every keystroke.
-  const draftOriginRef = useRef<EmailTemplateRecord | null>(null);
   const [filters, setFilters] = useState<EmailTemplateListFilters>(defaultEmailTemplateFilters);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [testSendOpen, setTestSendOpen] = useState(false);
@@ -175,41 +173,35 @@ export function EmailTemplatesAdminPage({
     [templates, selectedId]
   );
 
-  useEffect(() => {
-    if (!selectedId) {
-      setDraft(null);
-      setDraftOrigin(null);
-      return;
-    }
-    const next = templates.find((template) => template.id === selectedId) ?? null;
-    // Never over an edit in progress.
-    //
-    // This ran on EVERY change to `templates` — including server hydration and
-    // any save from another tab — and replaced the editor's contents outright.
-    // An admin part-way through rewriting a subject line lost it with no
-    // warning and nothing on screen to say why. Comparing against the saved
-    // copy is how the shared settings form decides the same question.
-    setDraft((current) => {
-      // A different template, or nothing open: adopt outright.
-      if (!current || current.id !== selectedId) {
-        setDraftOrigin(next);
-        return next;
-      }
-      // Untouched since it was loaded — take the server's newer copy.
-      if (!isEdited(current, draftOriginRef.current)) {
-        setDraftOrigin(next);
-        return next;
-      }
-      // Genuinely mid-edit. Keep what the admin typed; `isDirty` below
-      // compares against the new baseline, so the header and Save button
-      // describe the difference that actually matters.
-      return current;
-    });
-  }, [selectedId, templates]);
+  /*
+    The editor follows the chosen template and the saved list — adjusted while
+    rendering, the moment either changes, rather than by an effect a render
+    later.
 
-  useEffect(() => {
-    draftOriginRef.current = draftOrigin;
-  }, [draftOrigin]);
+    Never over an edit in progress. This once replaced the editor's contents
+    on EVERY change to `templates` — including server hydration and any save
+    from another tab — and an admin part-way through rewriting a subject line
+    lost it with no warning and nothing on screen to say why. Comparing
+    against the saved copy is how the shared settings form decides the same
+    question.
+  */
+  const [editorFor, setEditorFor] = useState<{
+    id: string | null;
+    templates: typeof templates;
+  } | null>(null);
+  if (!editorFor || editorFor.id !== selectedId || editorFor.templates !== templates) {
+    setEditorFor({ id: selectedId, templates });
+    const next = selectedId
+      ? (templates.find((template) => template.id === selectedId) ?? null)
+      : null;
+    // Nothing open; a different template; or untouched since it was loaded —
+    // adopt the saved copy. Otherwise the admin is genuinely mid-edit: keep
+    // what they typed, and `isDirty` below compares against the new baseline.
+    if (!selectedId || !draft || draft.id !== selectedId || !isEdited(draft, draftOrigin)) {
+      setDraft(next);
+      setDraftOrigin(next);
+    }
+  }
 
   /**
    * The slug is the KEY a sender matches on, so it is checked live rather
@@ -829,7 +821,7 @@ export function EmailTemplatesAdminPage({
             <DialogTitle>Delete template?</DialogTitle>
             <p className="text-sm text-muted-foreground">
               {draft
-                ? `“${draft.name}” will be removed from this demo store.`
+                ? `“${draft.name}” will be removed from this shop.`
                 : "This template will be removed."}
             </p>
           </DialogHeader>

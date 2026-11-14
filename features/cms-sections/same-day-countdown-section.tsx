@@ -200,7 +200,7 @@ export function SameDayCountdownSection(props: HomepageSectionRendererProps) {
               <span className="flex h-14 w-16 items-center justify-center rounded-lg bg-foreground font-heading text-3xl leading-none font-medium text-background tabular-nums shadow-sm lg:h-16 lg:w-[4.5rem] lg:text-4xl">
                 {value}
               </span>
-              <span className="text-[0.625rem] leading-none font-semibold tracking-[0.25em] text-foreground uppercase">
+              <span className="text-[0.6875rem] leading-none font-semibold tracking-[0.2em] text-foreground uppercase">
                 {label}
               </span>
             </span>
@@ -212,7 +212,7 @@ export function SameDayCountdownSection(props: HomepageSectionRendererProps) {
             THE SENTENCE IS THE BAND: the only thing in it that says what is
             closing, in the shop's own words, and the largest type on it.
           */}
-          <p className="font-heading text-2xl leading-tight font-bold text-balance sm:text-3xl md:text-2xl lg:text-3xl xl:text-4xl">
+          <p className="font-heading text-2xl leading-tight font-semibold text-balance sm:text-3xl md:text-2xl lg:text-3xl">
             {headline}
           </p>
           {/*
@@ -248,7 +248,7 @@ export function SameDayCountdownSection(props: HomepageSectionRendererProps) {
         {contentString(c, "ctaHref") && contentString(c, "ctaLabel") ? (
           <Link
             href={contentString(c, "ctaHref")}
-            className="flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-md bg-primary px-7 text-base font-bold tracking-wide text-primary-foreground uppercase shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+            className="flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-md bg-primary px-7 text-base font-semibold tracking-wide text-primary-foreground uppercase shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
           >
             {contentString(c, "ctaLabel")}
             <ArrowRight aria-hidden="true" className="size-4" />

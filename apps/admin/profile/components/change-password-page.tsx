@@ -70,7 +70,7 @@ function PasswordField({
         <button
           type="button"
           onClick={() => setShow((s) => !s)}
-          className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground after:absolute after:-inset-2.5 after:content-[''] hover:text-foreground"
           aria-label={show ? "Hide password" : "Show password"}
         >
           {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}

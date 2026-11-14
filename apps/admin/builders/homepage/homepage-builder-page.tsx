@@ -808,6 +808,7 @@ export function HomepageBuilderPage() {
           )}
         >
           <BuilderPreviewPanel
+            loaded={loadedLayout || mounted}
             sections={sections}
             selectedId={selectedId}
             onSelect={(id) => {

@@ -21,6 +21,7 @@ import {
 } from "@/apps/admin/components/filter-panel";
 import { MobileDetailDrawer } from "@/components/shared/mobile-detail-drawer";
 import { RefundOrderDialog } from "@/apps/admin/commerce/components/refund-order-dialog";
+import { useCan } from "@/features/team/lib/access-context";
 import { RefundStatusBadge } from "@/apps/admin/commerce/components/refund-status-badge";
 import { RefundTimeline } from "@/apps/admin/commerce/components/refund-timeline";
 import {
@@ -49,6 +50,7 @@ import { ListPagination } from "@/components/shared/list-pagination";
 import { routes } from "@/constants/routes";
 import { cn } from "@/lib/utils";
 import { settledRefundAmount } from "@/features/orders/lib/order-overviews";
+import { ORDER_STATUS_LABELS } from "@/features/orders/lib/order-status-meta";
 import { formatCurrency } from "@/utils/format";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
@@ -80,6 +82,9 @@ function RefundCaseDetail({
   onIssueRefund: () => void;
   onDeclineRefund: () => void;
 }) {
+  // Paying money back, or refusing to, is `orders.refund`; payments.view alone
+  // may read the case.
+  const canRefund = useCan("orders.refund");
   // A request nothing has been paid against — the only case the shop can
   // still say no to. See `declineRefund` on the server.
   const declinable =
@@ -109,7 +114,7 @@ function RefundCaseDetail({
             <div className="min-w-0">
               <p className="text-[11px] text-muted-foreground">Order status</p>
               <p className="mt-0.5 capitalize font-medium">
-                {order.status.replace(/_/g, " ")}
+                {ORDER_STATUS_LABELS[order.status] ?? order.status.replace(/_/g, " ")}
               </p>
             </div>
             <div className="min-w-0">
@@ -185,7 +190,7 @@ function RefundCaseDetail({
             </div>
           ) : null}
 
-          {order.status !== "refunded" ? (
+          {order.status !== "refunded" && canRefund ? (
             <Button variant="bakery" className="w-full" onClick={onIssueRefund}>
               Issue refund
             </Button>
@@ -196,7 +201,7 @@ function RefundCaseDetail({
             was already baked may not be. Issue refund can still pay a partial
             amount; this is for paying nothing.
           */}
-          {declinable ? (
+          {declinable && canRefund ? (
             <Button variant="outline" className="w-full" onClick={onDeclineRefund}>
               Decline refund
             </Button>
@@ -222,6 +227,7 @@ export function RefundCenterAdminPage({
   /** The default view's first page, read on the server; null fetches as before. */
   initial?: { items: PlacedOrder[]; total: number; overview: RefundOverview } | null;
 } = {}) {
+  const canRefund = useCan("orders.refund");
   // The server answered the default view; its first request would repeat it.
   const listFromServer = useRef(Boolean(initial));
   const [orders, setOrders] = useState<PlacedOrder[]>(initial?.items ?? []);
@@ -262,11 +268,12 @@ export function RefundCenterAdminPage({
     JSON.stringify({ filters, page: currentPage }),
     250
   );
-  const request = JSON.parse(requestKey) as {
-    filters: Record<string, unknown>;
-    page: number;
-  };
   useEffect(() => {
+    // Read from the key this effect runs on, so it uses nothing it does not list.
+    const request = JSON.parse(requestKey) as {
+      filters: Record<string, unknown>;
+      page: number;
+    };
     if (listFromServer.current) {
       listFromServer.current = false;
       return;
@@ -300,9 +307,11 @@ export function RefundCenterAdminPage({
   // arrive the record sits at `processing` for good while the money has gone.
   // The operator opening this screen is exactly the person who wants that
   // resolved, so opening it asks. Reloads the list only when something changed.
+  // Only for someone who may refund: a member who may only VIEW the cases
+  // (a manager, by default) was sent a refused request on every visit.
   const reconciledRef = useRef(false);
   useEffect(() => {
-    if (reconciledRef.current) return;
+    if (reconciledRef.current || !canRefund) return;
     reconciledRef.current = true;
 
     void fetch("/api/orders/refunds/reconcile", { method: "POST" })
@@ -311,16 +320,16 @@ export function RefundCenterAdminPage({
         if (result?.settled) setReloadKey((key) => key + 1);
       })
       .catch(() => undefined);
-  }, []);
+  }, [canRefund]);
 
   const paginated = orders;
   const selected = orders.find((order) => order.id === selectedId) ?? null;
 
-  useEffect(() => {
-    if (selectedId && !orders.some((order) => order.id === selectedId)) {
-      setSelectedId(null);
-    }
-  }, [orders, selectedId]);
+  // A case that has left the list (filtered out, or settled elsewhere) is no
+  // longer selected — let go while rendering, the moment it is gone.
+  if (selectedId && !orders.some((order) => order.id === selectedId)) {
+    setSelectedId(null);
+  }
 
   function updateFilters(patch: Partial<RefundListFilters>) {
     setFilters((prev) => ({ ...prev, ...patch }));
@@ -511,7 +520,7 @@ export function RefundCenterAdminPage({
         />
       </section>
 
-      <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+      <div className="relative -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         <div className="flex w-max min-w-full gap-1.5 pb-0.5">
           {caseTabs.map((tab) => {
             const active = filters.caseType === tab.value;

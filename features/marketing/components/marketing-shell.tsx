@@ -51,8 +51,10 @@ export function MarketingShell({ children }: { children: React.ReactNode }) {
       {/* ============================================================ */}
       <footer className="bg-[#241810] text-[#E7DDD1]">
         <Container className="py-16">
-          <div className="grid gap-12 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
-            <div className="flex flex-col gap-4">
+          {/* Link columns side by side on a phone too — one column ran the
+              footer to a screen and a half of short links. */}
+          <div className="grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-3 lg:grid-cols-[1.4fr_1fr_1fr_1fr] lg:gap-12">
+            <div className="col-span-2 flex flex-col gap-4 sm:col-span-3 lg:col-span-1">
               <Logo tone="invert" />
               <p className="max-w-xs text-sm leading-relaxed text-[#B7A895]">
                 The complete platform to manage, sell, and grow your bakery — website, orders,

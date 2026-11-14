@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
 import {
   Banknote,
   Building,
@@ -262,6 +262,15 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   const labels = useBusinessLabels();
   const productLower = labels.productWord.toLowerCase();
   const router = useRouter();
+  /*
+    An empty cart sends the customer back to it, in the shop's own word —
+    read when it happens, so the effects below need not restart (and re-run
+    the whole checkout set-up) when the shop's wording arrives.
+  */
+  const leaveForEmptyCart = useEffectEvent((message: string) => {
+    toast.info(`${message} — add a ${productLower} to check out`);
+    router.replace(routes.store.cart);
+  });
   const searchParams = useSearchParams();
   const [items, setItems] = useState<CartLineItem[]>([]);
   const [ready, setReady] = useState(false);
@@ -472,11 +481,14 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
    * Nothing to do while the list is empty — that is the pre-hydration instant,
    * not a shop that accepts no payment at all.
    */
-  useEffect(() => {
-    if (availablePaymentOptions.length === 0) return;
-    if (availablePaymentOptions.some((option) => option.value === paymentMethod)) return;
+  // A method the shop no longer offers gives way to the first one it does —
+  // while rendering, so no frame shows a choice that cannot be paid with.
+  if (
+    availablePaymentOptions.length > 0 &&
+    !availablePaymentOptions.some((option) => option.value === paymentMethod)
+  ) {
     setPaymentMethod(availablePaymentOptions[0].value);
-  }, [paymentMethod, availablePaymentOptions]);
+  }
 
   /**
    * This checkout has produced an order, so an emptied cart is expected.
@@ -517,11 +529,10 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
 
   const {
     register,
-    control,
     handleSubmit,
     reset,
     setValue,
-    watch,
+    control,
     getValues,
     setError,
     setFocus,
@@ -576,8 +587,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
 
     const cartItems = getCartItems();
     if (cartItems.length === 0) {
-      toast.info(`Your cart is empty — add a ${productLower} to check out`);
-      router.replace(routes.store.cart);
+      leaveForEmptyCart("Your cart is empty");
       return;
     }
 
@@ -741,18 +751,18 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   useEffect(() => () => publishCheckoutStep(null), []);
 
   // Browser Back/Forward changes the URL; follow it back into the right step.
-  useEffect(() => {
-    if (!ready) return;
-    const param = Number(searchParams.get("step"));
-    const target: CheckoutStep = param === 2 || param === 3 ? param : 1;
-    if (target === step) return;
+  // (Adjusted while rendering: the step follows the address the moment it
+  // differs, rather than an effect a render later.)
+  const urlStep = Number(searchParams.get("step"));
+  const stepInUrl: CheckoutStep = urlStep === 2 || urlStep === 3 ? urlStep : 1;
+  if (ready && stepInUrl !== step) {
     // Never land on a later step without what it stands on: an address to
     // deliver to, and — for Payment — a slot to deliver in.
     const draft = getCheckoutDraft();
-    if (target > 1 && !hasDeliverableAddress(draft.address)) return;
-    if (target === 3 && !hasDeliverySlot(draft.deliverySlot)) return;
-    setStep(target);
-  }, [searchParams, ready, step]);
+    const standsOnAddress = stepInUrl === 1 || hasDeliverableAddress(draft.address);
+    const standsOnSlot = stepInUrl !== 3 || hasDeliverySlot(draft.deliverySlot);
+    if (standsOnAddress && standsOnSlot) setStep(stepInUrl);
+  }
 
   // The cart is read once on mount. Keep it in step with edits made anywhere
   // else — including another tab — so the summary, the totals and the order
@@ -772,8 +782,7 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
          */
         if (orderCommitted.current) return;
 
-        toast.info(`Your cart is now empty — add a ${productLower} to check out`);
-        router.replace(routes.store.cart);
+        leaveForEmptyCart("Your cart is now empty");
         return;
       }
       setItems(next);
@@ -799,12 +808,12 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
   );
   const cartBlocked = hasBlockingCartIssues(cartIssues);
 
-  const watchedCity = watch("city");
-  const watchedPincode = watch("pincode");
-  const watchedState = watch("state");
   // The 3-up control is not an <input>, so its value is watched rather than
   // registered; `setValue` is what writes the choice back into the form.
-  const watchedAddressLabel = watch("addressLabel");
+  const [watchedCity, watchedPincode, watchedState, watchedAddressLabel] = useWatch({
+    control,
+    name: ["city", "pincode", "state", "addressLabel"],
+  });
 
   /**
    * WHERE THE PIN REALLY IS, from India Post.
@@ -1056,11 +1065,15 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
       : floor;
   }, [totals.deliveryMinDays, minDeliveryDate, commerce.sameDayCutoff]);
 
-  // Anything that changes the price invalidates the shop's last answer.
-  useEffect(() => {
+  // Anything that changes the price invalidates the shop's last answer — let
+  // go while rendering, the moment one of them changes.
+  const priceInputs = [items, validCoupon, giftWrap, deliveryTierId, watchedCity, watchedPincode, pin] as const;
+  const [pricedFor, setPricedFor] = useState(priceInputs);
+  if (priceInputs.some((value, index) => value !== pricedFor[index])) {
+    setPricedFor(priceInputs);
     setServerTotals(null);
     setServerItems(null);
-  }, [items, validCoupon, giftWrap, deliveryTierId, watchedCity, watchedPincode, pin]);
+  }
 
   function persistDraft(
     patch: Partial<{
@@ -1716,7 +1729,12 @@ export function CheckoutPage({ catalog, siteName }: CheckoutPageProps) {
                     */}
                     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-xl border border-border bg-cream-50 px-4 py-3 text-sm">
                       <span className="text-muted-foreground">Ordering as</span>
-                      <span className="font-medium break-all">{accountEmail}</span>
+                      {/* One line, cut with an ellipsis: `break-all` split a long
+                          address at any letter ("…apps.co" / "m"). The title
+                          still gives the whole of it. */}
+                      <span className="max-w-full min-w-0 truncate font-medium" title={accountEmail}>
+                        {accountEmail}
+                      </span>
                     </div>
                     <input type="hidden" {...register("email")} />
 

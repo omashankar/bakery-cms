@@ -1,5 +1,6 @@
 "use client";
 
+import { useCan } from "@/features/team/lib/access-context";
 import { useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
@@ -31,6 +32,8 @@ interface UnclaimedPayment {
 }
 
 export function UnclaimedPaymentsAlert() {
+  // Recording a refund is `payments.refund`; viewing payments shows the alert.
+  const canSettle = useCan("payments.refund");
   const [items, setItems] = useState<UnclaimedPayment[]>([]);
   const [amount, setAmount] = useState(0);
   const [marking, setMarking] = useState<string | null>(null);
@@ -112,14 +115,16 @@ export function UnclaimedPaymentsAlert() {
                   total above. The refund itself happens at the gateway; this
                   records that it did.
                 */}
-                <button
-                  type="button"
-                  className="mt-2 text-xs font-medium text-destructive underline underline-offset-2 disabled:opacity-50"
-                  disabled={marking === item.id}
-                  onClick={() => void markRefunded(item.id)}
-                >
-                  {marking === item.id ? "Recording…" : "I refunded this at the gateway"}
-                </button>
+                {canSettle ? (
+                  <button
+                    type="button"
+                    className="mt-2 text-xs font-medium text-destructive underline underline-offset-2 disabled:opacity-50"
+                    disabled={marking === item.id}
+                    onClick={() => void markRefunded(item.id)}
+                  >
+                    {marking === item.id ? "Recording…" : "I refunded this at the gateway"}
+                  </button>
+                ) : null}
               </li>
             ))}
           </ul>

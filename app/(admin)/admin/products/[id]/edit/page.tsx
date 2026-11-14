@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getServerLabels } from "@/features/settings/server/labels.server";
 import { ProductFormPage } from "@/apps/admin/products/components/product-form-page";
-import { whenAdmin } from "@/lib/server/auth/admin-initial";
+import { whenAllowed } from "@/lib/server/auth/access";
 import { getProductById } from "@/features/products/data/products-service";
 import { getCatalog } from "@/features/catalog/server/catalog.service";
 import { readSeoForAdmin } from "@/features/site-layout/server/site-layout.initial";
@@ -29,8 +29,8 @@ export default async function Page({ params }: PageProps) {
   const { id } = await params;
   // With the taxonomy the pickers offer and the SEO store the preview reads.
   const [initialProduct, initial] = await Promise.all([
-    whenAdmin(() => getProductById(id)),
-    whenAdmin(async () => {
+    whenAllowed("products.update", () => getProductById(id)),
+    whenAllowed("products.update", async () => {
       const [catalog, seo, settings] = await Promise.all([getCatalog(), readSeoForAdmin(), getSettings()]);
       // The delivery speeds and wording the form shows, so its HTML matches its first render.
       const commerce = (settings as { commerce?: CommerceSettings }).commerce;

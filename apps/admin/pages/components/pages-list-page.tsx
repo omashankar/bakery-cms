@@ -126,15 +126,14 @@ export function PagesListPage({
     title?: string;
   } | null>(null);
 
-  async function refresh() {
-    try {
-      setPages(await fetchPages());
-    } catch {
-      // Leave the previous list on screen rather than blanking the table.
-      toast.error("Could not load pages");
-    } finally {
-      setMounted(true);
-    }
+  // Every state change here lands when the request answers, never before.
+  function refresh(): Promise<void> {
+    return fetchPages()
+      .then(setPages, () => {
+        // Leave the previous list on screen rather than blanking the table.
+        toast.error("Could not load pages");
+      })
+      .finally(() => setMounted(true));
   }
 
   useEffect(() => {
@@ -313,6 +312,7 @@ export function PagesListPage({
           />
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:w-auto">
             <AdminSelect
+              aria-label="Filter by status"
               value={filters.status}
               onChange={(e) =>
                 updateFilters({ status: e.target.value as PageListFilters["status"] })
@@ -324,6 +324,7 @@ export function PagesListPage({
               <option value="archived">Archived</option>
             </AdminSelect>
             <AdminSelect
+              aria-label="Filter by template"
               value={filters.template}
               onChange={(e) =>
                 updateFilters({ template: e.target.value as PageListFilters["template"] })
@@ -334,6 +335,7 @@ export function PagesListPage({
               <option value="about">About layout</option>
             </AdminSelect>
             <AdminSelect
+              aria-label="Sort by"
               value={filters.sort}
               onChange={(e) => updateFilters({ sort: e.target.value as PageListFilters["sort"] })}
             >

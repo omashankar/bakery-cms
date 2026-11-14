@@ -4,14 +4,36 @@
  * Never throws; every write reports whether the server took it. Admin-guarded endpoints, so reads return null for
  * non-admins. The SEED/first-load is never pushed; only genuine saves are.
  */
-import { createHydrationGate } from "@/lib/hydration-gate";
+import { createHydrationGate, type HydrationGate } from "@/lib/hydration-gate";
 import { noteAuthStatus } from "@/features/auth/lib/session-expiry";
 
+export const ADMIN_CONFIG_KEYS = ["admin-profile", "payment-gateways", "payment-notif-prefs", "custom-code"] as const;
+export type AdminConfigKey = (typeof ADMIN_CONFIG_KEYS)[number];
+
 /**
- * Opened by `useAdminConfigServerSync` once the server's blobs have been read
- * into the local caches. Until then no replace-all write may go out.
+ * One gate per blob, each opened when THAT blob has been read from the server.
+ * Until then no replace-all write of it may go out.
+ *
+ * Four blobs shared one gate, and it opened only when all four had arrived. The
+ * admin profile is the owner's alone, so for every other member it never did —
+ * and a member allowed to change the payment gateways or the custom code had
+ * every save refused as "saved on this device only", for a blob they had read
+ * perfectly well.
  */
-export const adminConfigHydration = createHydrationGate();
+export const adminConfigGates = Object.fromEntries(
+  ADMIN_CONFIG_KEYS.map((key) => [key, createHydrationGate()]),
+) as Record<AdminConfigKey, HydrationGate>;
+
+/**
+ * All four together — for the one screen that needs every blob (Backup), and
+ * for code that opens the gates as a whole.
+ */
+export const adminConfigHydration: HydrationGate = {
+  hasSettled: () => ADMIN_CONFIG_KEYS.every((key) => adminConfigGates[key].hasSettled()),
+  markSettled: () => ADMIN_CONFIG_KEYS.forEach((key) => adminConfigGates[key].markSettled()),
+  waitForSettled: async (timeoutMs) =>
+    (await Promise.all(ADMIN_CONFIG_KEYS.map((key) => adminConfigGates[key].waitForSettled(timeoutMs)))).every(Boolean),
+};
 
 interface Envelope<T> {
   success: boolean;
@@ -42,7 +64,8 @@ async function getJson<T>(path: string): Promise<T | null> {
  * for a change that lives only in this browser and that the next hydration
  * silently reverts.
  */
-async function putJson(path: string, body: unknown): Promise<boolean> {
+async function putJson(key: AdminConfigKey, body: unknown): Promise<boolean> {
+  const path = url(key);
   // Every write here is a whole-blob REPLACE, sent from a local copy. Until that
   // local copy has been filled from the server, sending it overwrites the
   // server's real config with whatever this device happens to hold — and
@@ -52,7 +75,7 @@ async function putJson(path: string, body: unknown): Promise<boolean> {
   //
   // The settings API already learned this (`pushSection` waits on
   // `settingsHydration`); this path never did.
-  if (!(await adminConfigHydration.waitForSettled())) return false;
+  if (!(await adminConfigGates[key].waitForSettled())) return false;
 
   try {
     const res = await fetch(path, {
@@ -67,20 +90,20 @@ async function putJson(path: string, body: unknown): Promise<boolean> {
   }
 }
 
-const url = (key: string) => `/api/admin-config/${key}`;
+const url = (key: AdminConfigKey) => `/api/admin-config/${key}`;
 
 export const fetchAdminProfileConfig = () => getJson<Record<string, unknown>>(url("admin-profile"));
-export const replaceAdminProfileRequest = (value: unknown) => putJson(url("admin-profile"), value);
+export const replaceAdminProfileRequest = (value: unknown) => putJson("admin-profile", value);
 
 export const fetchPaymentGateways = () => getJson<Record<string, unknown>>(url("payment-gateways"));
 export const replacePaymentGatewaysRequest = (value: unknown) =>
-  putJson(url("payment-gateways"), value);
+  putJson("payment-gateways", value);
 
 export const fetchPaymentNotifPrefs = () =>
   getJson<Record<string, unknown>>(url("payment-notif-prefs"));
 export const replacePaymentNotifPrefsRequest = (value: unknown) =>
-  putJson(url("payment-notif-prefs"), value);
+  putJson("payment-notif-prefs", value);
 
 export const fetchCustomCode = () => getJson<{ css: string; js: string }>(url("custom-code"));
 export const replaceCustomCodeRequest = (value: { css: string; js: string }) =>
-  putJson(url("custom-code"), value);
+  putJson("custom-code", value);

@@ -56,7 +56,7 @@ export default async function Page(props: PageProps) {
   // /store/pages/corporate-catering answered 404, and the same URL with
   // ?preview=1 answered with the entire unreleased page. Same rule as the CMS
   // preview on the homepage and the wedding page.
-  const isPreview = preview === "1" && (await canPreviewDraft());
+  const isPreview = preview === "1" && (await canPreviewDraft("pages.view"));
   const page = await getPageForStorefront(slug, isPreview);
 
   // Unpublished and unknown slugs are indistinguishable to a visitor.

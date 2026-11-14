@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Heart, X } from "lucide-react";
 import { ProductCard } from "@/components/storefront/product-card";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -14,6 +14,10 @@ import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { routes } from "@/constants/routes";
 import { layoutSpacing } from "@/constants/spacing";
 import type { LandingProduct } from "@/constants/landing-data";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
+
+const wishlistChanges = windowEvents("bakery-wishlist-updated", "storage");
 
 // Two across on a phone (it was ONE, a full-width card per saved item), up to
 // five on a wide screen, as the reference lays its wishlist out.
@@ -22,11 +26,18 @@ const WISHLIST_GRID = "grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-co
 interface WishlistPageProps {
   /** Catalogue fetched on the server; the saved slugs themselves are browser-local. */
   catalog: LandingProduct[];
+  /** The saved slugs as the cookie mirror had them (wishlist-cookie.ts). */
+  initialSlugs?: string[];
+  /** False when the server could not tell — draw the skeleton, as before. */
+  initialKnown?: boolean;
 }
 
-export function WishlistPage({ catalog }: WishlistPageProps) {
-  const [slugs, setSlugs] = useState<string[]>([]);
-  const [loaded, setLoaded] = useState(false);
+export function WishlistPage({ catalog, initialSlugs = [], initialKnown = false }: WishlistPageProps) {
+  // Drawn from the server's copy at once; after hydration, the browser's own
+  // list — which stays the truth — followed on every change.
+  const slugs = useExternalValue(getWishlistSlugs, wishlistChanges, initialSlugs);
+  const hydrated = useHydrated();
+  const loaded = initialKnown || hydrated;
   const labels = useBusinessLabels();
 
   useEffect(() => {
@@ -48,12 +59,6 @@ export function WishlistPage({ catalog }: WishlistPageProps) {
         } been removed from your wishlist.`,
       );
     }
-
-    const load = () => setSlugs(getWishlistSlugs());
-    load();
-    setLoaded(true);
-    window.addEventListener("bakery-wishlist-updated", load);
-    return () => window.removeEventListener("bakery-wishlist-updated", load);
   }, [catalog]);
 
   const bySlug = new Map(catalog.map((cake) => [cake.slug, cake]));
@@ -71,7 +76,7 @@ export function WishlistPage({ catalog }: WishlistPageProps) {
             the reference heads the page. The heading was screen-reader only,
             so the page opened on a grid with nothing saying what it was.
           */}
-          <h1 className="mb-6 text-center font-heading text-2xl font-bold tracking-tight sm:mb-8 sm:text-3xl">
+          <h1 className="mb-6 text-center font-heading text-2xl font-semibold tracking-tight sm:mb-8 sm:text-3xl">
             My Wishlist{loaded && cakes.length > 0 ? ` (${cakes.length})` : ""}
           </h1>
           {!loaded ? (

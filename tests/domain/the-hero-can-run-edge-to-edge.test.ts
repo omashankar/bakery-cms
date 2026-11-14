@@ -1058,8 +1058,9 @@ describe("how one slide becomes the next", () => {
       '"lazy"',
     );
     expect(intrinsic).toContain('loading="eager"');
-    // `priority` still decides which one is asked for FIRST.
-    expect(intrinsic).toMatch(/fetchPriority=\{priority \? "high" : undefined\}/);
+    // `priority` still decides which one is asked for FIRST — and the others
+    // are asked for LOW, so they do not share the line with it.
+    expect(intrinsic).toMatch(/fetchPriority=\{priority \? "high" : "low"\}/);
   });
 
   it("and the track follows the row, not the slide number", () => {

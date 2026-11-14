@@ -4,7 +4,7 @@ import { connectDB } from "@/lib/server/db/mongoose";
 import { UserModel } from "@/lib/server/db/models/user.model";
 
 import { getAccessCookie } from "./cookies";
-import { AuthError, ForbiddenError } from "@/lib/server/http/errors";
+import { AuthError } from "@/lib/server/http/errors";
 import { verifyAccessToken, type AccessClaims } from "./jwt";
 
 /**
@@ -29,12 +29,13 @@ export async function requireSession(): Promise<AccessClaims> {
   return session;
 }
 
-/** Throws ForbiddenError unless the current user's role is in `roles`. */
-export async function requireRole(...roles: string[]): Promise<AccessClaims> {
-  const session = await requireSession();
-  if (!roles.includes(session.role)) throw new ForbiddenError();
-  return session;
-}
+/*
+ * There is no `requireRole` any more, on purpose. Authorising by role name
+ * meant every controller carried its own `["owner", "admin"]` list, and a role
+ * the seed created ("manager") was refused by all of them. Authorise with
+ * `requirePermission` from ./access, which reads the account's CURRENT role and
+ * status from the database rather than trusting the token.
+ */
 
 /** The current user document (safe DTO via model toJSON), or null. */
 export const getCurrentUser = cache(async () => {

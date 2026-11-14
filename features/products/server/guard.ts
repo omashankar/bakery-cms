@@ -1,20 +1,17 @@
-import { NextResponse } from "next/server";
+import type { NextResponse } from "next/server";
 
-import { requireRole } from "@/lib/server/auth/dal";
-import { AppError } from "@/lib/server/http/errors";
-import type { AccessClaims } from "@/lib/server/auth/jwt";
+import { requirePermissionResponse } from "@/lib/server/auth/guard";
+import type { Actor } from "@/lib/server/auth/access";
+import type { Permission } from "@/features/team/lib/permissions";
 
 /**
- * Admin guard for the legacy-shape product routes. Returns the session claims,
- * or a `{ error }` NextResponse (matching the routes' existing error shape) when
- * the caller isn't an authorised admin. Product-mutating requests must pass this.
+ * Guard for the legacy-shape product routes. Returns the caller, or a
+ * `{ error }` NextResponse (matching the routes' existing error shape) when they
+ * lack the permission. Viewing, creating, editing and deleting are separate
+ * permissions — "can edit a price" must not imply "can delete the product".
  */
-export async function requireProductAdmin(): Promise<AccessClaims | NextResponse> {
-  try {
-    return await requireRole("owner", "admin");
-  } catch (error) {
-    const status = error instanceof AppError ? error.status : 401;
-    const message = error instanceof Error ? error.message : "Unauthorized";
-    return NextResponse.json({ error: message }, { status });
-  }
+export async function requireProductPermission(
+  permission: Extract<Permission, `products.${string}`>,
+): Promise<Actor | NextResponse> {
+  return requirePermissionResponse(permission);
 }

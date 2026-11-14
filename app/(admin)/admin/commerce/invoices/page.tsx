@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { InvoicesAdminPage } from "@/apps/admin/commerce/pages/invoices-admin-page";
-import { whenAdmin } from "@/lib/server/auth/admin-initial";
+import { whenAllowed } from "@/lib/server/auth/access";
 import { asQueryParams } from "@/lib/server/http/query-params";
 import { invoicesQuerySchema } from "@/features/orders/server/order.validators";
 import { getInvoicesPage } from "@/features/orders/server/order.analytics";
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
  * (its default filters, page 1, 10 rows), through the API's schema.
  */
 export default async function Page() {
-  const initial = await whenAdmin(async () => {
+  const initial = await whenAllowed("payments.view", async () => {
     const { page, limit, ...filters } = invoicesQuerySchema.parse(
       asQueryParams({ ...defaultInvoiceListFilters, page: 1, limit: 10 }),
     );

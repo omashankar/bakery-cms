@@ -1,35 +1,38 @@
 import { ok } from "@/lib/server/http/response";
-import { withErrorHandler, NotFoundError } from "@/lib/server/http/errors";
+import { withErrorHandler, ForbiddenError, NotFoundError } from "@/lib/server/http/errors";
 import { validate, readJson } from "@/lib/server/http/validate";
-import { requireRole } from "@/lib/server/auth/dal";
+import { requireActor } from "@/lib/server/auth/access";
 import { requestContext } from "@/lib/server/audit/audit-log";
 
 import * as service from "./admin-config.service";
 import { adminConfigSchemas } from "./admin-config.validators";
+import { mayUseAdminConfig } from "./admin-config.access";
 import { allowlisted } from "@/lib/server/http/allowlist";
 
-const CONFIG_ROLES = ["owner", "admin"] as const;
 type KeyContext = { params: Promise<{ key: string }> };
 
 export const getAdminConfigController = withErrorHandler(async (_req: Request, ctx: KeyContext) => {
-  // Admin-only — these blobs include payment credentials; never public.
-  await requireRole(...CONFIG_ROLES);
+  // Never public — these blobs include payment configuration. Each key has its
+  // own permission; see admin-config.access.ts.
+  const actor = await requireActor();
   const { key } = await ctx.params;
+  if (!mayUseAdminConfig(actor, key, "read")) throw new ForbiddenError();
   return ok(await service.getAdminConfig(key), key);
 });
 
 export const replaceAdminConfigController = withErrorHandler(async (request: Request, ctx: KeyContext) => {
-  const session = await requireRole(...CONFIG_ROLES);
+  const actor = await requireActor();
   const { key } = await ctx.params;
 
   const schema = allowlisted(adminConfigSchemas, key);
   if (!schema) throw new NotFoundError("Unknown admin-config section");
+  if (!mayUseAdminConfig(actor, key, "write")) throw new ForbiddenError();
 
   const value = validate(schema, await readJson(request));
   const result = await service.replaceAdminConfig(key, value, {
     ...requestContext(request),
-    actorId: session.sub,
-    actorEmail: session.email,
+    actorId: actor.sub,
+    actorEmail: actor.email,
   });
   return ok(result, `${key} saved`);
 });

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Bell,
-  Cake,
   Clock3,
   FileText,
   FolderOpen,
@@ -49,6 +48,8 @@ import {
   type GlobalSearchResult,
 } from "@/apps/admin/lib/global-search";
 import { cn } from "@/lib/utils";
+import { useAccess } from "@/features/team/lib/access-context";
+import { canOpenRoute } from "@/features/team/lib/route-access";
 import { useCustomersServerSync } from "@/apps/admin/commerce/lib/use-customers-server-sync";
 import { usePagesServerSync } from "@/features/content/lib/use-pages-server-sync";
 import { useMediaServerSync } from "@/apps/admin/media/lib/use-media-server-sync";
@@ -64,9 +65,27 @@ import { ADMIN_DATA_EVENTS } from "@/apps/admin/lib/admin-data-events";
  * palette most visits never open. Mounted on the first open and kept mounted,
  * so it is one read per session, the same as before — just not up front.
  */
-function SearchOnlySources(): null {
+function SearchOnlySources() {
+  // Each only for a member who may read it — the rest would be refused.
+  const { can } = useAccess();
+  return (
+    <>
+      {can("customers.view") ? <CustomersSource /> : null}
+      {can("pages.view") ? <PagesSource /> : null}
+      {can("media.view") ? <MediaSource /> : null}
+    </>
+  );
+}
+
+function CustomersSource(): null {
   useCustomersServerSync();
+  return null;
+}
+function PagesSource(): null {
   usePagesServerSync();
+  return null;
+}
+function MediaSource(): null {
   useMediaServerSync();
   return null;
 }
@@ -215,13 +234,28 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
    * `[]` — and the palette compiles, renders, and shows the wording from first
    * paint for the rest of the session.
    */
-  const results = useMemo(
-    () => searchAdminGlobal(query, labels, { groupFilter: effectiveGroupFilter }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- dataVersion re-reads the caches
-    [query, effectiveGroupFilter, labels, dataVersion]
+  /**
+   * Only rows that lead somewhere this member can open — the same table as the
+   * sidebar and the route guard. A shortcut to "Add product" for kitchen staff
+   * is a door into an Access Denied page. Storefront links are not admin
+   * screens and always pass.
+   */
+  const { can } = useAccess();
+  const reachable = useCallback(
+    (result: { href: string }) => !result.href.startsWith("/admin") || canOpenRoute(result.href, can),
+    [can],
   );
 
-  const shortcuts = useMemo(() => getGlobalSearchShortcuts(labels), [labels]);
+  const results = useMemo(
+    () => searchAdminGlobal(query, labels, { groupFilter: effectiveGroupFilter }).filter(reachable),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- dataVersion re-reads the caches
+    [query, effectiveGroupFilter, labels, dataVersion, reachable]
+  );
+
+  const shortcuts = useMemo(
+    () => getGlobalSearchShortcuts(labels).filter(reachable),
+    [labels, reachable],
+  );
 
   // The palette’s own rows, by id, so a recent click shows what that row says
   // NOW rather than what it said the day it was clicked. Products and orders
@@ -233,8 +267,12 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
   }, [labels]);
 
   const recentResults = useMemo(
-    () => loadRecentSearches().map((entry) => recentSearchToResult(entry, liveTitles.get(entry.id))),
-    [recentVersion, open, liveTitles]
+    () =>
+      loadRecentSearches()
+        .map((entry) => recentSearchToResult(entry, liveTitles.get(entry.id)))
+        .filter(reachable),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- recentVersion and open re-read storage
+    [recentVersion, open, liveTitles, reachable]
   );
 
   const emptyStateResults = useMemo(() => {
@@ -260,17 +298,28 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
     [onOpenChange, router]
   );
 
-  useEffect(() => {
+  // Closing starts the next opening afresh — adjusted while rendering, the
+  // moment it closes, rather than by an effect a render later.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
     if (!open) {
       setQuery("");
       setActiveIndex(0);
       setGroupFilter("all");
     }
-  }, [open]);
+  }
 
-  useEffect(() => {
+  // A new query or group is a new list: the highlight goes back to its top,
+  // in the same change rather than a render later.
+  const changeQuery = (next: string) => {
+    setQuery(next);
     setActiveIndex(0);
-  }, [query, groupFilter]);
+  };
+  const changeGroup = (next: GlobalSearchGroup | "all") => {
+    setGroupFilter(next);
+    setActiveIndex(0);
+  };
 
   // ⌘K / Ctrl K lives in the header (useCommandSearchShortcut), which is
   // always loaded; this palette is loaded lazily.
@@ -307,7 +356,7 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
             <Input
               autoFocus
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => changeQuery(event.target.value)}
               onKeyDown={handleInputKeyDown}
               placeholder="Search or type order:, product:, inquiry:, stock:, zone:, >action…"
               className="h-10 border-border bg-muted/50 pl-9 shadow-none"
@@ -318,7 +367,7 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
               <button
                 key={filter}
                 type="button"
-                onClick={() => setGroupFilter(filter)}
+                onClick={() => changeGroup(filter)}
                 className={cn(
                   "rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
                   effectiveGroupFilter === filter
@@ -345,7 +394,7 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
                     key={hint.prefix}
                     type="button"
                     className="rounded-full border border-border bg-muted px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground"
-                    onClick={() => setQuery(hint.prefix)}
+                    onClick={() => changeQuery(hint.prefix)}
                   >
                     <span className="font-mono">{hint.prefix}</span> {hint.label}
                   </button>
@@ -447,7 +496,7 @@ export function AdminCommandSearch({ open, onOpenChange }: AdminCommandSearchPro
                       key={hint.prefix}
                       type="button"
                       className="rounded-full border border-border bg-card px-2 py-0.5 font-mono text-[11px] hover:text-foreground"
-                      onClick={() => setQuery(hint.prefix)}
+                      onClick={() => changeQuery(hint.prefix)}
                     >
                       {hint.prefix}
                     </button>

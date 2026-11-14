@@ -2,7 +2,7 @@
 
 import { hasExpired } from "@/lib/expiry-date";
 import { formatCurrency, formatDate } from "@/utils/format";
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useState } from "react";
 import { Pencil, Plus, RotateCcw, Tag, Trash2 } from "lucide-react";
 import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
@@ -24,8 +24,12 @@ import {
 import { CouponFormDialog } from "../components/coupon-form-dialog";
 import { applyServerCoupons, COUPONS_UPDATED_EVENT } from "@/features/commerce/lib/coupons-repository";
 import { adminCategories } from "@/features/products/lib/catalog-options";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
 
 const PAGE_SIZE = 10;
+const couponChanges = windowEvents(COUPONS_UPDATED_EVENT, "storage");
+const NO_COUPONS: StoredCoupon[] = [];
 
 /**
  * The categories a coupon is limited to, by name — or nothing when it is not.
@@ -68,35 +72,37 @@ export function CouponsAdminPage({
     if (initial) applyServerCoupons(initial);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
   }, []);
-  const [mounted, setMounted] = useState(false);
-  const [coupons, setCoupons] = useState<StoredCoupon[]>([]);
+  const mounted = useHydrated();
+  // A render after a write here, so the list re-reads the store.
+  const [, setReadTick] = useState(0);
+  /*
+    Re-read whenever the store changes, which is what every sibling list does.
+
+    This read the cache once on mount and subscribed to nothing. On a cold
+    cache `loadCoupons` seeds the shipped WELCOME10 / BDAY20 / WED2026 with
+    invented usage counts, and the server's real coupons — landing in
+    localStorage a moment later, from the hydration — never reached the
+    screen. So the page showed a discount table the shop does not have, with
+    redemption numbers nobody earned, for the whole of that mount.
+  */
+  const coupons = useExternalValue(loadCoupons, couponChanges, NO_COUPONS);
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [page, setPage] = useState(1);
 
-  function refresh() {
-    setCoupons(loadCoupons());
+  // A different list is a different selection: cleared the moment it changes.
+  const [selectionFor, setSelectionFor] = useState(coupons);
+  if (selectionFor !== coupons) {
+    setSelectionFor(coupons);
     setSelectedIds([]);
-    setMounted(true);
   }
 
-  useEffect(() => {
-    /**
-     * Re-read when the store changes, which is what every sibling list does.
-     *
-     * This read the cache once on mount and subscribed to nothing. On a cold
-     * cache `loadCoupons` seeds the shipped WELCOME10 / BDAY20 / WED2026 with
-     * invented usage counts, and the server's real coupons — landing in
-     * localStorage a moment later, from the hydration — never reached the
-     * screen. So the page showed a discount table the shop does not have, with
-     * redemption numbers nobody earned, for the whole of that mount. Delivery
-     * zones next door already listen for their own event.
-     */
-    refresh();
-    window.addEventListener(COUPONS_UPDATED_EVENT, refresh);
-    return () => window.removeEventListener(COUPONS_UPDATED_EVENT, refresh);
-  }, []);
+  function refresh() {
+    setReadTick((tick) => tick + 1);
+    setSelectedIds([]);
+  }
+
 
   const activeCount = coupons.filter((coupon) => coupon.isActive).length;
   const redemptionCount = coupons.reduce((sum, coupon) => sum + coupon.usageCount, 0);
@@ -282,6 +288,7 @@ export function CouponsAdminPage({
                     <div className="flex items-center gap-2 rounded-lg border border-border px-3 py-2">
                       <span className="text-xs text-muted-foreground">Active</span>
                       <Switch
+                        aria-label={`${coupon.code} active`}
                         checked={coupon.isActive}
                         onCheckedChange={() => handleToggle(coupon)}
                       />

@@ -94,12 +94,14 @@ describe("ending a session", () => {
     );
     expect(body).toContain("deleteSession");
     /**
-     * Order matters. Revoking after the delete would still work here, but the
-     * pair has to be inseparable — and reading them together is what stops the
-     * next person removing one.
+     * Order matters: the ROW goes first. `refresh` re-issues a token revoked
+     * within ROTATION_RACE_MS while its session row still stands (a lost
+     * answer), so a chain stamped before its row is deleted is, for that
+     * instant, a race to be rewarded rather than a session that has ended.
+     * The order is DRIVEN in a-lost-refresh-answer-does-not-sign-you-out.
      */
-    expect(body.indexOf("revokeRefreshTokensBySession")).toBeLessThan(
-      body.indexOf("deleteSession"),
+    expect(body.indexOf("await repo.deleteSession")).toBeLessThan(
+      body.indexOf("await repo.revokeRefreshTokensBySession"),
     );
   });
 
@@ -253,12 +255,11 @@ describe("a second tab that lost the rotation race", () => {
       "ROTATION_RACE_MS",
     );
 
-    // And inside that window it must NOT end the session.
-    const raceAt = body.indexOf("ROTATION_RACE_MS");
-    const branch = body.slice(raceAt, body.indexOf("return endSession", raceAt));
-
-    expect(branch, "the losing tab is still signed out").not.toContain("endSession");
-    expect(branch, "the losing tab is not answered at all").toMatch(/return toPublicUser\(/);
+    // And only OUTSIDE that window does it end the session. What happens
+    // inside it is driven in a-lost-refresh-answer-does-not-sign-you-out.
+    expect(body).toMatch(
+      /if \(!revokedAt \|\| Date\.now\(\) - revokedAt >= ROTATION_RACE_MS\) \{\s*return endSession\(claims\.sid, "Refresh token is no longer valid"\);/,
+    );
   });
 
   it("still ends the session for a token that was never issued", () => {
@@ -272,56 +273,13 @@ describe("a second tab that lost the rotation race", () => {
     );
   });
 
-  it("mints nothing for the loser, so the window costs an attacker nothing", () => {
-    /**
-     * The browser already holds the successor the winner set. Issuing another
-     * pair here would hand a replayer inside the window a working credential,
-     * which is the only thing that would make the concession expensive.
-     */
-    const body = bodyOf(service(), "export async function refresh");
-    const raceAt = body.indexOf("ROTATION_RACE_MS");
-    const branch = body.slice(raceAt, body.indexOf("return endSession", raceAt));
-
-    expect(branch, "the losing tab is issued a fresh token").not.toContain("signRefreshToken");
-    expect(branch, "the losing tab is issued fresh cookies").not.toContain("setAuthCookies");
-  });
-
-  it("is told apart from a session somebody deliberately revoked", () => {
-    /**
-     * `revokedAt` is not a rotation marker.
-     *
-     * Every revocation stamps it: `revokeRefreshTokensBySession` for "Revoke
-     * session" and "Log out everywhere", `revokeRefreshTokensByUser` for a
-     * password change or reset. Keyed on the timestamp alone, the window
-     * answered a lost laptop's heartbeat with 200 and the full user record for
-     * fifteen seconds after its owner revoked it — the client then published
-     * "active" and reset its idle clock against a `lastSeenAt` the server had
-     * never touched, and the branch skipped `clearAuthCookies`, so the device
-     * kept its access-token cookie rather than being cut off then and there.
-     *
-     * The SESSION ROW is what separates them: the honest loser's row is alive
-     * because the winner just rotated and touched that same session, while
-     * every deliberate revocation deletes the row before stamping the chain.
-     */
-    const body = bodyOf(service(), "export async function refresh");
-    const raceAt = body.indexOf("ROTATION_RACE_MS");
-    const branch = body.slice(raceAt, body.indexOf("return endSession", raceAt));
-
-    expect(branch, "the race window never looks for the session row").toContain(
-      "findSessionById(claims.sid)",
-    );
-
-    /**
-     * And the answer is a CONDITION, not a read whose result is dropped.
-     *
-     * Fetching the row and returning regardless is the shape this repo keeps
-     * producing — the gate that guards the mechanism but not its wiring.
-     */
-    const success = branch.slice(branch.indexOf("return toPublicUser"));
-    const guard = branch.slice(0, branch.indexOf("return toPublicUser"));
-    expect(success.length, "the race branch no longer answers success at all").toBeGreaterThan(0);
-    expect(guard, "the row is read and then ignored").toMatch(/if \([^)]*session[^)]*\)/);
-  });
+  /*
+    What the window DOES — re-issue for a live session, refuse a dead or idle
+    one, never re-stamp the raced token — is driven, not grepped, in
+    a-lost-refresh-answer-does-not-sign-you-out.test.ts. The two tests that
+    stood here asserted the old design ("mints nothing for the loser"), which
+    signed out any admin whose refresh answer was lost in flight.
+  */
 });
 
 describe("signing out", () => {

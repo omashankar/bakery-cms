@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,11 +27,15 @@ export function ReviewReplyDialog({
   onOpenChange,
   onSave,
 }: ReviewReplyDialogProps) {
-  const [reply, setReply] = useState("");
+  const [reply, setReply] = useState(review?.adminReply ?? "");
 
-  useEffect(() => {
+  // The review's own reply, taken again whenever it is another review —
+  // adjusted while rendering rather than by an effect a render later.
+  const [replyFor, setReplyFor] = useState(review);
+  if (replyFor !== review) {
+    setReplyFor(review);
     setReply(review?.adminReply ?? "");
-  }, [review]);
+  }
 
   if (!review) return null;
 

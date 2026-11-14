@@ -107,6 +107,10 @@ const EXEMPT = [
   // A storefront customer getting a delivery quote has no admin session to end,
   // and marking one would put a sign-in dialog over a shopper's checkout.
   "features/checkout/lib/quote-api.ts",
+  // A crash report from an error boundary — the storefront's too — sent to a
+  // PUBLIC endpoint that never answers 401. For a shopper whose page just
+  // broke, a sign-in dialog on top would be the second failure, not a fix.
+  "features/error-log/lib/report-client-error.ts",
   // Runs on the SERVER and calls WhatsApp, not this app. There is no browser
   // session here to have ended.
   "features/communications/server/whatsapp-client.server.ts",

@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -76,6 +77,22 @@ type SecurityTab = "policies" | "history" | "failed" | "sessions" | "devices";
  * pick a number the page offered, watch it save, and have a different one
  * enforced. One source now, exported from the validator that decides.
  */
+const securityCenterChanges = windowEvents(SECURITY_CENTER_UPDATED_EVENT, "storage");
+const EMPTY_CENTER = {
+  loginHistory: [] as LoginHistoryEntry[],
+  failedAttempts: [] as FailedLoginAttempt[],
+  sessions: [] as ActiveSession[],
+  devices: [] as RegisteredDevice[],
+};
+function readSecurityCenter() {
+  return {
+    loginHistory: getLoginHistory(),
+    failedAttempts: getFailedLoginAttempts(),
+    sessions: getActiveSessions(),
+    devices: getRegisteredDevices(),
+  };
+}
+
 const SESSION_TIMEOUT = SECURITY_RANGES.sessionTimeoutMinutes;
 const LOGIN_ATTEMPTS = SECURITY_RANGES.maxLoginAttempts;
 
@@ -102,12 +119,18 @@ export function SecuritySettingsPage() {
   const { settings, saved, isDirty, hydration, isWriting, canSave, edit, discard, runWrite } =
     useSettingsSection<SecuritySettings>(getSecuritySettings, defaultSecuritySettings);
   const [tab, setTab] = useState<SecurityTab>("policies");
-  const [loginHistory, setLoginHistory] = useState<LoginHistoryEntry[]>([]);
-  const [failedAttempts, setFailedAttempts] = useState<FailedLoginAttempt[]>([]);
-  const [sessions, setSessions] = useState<ActiveSession[]>([]);
+  /*
+    The security CENTRE — login history, sessions, devices — has its own
+    store and its own event, and is read from there: nothing on the server
+    render, then this browser's copy, followed as it changes. A render after
+    a write here re-reads it too (`refreshCenter`). The settings form above
+    is the hook's business.
+  */
+  const center = useExternalValue(readSecurityCenter, securityCenterChanges, EMPTY_CENTER);
+  const { loginHistory, failedAttempts, sessions, devices } = center;
+  const [, setReadTick] = useState(0);
   /** Whether /api/security-center has answered — see the header above. */
   const [centerLoaded, setCenterLoaded] = useState(false);
-  const [devices, setDevices] = useState<RegisteredDevice[]>([]);
   const [clearFailedOpen, setClearFailedOpen] = useState(false);
   const [logoutEverywhereOpen, setLogoutEverywhereOpen] = useState(false);
   /*
@@ -121,26 +144,13 @@ export function SecuritySettingsPage() {
   const [logoutOthersOpen, setLogoutOthersOpen] = useState(false);
 
   function refreshCenter() {
-    setLoginHistory(getLoginHistory());
-    setFailedAttempts(getFailedLoginAttempts());
-    setSessions(getActiveSessions());
-    setDevices(getRegisteredDevices());
+    setReadTick((tick) => tick + 1);
   }
 
   useEffect(() => {
-    // The security CENTRE — login history, sessions, devices — has its own
-    // store and its own event. The settings form above is the hook's business.
-    refreshCenter();
     // The COUNT comes from /api/security-center, so the header waits for that
     // request rather than for the synchronous cache read above it.
     void securityCenterHydration.waitForSettled().then(() => setCenterLoaded(true));
-
-    function handleUpdate() {
-      refreshCenter();
-    }
-
-    window.addEventListener(SECURITY_CENTER_UPDATED_EVENT, handleUpdate);
-    return () => window.removeEventListener(SECURITY_CENTER_UPDATED_EVENT, handleUpdate);
   }, []);
 
   async function handleSave() {
@@ -303,7 +313,7 @@ export function SecuritySettingsPage() {
         onValueChange={(value) => setTab(value as SecurityTab)}
         className="space-y-4"
       >
-        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 bg-muted/50 p-1">
+        <TabsList className="flex w-full flex-wrap justify-start gap-1 bg-muted/50 p-1 group-data-horizontal/tabs:h-auto [&>[data-slot=tabs-trigger]]:h-8 [&>[data-slot=tabs-trigger]]:flex-none">
           <TabsTrigger value="policies">Policies</TabsTrigger>
           <TabsTrigger value="history">Login history</TabsTrigger>
           <TabsTrigger value="failed">

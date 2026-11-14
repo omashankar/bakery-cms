@@ -176,6 +176,28 @@ export function timeSlotEndsAt(slot: string): number | null {
   return hour * 60 + minute;
 }
 
+/**
+ * The minute a slot's window OPENS, as minutes past midnight. Null if the
+ * shop's wording does not say.
+ *
+ * What a list sorts by: as text, “9:00 AM” sorts after “12:00 PM”, so the
+ * kitchen saw the morning cake below the lunchtime one.
+ */
+export function timeSlotStartsAt(slot: string): number | null {
+  const text = normaliseTimeSlot(slot);
+  if (!text) return null;
+
+  const meridiem = text.match(/(\d{1,2}):(\d{2})\s*(am|pm)/);
+  if (meridiem) return ((Number(meridiem[1]) % 12) + (meridiem[3] === "pm" ? 12 : 0)) * 60 + Number(meridiem[2]);
+
+  const plain = text.match(/(\d{1,2}):(\d{2})/);
+  if (!plain) return null;
+  const hour = Number(plain[1]);
+  const minute = Number(plain[2]);
+  if (hour > 23 || minute > 59) return null;
+  return hour * 60 + minute;
+}
+
 /** Minutes past midnight, on the LOCAL clock — the one the shop bakes on. */
 function minutesIntoDay(now: Date): number {
   return now.getHours() * 60 + now.getMinutes();

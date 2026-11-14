@@ -61,7 +61,7 @@ export const designPrinciples = {
       items: [
         "8px spacing grid for padding and gaps",
         "12–16px radius on cards and controls (website radius from Appearance)",
-        "Clear heading → body hierarchy with Plus Jakarta / Inter",
+        "Clear heading → body hierarchy, all in Inter",
         "Gold as ring/accent; Bakery variant when brown CTA is required in admin dark mode",
       ],
     },

@@ -34,7 +34,8 @@ export type EmailTemplateSlug =
   | "customer_sign_in"
   | "refund_processed"
   | "admin_new_order"
-  | "refund_failed";
+  | "refund_failed"
+  | "team_invite";
 
 /**
  * Used when the stored template is missing or still a draft.
@@ -137,6 +138,20 @@ const FALLBACKS: Record<EmailTemplateSlug, { subject: string; body: string }> = 
       "Hi {{customer_name}},\n\nUse this code to reset your password:\n\n" +
       "{{reset_code}}\n\nIt expires in {{expires_in}}. If you did not request " +
       "this, ignore this email — your password has not changed.\n\n— {{store_name}}",
+  },
+  /**
+   * An invitation to the shop's ADMIN — sent to a new team member, not a
+   * customer. The link is the whole credential until they set a password, so
+   * the email says how long it lasts and what to do if it was not expected.
+   */
+  team_invite: {
+    subject: "{{inviter_name}} invited you to the {{store_name}} team",
+    body:
+      "Hi {{invitee_name}},\n\n{{inviter_name}} has invited you to help run {{store_name}} " +
+      "as {{role_name}}.\n\n{{personal_message}}" +
+      "Set your password and join here:\n{{invite_url}}\n\n" +
+      "This link works once and expires in {{expires_in}}. If you were not expecting it, " +
+      "you can ignore this email — nobody can join without the link.\n\n— {{store_name}}",
   },
   /**
    * How a CUSTOMER signs in to the storefront.

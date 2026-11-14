@@ -158,7 +158,7 @@ export function TaxesAdminPage() {
       ) : null}
 
       <SettingsFormGate hydration={hydration}>
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)] xl:items-start">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)] xl:items-start">
         <div className="space-y-4">
           <Card className="shadow-sm">
             <CardHeader>

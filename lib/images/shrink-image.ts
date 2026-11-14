@@ -130,3 +130,27 @@ export async function shrinkImageFile(file: File): Promise<ShrunkImage> {
     return original();
   }
 }
+
+/**
+ * The same shrink, as a File for a FormData upload.
+ *
+ * The customer's uploads — review photos and the profile photo — sent the
+ * camera's original: a 10–15 MB phone picture crossed mobile data in full and
+ * was then refused as "over 6 MB", and an accepted one was stored at up to
+ * 6 MB to be drawn in a 64px square. The admin's uploads were already shrunk;
+ * these now go through the same 1600px WebP.
+ *
+ * A file that did not shrink comes back unchanged, so the server's own checks
+ * still see the original.
+ */
+export async function shrinkImageForUpload(file: File): Promise<File> {
+  const shrunk = await shrinkImageFile(file);
+  if (!shrunk.shrunk) return file;
+  try {
+    const blob = await (await fetch(shrunk.dataUrl)).blob();
+    const name = file.name.replace(/\.[^.]+$/, "") + ".webp";
+    return new File([blob], name, { type: "image/webp" });
+  } catch {
+    return file;
+  }
+}

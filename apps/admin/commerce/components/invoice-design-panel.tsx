@@ -251,7 +251,7 @@ export function InvoiceDesignPanel() {
       ) : null}
 
       <SettingsFormGate hydration={hydration}>
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] xl:items-start">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] xl:items-start">
         <div className="space-y-4">
           <Card className="shadow-sm">
             <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

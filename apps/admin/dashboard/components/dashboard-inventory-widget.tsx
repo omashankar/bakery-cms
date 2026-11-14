@@ -1,5 +1,6 @@
 "use client";
 
+import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AlertTriangle, ArrowRight } from "lucide-react";
@@ -56,7 +57,13 @@ export function DashboardInventoryWidget() {
           <div className="rounded-lg border border-border bg-muted px-3 py-2.5">
             <p className="text-[11px] text-muted-foreground">Low stock</p>
             {loaded ? (
-              <p className="font-heading text-xl font-semibold text-amber-700 dark:text-amber-400">
+              <p
+                className={cn(
+                  "font-heading text-xl font-semibold",
+                  // A warning colour only when there is something to warn about.
+                  overview.lowStock > 0 ? "text-amber-700 dark:text-amber-400" : "text-foreground",
+                )}
+              >
                 {overview.lowStock}
               </p>
             ) : (
@@ -66,7 +73,12 @@ export function DashboardInventoryWidget() {
           <div className="rounded-lg border border-border bg-muted px-3 py-2.5">
             <p className="text-[11px] text-muted-foreground">Out of stock</p>
             {loaded ? (
-              <p className="font-heading text-xl font-semibold text-destructive">
+              <p
+                className={cn(
+                  "font-heading text-xl font-semibold",
+                  overview.outOfStock > 0 ? "text-destructive" : "text-foreground",
+                )}
+              >
                 {overview.outOfStock}
               </p>
             ) : (

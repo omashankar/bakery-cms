@@ -47,6 +47,9 @@ export function DashboardRevenueChart({ analytics, figures = "ready" }: Dashboar
       <CardContent className="flex flex-1 flex-col space-y-3 pt-0">
         <div
           ref={trendScrollRef}
+          tabIndex={0}
+          role="region"
+          aria-label="Sales trend chart"
           className="overflow-x-auto rounded-xl border border-dashed border-border bg-muted/50 p-3 sm:p-4"
         >
           {figures === "loading" ? (

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { useEffect } from "react";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminSelect } from "@/apps/admin/products/components/admin-field";
@@ -19,7 +19,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toExpiryInputValue, toExpiryInstant } from "@/lib/expiry-date";
-import { createCoupon, loadCoupons, updateCoupon } from "@/features/commerce/lib/coupons-repository";
+import {
+  COUPONS_UPDATED_EVENT,
+  createCoupon,
+  loadCoupons,
+  updateCoupon,
+  type StoredCoupon,
+} from "@/features/commerce/lib/coupons-repository";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+
+const couponChanges = windowEvents(COUPONS_UPDATED_EVENT, "storage");
+const NO_COUPONS: StoredCoupon[] = [];
 import { adminCategories } from "@/features/products/lib/catalog-options";
 
 type CouponFormValues = {
@@ -35,6 +45,20 @@ type CouponFormValues = {
   /** Empty means the whole shop, which is what every coupon was until now. */
   categoryIds: string[];
 };
+
+/**
+ * Says which box is missing. Without it, "Create coupon" with an empty badge
+ * label only moved the cursor there — nothing on screen said why the coupon
+ * was not created.
+ */
+function Problem({ id, message }: { id: string; message?: string }) {
+  if (!message) return null;
+  return (
+    <p id={id} role="alert" className="text-xs text-destructive">
+      {message}
+    </p>
+  );
+}
 
 const emptyValues: CouponFormValues = {
   code: "",
@@ -62,16 +86,18 @@ export function CouponFormDialog({
   onOpenChange,
   onSaved,
 }: CouponFormDialogProps) {
-  const editingCoupon = useMemo(
-    () => (editingId ? loadCoupons().find((coupon) => coupon.id === editingId) ?? null : null),
-    [editingId, open]
-  );
+  // The coupon being edited, from the store as it is now — followed as it
+  // changes, so reopening the dialog never shows a stale copy.
+  const coupons = useExternalValue(loadCoupons, couponChanges, NO_COUPONS);
+  const editingCoupon = editingId ? (coupons.find((coupon) => coupon.id === editingId) ?? null) : null;
 
-  const { register, control, handleSubmit, reset, watch, formState } = useForm<CouponFormValues>({
+  const { register, control, handleSubmit, reset, formState } = useForm<CouponFormValues>({
     defaultValues: emptyValues,
   });
 
-  const discountType = watch("discountType");
+  const discountType = useWatch({ control, name: "discountType" });
+  const { errors } = formState;
+  const valueError = discountType === "percent" ? errors.percentOff : errors.flatOff;
 
   useEffect(() => {
     if (!open) return;
@@ -140,17 +166,35 @@ export function CouponFormDialog({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="coupon-code">Code</Label>
-              <Input id="coupon-code" {...register("code", { required: true })} />
+              <Input
+                id="coupon-code"
+                aria-invalid={errors.code ? true : undefined}
+                aria-describedby={errors.code ? "coupon-code-error" : undefined}
+                {...register("code", { required: "Enter the code customers will type." })}
+              />
+              <Problem id="coupon-code-error" message={errors.code?.message} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="coupon-label">Badge label</Label>
-              <Input id="coupon-label" {...register("label", { required: true })} />
+              <Input
+                id="coupon-label"
+                aria-invalid={errors.label ? true : undefined}
+                aria-describedby={errors.label ? "coupon-label-error" : undefined}
+                {...register("label", { required: "Enter a short label, like \"20% off\"." })}
+              />
+              <Problem id="coupon-label-error" message={errors.label?.message} />
             </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="coupon-description">Description</Label>
-            <Textarea id="coupon-description" {...register("description", { required: true })} />
+            <Textarea
+              id="coupon-description"
+              aria-invalid={errors.description ? true : undefined}
+              aria-describedby={errors.description ? "coupon-description-error" : undefined}
+              {...register("description", { required: "Say what the coupon gives." })}
+            />
+            <Problem id="coupon-description-error" message={errors.description?.message} />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -170,11 +214,14 @@ export function CouponFormDialog({
                 type="number"
                 min="1"
                 max={discountType === "percent" ? "100" : undefined}
+                aria-invalid={valueError ? true : undefined}
+                aria-describedby={valueError ? "discount-value-error" : undefined}
                 {...register(discountType === "percent" ? "percentOff" : "flatOff", {
-                  required: true,
-                  ...(discountType === "percent" ? { max: 100 } : {}),
+                  required: "Enter the discount.",
+                  ...(discountType === "percent" ? { max: { value: 100, message: "A percentage can be at most 100." } } : {}),
                 })}
               />
+              <Problem id="discount-value-error" message={valueError?.message} />
             </div>
           </div>
 

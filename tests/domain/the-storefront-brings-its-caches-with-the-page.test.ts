@@ -95,7 +95,7 @@ describe("the syncs it replaces", () => {
       expect(read(layout)).toContain("{cacheSeed ? <StorefrontCacheSeed data={cacheSeed} /> : null}");
     }
     expect(read("apps/website/lib/storefront-cache-seed.server.ts")).toContain(
-      'if (session && (session.role === "owner" || session.role === "admin")) return null;',
+      "if (session) return null;",
     );
   });
 });

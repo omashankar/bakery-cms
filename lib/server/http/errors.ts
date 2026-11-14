@@ -69,6 +69,23 @@ export function withErrorHandler<Args extends unknown[]>(
         return fail(error.message, { status: error.status, errors: error.errors ?? undefined });
       }
       console.error("[api] Unhandled error:", error);
+      // Kept where the shop can see it (Settings → Error log) — this branch
+      // answers a clean 500, so Next's own error hook never hears of it.
+      // Loaded on demand: most requests never come this way.
+      const request = args.find((arg): arg is Request => arg instanceof Request);
+      void import("@/lib/server/errors/record-error")
+        .then(({ recordError }) =>
+          recordError({
+            source: "server",
+            kind: "api",
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? (error.stack ?? "") : "",
+            path: request ? new URL(request.url).pathname : "",
+            method: request?.method ?? "",
+            userAgent: request?.headers.get("user-agent") ?? "",
+          }),
+        )
+        .catch(() => undefined);
       return fail("Something went wrong. Please try again.", { status: 500 });
     }
   };

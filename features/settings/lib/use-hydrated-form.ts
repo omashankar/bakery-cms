@@ -1,5 +1,6 @@
 "use client";
 
+import { useCanEditHere } from "@/features/team/lib/use-can-edit-here";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { HydrationGate } from "@/lib/hydration-gate";
@@ -97,6 +98,7 @@ export function useHydratedForm<T>({
   ensureHydrated,
   updatedEvent,
 }: HydratedFormOptions<T>): HydratedForm<T> {
+  const canEdit = useCanEditHere();
   const [form, setForm] = useState<{ current: T; saved: T }>({
     current: fallback,
     saved: fallback,
@@ -188,7 +190,8 @@ export function useHydratedForm<T>({
     // Not while a write is already in flight: the round-trip can take seconds on
     // a cold serverless read, and the button used to sit there enabled and
     // unlabelled, inviting a second click that races the first.
-    canSave: hydration === "ready" && !isWriting,
+    // And not for a role that may only VIEW this screen — see `useCanEditHere`.
+    canSave: hydration === "ready" && !isWriting && canEdit,
     edit,
     set,
     discard,

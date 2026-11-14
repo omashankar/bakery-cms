@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
   MapPin,
@@ -36,9 +36,11 @@ import {
   toggleDeliveryZoneActive,
 } from "@/features/commerce/lib/delivery-zones-repository";
 import {
-  getCommerceSettings,
+  peekCommerceSettings,
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
 import {
   FilterPanel,
   FilterPanelSearch,
@@ -56,6 +58,9 @@ import { formatCurrency } from "@/utils/format";
 import { RelativeTime } from "@/components/shared/relative-time";
 
 const PAGE_SIZE = 10;
+/** The zones, the shop settings beside them, and another tab. */
+const zoneChanges = windowEvents(DELIVERY_ZONES_UPDATED_EVENT, SETTINGS_UPDATED_EVENT, "storage");
+const NO_ZONES: DeliveryZone[] = [];
 
 const EMPTY_STATS = {
   total: 0,
@@ -117,8 +122,12 @@ export function DeliveryZonesAdminPage({
     if (initial) applyServerZones(initial);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
   }, []);
-  const [mounted, setMounted] = useState(false);
-  const [zones, setZones] = useState<DeliveryZone[]>([]);
+  const mounted = useHydrated();
+  // The zones, read from this browser and followed as they change; a render
+  // after a write here re-reads them too (`rereadZones`).
+  const zones = useExternalValue(loadDeliveryZones, zoneChanges, NO_ZONES);
+  const [, setReadTick] = useState(0);
+  const rereadZones = () => setReadTick((tick) => tick + 1);
   const [filters, setFilters] = useState<DeliveryZoneListFilters>(defaultDeliveryZoneFilters);
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -145,7 +154,7 @@ export function DeliveryZonesAdminPage({
       }
     }
     void toggleDeliveryZoneActive(zone.id).then(({ persisted }) => {
-      setZones(loadDeliveryZones());
+      rereadZones();
       // A zone active on the server but shown inactive
       // here decides whether the shop delivers there.
       reportWrite(persisted, zone.isActive ? "Zone deactivated" : "Zone activated");
@@ -154,23 +163,8 @@ export function DeliveryZonesAdminPage({
 
   // Whether any of this reaches a customer. The master switch lives on Shipping
   // Rules and is OFF by default, so a zone map built here can be entirely inert.
-  const [commerce, setCommerce] = useState<CommerceSettings | null>(null);
+  const commerce = useExternalValue<CommerceSettings | null>(peekCommerceSettings, zoneChanges, null);
   const zonePricingOn = Boolean(commerce?.useZoneBasedDelivery);
-
-  useEffect(() => {
-    function refresh() {
-      setZones(loadDeliveryZones());
-      setCommerce(getCommerceSettings());
-    }
-    refresh();
-    setMounted(true);
-    window.addEventListener(DELIVERY_ZONES_UPDATED_EVENT, refresh);
-    window.addEventListener(SETTINGS_UPDATED_EVENT, refresh);
-    return () => {
-      window.removeEventListener(DELIVERY_ZONES_UPDATED_EVENT, refresh);
-      window.removeEventListener(SETTINGS_UPDATED_EVENT, refresh);
-    };
-  }, []);
 
   const stats = useMemo(
     () => (mounted ? getDeliveryZoneStats(zones) : EMPTY_STATS),
@@ -228,7 +222,7 @@ export function DeliveryZonesAdminPage({
 
     const { value: count, persisted } = await deleteDeliveryZones(selectedIds);
     setSelectedIds([]);
-    setZones(loadDeliveryZones());
+    rereadZones();
     reportWrite(persisted, `Deleted ${count} zone${count === 1 ? "" : "s"}`, {
       failure: "Could not delete — the server rejected it",
     });
@@ -444,28 +438,28 @@ export function DeliveryZonesAdminPage({
           )
         ) : (
           <>
-            <div className="hidden overflow-x-auto lg:block">
-              <table className="w-full min-w-[980px] text-sm">
+            <div className="relative hidden overflow-x-auto xl:block">
+              <table className="w-full min-w-[960px] text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                    <th className="px-4 py-3 font-medium">
+                    <th className="px-3 py-3 font-medium">
                       <Checkbox
                         checked={allPageSelected}
                         onCheckedChange={toggleSelectPage}
                         aria-label="Select all on page"
                       />
                     </th>
-                    <th className="px-4 py-3 font-medium">Zone</th>
+                    <th className="px-3 py-3 font-medium">Zone</th>
                     {/* WHAT THE ZONE COVERS, in words. It was a City column and a
                         Pincode column, which said nothing about a zone covering
                         a state or the whole country, or the PINs it leaves out. */}
-                    <th className="px-4 py-3 font-medium">Covers</th>
-                    <th className="px-4 py-3 font-medium">Charge</th>
-                    <th className="px-4 py-3 font-medium">Delivery time</th>
-                    <th className="px-4 py-3 font-medium">Priority</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="px-4 py-3 font-medium">Updated</th>
-                    <th className="px-4 py-3 font-medium">Actions</th>
+                    <th className="px-3 py-3 font-medium">Covers</th>
+                    <th className="px-3 py-3 font-medium">Charge</th>
+                    <th className="px-3 py-3 font-medium">Delivery time</th>
+                    <th className="px-3 py-3 font-medium">Priority</th>
+                    <th className="px-3 py-3 font-medium">Status</th>
+                    <th className="px-3 py-3 font-medium">Updated</th>
+                    <th className="px-3 py-3 font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -474,15 +468,15 @@ export function DeliveryZonesAdminPage({
                       key={zone.id}
                       className="border-b border-border/70 transition-colors hover:bg-muted last:border-0"
                     >
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-3">
                         <Checkbox
                           checked={selectedIds.includes(zone.id)}
                           onCheckedChange={() => toggleSelect(zone.id)}
                           aria-label={`Select ${zone.name}`}
                         />
                       </td>
-                      <td className="px-4 py-3 font-medium">{zone.name}</td>
-                      <td className="max-w-xs px-4 py-3">
+                      <td className="px-3 py-3 font-medium">{zone.name}</td>
+                      <td className="max-w-xs px-3 py-3">
                         <p>{describeZoneCoverage(zone).covers}</p>
                         {!decidesDelivery(zone) ? (
                           <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
@@ -495,24 +489,24 @@ export function DeliveryZonesAdminPage({
                           </p>
                         ) : null}
                       </td>
-                      <td className="px-4 py-3 font-semibold">
+                      <td className="px-3 py-3 font-semibold">
                         {formatCurrency(zone.deliveryCharge)}
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">
+                      <td className="px-3 py-3 text-muted-foreground">
                         {formatZoneDeliveryTime(zone)}
                       </td>
-                      <td className="px-4 py-3">{zone.priority}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-3">{zone.priority}</td>
+                      <td className="px-3 py-3">
                         <Switch
                           checked={zone.isActive}
                           onCheckedChange={() => toggleActive(zone)}
                           aria-label={zone.isActive ? "Deactivate zone" : "Activate zone"}
                         />
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                      <td className="px-3 py-3 whitespace-nowrap text-muted-foreground">
                         <RelativeTime date={zone.updatedAt} />
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-3">
                         <Button size="sm" variant="outline" onClick={() => openEdit(zone)}>
                           <Pencil className="size-3.5" />
                           Edit
@@ -524,7 +518,7 @@ export function DeliveryZonesAdminPage({
               </table>
             </div>
 
-            <ul className="divide-y divide-border lg:hidden">
+            <ul className="divide-y divide-border xl:hidden">
               {paginated.map((zone) => (
                 <li key={zone.id} className="p-3 sm:p-4">
                   <div className="flex items-start gap-3">
@@ -597,7 +591,7 @@ export function DeliveryZonesAdminPage({
         allZones={zones}
         onSaved={() => {
           setSelectedIds([]);
-          setZones(loadDeliveryZones());
+          rereadZones();
         }}
       />
     </AdminPage>

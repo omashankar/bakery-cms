@@ -159,7 +159,9 @@ describe("the search box", () => {
      */
     const page = code("apps/website/pages/collections-page.tsx");
 
-    expect(page, "the query is never re-seeded").toContain("}, [initialSearch]);");
+    expect(page, "the query is never re-seeded").toMatch(
+      /if \(searchSeen !== initialSearch\) \{\s*setSearchSeen\(initialSearch\);\s*setFilters\(/,
+    );
   });
 
   it("says the shop's own line when it has one, and a generic one otherwise", () => {

@@ -164,11 +164,12 @@ export function InvoicesAdminPage({
   // already wrong result is still on screen — asserted as "No invoices found"
   // rather than shown as pending.
   const pending = loading || requestKey !== liveKey;
-  const request = JSON.parse(requestKey) as {
-    filters: Record<string, unknown>;
-    page: number;
-  };
   useEffect(() => {
+    // Read from the key this effect runs on, so it uses nothing it does not list.
+    const request = JSON.parse(requestKey) as {
+      filters: Record<string, unknown>;
+      page: number;
+    };
     if (listFromServer.current) {
       listFromServer.current = false;
       return;
@@ -235,7 +236,8 @@ export function InvoicesAdminPage({
     setExporting(true);
     // The DEBOUNCED filters, matching the rows on screen and the count beside
     // them — not the live inputs, which may be a keystroke ahead of both.
-    const result = await fetchInvoicesPage({ ...request.filters, page: 1, limit: EXPORT_LIMIT });
+    const { filters } = JSON.parse(requestKey) as { filters: Record<string, unknown> };
+    const result = await fetchInvoicesPage({ ...filters, page: 1, limit: EXPORT_LIMIT });
     setExporting(false);
     return result;
   }
@@ -506,7 +508,7 @@ export function InvoicesAdminPage({
               />
             ) : (
               <>
-                <div className="hidden overflow-x-auto lg:block">
+                <div className="relative hidden overflow-x-auto xl:block">
                   <table className="w-full min-w-[920px] text-sm">
                     <thead>
                       <tr className="border-b border-border text-left text-xs text-muted-foreground">
@@ -540,7 +542,7 @@ export function InvoicesAdminPage({
                             />
                           </td>
                           <td
-                            className="cursor-pointer px-4 py-3 font-medium text-foreground"
+                            className="cursor-pointer px-4 py-3 font-medium whitespace-nowrap text-foreground"
                             onClick={() =>
                               router.push(routes.admin.orders.detail(order.id))
                             }
@@ -605,7 +607,7 @@ export function InvoicesAdminPage({
                   </table>
                 </div>
 
-                <ul className="divide-y divide-border lg:hidden">
+                <ul className="divide-y divide-border xl:hidden">
                   {paginated.map((order) => (
                     <li key={order.id} className="p-3 sm:p-4">
                       <div className="flex items-start gap-3">

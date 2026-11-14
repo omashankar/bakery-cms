@@ -35,24 +35,31 @@ import {
  * `ensureCommunicationsHydrated` reaches, so it then has nothing to fetch.
  */
 export function applyServerCommunications(read: {
-  email: EmailTemplateRecord[];
-  whatsapp: WhatsAppTemplateRecord[];
+  /** Null when this member may not read templates — that gate stays shut. */
+  email: EmailTemplateRecord[] | null;
+  whatsapp: WhatsAppTemplateRecord[] | null;
   settings: NotificationSettings;
   state: NotificationStatePayload;
 }): void {
-  persistServerEmailTemplates(read.email);
-  emailTemplatesHydration.markSettled();
-  persistServerWhatsAppTemplates(read.whatsapp);
-  whatsappTemplatesHydration.markSettled();
+  if (read.email) {
+    persistServerEmailTemplates(read.email);
+    emailTemplatesHydration.markSettled();
+  }
+  if (read.whatsapp) {
+    persistServerWhatsAppTemplates(read.whatsapp);
+    whatsappTemplatesHydration.markSettled();
+  }
   persistServerNotificationSettings(read.settings);
   notificationSettingsHydration.markSettled();
   persistServerNotificationState(read.state);
   notificationStateHydration.markSettled();
 }
 
-export function useCommunicationsServerSync(): void {
+export function useCommunicationsServerSync(options: { templates?: boolean } = {}): void {
+  const templates = options.templates ?? true;
   useEffect(() => {
-    void ensureCommunicationsHydrated();
+    void ensureCommunicationsHydrated({ templates });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page load
   }, []);
 }
 
@@ -73,13 +80,19 @@ export function useCommunicationsServerSync(): void {
  * never remounts it. The forms call this so they can adopt the server's copy
  * before they unlock.
  */
-export async function ensureCommunicationsHydrated(): Promise<{
+export async function ensureCommunicationsHydrated(
+  /**
+   * `templates: false` for a member without settings.view: the template reads
+   * would only be refused, and the bell needs just the other two.
+   */
+  { templates = true }: { templates?: boolean } = {},
+): Promise<{
   email: boolean;
   whatsapp: boolean;
 }> {
   const [email, whatsapp, settings, state] = await Promise.all([
-    emailTemplatesHydration.hasSettled() ? null : fetchEmailTemplates(),
-    whatsappTemplatesHydration.hasSettled() ? null : fetchWhatsAppTemplates(),
+    !templates || emailTemplatesHydration.hasSettled() ? null : fetchEmailTemplates(),
+    !templates || whatsappTemplatesHydration.hasSettled() ? null : fetchWhatsAppTemplates(),
     notificationSettingsHydration.hasSettled() ? null : fetchNotificationSettings(),
     notificationStateHydration.hasSettled() ? null : fetchNotificationState(),
   ]);

@@ -1,6 +1,6 @@
 import type { LandingProduct } from "@/constants/landing-data";
 
-import { searchHaystack } from "./product-catalog";
+import { searchCatalog } from "./search-match";
 
 /**
  * WHAT THE HEADER OFFERS WHILE A CUSTOMER IS STILL TYPING.
@@ -97,41 +97,6 @@ function thumbnailFor(product: LandingProduct): string {
   return primary.startsWith("data:") ? "" : primary;
 }
 
-/** Where in a string a word begins, for the "word starts with it" rank. */
-function hasWordStartingWith(text: string, query: string): boolean {
-  let at = text.indexOf(query);
-  while (at !== -1) {
-    // Position 0, or anything after a break — so "velvet" ranks on "Red
-    // Velvet Cake", and "elvet" does not.
-    if (at === 0 || /[\s\-–—(/&,.]/u.test(text[at - 1] ?? "")) return true;
-    at = text.indexOf(query, at + 1);
-  }
-  return false;
-}
-
-/**
- * Lower is better. The order is the opinion; the numbers are arbitrary.
- *
- * Returns null for a product that matched nothing at all, which cannot happen
- * for a candidate that passed the haystack test — but this function is also
- * the only thing that decides whether the rank is meaningful, and returning a
- * rank for a non-match would let a caller that forgot the test show anything.
- */
-function rankOf(product: LandingProduct, query: string): number | null {
-  const name = product.name.toLowerCase();
-  const category = (product.category ?? "").toLowerCase();
-
-  if (name.startsWith(query)) return 0;
-  if (hasWordStartingWith(name, query)) return 1;
-  if (name.includes(query)) return 2;
-  if (category.startsWith(query) || hasWordStartingWith(category, query)) return 3;
-  if (category.includes(query)) return 4;
-  // Matched through a flavour, an occasion or an option label — true, and
-  // last, because the customer cannot see why it is here.
-  if (searchHaystack(product).includes(query)) return 5;
-  return null;
-}
-
 /**
  * The rows to offer for what has been typed so far.
  *
@@ -150,38 +115,14 @@ export function suggestProducts(
   products: LandingProduct[],
   limit: number = SUGGESTION_LIMIT,
 ): ProductSuggestion[] {
-  const needle = query.trim().toLowerCase();
-  if (needle.length < MIN_SUGGEST_CHARS) return [];
-
-  const ranked: { product: LandingProduct; rank: number }[] = [];
-  for (const product of products) {
-    if (!product?.slug || !product.name) continue;
-    const rank = rankOf(product, needle);
-    if (rank === null) continue;
-    ranked.push({ product, rank });
-  }
-
-  /*
-    Sorted to a TOTAL order, not just by rank. Two products at rank 1 would
-    otherwise come back in catalogue order, which is the order MongoDB happened
-    to answer in — so the same three letters could produce a different top row
-    on two consecutive keystrokes, and the row under the customer's finger
-    would move as they typed. Shorter name first (the closer match to what was
-    typed), then alphabetical, which can never tie for two products because the
-    slug is unique and the name all but is.
-  */
-  ranked.sort(
-    (a, b) =>
-      a.rank - b.rank ||
-      a.product.name.length - b.product.name.length ||
-      a.product.name.localeCompare(b.product.name) ||
-      a.product.slug.localeCompare(b.product.slug),
-  );
-
-  return ranked.slice(0, Math.max(0, limit)).map(({ product }) => ({
-    slug: product.slug,
-    name: product.name,
-    category: product.category ?? "",
-    image: thumbnailFor(product),
-  }));
+  if (query.trim().length < MIN_SUGGEST_CHARS) return [];
+  // The same matcher and order as the results page — see search-match.ts.
+  return searchCatalog(query, products)
+    .hits.slice(0, Math.max(0, limit))
+    .map(({ product }) => ({
+      slug: product.slug,
+      name: product.name,
+      category: product.category ?? "",
+      image: thumbnailFor(product),
+    }));
 }

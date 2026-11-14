@@ -68,6 +68,26 @@ export interface StorefrontTrust {
   sameDayTimeLeft: string | null;
 }
 
+/**
+ * Today's same-day window, as the shop's settings and clock give it: when
+ * same-day orders close ("" when this shop has no same-day delivery) and how
+ * long is left now (null once closed). Shared by the homepage band and the
+ * header bar, so they cannot disagree about a deadline.
+ */
+export function sameDayWindow(
+  commerce: Partial<CommerceSettings> | undefined,
+  timezone: string | undefined,
+): { closesAt: string; timeLeft: string | null } {
+  const leadDays = Number(commerce?.deliveryLeadDays);
+  // Unreadable reads as next-day — see the note in getStorefrontTrust.
+  const lead = Number.isFinite(leadDays) ? leadDays : 1;
+  const closesAt = sameDayCutoffFor(commerce?.sameDayCutoff, lead);
+  return {
+    closesAt,
+    timeLeft: closesAt ? timeLeftToday(closesAt, shopClockNow(timezone ?? "")) : null,
+  };
+}
+
 export const getStorefrontTrust = cache(async function getStorefrontTrust(
   settings?: { commerce?: CommerceSettings; general?: { timezone?: string } },
 ): Promise<StorefrontTrust | null> {

@@ -1,14 +1,13 @@
 import { ok } from "@/lib/server/http/response";
 import { withErrorHandler, NotFoundError } from "@/lib/server/http/errors";
 import { validate, readJson } from "@/lib/server/http/validate";
-import { requireRole } from "@/lib/server/auth/dal";
+import { requirePermission } from "@/lib/server/auth/access";
 import { requestContext } from "@/lib/server/audit/audit-log";
 
 import * as service from "./catalog.service";
-import { catalogSectionSchemas, type CatalogSection } from "./catalog.validators";
+import { catalogSectionSchemas } from "./catalog.validators";
 import { allowlisted } from "@/lib/server/http/allowlist";
 
-const CATALOG_ROLES = ["owner", "admin"] as const;
 
 type SectionContext = { params: Promise<{ section: string }> };
 
@@ -19,7 +18,7 @@ export const getCatalogController = withErrorHandler(async () => {
 
 export const updateCatalogSectionController = withErrorHandler(
   async (request: Request, context: SectionContext) => {
-    const session = await requireRole(...CATALOG_ROLES);
+    const session = await requirePermission("catalog.manage");
     const { section } = await context.params;
 
     // Checked on the OWN keys before indexing: a bare lookup resolves
@@ -43,7 +42,7 @@ export const updateCatalogSectionController = withErrorHandler(
 
 export const resetCatalogSectionController = withErrorHandler(
   async (request: Request, context: SectionContext) => {
-    const session = await requireRole(...CATALOG_ROLES);
+    const session = await requirePermission("catalog.manage");
     const { section } = await context.params;
     const ctx = requestContext(request);
     const updated = await service.resetSection(section, {

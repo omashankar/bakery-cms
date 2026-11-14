@@ -1,10 +1,12 @@
 import type { MetadataRoute } from "next";
-import { routes } from "@/constants/routes";
 import { getGlobalSeo, getSeoRoutes } from "@/features/seo/lib/seo-repository";
 import type { SeoStore } from "@/types/seo";
 
 export interface SitemapGating {
-  /** False hides the wedding-cakes route — it 404s, so advertising it is a lie. */
+  /**
+   * Read by nothing since the wedding-cakes page itself was removed
+   * (05ec3249); kept so existing callers still type-check.
+   */
   weddingEnabled?: boolean;
 }
 
@@ -18,11 +20,10 @@ export interface SitemapGating {
  */
 export function buildSitemapEntriesFrom(
   store: SeoStore,
-  gating: SitemapGating = {},
+  _gating: SitemapGating = {},
 ): MetadataRoute.Sitemap {
   const global = store.global;
   const base = global.canonicalBaseUrl.replace(/\/$/, "");
-  const weddingEnabled = gating.weddingEnabled ?? true;
 
   return store.routes
     .filter((entry) => !entry.noIndex && global.allowIndexing)

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getSeoStoreServer } from "@/features/seo/server/seo-store.server";
-import { Inter, Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
+import { Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { AppProviders } from "@/components/providers/app-providers";
 import { ThemeBlockingScript } from "@/components/theme-blocking-script";
 import { BusinessBlockingScript } from "@/components/business-blocking-script";
@@ -10,16 +11,40 @@ import { setActiveLocale } from "@/features/settings/lib/active-locale";
 import { optimizedImageUrl } from "@/lib/image-url";
 import "./globals.css";
 
-const inter = Inter({
+/**
+ * ONE FACE, AS THE BIG INDIAN SHOPS SET THEIRS (2026-11-13). Headings and
+ * body are both Inter: Poppins was tried and the shop found it "not nice",
+ * asking for the plain, even look of a large marketplace instead. Headings
+ * take Inter through `--font-heading` (globals.css), so nothing new is
+ * downloaded for them — the page's one variable font draws every weight.
+ *
+ * ONE FILE, WITH THE RUPEE IN IT. Google serves Inter as a "latin" file
+ * (47 KB) and puts ₹ in "latin-ext" (83 KB), so every page with a price
+ * downloaded both — 130 KB of font for one extra character — and on a slow
+ * phone the first paint waited for the pair (measured: with the fonts
+ * withheld, /platform painted at 1.3s instead of 4.0s). This is Google's own
+ * Inter (google/fonts, ofl/inter, `Inter[opsz,wght].ttf`) cut to the same
+ * latin range plus U+20B9, weight axis 100–900 kept, opsz pinned at its
+ * default 14, unhinted, with only the features this site uses: kern, liga,
+ * clig, calt, rlig, ccmp, locl, mark, mkmk and tnum (`tabular-nums`). 43 KB.
+ * Made with the `subset-font` npm package (HarfBuzz); OFL licence beside it.
+ *
+ * NOT PRELOADED, and that is measured, not assumed. A preloaded font held the
+ * first paint until it arrived, and on a phone it arrives alongside ~180 KB
+ * of scripts sharing the same bandwidth. Throttled phone, A/B, median of 5–7:
+ * first paint 0.3–0.9s sooner on every page and /platform 3.4s → 1.7s; LCP
+ * within ±0.2s on the listing and product pages (their LCP is a photo).
+ * (With Google's two files the same switch cost home and collections 0.2–0.4s
+ * of LCP — it is the one small file that makes it a win.)
+ */
+const inter = localFont({
+  src: "./fonts/inter-latin-rupee.woff2",
   variable: "--font-sans",
-  subsets: ["latin"],
+  weight: "100 900",
+  style: "normal",
   display: "swap",
-});
-
-const plusJakarta = Plus_Jakarta_Sans({
-  variable: "--font-heading",
-  subsets: ["latin"],
-  display: "swap",
+  adjustFontFallback: "Arial",
+  preload: false,
 });
 
 const geistMono = Geist_Mono({
@@ -102,7 +127,7 @@ export default async function RootLayout({
       lang="en"
       data-scroll-behavior="smooth"
       suppressHydrationWarning
-      className={`${inter.variable} ${plusJakarta.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-sans">
         {/*

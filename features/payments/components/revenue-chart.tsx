@@ -12,16 +12,24 @@ interface RevenueChartProps {
 /** Lightweight 7-day revenue bar chart — pure CSS bars, no external library. */
 export function RevenueChart({ data, className }: RevenueChartProps) {
   const max = Math.max(1, ...data.map((d) => d.amount));
+  // A week with nothing taken drew seven 2% stubs — a chart that looked broken
+  // rather than one that said "nothing yet".
+  const empty = data.every((d) => d.amount <= 0);
 
   return (
-    <div className={cn("space-y-3", className)}>
+    <div className={cn("relative space-y-3", className)}>
+      {empty ? (
+        <p className="absolute inset-x-0 top-14 text-center text-sm text-muted-foreground">
+          No payments in these days yet.
+        </p>
+      ) : null}
       <div className="flex h-40 items-end gap-2 sm:gap-3">
         {data.map((point, i) => {
           const heightPct = Math.round((point.amount / max) * 100);
           const isLast = i === data.length - 1;
           return (
             <div key={point.label} className="group flex h-full flex-1 flex-col items-center justify-end gap-1.5">
-              <span className="text-[10px] font-semibold text-foreground opacity-0 transition-opacity group-hover:opacity-100">
+              <span className="text-[11px] font-semibold text-foreground opacity-0 transition-opacity group-hover:opacity-100">
                 {point.amount > 0 ? formatCurrency(point.amount) : ""}
               </span>
               <div
@@ -38,7 +46,7 @@ export function RevenueChart({ data, className }: RevenueChartProps) {
       </div>
       <div className="flex gap-2 sm:gap-3">
         {data.map((point) => (
-          <span key={point.label} className="flex-1 text-center text-[10px] text-muted-foreground">
+          <span key={point.label} className="flex-1 text-center text-[11px] text-muted-foreground">
             {point.label}
           </span>
         ))}

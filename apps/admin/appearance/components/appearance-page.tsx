@@ -242,7 +242,7 @@ export function AppearancePage({
       resetDescription="Restore the default preset and radius. Custom colors will be lost."
     >
       <SettingsHydrationNotice hydration={hydration} />
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] xl:items-start">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] xl:items-start">
         <div className="space-y-4">
           <Card className="shadow-sm">
             <CardHeader>
@@ -348,8 +348,8 @@ export function AppearancePage({
             <CardHeader>
               <CardTitle className="text-base">Shape &amp; typography</CardTitle>
               <CardDescription>
-                Border radius applies to the storefront. Typography uses Plus Jakarta Sans +
-                Inter.
+                Border radius applies to the storefront. Typography uses Inter for
+                headings and text.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -378,8 +378,8 @@ export function AppearancePage({
                   </p>
                   {/* The shop’s own headings, so the specimen shows the type at
                       the words it will actually render. */}
-                  <p className="mt-2 font-heading text-2xl font-bold">{labels.collectionsTitle}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Plus Jakarta Sans</p>
+                  <p className="mt-2 font-heading text-2xl font-semibold">{labels.collectionsTitle}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Inter</p>
                 </div>
                 <div className="rounded-xl border border-border bg-card p-4">
                   <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">

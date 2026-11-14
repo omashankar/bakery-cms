@@ -86,6 +86,8 @@ export function InvoiceDocument({
                 alt={settings.companyName}
                 className="h-[56px] w-auto max-w-[220px] object-contain object-left"
                 fill={false}
+                // The box's widest, so the stored original is not fetched for it.
+                width={220}
               />
             ) : null}
             <div>

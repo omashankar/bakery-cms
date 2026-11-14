@@ -12,10 +12,15 @@ import { isStorefrontSeeded } from "@/lib/storefront-seed-flag";
 import {
   lookUpDeliveryPincode,
   pincodeLabel,
+  DELIVERY_LOCATION_UPDATED_EVENT,
   readDeliveryLocation,
   saveDeliveryLocation,
   type DeliveryLookup,
 } from "@/features/commerce/lib/delivery-location";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+
+const readSavedPincode = () => readDeliveryLocation()?.pincode ?? "";
+const savedPincodeChanges = windowEvents(DELIVERY_LOCATION_UPDATED_EVENT, "storage");
 import { isFullPincode, normalizePincode } from "@/features/commerce/lib/delivery-zone-utils";
 import type { DeliveryZone } from "@/types/delivery";
 import { cn } from "@/lib/utils";
@@ -50,6 +55,7 @@ export function PincodeCheck({
   className,
   title,
   inline = false,
+  initialZones,
 }: {
   className?: string;
   /**
@@ -64,9 +70,18 @@ export function PincodeCheck({
    * than a heading over a full-width box.
    */
   inline?: boolean;
+  /**
+   * The shop's zones, read on the server — so the box is in the page's HTML
+   * instead of appearing after hydration and pushing everything under it down
+   * (146px on the cart, CLS 0.11). The effect below still reads the live list.
+   */
+  initialZones?: DeliveryZone[];
 }) {
-  const [zones, setZones] = useState<DeliveryZone[] | null>(null);
-  const [entered, setEntered] = useState("");
+  const [zones, setZones] = useState<DeliveryZone[] | null>(() => initialZones ?? null);
+  // What the customer typed here; until they type, the code they saved before.
+  const [typed, setEntered] = useState<string | null>(null);
+  const savedPincode = useExternalValue(readSavedPincode, savedPincodeChanges, "");
+  const entered = typed ?? savedPincode;
   // Bumped on every edit, so a check answered after the box changed is dropped.
   const checkSeq = useRef(0);
   const [result, setResult] = useState<DeliveryLookup | null>(null);
@@ -95,17 +110,12 @@ export function PincodeCheck({
     they cannot see the input of is the page claiming to have checked something
     it has not; they press Check and it answers.
 
-    IN AN EFFECT, and the lint rule against that cannot be satisfied here. The
-    obvious alternative is a lazy initialiser — `useState(() => readDelivery…)`
-    — which runs during render, and `readDeliveryLocation` reads localStorage,
-    which the server does not have. The first client render would then disagree
-    with the HTML and React would throw the whole tree away. A second render is
-    the cost of reading the browser at all.
+    NOT A LAZY INITIALISER: `readDeliveryLocation` reads localStorage, which
+    the server does not have, so the first client render would disagree with
+    the HTML. `useExternalValue` above gives the server's "" to that render
+    and the saved code straight after — and keeps following it until the
+    customer types here.
   */
-  useEffect(() => {
-    const saved = readDeliveryLocation();
-    if (saved?.pincode) setEntered(saved.pincode);
-  }, []);
 
   useEffect(() => {
     if (!inline || !zones || zones.length === 0) return;

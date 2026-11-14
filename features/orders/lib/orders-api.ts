@@ -58,6 +58,8 @@ export interface OrderAnalyticsResponse {
   cityBreakdown: CityBreakdownItem[];
   couponBreakdown: CouponBreakdownItem[];
   recentOrders: PlacedOrder[];
+  /** False when the money was zeroed for a member without `reports.revenue.view` — hide it, do not print ₹0. */
+  includesRevenue?: boolean;
 }
 
 interface Envelope<T> {
@@ -383,7 +385,7 @@ export function adminNotesRequest(orderId: string, adminNotes: string): Promise<
 /** Assign (or, with a blank name, clear) the rider on an order. */
 export function deliveryPartnerRequest(
   orderId: string,
-  partner: { name: string; phone?: string; vehicle?: string },
+  partner: { name: string; phone?: string; vehicle?: string; userId?: string },
 ): Promise<boolean> {
   return send(`/api/orders/${orderId}/delivery-partner`, "PATCH", partner);
 }

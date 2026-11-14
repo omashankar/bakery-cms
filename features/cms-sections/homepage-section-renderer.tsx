@@ -395,7 +395,7 @@ function OurMenuSection(props: HomepageSectionRendererProps) {
               showed through the bottom padding under the ellipsis.
             */}
             <div className="px-1.5 pt-2.5 pb-3 sm:px-2">
-              <p className="line-clamp-2 text-center text-[13px] font-bold text-foreground sm:text-base">
+              <p className="line-clamp-2 text-center text-[13px] font-semibold text-foreground sm:text-base">
                 {category.name}
               </p>
             </div>
@@ -508,7 +508,7 @@ function ProductGridSection(
           description={contentString(c, "subtitle")}
           className="items-center"
           trailing={
-            props.showCta ? (
+            props.showCta && ctaHref && ctaLabel ? (
               <ViewAllLink href={ctaHref} label={ctaLabel} on={props.section.background} />
             ) : null
           }
@@ -770,7 +770,13 @@ function BlogCardsSection(props: HomepageSectionRendererProps) {
         description={contentString(c, "subtitle")}
         className="items-end"
         trailingClassName="hidden sm:flex"
-        trailing={<ViewAllLink href={ctaHref} label={ctaLabel} on={props.section.background} />}
+        // Only when there is a link: a null-rendering element still holds the
+        // trailing slot and its gap open (see the banner strip).
+        trailing={
+          ctaHref && ctaLabel ? (
+            <ViewAllLink href={ctaHref} label={ctaLabel} on={props.section.background} />
+          ) : null
+        }
       />
       <div className="mt-6 grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
         {posts.map((post, index) => {

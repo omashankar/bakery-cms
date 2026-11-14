@@ -20,7 +20,7 @@ function renderBlocks(blocks: CmsPageBlock[]) {
       return (
         <h2
           key={block.id}
-          className="mt-8 mb-3 font-heading text-2xl font-bold text-foreground first:mt-0"
+          className="mt-8 mb-3 font-heading text-2xl font-semibold text-foreground first:mt-0"
         >
           {block.content}
         </h2>
@@ -234,7 +234,7 @@ function AboutTemplate({ page, preview }: { page: CmsPage; preview: boolean }) {
           {about.highlightsTitle || about.highlightsDescription ? (
             <ScrollReveal className="max-w-2xl">
               {about.highlightsTitle ? (
-                <h2 className="font-heading text-2xl font-bold sm:text-3xl">
+                <h2 className="font-heading text-2xl font-semibold sm:text-3xl">
                   {about.highlightsTitle}
                 </h2>
               ) : null}
@@ -276,7 +276,7 @@ function AboutTemplate({ page, preview }: { page: CmsPage; preview: boolean }) {
         <div className={layoutSpacing.container}>
           <ScrollReveal className="rounded-3xl border border-border bg-cream-100 px-6 py-12 text-center sm:px-10 lg:py-14">
             {about.ctaTitle ? (
-              <h2 className="font-heading text-2xl font-bold sm:text-3xl">{about.ctaTitle}</h2>
+              <h2 className="font-heading text-2xl font-semibold sm:text-3xl">{about.ctaTitle}</h2>
             ) : null}
             {about.ctaDescription ? (
               <p className="mx-auto mt-3 max-w-xl text-muted-foreground">{about.ctaDescription}</p>

@@ -30,7 +30,7 @@ async function buyAndPay(page: Page, productSlug: string, email: string): Promis
   await page.getByRole("button", { name: /add to cart/i }).first().click();
 
   await page.goto("/store/cart");
-  await page.getByRole("button", { name: /proceed to checkout/i }).click();
+  await page.getByRole("link", { name: /proceed to checkout/i }).click();
   await expect(page).toHaveURL(/\/store\/checkout/);
 
   await page.getByLabel(/full name/i).fill("E2E Cancel Probe");

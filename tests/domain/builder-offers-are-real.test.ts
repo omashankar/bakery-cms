@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { specialOffers, type LandingProduct } from "@/constants/landing-data";
+import { specialOffers } from "@/constants/landing-data";
 import {
   isLiveCoupon,
   selectStorefrontOffers,

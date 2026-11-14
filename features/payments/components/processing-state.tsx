@@ -108,7 +108,7 @@ export function ProcessingState({
         )}
       </span>
 
-      <h2 className="mt-4 font-heading text-xl font-bold text-foreground">
+      <h2 className="mt-4 font-heading text-xl font-semibold text-foreground">
         {title ?? preset.title}
       </h2>
       <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">

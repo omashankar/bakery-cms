@@ -7,6 +7,7 @@ import { CatalogServerSync } from "@/components/shared/catalog-server-sync";
 import { CommerceServerSync } from "@/components/shared/commerce-server-sync";
 import { ContentServerSync } from "@/components/shared/content-server-sync";
 import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
 
 /**
  * The toast host, loaded after the page rather than with it.
@@ -25,6 +26,16 @@ interface AppProvidersProps {
 }
 
 export function AppProviders({ children }: AppProvidersProps) {
+  /*
+    NOT ON THE VENDOR'S OWN PAGES. /platform sells the CMS; it reads nothing
+    of the shop's — no settings, catalogue, coupons, zones, banners or FAQ —
+    yet these four fetched all seven after every visit (measured 2026-11-13,
+    ~35 KB and their parsing on a phone already at 2s of blocked main thread).
+    A visitor who goes on to the store is covered there: the storefront
+    layout seeds the same caches with the page.
+  */
+  const pathname = usePathname();
+  const vendorPage = pathname?.startsWith("/platform") ?? false;
   return (
     <ThemeProvider defaultTheme="light">
       <AppearanceThemeSync />
@@ -56,10 +67,14 @@ export function AppProviders({ children }: AppProvidersProps) {
         already follow. That belongs in a change of its own, made against the
         checkout page deliberately, not as a side effect of a prefetch tweak.
       */}
-      <SettingsServerSync />
-      <CatalogServerSync />
-      <CommerceServerSync />
-      <ContentServerSync />
+      {vendorPage ? null : (
+        <>
+          <SettingsServerSync />
+          <CatalogServerSync />
+          <CommerceServerSync />
+          <ContentServerSync />
+        </>
+      )}
       {/*
         `SiteLayoutServerSync` is deliberately NOT here.
 

@@ -11,6 +11,7 @@ import {
 import { loadProducts } from "@/features/products/lib/products-repository";
 import { slugify } from "@/utils/slug";
 import { getPublishedStorefrontProducts } from "@/features/products/lib/product-mapper";
+import { searchCatalog } from "./search-match";
 
 function getLandingCatalog(): LandingProduct[] {
   const combined = [
@@ -109,10 +110,10 @@ export function searchHaystack(cake: LandingProduct): string {
 
 export function searchProducts(query: string, catalog?: LandingProduct[]): LandingProduct[] {
   const source = catalog ?? getAllProducts();
-  const normalized = query.trim().toLowerCase();
-  if (!normalized) return source;
+  if (!query.trim()) return source;
 
-  return source.filter((cake) => searchHaystack(cake).includes(normalized));
+  const found = new Set(searchCatalog(query, source).hits.map((hit) => hit.product.slug));
+  return source.filter((cake) => found.has(cake.slug));
 }
 
 /**

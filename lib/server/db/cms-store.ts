@@ -9,7 +9,7 @@ import type { JsonStore } from "@/lib/server/json-store";
  *
  * Each "store" holds one value T (an array like pages, or a singleton object
  * like the homepage builder state) as a single document keyed by `key`, in the
- * shared `cms_stores` collection. It exposes the SAME interface as the old JSON
+ * shared `cmsstores` collection (Mongoose's plural of the model name). It exposes the SAME interface as the old JSON
  * file store — read / write / mutate / reset — so a `.server.ts` file migrates
  * by swapping `createJsonStore` for `createMongoStore` and `file` for `key`.
  *

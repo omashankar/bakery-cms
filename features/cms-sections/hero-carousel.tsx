@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { layoutSpacing } from "@/constants/spacing";
 import type { HeroCopySide } from "@/types/homepage-builder";
 import { cn } from "@/lib/utils";
+import { optimizedImageUrl } from "@/lib/image-url";
 
 export interface HeroSlide {
   badge?: string;
@@ -78,6 +79,9 @@ function HeroBannerSlideView({
    * picture until the third slide happened to come round. Measured.
    *
    * `priority` still marks the FIRST one, which is what gets `fetchPriority`.
+   * The rest are asked for at LOW priority: still eager, so the band keeps its
+   * height, but on a phone's 4G the three pictures shared the line equally
+   * and the one on screen — the page's LCP — arrived with the other two.
    */
   priority?: boolean;
   /** Which half of the picture the words sit in. */
@@ -135,19 +139,22 @@ function HeroBannerSlideView({
    * and next/image does not expose it. That trades the optimiser for
    * correctness, and costs less than it sounds: this path only runs when a
    * shop has deliberately uploaded a second, already-sized picture.
+   *
+   * Both URLs still ask Cloudinary for AVIF/WebP at the drawn width — they
+   * were the stored originals, on the largest image on the page.
    */
   const image = mobile ? (
     <picture>
-      <source media="(min-width: 640px)" srcSet={slide.imageUrl} />
+      <source media="(min-width: 640px)" srcSet={optimizedImageUrl(slide.imageUrl, { width: 1440 })} />
       <img
-        src={mobile}
+        src={optimizedImageUrl(mobile, { width: 480 })}
         alt={alt}
         className="absolute inset-0 size-full object-cover"
         // Same reason as the branch below, though this one is cropped to a
         // fixed ratio and so cannot stretch the row — eager for consistency,
         // and because it is on screen within seconds either way.
         loading="eager"
-        fetchPriority={priority ? "high" : undefined}
+        fetchPriority={priority ? "high" : "low"}
         decoding="async"
       />
     </picture>
@@ -157,7 +164,7 @@ function HeroBannerSlideView({
       alt={alt}
       fill
       loading={priority ? "eager" : "lazy"}
-      fetchPriority={priority ? "high" : undefined}
+      fetchPriority={priority ? "high" : "low"}
       className="object-cover"
       /*
         100vw, because this band spans the window rather than the content
@@ -197,7 +204,7 @@ function HeroBannerSlideView({
       // See the note on `priority` above: every banner slide loads eagerly,
       // because an unloaded one makes the whole band too tall.
       loading="eager"
-      fetchPriority={priority ? "high" : undefined}
+      fetchPriority={priority ? "high" : "low"}
       /*
         `max-h` in CONTAINER units, never `vh`. The admin builder mounts this
         same component inside a 1024px-max preview panel, where `vh` resolves

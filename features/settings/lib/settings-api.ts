@@ -217,3 +217,20 @@ export async function sendTestEmailRequest(): Promise<TestEmailResult> {
     return { sent: false, error: "Could not reach the server." };
   }
 }
+
+/** Settings → SMTP: is mail reaching inboxes? (lib/server/mail/delivery-check.ts) */
+export async function fetchDeliveryCheck(): Promise<
+  { ok: true; data: import("@/lib/server/mail/delivery-check").DeliveryCheck } | { ok: false; error: string }
+> {
+  try {
+    const res = await fetch("/api/settings/smtp/delivery-check", { cache: "no-store" });
+    const json = (await res.json().catch(() => null)) as { data?: unknown; message?: string } | null;
+    if (!res.ok || !json?.data) {
+      noteAuthStatus(res.status);
+      return { ok: false, error: json?.message ?? `The server refused (${res.status}).` };
+    }
+    return { ok: true, data: json.data as import("@/lib/server/mail/delivery-check").DeliveryCheck };
+  } catch {
+    return { ok: false, error: "Could not reach the server." };
+  }
+}

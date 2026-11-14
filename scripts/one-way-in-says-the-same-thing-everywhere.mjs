@@ -53,8 +53,6 @@ const patch = (list) =>
     return { ...s, content: { ...s.content, ctaLabel: SAYS } };
   });
 
-const published = patch(store.data.published.sections ?? []);
-changes.length = 0;
 const draft = patch(store.data.draft.sections ?? []);
 changes.length = 0;
 const finalPublished = patch(store.data.published.sections ?? []);

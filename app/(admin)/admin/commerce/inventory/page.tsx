@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { InventoryAdminPage } from "@/apps/admin/commerce/pages/inventory-admin-page";
-import { whenAdmin } from "@/lib/server/auth/admin-initial";
+import { whenAllowed } from "@/lib/server/auth/access";
 import { getProducts } from "@/features/products/data/products-service";
 import { getOverview } from "@/features/inventory/server/inventory.service";
 
@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 /** The catalogue and the stock overview, read with the page. */
 export default async function Page() {
-  const initial = await whenAdmin(async () => {
+  const initial = await whenAllowed("inventory.view", async () => {
     const [products, overview] = await Promise.all([getProducts(), getOverview()]);
     return JSON.parse(JSON.stringify({ products, overview }));
   });

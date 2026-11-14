@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {
   Activity,
+  Bug,
   AlertTriangle,
   BarChart3,
   Blocks,
@@ -44,15 +45,22 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { routes } from "@/constants/routes";
+import { useAccess } from "@/features/team/lib/access-context";
+import { canOpenRoute } from "@/features/team/lib/route-access";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { cn } from "@/lib/utils";
 import {
   ensureSettingsHydrated,
-  getGeneralSettings,
-  getMaintenanceSettings,
+  peekSettings,
   SETTINGS_UPDATED_EVENT,
 } from "@/features/settings/lib/settings-repository";
 import { settingsHydration } from "@/features/settings/lib/settings-api";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
+
+const settingsChanges = windowEvents(SETTINGS_UPDATED_EVENT, "storage");
+const readSiteName = () => peekSettings().general.siteName;
+const readMaintenanceOn = () => peekSettings().maintenance.isEnabled;
 
 type SettingsItem = {
   title: string;
@@ -286,11 +294,16 @@ const groups: SettingsGroup[] = [
         icon: Activity,
       },
       {
-        title: "Permissions",
-        description: "Team access control — available in a future release.",
+        title: "Error log",
+        description: "Problems the site ran into — on the server or in a customer's browser.",
+        href: routes.admin.settings.errors,
+        icon: Bug,
+      },
+      {
+        title: "Team & permissions",
+        description: "Invite your staff, give each a role, and decide what every role can do.",
         href: routes.admin.settings.permissions,
         icon: UserCog,
-        future: true,
       },
     ],
   },
@@ -325,36 +338,30 @@ export function SettingsOverviewPage() {
   //    job is avoiding a server/client mismatch on first paint.
   //  - `hydrated`: has the SERVER's copy arrived? Only the two CLAIMS wait on
   //    this — the shop's name, and whether maintenance mode is on.
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHydrated();
+  // Only the screens this member can open; a group left empty is not drawn.
+  const { can } = useAccess();
+  const visibleGroups = groups
+    .map((group) => ({ ...group, items: group.items.filter((item) => canOpenRoute(item.href, can)) }))
+    .filter((group) => group.items.length > 0);
   const [hydrated, setHydrated] = useState(settingsHydration.hasSettled());
-  const [siteName, setSiteName] = useState("");
-  const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
+  // Read from this browser's settings and followed as they change; shown only
+  // once `hydrated` says they are the server's (read only — `peekSettings`).
+  const siteName = useExternalValue(readSiteName, settingsChanges, "");
+  const maintenanceEnabled = useExternalValue(readMaintenanceOn, settingsChanges, false);
 
   useEffect(() => {
     let cancelled = false;
-
-    function read() {
-      setSiteName(getGeneralSettings().siteName);
-      setMaintenanceEnabled(getMaintenanceSettings().isEnabled);
-    }
-
-    read();
-    setMounted(true);
-    window.addEventListener(SETTINGS_UPDATED_EVENT, read);
-
     void ensureSettingsHydrated().then((settled) => {
       if (cancelled) return;
-      if (settled) read();
       // Only a SUCCESSFUL read may unlock the claims. `ensureSettingsHydrated`
       // reports false when the FULL admin read failed even if the public subset
       // landed — so this legitimately stays false, and the claims stay generic
       // rather than reporting this browser's defaults as fact.
       setHydrated(settled);
     });
-
     return () => {
       cancelled = true;
-      window.removeEventListener(SETTINGS_UPDATED_EVENT, read);
     };
   }, []);
 
@@ -411,7 +418,7 @@ export function SettingsOverviewPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {groups.map((group) => (
+          {visibleGroups.map((group) => (
             <Card key={group.title} className="shadow-sm">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">{group.title}</CardTitle>

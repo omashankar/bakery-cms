@@ -71,7 +71,7 @@ test.describe("a customer placing an order", () => {
 
     // Clicked, not navigated to. A direct `goto("/store/checkout")` bounces
     // back to the cart, which is worth knowing but is not what a customer does.
-    await page.getByRole("button", { name: /proceed to checkout/i }).click();
+    await page.getByRole("link", { name: /proceed to checkout/i }).click();
     await expect(page).toHaveURL(/\/store\/checkout/);
 
     // ---- the address step ----

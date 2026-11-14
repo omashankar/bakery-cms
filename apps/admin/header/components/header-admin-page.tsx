@@ -198,7 +198,7 @@ function NavRowCard({
           is SET shows as a quiet word beside it, so the shop can tell six
           rows apart without opening any of them.
         */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
             <Switch
               checked={item.isVisible}
               onCheckedChange={(checked) =>
@@ -268,6 +268,7 @@ function NavRowCard({
           </span>
             <Button
               size="icon"
+              className="max-sm:size-7"
               variant="ghost"
               disabled={index === 0}
               onClick={() => moveNav(item.id, "up")}
@@ -277,6 +278,7 @@ function NavRowCard({
             </Button>
             <Button
               size="icon"
+              className="max-sm:size-7"
               variant="ghost"
               disabled={index === rowCount - 1}
               onClick={() => moveNav(item.id, "down")}
@@ -286,6 +288,7 @@ function NavRowCard({
             </Button>
             <Button
               size="icon"
+              className="max-sm:size-7"
               variant="ghost"
               onClick={() => setRemoveTarget(item)}
               disabled={totalRows <= 1}
@@ -299,6 +302,7 @@ function NavRowCard({
           */}
           <Button
             size="icon"
+            className="max-sm:size-7"
             variant="ghost"
             onClick={onToggle}
             aria-expanded={open}

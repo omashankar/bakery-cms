@@ -52,12 +52,12 @@ export const docChapters: DocChapter[] = [
         body: "Address, phone, email and opening hours. These appear in the footer of every storefront page, on the contact page, and on the invoice.",
         where: { label: "Settings → Contact", href: routes.admin.settings.contact },
         caution:
-          "The demo phone number is a live `tel:` link. Anyone who taps it before you change it is calling a number that does not exist.",
+          "The demo phone number is a live phone link. Anyone who taps it before you change it is calling a number that is not yours.",
       },
       {
         title: "Switch payments on",
-        body: "Choose which methods you accept — cash on delivery, UPI, card, or Razorpay online payment — and connect the gateway.",
-        where: { label: "Settings → Commerce", href: routes.admin.settings.commerce },
+        body: "Turn on cash on delivery and Razorpay — which takes UPI, cards, net banking and wallets — and paste your Razorpay keys. Online payments land in your own Razorpay account.",
+        where: { label: "Payments → Gateways", href: routes.admin.commerce.gateways },
         caution:
           "A test key takes no real money. Swap to live keys only when you are ready to open, and register the payment webhook at the same time.",
       },
@@ -80,8 +80,8 @@ export const docChapters: DocChapter[] = [
         where: { label: "Orders → open one", href: routes.admin.orders.list },
       },
       {
-        title: "Name the delivery person",
-        body: "Once you know who is taking it, add their name and number to the order. That is what the customer's tracking page shows.",
+        title: "Assign the delivery",
+        body: "Pick one of your delivery staff on the order — they get an email, and the order appears on their own Deliveries screen — or type the name and number of someone outside the team. The customer's tracking page shows who is bringing it.",
         caution:
           "Until you set one, the tracking page says nobody has been assigned — which is true, and better than inventing a name.",
       },
@@ -99,6 +99,37 @@ export const docChapters: DocChapter[] = [
     ],
   },
   {
+    id: "team",
+    title: "Your team",
+    summary:
+      "Each person signs in with their own login and sees only their part of the shop — the kitchen what to make, a rider where to go.",
+    steps: [
+      {
+        title: "Invite your staff",
+        body: "Send an invite by email and pick a role: Manager, Kitchen Staff, Delivery Staff or Content Editor. They set their own password from the invite.",
+        where: { label: "Settings → Team & permissions", href: routes.admin.settings.permissions },
+        caution: "Invites go out by email, so set your mail server up first — Settings → SMTP.",
+      },
+      {
+        title: "The kitchen board",
+        body: "Kitchen staff open Kitchen and see what to make, soonest delivery first. A new order plays a chime and shows a count in the browser tab, and the board refreshes on its own every 30 seconds.",
+        where: { label: "Kitchen", href: routes.admin.kitchen },
+        caution:
+          "A browser only plays sound after the page has been tapped once. Open the board and tap it at the start of the shift.",
+      },
+      {
+        title: "Deliveries for riders",
+        body: "A rider opens Deliveries on their phone and sees only the orders assigned to them — the address, the time window and what to hand over — and moves each one on as they go.",
+        where: { label: "Deliveries", href: routes.admin.deliveries },
+      },
+      {
+        title: "A role of your own",
+        body: "When the four roles do not fit, build one: area by area, choose no access, view only, or full access.",
+        where: { label: "Settings → Team & permissions", href: routes.admin.settings.permissions },
+      },
+    ],
+  },
+  {
     id: "catalogue",
     title: "Your cakes",
     summary:
@@ -107,7 +138,7 @@ export const docChapters: DocChapter[] = [
       {
         title: "Add a cake",
         body: "Name, description, photographs, price, category and occasion. Add the sizes this product comes in, each with its own surcharge, and the flavour words customers can filter by; the storefront prices the default size.",
-        where: { label: "Cakes → Add", href: routes.admin.cakes.add },
+        where: { label: "Products → Add", href: routes.admin.cakes.add },
         caution:
           "A cake stays hidden from customers until its status is Published. Draft and archived items are not shown, and not sold.",
       },
@@ -143,7 +174,7 @@ export const docChapters: DocChapter[] = [
       },
       {
         title: "Header, footer and colours",
-        body: "Your navigation menu, the footer columns, the call-to-action button, and the shop's colour palette. Changes show on the storefront immediately.",
+        body: "Your navigation menu and its call-to-action button are under Header, the footer columns under Footer, and the shop's colour palette under Appearance. Changes show on the storefront immediately.",
         where: { label: "Appearance", href: routes.admin.appearance },
       },
       {
@@ -160,14 +191,14 @@ export const docChapters: DocChapter[] = [
     steps: [
       {
         title: "Run a discount",
-        body: "Create a coupon code with a percentage or flat discount, a minimum order value, a usage limit and an expiry date. Checkout validates it against the live cart, so a cart that stops qualifying loses the discount and says so.",
+        body: "Create a coupon code with a percentage or flat discount, a minimum order value and an expiry date, for the whole shop or only some categories. Checkout validates it against the live cart, so a cart that stops qualifying loses the discount and says so.",
         where: { label: "Coupons", href: routes.admin.commerce.coupons },
         caution:
           "Set an expiry. A coupon without one keeps discounting for as long as the shop runs.",
       },
       {
         title: "Decide where you deliver",
-        body: "Add delivery zones by pincode, each with its own fee and free-delivery threshold. Checkout refuses an address outside them rather than accepting an order you cannot fulfil.",
+        body: "Draw delivery zones by PIN code, by city, or as an area on the map, each with its own delivery charge. Free delivery above an order value is set once, for the whole shop. Checkout refuses an address outside your zones rather than accepting an order you cannot fulfil.",
         where: { label: "Delivery Zones", href: routes.admin.commerce.deliveryZones },
       },
       {
@@ -201,6 +232,16 @@ export const docChapters: DocChapter[] = [
         title: "See what was done",
         body: "Every meaningful action — a price change, a refund, a deletion, a sign-in — is recorded with who did it and when. The trail is append-only; nothing edits it.",
         where: { label: "Settings → Activity", href: routes.admin.settings.activity },
+      },
+      {
+        title: "Make sure mail arrives",
+        body: "Send yourself a test, then run the delivery check: it reads your domain's mail records and, for Brevo, what happened to each recent message — so a mail that was accepted but never reached an inbox does not go unnoticed.",
+        where: { label: "Settings → SMTP", href: routes.admin.settings.smtp },
+      },
+      {
+        title: "See what went wrong",
+        body: "Errors on the live site — on a page, in the admin or in a customer's browser — are kept for 30 days, grouped so the same fault is one line with a count.",
+        where: { label: "Settings → Errors", href: routes.admin.settings.errors },
       },
       {
         title: "Close the shop temporarily",

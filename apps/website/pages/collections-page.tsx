@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowDownUp, ChevronDown, IndianRupee, SearchX, X } from "lucide-react";
 import { StaggerReveal } from "@/components/shared/scroll-reveal";
@@ -63,11 +63,25 @@ const PAGE_SLOTS = 7;
  * actually sorting.
  */
 const SORT_LABELS: Record<CollectionFilters["sort"], string> = {
+  relevance: "Best match",
   popular: "Popular",
   name: "Name",
   "price-asc": "Price: low to high",
   "price-desc": "Price: high to low",
 };
+
+/**
+ * A search orders by how well each product answers it; no search, no "Best
+ * match". Chosen for the customer when a search begins and taken back when it
+ * is cleared — a choice they made themselves (price, name) is left alone.
+ */
+function withSearchSort(previous: CollectionFilters, next: CollectionFilters): CollectionFilters {
+  const searching = next.search.trim() !== "";
+  const wasSearching = previous.search.trim() !== "";
+  if (!searching && next.sort === "relevance") return { ...next, sort: "popular" };
+  if (searching && !wasSearching && next.sort === "popular") return { ...next, sort: "relevance" };
+  return next;
+}
 
 /**
  * The page numbers to draw, with `null` where the run breaks.
@@ -289,10 +303,10 @@ export function CollectionsPage({
    * the boxes do not vanish as the customer uses them.
    */
   const optionFacets = useMemo(() => getFilterOptionFacets(inCategory), [inCategory]);
-  const [filters, setFilters] = useState<CollectionFilters>(() => ({
-    ...defaultCollectionFilters(collectionPriceCeiling(catalog)),
-    search: initialSearch,
-  }));
+  const [filters, setFilters] = useState<CollectionFilters>(() => {
+    const blank = defaultCollectionFilters(collectionPriceCeiling(catalog));
+    return withSearchSort(blank, { ...blank, search: initialSearch });
+  });
   /**
    * RE-SEEDED, NOT JUST SEEDED, AND THIS IS THE WHOLE TRAP.
    *
@@ -305,12 +319,33 @@ export function CollectionsPage({
    * shape a bug can have. The page this replaces had exactly this effect
    * for exactly this reason.
    */
-  useEffect(() => {
+  // A new search in the address (the header's box, a link) becomes the
+  // filter's search — adjusted while rendering, the moment it is new.
+  const [searchSeen, setSearchSeen] = useState(initialSearch);
+  if (searchSeen !== initialSearch) {
+    setSearchSeen(initialSearch);
     setFilters((current) =>
-      current.search === initialSearch ? current : { ...current, search: initialSearch },
+      current.search === initialSearch
+        ? current
+        : withSearchSort(current, { ...current, search: initialSearch }),
     );
-  }, [initialSearch]);
-  const [page, setPage] = useState(1);
+  }
+  /*
+    THE PAGE NUMBER BELONGS TO ONE LIST — this category, these filters — and
+    any other list starts on page 1. Kept with the list it was chosen in, so
+    changing a filter cannot show page 3 of a list with one page, even for a
+    render. (This was an effect that reset it a render later.)
+  */
+  const [paging, setPaging] = useState<{ filters: CollectionFilters; category?: string; page: number }>(
+    () => ({ filters, category: categorySlug, page: 1 }),
+  );
+  const page = paging.filters === filters && paging.category === categorySlug ? paging.page : 1;
+  const setPage = (next: number | ((current: number) => number)) =>
+    setPaging({
+      filters,
+      category: categorySlug,
+      page: typeof next === "function" ? next(page) : next,
+    });
   /**
    * The shared hook, not a local copy of it.
    *
@@ -423,12 +458,8 @@ export function CollectionsPage({
   // adjusting your filters" is useless advice when no filter is the reason.
   const categoryIsEmpty = Boolean(categorySlug) && inCategory.length === 0;
 
-  useEffect(() => {
-    setPage(1);
-  }, [categorySlug, filters]);
 
-
-  const updateFilters = (next: CollectionFilters) => setFilters(next);
+  const updateFilters = (next: CollectionFilters) => setFilters((current) => withSearchSort(current, next));
 
   return (
     <>
@@ -556,7 +587,7 @@ export function CollectionsPage({
                       32px word beside two 14px controls outweighed the filters. */}
                   <h1
                     className={
-                      heading ? "font-heading text-xl font-bold tracking-tight sm:text-2xl" : "sr-only"
+                      heading ? "font-heading text-xl font-semibold tracking-tight sm:text-2xl" : "sr-only"
                     }
                   >
                     {pageTitle}
@@ -689,7 +720,9 @@ export function CollectionsPage({
                     >
                       {/* The word is the label above now — "Sort: Popular"
                           inside a cell headed "Sort by" said it twice. */}
-                      {(Object.keys(SORT_LABELS) as CollectionFilters["sort"][]).map((key) => (
+                      {(Object.keys(SORT_LABELS) as CollectionFilters["sort"][])
+                        .filter((key) => key !== "relevance" || filters.search.trim() !== "")
+                        .map((key) => (
                         <option key={key} value={key}>
                           {SORT_LABELS[key]}
                         </option>

@@ -70,7 +70,7 @@ export function DocsPage() {
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               On this page
             </p>
-            <ol className="mt-4 grid gap-x-8 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+            <ol className="mt-4 grid gap-x-8 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
               {docChapters.map((chapter, i) => (
                 <li key={chapter.id}>
                   <a

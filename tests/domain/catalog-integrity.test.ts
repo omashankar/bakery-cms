@@ -169,8 +169,9 @@ describe("the catalog screen", () => {
     // it showed the shipped defaults for the whole visit.
     expect(page).toContain("CATALOG_UPDATED_EVENT");
     expect(page).toContain("CATALOG_HYDRATION_EVENT");
-    expect(page).toMatch(/addEventListener\(CATALOG_UPDATED_EVENT/);
-    expect(page).toMatch(/addEventListener\(CATALOG_HYDRATION_EVENT/);
+    // Subscribed through an external store, so both events re-read the cache.
+    expect(page).toMatch(/windowEvents\(\s*CATALOG_UPDATED_EVENT,\s*CATALOG_HYDRATION_EVENT/);
+    expect(page).toMatch(/useExternalValue\([^)]*catalogChanges/);
   });
 
   it("disables the buttons rather than guarding inside the handlers", () => {

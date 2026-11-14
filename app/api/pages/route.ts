@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createPage, getPages } from "@/features/content/data/pages.server";
-import { requireAdminResponse } from "@/lib/server/auth/guard";
+import { requirePermissionResponse } from "@/lib/server/auth/guard";
 import type { CmsPageFormData } from "@/types/content";
 
 /**
@@ -17,7 +17,7 @@ import type { CmsPageFormData } from "@/types/content";
  */
 
 export async function GET() {
-  const auth = await requireAdminResponse();
+  const auth = await requirePermissionResponse("pages.view");
   if (auth instanceof NextResponse) return auth;
 
   try {
@@ -28,7 +28,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireAdminResponse();
+  const auth = await requirePermissionResponse("pages.manage");
   if (auth instanceof NextResponse) return auth;
 
   let body: CmsPageFormData;

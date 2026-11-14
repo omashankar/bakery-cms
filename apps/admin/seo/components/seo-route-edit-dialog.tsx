@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { reportWrite } from "@/apps/admin/lib/report-write";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
@@ -76,25 +76,40 @@ export function SeoRouteEditDialog({
     [form, baseline]
   );
 
-  useEffect(() => {
-    if (!open) {
-      setDiscardOpen(false);
-      return;
-    }
-    if (!entry) return;
+  /*
+    Filled from the route when the dialog opens (or the route or the shop's
+    default card changes while open); the discard prompt put away when it
+    closes. Adjusted while rendering, rather than by an effect a render later.
+  */
+  const [formFor, setFormFor] = useState<{
+    open: boolean;
+    entry: typeof entry;
+    card: string;
+  } | null>(null);
+  if (
+    !formFor ||
+    formFor.open !== open ||
+    formFor.entry !== entry ||
+    formFor.card !== global.defaultTwitterCard
+  ) {
+    setFormFor({ open, entry, card: global.defaultTwitterCard });
+    if (!open) setDiscardOpen(false);
+    else if (entry) fillFrom(entry);
+  }
 
+  function fillFrom(route: NonNullable<typeof entry>) {
     const next: SeoRouteFormState = {
-      metaTitle: entry.metaTitle,
-      metaDescription: entry.metaDescription,
-      keywords: (entry.metaKeywords ?? []).join(", "),
-      ogImage: entry.ogImage ?? "",
-      noIndex: entry.noIndex,
-      noFollow: entry.noFollow ?? false,
-      twitterCard: entry.twitterCard ?? global.defaultTwitterCard,
+      metaTitle: route.metaTitle,
+      metaDescription: route.metaDescription,
+      keywords: (route.metaKeywords ?? []).join(", "),
+      ogImage: route.ogImage ?? "",
+      noIndex: route.noIndex,
+      noFollow: route.noFollow ?? false,
+      twitterCard: route.twitterCard ?? global.defaultTwitterCard,
     };
     setForm(next);
     setBaseline(serializeForm(next));
-  }, [open, entry, global.defaultTwitterCard]);
+  }
 
   function handleDiscard() {
     setForm(JSON.parse(baseline) as SeoRouteFormState);

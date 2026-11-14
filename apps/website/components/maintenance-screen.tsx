@@ -31,7 +31,7 @@ export function MaintenanceScreen({
         <Wrench className="size-6" />
       </span>
 
-      <h1 className="mt-6 font-heading text-2xl font-bold text-foreground sm:text-3xl">
+      <h1 className="mt-6 font-heading text-2xl font-semibold text-foreground sm:text-3xl">
         {siteName} is closed for maintenance
       </h1>
 

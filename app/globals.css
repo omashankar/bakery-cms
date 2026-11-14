@@ -95,8 +95,14 @@
   --color-sidebar-ring: var(--sidebar-ring);
 
   /* Typography */
+  /*
+    "tracking-tight" eased (2026-11-13). At -0.025em a bold heading packs its
+    letters close and reads like a poster; the even, open look the shop asked
+    for (a large marketplace's) wants barely any. Headings alone use it.
+  */
+  --tracking-tight: -0.015em;
   --font-sans: var(--font-sans);
-  --font-heading: var(--font-heading);
+  --font-heading: var(--font-sans);
   --font-mono: var(--font-geist-mono);
 
   /*
@@ -409,6 +415,12 @@ html.dark {
       still ask for tracking-tight themselves.
     */
     @apply font-heading tracking-[-0.01em] text-foreground;
+    /*
+      NO DEFAULT WEIGHT. A heading without its own weight keeps the body's
+      400 — a product card's name is an <h3>, and a blanket 600 here set
+      every card on the shop in bold (2026-11-13; the shop said no). A
+      heading that should stand out says so with its own class.
+    */
   }
 
   /*
@@ -455,6 +467,14 @@ html.dark {
 
   .no-scrollbar::-webkit-scrollbar {
     display: none;
+  }
+
+  /*
+    Headings share the body's face (app/layout.tsx). The name stays so a shop
+    could be given its own heading face by setting this one variable.
+  */
+  :root {
+    --font-heading: var(--font-sans);
   }
 
   .font-heading {

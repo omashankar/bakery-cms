@@ -101,6 +101,31 @@ export interface UploadedPhoto {
  * one-byte `photo` part still spent the shop-wide allowance — which made the
  * denial the budget exists to prevent cheaper, not dearer.
  */
+/**
+ * Refused from the HEADER, before a byte of the body is read.
+ *
+ * `request.formData()` reads the whole body into memory, and every size check
+ * came after it — so the 6 MB limit stopped nothing from being received: an
+ * anonymous loop posting hundreds of megabytes had each one buffered by the
+ * server first. Browsers always send Content-Length with a FormData body; a
+ * request without one, or with one over the photo limit plus the multipart
+ * wrapping, is not a photo from this shop's page.
+ */
+const MULTIPART_ALLOWANCE = 512 * 1024;
+
+export function refuseOversizedBody(request: Request): void {
+  const declared = Number(request.headers.get("content-length"));
+  if (!Number.isFinite(declared) || declared <= 0) {
+    throw new AppError("The photo could not be read. Please try again.", 411);
+  }
+  if (declared > MAX_BYTES + MULTIPART_ALLOWANCE) {
+    throw new AppError(
+      `That photo is too large. Please use an image under ${Math.round(MAX_BYTES / (1024 * 1024))} MB.`,
+      413,
+    );
+  }
+}
+
 export function rejectUnusableFile(file: File): void {
   if (file.size === 0) throw photoError("That file is empty");
   if (file.size > MAX_BYTES) {
@@ -162,9 +187,25 @@ function ensureExpiryIndex(): Promise<void> {
   })();
   return ttlIndex;
 }
+/**
+ * WHAT COUNTS AGAINST THE CEILING, AND WHEN THE SWEEP GETS A TURN.
+ *
+ * It counted every row. A photo on an approved review keeps its row for as
+ * long as the review shows it, so 500 real reviews with four photos each
+ * reached 2,000 by themselves — and then every upload was refused, for photo
+ * cakes and reviews alike, with no way back: the sweep that frees rows only
+ * ran after a SUCCESSFUL upload. Rows the shop approved are not unclaimed, and
+ * a full count gets one sweep before anyone is turned away.
+ */
+function countUnclaimed(): Promise<number> {
+  return PhotoUploadModel.countDocuments({ keptFor: { $exists: false } });
+}
+
 export async function refuseIfStorageIsFull(): Promise<void> {
   await connectDB();
-  if ((await PhotoUploadModel.estimatedDocumentCount()) < MAX_UNCLAIMED) return;
+  if ((await countUnclaimed()) < MAX_UNCLAIMED) return;
+  await sweepUnclaimedPhotos(SWEEP_WHEN_FULL);
+  if ((await countUnclaimed()) < MAX_UNCLAIMED) return;
   throw new AppError(
     "We cannot take a photo just now. Please place your order and the store will contact you.",
     503,
@@ -291,6 +332,8 @@ const CLAIM_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 /** Bounded, because this runs inside a customer’s upload request. */
 const SWEEP_BATCH = 10;
+/** A full ceiling sweeps harder, once, before refusing anyone. */
+const SWEEP_WHEN_FULL = 200;
 
 /**
  * Delete the photos nothing has claimed in thirty days.
@@ -310,13 +353,13 @@ const SWEEP_BATCH = 10;
  * Failure is swallowed on purpose: the customer is waiting for their upload, and
  * a housekeeping error is not their problem. It is retried on the next one.
  */
-async function sweepUnclaimedPhotos(): Promise<void> {
+async function sweepUnclaimedPhotos(batch = SWEEP_BATCH): Promise<void> {
   try {
     await connectDB();
     const stale = await PhotoUploadModel.find({
       createdAt: { $lt: new Date(Date.now() - CLAIM_WINDOW_MS) },
     })
-      .limit(SWEEP_BATCH)
+      .limit(batch)
       .lean();
     if (!stale.length) return;
 
@@ -333,7 +376,7 @@ async function sweepUnclaimedPhotos(): Promise<void> {
        * from Cloudinary — and the review it belonged to went on rendering a
        * broken image on the product page, for as long as the review stood.
        */
-      ReviewModel.find({ photoUrls: { $in: urls } }).select("photoUrls").lean(),
+      ReviewModel.find({ photoUrls: { $in: urls } }).select("photoUrls status").lean(),
     ]);
     // Kept apart, because a draft is a weaker claim than an order: it keeps the
     // asset but must not take the row (see the loop below).
@@ -361,9 +404,15 @@ async function sweepUnclaimedPhotos(): Promise<void> {
      * exists nowhere and which nothing can ever clean up. Keeping the row means
      * the question is simply asked again in another thirty days.
      */
+    // An APPROVED review is the shop's own decision to show the photo, so its
+    // row stops counting as unclaimed. A pending one is anyone's submission and
+    // still counts — otherwise a script posting reviews could store unbounded.
+    const approvedUrls = new Set<string>();
     for (const review of reviews) {
       for (const url of (review.photoUrls ?? []) as string[]) {
-        if (url) claimed.add(url);
+        if (!url) continue;
+        claimed.add(url);
+        if (review.status === "approved") approvedUrls.add(url);
       }
     }
 
@@ -387,7 +436,12 @@ async function sweepUnclaimedPhotos(): Promise<void> {
       if (orderedUrls.has(row.url)) {
         await PhotoUploadModel.deleteOne({ _id: row._id });
       } else {
-        await PhotoUploadModel.updateOne({ _id: row._id }, { $set: { createdAt: new Date() } });
+        await PhotoUploadModel.updateOne(
+          { _id: row._id },
+          approvedUrls.has(row.url)
+            ? { $set: { createdAt: new Date(), keptFor: "approved-review" } }
+            : { $set: { createdAt: new Date() }, $unset: { keptFor: "" } },
+        );
       }
     }
   } catch {

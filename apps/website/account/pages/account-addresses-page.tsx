@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import {
   Building,
   Building2,
@@ -116,13 +116,15 @@ export function AccountAddressesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
 
-  const { register, handleSubmit, reset, setValue, getValues, watch, formState } = useForm<AddressForm>({
+  const { register, handleSubmit, reset, setValue, getValues, control, formState } = useForm<AddressForm>({
     defaultValues: emptyForm,
   });
 
-  const isDefault = watch("isDefault");
   // The 3-up control is not an <input>, so it is watched rather than registered.
-  const watchedLabel = watch("label");
+  const [isDefault, watchedLabel, watchedPincode] = useWatch({
+    control,
+    name: ["isDefault", "label", "pincode"],
+  });
 
   useEffect(() => {
     const refresh = () => setAddresses(getSavedAddresses());
@@ -138,7 +140,6 @@ export function AccountAddressesPage() {
     THE STATE FROM THE PIN, where the box is still empty — the same lookup the
     delivery zones use. Never over a state the customer typed themselves.
   */
-  const watchedPincode = watch("pincode");
   useEffect(() => {
     const pin = (watchedPincode ?? "").trim();
     if (!/^\d{6}$/.test(pin) || getValues("state")?.trim()) return;
@@ -274,7 +275,14 @@ export function AccountAddressesPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <IconInput icon={Mail} id="email" type="email" {...register("email", { required: true })} />
+                <IconInput
+                  icon={Mail}
+                  id="email"
+                  type="email"
+                  aria-invalid={formState.errors.email ? true : undefined}
+                  {...register("email", { required: "Enter an email for order updates" })}
+                />
+                <FieldError message={formState.errors.email?.message} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone</Label>
@@ -412,7 +420,7 @@ export function AccountAddressesPage() {
         </div>
         ) : null}
         <div className={cn("flex flex-wrap items-center justify-between gap-3", showForm && "pt-2")}>
-          <h2 className="flex items-center gap-2 font-heading text-lg font-bold text-foreground">
+          <h2 className="flex items-center gap-2 font-heading text-lg font-semibold text-foreground">
             <MapPin className="size-5 text-bakery-700" aria-hidden />
             Saved addresses{addresses.length > 0 ? ` (${addresses.length})` : ""}
           </h2>
@@ -434,7 +442,7 @@ export function AccountAddressesPage() {
               <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-cream-100">
                 <MapPin className="size-6 text-bakery-700" />
               </div>
-              <p className="mt-4 font-heading font-bold text-foreground">No saved addresses</p>
+              <p className="mt-4 font-heading font-semibold text-foreground">No saved addresses</p>
               <p className="mt-1 text-sm text-muted-foreground">
                 Add your first delivery address above.
               </p>

@@ -246,7 +246,7 @@ function SortableSectionRow<T extends BuilderSectionListItem>({
               type="button"
               variant="ghost"
               size="sm"
-              className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+              className="h-7 px-2 text-xs text-red-700 hover:text-red-700 dark:text-red-400 dark:hover:text-red-400"
               onClick={() => onRemove(section.instanceId)}
               disabled={!canRemove}
             >
@@ -294,7 +294,9 @@ export function SectionListPanel<T extends BuilderSectionListItem>({
     }
   }, []);
 
-  const tickAutoScroll = useCallback(() => {
+  // A named inner function so each frame schedules ITSELF — a callback that
+  // names its own const reads that binding before it is declared.
+  const tickAutoScroll = useCallback(function tick() {
     const el = scrollRef.current;
     const y = pointerYRef.current;
 
@@ -332,7 +334,7 @@ export function SectionListPanel<T extends BuilderSectionListItem>({
       el.scrollTop = Math.max(0, Math.min(el.scrollHeight - el.clientHeight, prev + delta));
     }
 
-    rafRef.current = requestAnimationFrame(tickAutoScroll);
+    rafRef.current = requestAnimationFrame(tick);
   }, []);
 
   const handleDragMove = useCallback((clientY: number) => {

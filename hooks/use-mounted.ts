@@ -1,13 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useHydrated } from "./use-hydrated";
 
-export function useMounted() {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  return mounted;
+/** Kept for its callers: the same answer as `useHydrated` (see there). */
+export function useMounted(): boolean {
+  return useHydrated();
 }

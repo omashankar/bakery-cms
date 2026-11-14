@@ -126,7 +126,9 @@ export function ProductCard({
         className={cn(
           // Framed, the card clips the corners; a radius here would round
           // the picture's bottom edge against a straight seam.
-          "relative overflow-hidden bg-cream-100",
+          // `shrink-0`: in this column a name that wrapped to two lines took
+          // its extra line out of the picture, 12px shorter than its row.
+          "relative shrink-0 overflow-hidden bg-cream-100",
           !framed && "rounded-xl",
           variant === "tall" ? "aspect-[3/4]" : "aspect-square"
         )}

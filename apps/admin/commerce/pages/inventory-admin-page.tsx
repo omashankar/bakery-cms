@@ -60,6 +60,9 @@ import { applyServerProducts, useProductCacheSync } from "@/features/products/da
 import type { Product } from "@/types/product";
 import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { RelativeTime } from "@/components/shared/relative-time";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
+import type { StockHistoryEntry } from "@/types/inventory";
 
 const PAGE_SIZE = 10;
 
@@ -72,6 +75,12 @@ const EMPTY_OVERVIEW: InventoryOverview = {
   alertCount: 0,
   totalUnits: 0,
 };
+
+/** The stock, the products and another tab: everything the lists below read. */
+const inventoryChanges = windowEvents(INVENTORY_UPDATED_EVENT, PRODUCTS_UPDATED_EVENT, "storage");
+const NO_ITEMS: InventoryItem[] = [];
+const NO_HISTORY: StockHistoryEntry[] = [];
+const readRecentHistory = () => loadStockHistory().slice(0, 8);
 
 export function InventoryAdminPage({
   initial = null,
@@ -100,8 +109,9 @@ export function InventoryAdminPage({
    */
   useProductCacheSync();
 
-  const [mounted, setMounted] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const mounted = useHydrated();
+  // A render after a write here, so the lists below read the store again.
+  const [, setWriteTick] = useState(0);
   const [filters, setFilters] = useState<InventoryListFilters>(defaultInventoryFilters);
   const [page, setPage] = useState(1);
   const [adjustTarget, setAdjustTarget] = useState<InventoryItem | null>(null);
@@ -143,15 +153,17 @@ export function InventoryAdminPage({
     initial?.overview ?? null,
   );
 
-  const overview = useMemo(
-    () => serverOverview ?? (mounted ? getInventoryOverview() : EMPTY_OVERVIEW),
-    [serverOverview, mounted, refreshKey]
-  );
-  const items = useMemo(() => (mounted ? getInventoryItems() : []), [mounted, refreshKey]);
-  const history = useMemo(
-    () => (mounted ? loadStockHistory().slice(0, 8) : []),
-    [mounted, refreshKey]
-  );
+  /*
+    The product cache arrives from the server AFTER this screen first renders,
+    and the server's stock is laid over it just before (the layout effect
+    above). Read as external values — subscribed, and re-checked by React when
+    the subscription starts — the lists follow both; read once at mount they
+    showed whatever localStorage held then, on a fresh browser the demo seed.
+  */
+  const localOverview = useExternalValue(getInventoryOverview, inventoryChanges, EMPTY_OVERVIEW);
+  const overview = serverOverview ?? localOverview;
+  const items = useExternalValue(getInventoryItems, inventoryChanges, NO_ITEMS);
+  const history = useExternalValue(readRecentHistory, inventoryChanges, NO_HISTORY);
 
   const filtered = useMemo(() => filterInventoryItems(items, filters), [items, filters]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -159,31 +171,24 @@ export function InventoryAdminPage({
   const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   useEffect(() => {
-    setMounted(true);
-    setRefreshKey(1);
-
     let cancelled = false;
 
     // Re-read after every adjustment as well as on mount: the cards must show
     // what the server holds now, not what it held when the page opened.
-    async function refreshOverview() {
-      const next = await fetchInventoryOverview();
-      if (!cancelled && next) setServerOverview(next);
-    }
+    const refreshOverview = () =>
+      void fetchInventoryOverview().then((next) => {
+        if (!cancelled && next) setServerOverview(next);
+      });
 
     function onInventoryUpdated(event: Event) {
-      setRefreshKey((value) => value + 1);
       // The admin's sync copying the server's history and settings into this
       // browser changes nothing the server's overview counts.
-      if (!isServerCopyUpdate(event)) void refreshOverview();
+      if (!isServerCopyUpdate(event)) refreshOverview();
     }
 
     // The server sent the overview with the page; later changes still re-read.
-    if (!initial) void refreshOverview();
+    if (!initial) refreshOverview();
     window.addEventListener(INVENTORY_UPDATED_EVENT, onInventoryUpdated);
-    // The product cache arrives from the server AFTER this screen has read it.
-    // Without this the item list showed whatever localStorage held at mount for
-    // the whole visit — on a fresh browser, the demo seed's stock levels.
     window.addEventListener(PRODUCTS_UPDATED_EVENT, onInventoryUpdated);
     return () => {
       cancelled = true;
@@ -199,7 +204,7 @@ export function InventoryAdminPage({
   }
 
   function bump() {
-    setRefreshKey((value) => value + 1);
+    setWriteTick((value) => value + 1);
   }
 
   async function handleSaveSettings() {
@@ -429,7 +434,7 @@ export function InventoryAdminPage({
           />
         ) : (
           <>
-            <div className="hidden overflow-x-auto lg:block">
+            <div className="relative hidden overflow-x-auto xl:block">
               <table className="w-full min-w-[920px] text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs text-muted-foreground">
@@ -538,7 +543,7 @@ export function InventoryAdminPage({
               </table>
             </div>
 
-            <ul className="divide-y divide-border lg:hidden">
+            <ul className="divide-y divide-border xl:hidden">
               {paginated.map((item) => (
                 <li key={item.cakeId} className="p-3 sm:p-4">
                   <div className="flex items-start gap-3">

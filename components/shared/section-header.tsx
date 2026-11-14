@@ -51,8 +51,16 @@ export function SectionHeader({
    * Trimmed, because a space is not a heading either — and a stored value
    * that looks empty in the builder was the likeliest way to get one.
    */
-  const hasOverline = Boolean(overline?.trim());
   const hasTitle = Boolean(title?.trim());
+  /*
+    A LINE THAT REPEATS THE TITLE IS NOT A LINE. This shop's band read
+    "DELICIOUS TREATS FOR EVERY OCCASION" over "Delicious Treats for Every
+    Occasion" — the same words twice, the second time in capitals. Only the
+    title draws then.
+  */
+  const hasOverline =
+    Boolean(overline?.trim()) &&
+    !(hasTitle && overline!.trim().toLowerCase() === title.trim().toLowerCase());
   const hasDescription = Boolean(description?.trim());
 
   // The same question the bands below ask before they hold a gap open for

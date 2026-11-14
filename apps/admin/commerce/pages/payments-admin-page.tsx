@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import {
   ArrowRight,
   Banknote,
@@ -27,9 +26,16 @@ import { RevenueChart } from "@/features/payments/components/revenue-chart";
 import { PaymentMethodBreakdown } from "@/features/payments/components/payment-method-breakdown";
 import { UnclaimedPaymentsAlert } from "@/apps/admin/commerce/components/unclaimed-payments-alert";
 import { RazorpaySummaryCard } from "@/apps/admin/commerce/components/razorpay-summary-card";
+import { useAccess } from "@/features/team/lib/access-context";
+import { canOpenRoute } from "@/features/team/lib/route-access";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { routes } from "@/constants/routes";
 import { formatCurrency } from "@/utils/format";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
+
+const orderChanges = windowEvents(ORDERS_UPDATED_EVENT, "storage");
+const NO_ORDERS: PlacedOrder[] = [];
 
 const quickLinks = [
   { href: routes.admin.commerce.gateways, label: "Gateways", icon: Layers },
@@ -43,27 +49,16 @@ export function PaymentsAdminPage({
   /** The payment counters over every order, read on the server. */
   initial?: CommerceOverviewsResponse | null;
 } = {}) {
-  const [orders, setOrders] = useState<PlacedOrder[]>([]);
-  const [loadedLocal, setLoadedLocal] = useState(false);
+  // The gateway card reads and changes the keys (payments.manage); the links
+  // are only to screens this member can open.
+  const { can } = useAccess();
+  const links = quickLinks.filter((link) => canOpenRoute(link.href, can));
+  // This browser's order cache, followed as it changes. (The gateway status
+  // belongs to `RazorpaySummaryCard`, which fetches it itself — fetching it
+  // here too would be a second request for one answer.)
+  const orders = useExternalValue(getOrders, orderChanges, NO_ORDERS);
+  const loadedLocal = useHydrated();
   const { overviews } = useCommerceOverviews(initial);
-
-  useEffect(() => {
-    setLoadedLocal(true);
-
-    function refresh() {
-      setOrders(getOrders());
-    }
-
-    refresh();
-    window.addEventListener(ORDERS_UPDATED_EVENT, refresh);
-
-    // The gateway status belongs to `RazorpaySummaryCard`, which fetches it
-    // itself. Fetching it here too would be a second request for one answer.
-
-    return () => {
-      window.removeEventListener(ORDERS_UPDATED_EVENT, refresh);
-    };
-  }, []);
 
   // Collection totals span every order, which the local cache cannot answer —
   // it only holds the most recent slice. Until the server replies (and if it
@@ -112,7 +107,7 @@ export function PaymentsAdminPage({
       {/* Status only. The keys FORM lives on the Razorpay gateway page — having
           it in both places meant the same three inputs twice, with nothing to
           say which one was authoritative. */}
-      <RazorpaySummaryCard />
+      {can("payments.manage") ? <RazorpaySummaryCard /> : null}
 
       {/*
         Eight stat cards used to sit here as two unlabelled rows split
@@ -122,7 +117,7 @@ export function PaymentsAdminPage({
         anything wrong with it.
       */}
       <section className="space-y-2.5 sm:space-y-3">
-        <h2 className="font-heading text-base font-bold text-foreground">Collection</h2>
+        <h2 className="font-heading text-base font-semibold text-foreground">Collection</h2>
         <div className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
           <DashboardStatCard
             title="Today's collection"
@@ -167,7 +162,7 @@ export function PaymentsAdminPage({
       </section>
 
       <section className="space-y-2.5 sm:space-y-3">
-        <h2 className="font-heading text-base font-bold text-foreground">Health</h2>
+        <h2 className="font-heading text-base font-semibold text-foreground">Health</h2>
         <div className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
           <DashboardStatCard
             title="Success rate"
@@ -247,9 +242,9 @@ export function PaymentsAdminPage({
         Stack on mobile — three across at 390px clips the labels.
       */}
       <section className="space-y-2.5 sm:space-y-3">
-        <h2 className="font-heading text-base font-bold text-foreground">Go deeper</h2>
+        <h2 className="font-heading text-base font-semibold text-foreground">Go deeper</h2>
         <div className="grid gap-2.5 sm:grid-cols-3 sm:gap-3">
-          {quickLinks.map((link) => (
+          {links.map((link) => (
             <Link
               key={link.href}
               href={link.href}

@@ -36,9 +36,9 @@ const stats = [
 const bars = [42, 58, 46, 72, 63, 88, 70, 96, 82, 108, 94, 120];
 
 const recent = [
-  { name: "Truffle Cake", amount: "₹2,450", tone: "bg-[#BFD8B4] text-[#3f6b39]", status: "Paid" },
-  { name: "Wedding Tier", amount: "₹18,900", tone: "bg-[#EBD4A0] text-[#7a5a1e]", status: "Preparing" },
-  { name: "Cheesecake", amount: "₹1,180", tone: "bg-[#BFD8B4] text-[#3f6b39]", status: "Paid" },
+  { name: "Truffle Cake", amount: "₹2,450", tone: "bg-[#BFD8B4] text-[#2f5429]", status: "Paid" },
+  { name: "Wedding Tier", amount: "₹18,900", tone: "bg-[#EBD4A0] text-[#634814]", status: "Preparing" },
+  { name: "Cheesecake", amount: "₹1,180", tone: "bg-[#BFD8B4] text-[#2f5429]", status: "Paid" },
   { name: "Birthday Cake", amount: "₹3,320", tone: "bg-[#CBD9EA] text-[#3d5578]", status: "Delivered" },
 ];
 
@@ -107,7 +107,7 @@ export function DashboardMockup({ className }: { className?: string }) {
                 {s.label}
               </p>
               <p className="mt-1 truncate font-heading text-[17px] font-semibold leading-none">{s.value}</p>
-              <span className="mt-1.5 inline-flex items-center gap-0.5 text-[10px] font-semibold text-[#4f8a45]">
+              <span className="mt-1.5 inline-flex items-center gap-0.5 text-[10px] font-semibold text-[#3d6e35]">
                 <ArrowUpRightIcon className="size-2.5" />
                 {s.delta}
               </span>
@@ -121,7 +121,7 @@ export function DashboardMockup({ className }: { className?: string }) {
           <div className="flex flex-col rounded-xl border border-border bg-card p-3.5 @lg:col-span-2">
             <div className="flex items-center justify-between">
               <p className="text-[12px] font-semibold">Revenue overview</p>
-              <span className="rounded-md bg-[#F3EEE7] px-2 py-0.5 text-[10px] font-medium text-[#8a6a45]">
+              <span className="rounded-md bg-[#F3EEE7] px-2 py-0.5 text-[10px] font-medium text-[#735836]">
                 Last 12 months
               </span>
             </div>

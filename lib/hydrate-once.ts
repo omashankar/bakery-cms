@@ -20,6 +20,28 @@
  */
 const done = new Set<string>();
 const inFlight = new Map<string, Promise<void>>();
+const waiting = new Map<string, Array<() => void>>();
+
+function settle(key: string): void {
+  done.add(key);
+  for (const resolve of waiting.get(key) ?? []) resolve();
+  waiting.delete(key);
+}
+
+/**
+ * Resolves once `key` has hydrated — now, if it already has, or whenever a
+ * later run succeeds. For a screen that must not draw a figure from a cache
+ * still holding the seed: the dashboard's alerts strip counted the demo
+ * products' stock, then the real ones', and jumped the page each time.
+ */
+export function whenHydrated(key: string): Promise<void> {
+  if (done.has(key)) return Promise.resolve();
+  return new Promise((resolve) => {
+    const list = waiting.get(key) ?? [];
+    list.push(resolve);
+    waiting.set(key, list);
+  });
+}
 
 /**
  * Runs `run` unless it has already succeeded, or is running now.
@@ -34,7 +56,7 @@ const inFlight = new Map<string, Promise<void>>();
  * page — so the browser does not fetch it again.
  */
 export function markHydrated(key: string): void {
-  done.add(key);
+  settle(key);
 }
 
 export function hydrateOnce(key: string, run: () => Promise<void>): Promise<void> {
@@ -53,7 +75,7 @@ export function hydrateOnce(key: string, run: () => Promise<void>): Promise<void
    */
   const started = run()
     .then(() => {
-      done.add(key);
+      settle(key);
     })
     .catch(() => {
       // Left undone on purpose; see above.
@@ -106,5 +128,6 @@ export function shareHydration<T>(key: string, run: () => Promise<T>): Promise<T
 export function resetHydrateOnce(): void {
   done.clear();
   inFlight.clear();
+  waiting.clear();
   shared.clear();
 }

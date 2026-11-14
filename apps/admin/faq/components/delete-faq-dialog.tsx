@@ -33,7 +33,7 @@ export function DeleteFaqDialog({
         <DialogHeader>
           <DialogTitle>Delete {count > 1 ? "questions" : "question"}?</DialogTitle>
           <DialogDescription>
-            Delete {label}? This cannot be undone in the demo CMS.
+            Delete {label}? This cannot be undone.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="gap-2 sm:justify-end">

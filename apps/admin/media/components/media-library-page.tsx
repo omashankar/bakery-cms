@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useState } from "react";
 import {
   FolderInput,
   Grid3x3,
@@ -28,6 +28,8 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import type { MediaFile, MediaFolder } from "@/types/media";
+import { useExternalValue, windowEvents } from "@/hooks/use-external-value";
+import { useHydrated } from "@/hooks/use-hydrated";
 import {
   bulkMoveMediaToFolder,
   countMediaUsage,
@@ -62,6 +64,9 @@ import { useBusinessLabels } from "@/hooks/use-business-labels";
 import { RelativeTime } from "@/components/shared/relative-time";
 
 const PAGE_SIZE = 12;
+const mediaChanges = windowEvents(MEDIA_UPDATED_EVENT, "storage");
+const NO_FILES: MediaFile[] = [];
+const NO_FOLDERS: MediaFolder[] = [];
 
 const EMPTY_STATS = {
   total: 0,
@@ -118,9 +123,15 @@ export function MediaLibraryPage({
   const usageVersion = useMediaUsageSync();
   const usageKnown = usageVersion > 0 && isUsageIndexReady();
 
-  const [files, setFiles] = useState<MediaFile[]>([]);
-  const [folders, setFolders] = useState<ReturnType<typeof loadMediaFolders>>([]);
-  const [ready, setReady] = useState(false);
+  /*
+    The library and its folders, read from the browser's cache and followed
+    as it changes (an upload, a delete, another tab); a render after a write
+    here re-reads them too (`refresh`). Nothing on the server render.
+  */
+  const files = useExternalValue(loadMediaFiles, mediaChanges, NO_FILES);
+  const folders = useExternalValue(loadMediaFolders, mediaChanges, NO_FOLDERS);
+  const [, setReadTick] = useState(0);
+  const ready = useHydrated();
   const [filters, setFilters] = useState<MediaListFilters>(defaultMediaFilters);
   const [view, setView] = useState<"grid" | "list">("grid");
   const [page, setPage] = useState(1);
@@ -129,7 +140,9 @@ export function MediaLibraryPage({
   const [uploadOpen, setUploadOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
-  const [moveFolderId, setMoveFolderId] = useState("");
+  // The folder chosen to move into; until one is chosen, the first folder.
+  const [chosenMoveFolderId, setMoveFolderId] = useState("");
+  const moveFolderId = chosenMoveFolderId || folders[0]?.id || "";
   const [deleteTarget, setDeleteTarget] = useState<{
     ids: string[];
     name?: string;
@@ -180,23 +193,8 @@ export function MediaLibraryPage({
     filters.folderId !== "all";
 
   function refresh() {
-    const nextFolders = loadMediaFolders();
-    setFiles(loadMediaFiles());
-    setFolders(nextFolders);
-    setMoveFolderId((current) => current || nextFolders[0]?.id || "");
+    setReadTick((tick) => tick + 1);
   }
-
-  useEffect(() => {
-    refresh();
-    setReady(true);
-
-    function handleMediaUpdated() {
-      refresh();
-    }
-
-    window.addEventListener(MEDIA_UPDATED_EVENT, handleMediaUpdated);
-    return () => window.removeEventListener(MEDIA_UPDATED_EVENT, handleMediaUpdated);
-  }, []);
 
   function updateFilters(patch: Partial<MediaListFilters>) {
     setFilters((prev) => ({ ...prev, ...patch }));
@@ -335,6 +333,7 @@ export function MediaLibraryPage({
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
               <AdminSelect
+                aria-label="Filter by type"
                 value={filters.type}
                 onChange={(e) =>
                   updateFilters({ type: e.target.value as MediaListFilters["type"] })
@@ -345,6 +344,7 @@ export function MediaLibraryPage({
                 <option value="video">Videos</option>
               </AdminSelect>
               <AdminSelect
+                aria-label="Filter by usage"
                 value={filters.usage}
                 onChange={(e) =>
                   updateFilters({ usage: e.target.value as MediaListFilters["usage"] })
@@ -355,6 +355,7 @@ export function MediaLibraryPage({
                 <option value="unused">Unused</option>
               </AdminSelect>
               <AdminSelect
+                aria-label="Filter by tag"
                 value={filters.tag}
                 onChange={(e) => updateFilters({ tag: e.target.value })}
               >
@@ -366,6 +367,7 @@ export function MediaLibraryPage({
                 ))}
               </AdminSelect>
               <AdminSelect
+                aria-label="Filter by date"
                 value={filters.date}
                 onChange={(e) =>
                   updateFilters({ date: e.target.value as MediaListFilters["date"] })
@@ -376,6 +378,7 @@ export function MediaLibraryPage({
                 <option value="30d">Last 30 days</option>
               </AdminSelect>
               <AdminSelect
+                aria-label="Sort by"
                 value={filters.sort}
                 onChange={(e) =>
                   updateFilters({ sort: e.target.value as MediaListFilters["sort"] })
@@ -492,7 +495,9 @@ export function MediaLibraryPage({
         ))}
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)_minmax(260px,320px)]">
+      {/* The file panel only from 2xl: at 1280 it squeezed the grid to 90px
+          cards. Below that, a picked file opens in the drawer. */}
+      <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)] 2xl:grid-cols-[220px_minmax(0,1fr)_minmax(260px,320px)]">
         <div className="hidden xl:block">
           <MediaFolderSidebar
             folders={folders}
@@ -546,45 +551,50 @@ export function MediaLibraryPage({
                   const isSelected = selectedId === file.id;
                   const isChecked = selectedIds.includes(file.id);
                   return (
-                    <button
+                    // The checkbox sits BESIDE the card's button, not inside it:
+                    // a control inside a button is unreachable to a screen reader.
+                    <div
                       key={file.id}
-                      type="button"
-                      onClick={() => setSelectedId(file.id)}
                       className={cn(
-                        "group relative overflow-hidden rounded-xl border bg-card text-left transition-premium",
+                        "group relative overflow-hidden rounded-xl border bg-card transition-premium",
                         isSelected
                           ? "border-primary ring-2 ring-primary/20"
                           : "border-border"
                       )}
                     >
+                      <button
+                        type="button"
+                        onClick={() => setSelectedId(file.id)}
+                        className="block w-full text-left"
+                      >
+                        <div className="relative aspect-square bg-muted">
+                          {/* The WHOLE picture, letterboxed. `object-cover`
+                              cropped a 1920x550 banner to its middle square,
+                              and the owner could not tell one banner from the
+                              next. The same fit is used in the list, the
+                              details panel, the tools dialog and the picker. */}
+                          <MediaThumbnail
+                            src={file.url}
+                            alt={file.alt || file.name}
+                            className="object-contain"
+                            sizes="200px"
+                          />
+                        </div>
+                        <div className="space-y-1 p-3">
+                          <p className="truncate text-sm font-medium">{file.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatFileSize(file.size)} · <RelativeTime date={file.createdAt} />
+                          </p>
+                        </div>
+                      </button>
                       <div className="absolute top-2 left-2 z-10">
                         <Checkbox
                           checked={isChecked}
                           onCheckedChange={() => toggleSelect(file.id)}
-                          onClick={(event) => event.stopPropagation()}
                           aria-label={`Select ${file.name}`}
                         />
                       </div>
-                      <div className="relative aspect-square bg-muted">
-                        {/* The WHOLE picture, letterboxed. `object-cover`
-                            cropped a 1920x550 banner to its middle square,
-                            and the owner could not tell one banner from the
-                            next. The same fit is used in the list, the
-                            details panel, the tools dialog and the picker. */}
-                        <MediaThumbnail
-                          src={file.url}
-                          alt={file.alt || file.name}
-                          className="object-contain"
-                          sizes="200px"
-                        />
-                      </div>
-                      <div className="space-y-1 p-3">
-                        <p className="truncate text-sm font-medium">{file.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatFileSize(file.size)} · <RelativeTime date={file.createdAt} />
-                        </p>
-                      </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -601,39 +611,42 @@ export function MediaLibraryPage({
               </div>
               <div className="divide-y divide-border">
                 {paginated.map((file) => (
-                  <button
+                  <div
                     key={file.id}
-                    type="button"
-                    onClick={() => setSelectedId(file.id)}
                     className={cn(
-                      "flex w-full items-center gap-3 p-3 text-left hover:bg-muted/40",
+                      "flex items-center gap-3 pl-3 hover:bg-muted/40",
                       selectedId === file.id && "bg-muted/60"
                     )}
                   >
                     <Checkbox
                       checked={selectedIds.includes(file.id)}
                       onCheckedChange={() => toggleSelect(file.id)}
-                      onClick={(event) => event.stopPropagation()}
                       aria-label={`Select ${file.name}`}
                     />
-                    <div className="relative size-12 overflow-hidden rounded-lg border border-border bg-muted">
-                      <MediaThumbnail
-                        src={file.url}
-                        alt={file.alt || file.name}
-                        className="object-contain"
-                        sizes="48px"
-                      />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{file.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatFileSize(file.size)} · <RelativeTime date={file.createdAt} />
-                      </p>
-                    </div>
-                    <Badge variant="outline" className="capitalize">
-                      {file.type}
-                    </Badge>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedId(file.id)}
+                      className="flex min-w-0 flex-1 items-center gap-3 py-3 pr-3 text-left"
+                    >
+                      <div className="relative size-12 overflow-hidden rounded-lg border border-border bg-muted">
+                        <MediaThumbnail
+                          src={file.url}
+                          alt={file.alt || file.name}
+                          className="object-contain"
+                          sizes="48px"
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{file.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatFileSize(file.size)} · <RelativeTime date={file.createdAt} />
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="capitalize">
+                        {file.type}
+                      </Badge>
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
@@ -648,7 +661,7 @@ export function MediaLibraryPage({
           ) : null}
         </div>
 
-        <aside className="hidden min-h-[28rem] overflow-hidden rounded-xl border border-border bg-card shadow-sm xl:block">
+        <aside className="hidden min-h-[28rem] overflow-hidden rounded-xl border border-border bg-card shadow-sm 2xl:block">
           <MediaDetailPanel
             key={selectedFile?.id ?? "empty"}
             file={selectedFile}
@@ -668,6 +681,7 @@ export function MediaLibraryPage({
       </div>
 
       <MobileDetailDrawer
+        from="2xl"
         open={Boolean(selectedFile)}
         onClose={() => setSelectedId(null)}
         title={selectedFile?.name ?? "Media details"}

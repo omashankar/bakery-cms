@@ -19,7 +19,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * The thing it declined to guard was returning the draft.
  */
 
-const guard = vi.hoisted(() => ({ requireAdminResponse: vi.fn() }));
+const guard = vi.hoisted(() => ({ requirePermissionResponse: vi.fn() }));
 vi.mock("@/lib/server/auth/guard", () => guard);
 
 const state = {
@@ -46,13 +46,13 @@ const ROUTES = [
 ] as const;
 
 function signedOut() {
-  guard.requireAdminResponse.mockResolvedValue(
+  guard.requirePermissionResponse.mockResolvedValue(
     NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
   );
 }
 
 function signedIn() {
-  guard.requireAdminResponse.mockResolvedValue({ sub: "admin-1", role: "admin" });
+  guard.requirePermissionResponse.mockResolvedValue({ sub: "admin-1", role: "admin" });
 }
 
 function put(body: unknown) {
@@ -64,7 +64,7 @@ function put(body: unknown) {
 
 describe.each(ROUTES)("$what", ({ route }) => {
   beforeEach(() => {
-    guard.requireAdminResponse.mockReset();
+    guard.requirePermissionResponse.mockReset();
   });
 
   it("refuses to hand the unpublished draft to a signed-out caller", async () => {
@@ -98,7 +98,23 @@ describe.each(ROUTES)("$what", ({ route }) => {
 
     await route.GET();
 
-    expect(guard.requireAdminResponse).toHaveBeenCalledTimes(1);
+    expect(guard.requirePermissionResponse).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks for the homepage-builder permission on every verb, the read included", async () => {
+    signedOut();
+
+    await route.GET();
+    await route.PUT(put({ sections: [] }));
+    await route.POST(put({ sections: [] }));
+
+    // Not "any admin": kitchen staff are signed in too, and the draft is
+    // unreleased content.
+    expect(guard.requirePermissionResponse.mock.calls).toEqual([
+      ["homepage.manage"],
+      ["homepage.manage"],
+      ["homepage.manage"],
+    ]);
   });
 
   it("hands back the version a write landed on, so the next one can carry it", async () => {

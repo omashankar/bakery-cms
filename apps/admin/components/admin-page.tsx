@@ -55,12 +55,12 @@ export function AdminPageHeader({
             {eyebrow}
           </p>
         ) : null}
-        <h1 className="font-heading text-2xl font-bold tracking-tight text-balance sm:text-3xl">{title}</h1>
+        <h1 className="font-heading text-2xl font-semibold tracking-tight text-balance sm:text-3xl">{title}</h1>
         {description ? (
           <p className="max-w-2xl text-sm text-pretty text-muted-foreground">{description}</p>
         ) : null}
         {status ? (
-          <p className="text-xs font-medium text-muted-foreground/80 tabular-nums">{status}</p>
+          <p className="text-xs font-medium text-muted-foreground tabular-nums">{status}</p>
         ) : null}
       </div>
       {actions ? (

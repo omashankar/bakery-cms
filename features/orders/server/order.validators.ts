@@ -250,6 +250,8 @@ export const deliveryPartnerSchema = z.object({
   name: z.string().trim().max(120),
   phone: z.string().trim().max(32).optional(),
   vehicle: z.string().trim().max(80).optional(),
+  /** A team member with own-deliveries access. Checked against the team, never trusted. */
+  userId: z.string().trim().max(64).optional(),
 });
 
 export const refundNotesSchema = z.object({ notes: z.string() });

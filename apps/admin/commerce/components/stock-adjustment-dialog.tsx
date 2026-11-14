@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AdminSelect, adminTextareaClassName } from "@/apps/admin/products/components/admin-field";
 import { StockStatusBadge } from "@/apps/admin/commerce/components/stock-status-badge";
@@ -45,13 +45,19 @@ export function StockAdjustmentDialog({
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
-    setType("add");
-    setQuantity("1");
-    setReason("manual_adjustment");
-    setNote("");
-  }, [open, item?.cakeId]);
+  // A fresh adjustment each time the dialog opens, or opens on another item —
+  // adjusted while rendering; forgotten on close so the next opening resets.
+  const formKey = open ? (item?.cakeId ?? "") : null;
+  const [formFor, setFormFor] = useState<string | null>(null);
+  if (formFor !== formKey) {
+    setFormFor(formKey);
+    if (formKey !== null) {
+      setType("add");
+      setQuantity("1");
+      setReason("manual_adjustment");
+      setNote("");
+    }
+  }
 
   const preview = useMemo(() => {
     if (!item) return null;

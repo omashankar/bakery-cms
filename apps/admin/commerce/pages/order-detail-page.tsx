@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useHydrated } from "@/hooks/use-hydrated";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ExternalLink, Image as ImageIcon, Loader2, Mail, MapPin, Phone, Printer } from "lucide-react";
@@ -11,6 +12,9 @@ import { cartLineChoices } from "@/features/cart/lib/cart";
 import { AdminOrderStatusBadge } from "@/apps/admin/commerce/components/admin-order-status-badge";
 import { AdminPaymentStatusBadge } from "@/apps/admin/commerce/components/admin-payment-status-badge";
 import { CancelOrderDialog } from "@/apps/admin/commerce/components/cancel-order-dialog";
+import { useAccess } from "@/features/team/lib/access-context";
+import { fetchDeliveryStaff } from "@/features/team/lib/team-api";
+import type { TeamMemberOption } from "@/features/team/lib/team-types";
 import { OrderInvoice } from "@/apps/admin/commerce/components/order-invoice";
 import { RefundOrderDialog } from "@/apps/admin/commerce/components/refund-order-dialog";
 import { RefundTimeline } from "@/apps/admin/commerce/components/refund-timeline";
@@ -19,7 +23,7 @@ import { runBrowserPrint } from "@/features/commerce/lib/print-invoice";
 import { AdminPage, AdminPageHeader } from "@/apps/admin/components/admin-page";
 import { OrderStatusTimeline } from "@/components/shared/order-status-timeline";
 import { getOrderTimeline } from "@/features/orders/lib/order-tracking";
-import { isTerminalOrderStatus } from "@/features/orders/lib/order-status-meta";
+import { ORDER_STATUS_LABELS, isTerminalOrderStatus } from "@/features/orders/lib/order-status-meta";
 import { getActiveFulfillmentStatuses } from "@/features/orders/lib/order-tracking";
 import {
   cancelOrder,
@@ -104,11 +108,15 @@ function OrderDeliveryPin({ order }: { order: Pick<PlacedOrder, "address" | "tot
 }
 
 /** The rider on an order, in the shape the form holds. */
-function toPartnerForm(order: { deliveryPartner?: { name: string; phone?: string; vehicle?: string } }) {
+function toPartnerForm(order: {
+  deliveryPartner?: { name: string; phone?: string; vehicle?: string; userId?: string };
+}) {
   return {
     name: order.deliveryPartner?.name ?? "",
     phone: order.deliveryPartner?.phone ?? "",
     vehicle: order.deliveryPartner?.vehicle ?? "",
+    /** A team member with their own "My deliveries" list; "" for an outside courier. */
+    userId: order.deliveryPartner?.userId ?? "",
   };
 }
 
@@ -117,28 +125,51 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
   const [order, setOrder] = useState<PlacedOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [adminNotes, setAdminNotes] = useState("");
-  const [partner, setPartner] = useState({ name: "", phone: "", vehicle: "" });
+  const [partner, setPartner] = useState({ name: "", phone: "", vehicle: "", userId: "" });
+  // What this member may do here. The server checks each again; these only
+  // decide which controls to offer.
+  const { can } = useAccess();
+  const canAssign = can("orders.assign_delivery");
+  const [riders, setRiders] = useState<TeamMemberOption[]>([]);
+  useEffect(() => {
+    if (!canAssign) return;
+    let cancelled = false;
+    void fetchDeliveryStaff().then((result) => {
+      if (!cancelled && result.ok && result.data) setRiders(result.data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [canAssign]);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [refundOpen, setRefundOpen] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
+  /*
+    The cache is a starting point, never the answer.
 
-    // The cache is a starting point, never the answer.
-    //
-    // This returned as soon as localStorage had the order, and that cache holds
-    // only the most recent page of orders written by whatever this browser last
-    // did. So an order refunded on another device, settled by a webhook, or
-    // cancelled by a colleague rendered here in its old state for the whole
-    // visit — on the one screen an operator opens to find out what happened to
-    // it. The server is asked every time; the cached copy only fills the gap
-    // while the request is in flight, so the page does not flash empty.
+    This once returned as soon as localStorage had the order, and that cache
+    holds only the most recent page of orders written by whatever this browser
+    last did. So an order refunded on another device, settled by a webhook, or
+    cancelled by a colleague rendered here in its old state for the whole
+    visit — on the one screen an operator opens to find out what happened to
+    it. The server is asked every time (the effect below); the cached copy
+    only fills the gap while the request is in flight, so the page does not
+    flash empty. Taken while rendering, once per order, after hydration.
+  */
+  const hydrated = useHydrated();
+  const [cacheTakenFor, setCacheTakenFor] = useState<string | null>(null);
+  if (hydrated && cacheTakenFor !== orderId) {
+    setCacheTakenFor(orderId);
     const current = getOrderById(orderId);
     if (current) {
       setOrder(current);
       setAdminNotes(current.adminNotes ?? "");
       setPartner(toPartnerForm(current));
     }
+  }
+
+  useEffect(() => {
+    let cancelled = false;
 
     // `fetchOrder` resolves null on any failure, so it cannot reject.
     void fetchOrder(orderId).then((fetched) => {
@@ -214,7 +245,7 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
     if (!updated) return reportUnreachable();
     setOrder(updated);
     if (!persisted) return reportUnpersisted("Status changed");
-    toast.success(`Order marked as ${status.replace(/_/g, " ")}`);
+    toast.success(`Order marked as ${ORDER_STATUS_LABELS[status] ?? status.replace(/_/g, " ")}`);
   }
 
   async function handleSaveNotes() {
@@ -492,55 +523,96 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
             now shows nobody until this is filled in, so this card is the only
             thing that can put a courier in front of a customer.
           */}
-          <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-            <h2 className="font-heading text-base font-semibold">Delivery partner</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Shown to the customer on their tracking page. Leave the name blank to remove it.
-            </p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <label className="space-y-1.5 text-sm">
-                <span className="font-medium">Name</span>
-                <Input
-                  value={partner.name}
-                  onChange={(event) => setPartner((p) => ({ ...p, name: event.target.value }))}
-                  placeholder="Who is delivering"
-                />
+          {canAssign ? (
+            <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+              <h2 className="font-heading text-base font-semibold">Delivery partner</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Shown to the customer on their tracking page. Leave the name blank to remove it.
+              </p>
+              {/*
+                A TEAM MEMBER, or anyone else. Choosing a member puts this order on
+                their "My deliveries" list — the only orders they can see — with
+                the address and the cash to collect. An outside courier is just a
+                name and a phone, as before.
+              */}
+              <label className="mt-4 block space-y-1.5 text-sm">
+                <span className="font-medium">Team member</span>
+                <AdminSelect
+                  value={partner.userId}
+                  onChange={(event) => {
+                    const id = event.target.value;
+                    const rider = riders.find((r) => r.id === id);
+                    setPartner((p) => ({ ...p, userId: id, name: rider ? rider.name : p.userId ? "" : p.name }));
+                  }}
+                >
+                  <option value="">Someone outside the team</option>
+                  {riders.map((rider) => (
+                    <option key={rider.id} value={rider.id}>
+                      {rider.name} — {rider.roleName}
+                    </option>
+                  ))}
+                  {partner.userId && !riders.some((r) => r.id === partner.userId) ? (
+                    <option value={partner.userId}>{partner.name || "A former team member"}</option>
+                  ) : null}
+                </AdminSelect>
               </label>
-              <label className="space-y-1.5 text-sm">
-                <span className="font-medium">Phone</span>
-                <Input
-                  value={partner.phone}
-                  onChange={(event) => setPartner((p) => ({ ...p, phone: event.target.value }))}
-                  placeholder="Optional"
-                />
-              </label>
-              <label className="space-y-1.5 text-sm">
-                <span className="font-medium">Vehicle</span>
-                <Input
-                  value={partner.vehicle}
-                  onChange={(event) => setPartner((p) => ({ ...p, vehicle: event.target.value }))}
-                  placeholder="Optional"
-                />
-              </label>
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <label className="space-y-1.5 text-sm">
+                  <span className="font-medium">Name</span>
+                  <Input
+                    value={partner.name}
+                    // A member's name comes from their account.
+                    readOnly={Boolean(partner.userId)}
+                    onChange={(event) => setPartner((p) => ({ ...p, name: event.target.value }))}
+                    placeholder="Who is delivering"
+                  />
+                </label>
+                <label className="space-y-1.5 text-sm">
+                  <span className="font-medium">Phone</span>
+                  <Input
+                    value={partner.phone}
+                    onChange={(event) => setPartner((p) => ({ ...p, phone: event.target.value }))}
+                    placeholder="Optional"
+                  />
+                </label>
+                <label className="space-y-1.5 text-sm">
+                  <span className="font-medium">Vehicle</span>
+                  <Input
+                    value={partner.vehicle}
+                    onChange={(event) => setPartner((p) => ({ ...p, vehicle: event.target.value }))}
+                    placeholder="Optional"
+                  />
+                </label>
+              </div>
+              <Button variant="outline" size="sm" className="mt-3" onClick={handleSavePartner}>
+                {partner.name.trim() ? "Save delivery partner" : "Clear delivery partner"}
+              </Button>
             </div>
-            <Button variant="outline" size="sm" className="mt-3" onClick={handleSavePartner}>
-              {partner.name.trim() ? "Save delivery partner" : "Clear delivery partner"}
-            </Button>
-          </div>
+          ) : order.deliveryPartner?.name ? (
+            <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+              <h2 className="font-heading text-base font-semibold">Delivery partner</h2>
+              <p className="mt-2 text-sm">
+                {order.deliveryPartner.name}
+                {order.deliveryPartner.phone ? ` · ${order.deliveryPartner.phone}` : ""}
+              </p>
+            </div>
+          ) : null}
 
-          <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-            <h2 className="font-heading text-base font-semibold">Internal notes</h2>
-            <textarea
-              className={`${adminTextareaClassName} mt-3`}
-              value={adminNotes}
-              onChange={(event) => setAdminNotes(event.target.value)}
-              placeholder="Notes visible only to admin staff..."
-              rows={4}
-            />
-            <Button variant="outline" size="sm" className="mt-3" onClick={handleSaveNotes}>
-              Save notes
-            </Button>
-          </div>
+          {can("orders.manage") ? (
+            <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+              <h2 className="font-heading text-base font-semibold">Internal notes</h2>
+              <textarea
+                className={`${adminTextareaClassName} mt-3`}
+                value={adminNotes}
+                onChange={(event) => setAdminNotes(event.target.value)}
+                placeholder="Notes visible only to admin staff..."
+                rows={4}
+              />
+              <Button variant="outline" size="sm" className="mt-3" onClick={handleSaveNotes}>
+                Save notes
+              </Button>
+            </div>
+          ) : null}
         </section>
 
         <aside className="space-y-4">
@@ -659,12 +731,12 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
               id="order-status"
               className="mt-2"
               value={order.status}
-              disabled={isTerminal}
+              disabled={isTerminal || !can("orders.update_status")}
               onChange={(event) => handleStatusChange(event.target.value as OrderStatus)}
             >
               {statusOptions.map((status) => (
                 <option key={status} value={status}>
-                  {status.replace(/_/g, " ")}
+                  {ORDER_STATUS_LABELS[status] ?? status.replace(/_/g, " ")}
                 </option>
               ))}
             </AdminSelect>
@@ -697,7 +769,7 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
               {!isTerminal ? (
                 <>
                   {/* A delivered order is refunded, not cancelled — the server refuses it. */}
-                  {order.status !== "delivered" ? (
+                  {order.status !== "delivered" && can("orders.cancel") ? (
                     <Button
                       variant="destructive"
                       className="w-full"
@@ -706,13 +778,15 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
                       Cancel order
                     </Button>
                   ) : null}
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => setRefundOpen(true)}
-                  >
-                    Issue refund
-                  </Button>
+                  {can("orders.refund") ? (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => setRefundOpen(true)}
+                    >
+                      Issue refund
+                    </Button>
+                  ) : null}
                 </>
               ) : null}
             </div>

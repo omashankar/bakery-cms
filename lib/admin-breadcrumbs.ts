@@ -27,6 +27,8 @@ export interface AdminBreadcrumb {
  */
 const SEGMENT_LABELS: Record<string, string> = {
   dashboard: "Dashboard",
+  kitchen: "Kitchen",
+  deliveries: "My deliveries",
   profile: "My Profile",
   password: "Change Password",
   preview: "Preview",
@@ -56,7 +58,8 @@ const SEGMENT_LABELS: Record<string, string> = {
   maintenance: "Maintenance Mode",
   backup: "Backup & Restore",
   activity: "Activity Log",
-  permissions: "Permissions",
+  errors: "Error log",
+  permissions: "Team & permissions",
   commerce: "Commerce",
   orders: "Orders",
   customers: "Customers",
