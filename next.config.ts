@@ -97,6 +97,18 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["mongoose", "cloudinary"],
   // Nothing gains from telling every caller which framework and version this is.
   poweredByHeader: false,
+  /**
+   * Which upgrade reminders `next dev` and `next build` may raise.
+   *
+   * `security` is both what this shop wants and the framework's current
+   * default, but writing it down is the point: the default can change, and a
+   * build that stops to recommend a new minor or a Future Default is a build
+   * that stopped for something nobody asked for. A published advisory against
+   * the installed version is worth interrupting for; nothing else here is.
+   *
+   * Added when this app was moved off 16.4.3, which was affected by one.
+   */
+  experimental: { agentUpgrade: "security" },
   images: {
     /**
      * Every host `next/image` is allowed to fetch from.
