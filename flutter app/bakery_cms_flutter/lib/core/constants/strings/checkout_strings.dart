@@ -202,10 +202,26 @@ abstract final class CheckoutStrings {
       'Could not find your location. Please move the map to your address.';
 
   // Success
-  static const String successTitle = 'Order placed!';
+  // The website's order confirmation, word for word where it applies.
+  static const String successTitle = 'Thank you for your order!';
   static const String successMessage =
-      'Thank you. We have emailed your confirmation and will start preparing your order.';
+      'Your order has been placed successfully. Save your order number below — you can use it '
+      'to track this order at any time.';
   static const String orderNumberLabel = 'Order number';
-  static const String viewOrder = 'View order';
+  static const String trackOrder = 'Track order';
   static const String continueShopping = 'Continue shopping';
+  static const String amountDueOnDelivery = 'Amount due on delivery';
+  static const String totalPaid = 'Total paid';
+  static const String paymentLabel = 'Payment';
+  static const String deliveryLabel = 'Delivery';
+  static const String estimatedDeliveryLabel = 'Estimated delivery';
+  static const String itemsLabel = 'Items';
+
+  /// The details could not be read back; the order itself was placed.
+  static const String successDetailsUnavailable =
+      'We could not load the details here. Track order shows them, or contact us with your '
+      'order number and we will help.';
+
+  /// "Order BK-20261118-2132", over the summary.
+  static String orderHeading(String number) => 'Order $number';
 }

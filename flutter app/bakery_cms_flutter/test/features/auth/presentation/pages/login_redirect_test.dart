@@ -17,6 +17,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../catalog/app_cubits_harness.dart';
+
 class _MockAuthBloc extends MockBloc<AuthEvent, AuthState> implements AuthBloc {}
 
 class _MockLoginBloc extends MockBloc<LoginEvent, LoginState> implements LoginBloc {}
@@ -69,9 +71,12 @@ void main() {
       ],
     );
     await tester.pumpWidget(
-      BlocProvider<AuthBloc>.value(
-        value: auth,
-        child: MaterialApp.router(theme: AppTheme.light, routerConfig: router),
+      // The shop's settings: the sign-in header carries its logo.
+      withAppCubits(
+        BlocProvider<AuthBloc>.value(
+          value: auth,
+          child: MaterialApp.router(theme: AppTheme.light, routerConfig: router),
+        ),
       ),
     );
     return router;

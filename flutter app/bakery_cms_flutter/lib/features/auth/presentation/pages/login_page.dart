@@ -19,6 +19,7 @@ import '../bloc/login_state.dart';
 import '../bloc/login_step.dart';
 import '../widgets/code_step_form.dart';
 import '../widgets/email_step_form.dart';
+import '../../../catalog/presentation/widgets/shop_title.dart';
 
 /// Sign in with an emailed code.
 ///
@@ -92,8 +93,10 @@ class _LoginView extends StatelessWidget {
           if (!didPop) context.go(AppRoutes.home);
         },
         child: Scaffold(
+          // The shop's brand, as on every page: the heading below already says
+          // "Sign in or create an account", so the bar does not say it twice.
           appBar: AppAppBar(
-            title: AuthStrings.title,
+            titleWidget: const ShopTitle(),
             leading: IconButton(
               tooltip: AppStrings.close,
               icon: const Icon(Icons.close),
