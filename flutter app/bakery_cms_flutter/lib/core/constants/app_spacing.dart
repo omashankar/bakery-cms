@@ -17,6 +17,9 @@ abstract final class AppSpacing {
 
   static const double buttonHeight = 48;
 
+  /// The footer's height: an icon and its name, no taller.
+  static const double navigationBarHeight = 64;
+
   /// Material's own minimum. Never `Size.fromHeight` (infinite width): a
   /// button in a Row then has no width it can take and the whole page fails
   /// to lay out. `AppButton(expand: true)` is how a button goes full width.

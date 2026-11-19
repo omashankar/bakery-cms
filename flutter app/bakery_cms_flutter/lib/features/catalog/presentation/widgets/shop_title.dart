@@ -12,7 +12,11 @@ import '../../../store/presentation/bloc/store_config_state.dart';
 /// header draws it: the shop's own logo at its natural width when it has one
 /// (the logo already carries the name), otherwise its small mark and name.
 class ShopTitle extends StatelessWidget {
-  const ShopTitle({super.key});
+  const ShopTitle({super.key, this.centered = false});
+
+  /// In the middle of its room (the cart's and checkout's header), rather
+  /// than at its start.
+  final bool centered;
 
   static const double markSize = 32;
 
@@ -34,11 +38,11 @@ class ShopTitle extends StatelessWidget {
       ),
       builder: (context, shop) {
         final (name, logo, mark) = shop;
-        final nameAndMark = _NameAndMark(name: name, mark: mark);
+        final nameAndMark = _NameAndMark(name: name, mark: mark, centered: centered);
         if (logo.isEmpty) return nameAndMark;
         return LayoutBuilder(
           builder: (context, constraints) => Align(
-            alignment: AlignmentDirectional.centerStart,
+            alignment: centered ? Alignment.center : AlignmentDirectional.centerStart,
             child: ConstrainedBox(
               constraints: BoxConstraints(
                 maxHeight: logoHeight,
@@ -52,7 +56,7 @@ class ShopTitle extends StatelessWidget {
                   imageUrl: AppNetworkImage.sizedUrl(logo, AppNetworkImage.thumbnailWidth),
                   height: logoHeight,
                   fit: BoxFit.contain,
-                  alignment: Alignment.centerLeft,
+                  alignment: centered ? Alignment.center : Alignment.centerLeft,
                   fadeInDuration: Duration.zero,
                   // The name, never a blank bar, while the logo arrives or
                   // if it cannot.
@@ -70,14 +74,17 @@ class ShopTitle extends StatelessWidget {
 
 /// A shop without a logo: its small square mark, then its name.
 class _NameAndMark extends StatelessWidget {
-  const _NameAndMark({required this.name, required this.mark});
+  const _NameAndMark({required this.name, required this.mark, required this.centered});
 
   final String name;
   final String mark;
+  final bool centered;
 
   @override
   Widget build(BuildContext context) {
     return Row(
+      mainAxisSize: centered ? MainAxisSize.min : MainAxisSize.max,
+      mainAxisAlignment: centered ? MainAxisAlignment.center : MainAxisAlignment.start,
       children: [
         if (mark.isNotEmpty) ...[
           SizedBox.square(

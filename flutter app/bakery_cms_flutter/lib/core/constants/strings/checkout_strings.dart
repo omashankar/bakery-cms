@@ -8,6 +8,17 @@ abstract final class CheckoutStrings {
   static const String browseProducts = 'Browse products';
   static const String loadingShop = 'Loading the shop\'s delivery options…';
 
+  // The steps in the cart's and checkout's header, as the website names them.
+  static const String stepCart = 'Cart';
+  static const String stepAddress = 'Address';
+  static const String stepPersonalise = 'Personalize';
+  static const String stepPayment = 'Payment';
+  static const String secureCheckout = 'Secure checkout';
+  static const String secureShort = 'Secure';
+
+  /// "Step 2 of 4: Address", for a screen reader.
+  static String stepOf(int number, int total, String label) => 'Step $number of $total: $label';
+
   // Contact & address
   static const String sectionAddress = 'Contact & address';
   static const String fullName = 'Full name';

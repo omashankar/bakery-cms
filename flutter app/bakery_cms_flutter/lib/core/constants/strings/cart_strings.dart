@@ -14,6 +14,34 @@ abstract final class CartStrings {
   static const String removeMessage = 'This item will be taken out of your cart.';
   static const String messagePrefix = 'Message:';
   static const String photoAdded = 'Photo added';
+  static const String photoToPrint = 'Your photo, to be printed on it';
+  static const String moveToWishlist = 'Move to wishlist';
+  static const String movedToWishlist = 'Moved to wishlist';
+  static const String alreadyInWishlist = 'Removed from cart — it was already in your wishlist';
+  static const String proceedToCheckout = 'Proceed to checkout';
+  static const String signInToCheckout = 'Sign in to checkout';
+
+  static const String undo = 'Undo';
+  static const String restored = 'Item restored';
+
+  /// "Removed Chocolate Truffle Cake", with Undo beside it.
+  static String removed(String name) => 'Removed $name';
+
+  /// "Shopping Cart (3)", the website's cart heading.
+  static String heading(int count) => 'Shopping Cart ($count)';
+
+  /// "Subtotal (3 items)".
+  static String subtotalOf(int count) =>
+      '$subtotal ($count ${count == 1 ? itemSuffix : itemsSuffix})';
+
+  /// "(20% off)" after the struck price.
+  static String percentOff(int percent) => '($percent% off)';
+
+  /// "₹799 each", under a line of more than one.
+  static String each(String price) => '$price each';
+
+  /// "You save ₹600".
+  static String youSave(String amount) => 'You save $amount';
 
   // A line's choices, labelled (the website's `cartLineChoices`).
   static const String sizeLabel = 'Size';

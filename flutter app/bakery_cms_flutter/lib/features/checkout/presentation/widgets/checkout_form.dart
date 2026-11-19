@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -13,6 +15,8 @@ import '../../../cart/presentation/bloc/cart_cubit.dart';
 import '../bloc/checkout_bloc.dart';
 import '../bloc/checkout_event.dart';
 import '../bloc/checkout_state.dart';
+import '../bloc/checkout_step.dart';
+import '../bloc/checkout_step_cubit.dart';
 import 'address_section.dart';
 import 'delivery_section.dart';
 import 'extras_section.dart';
@@ -41,6 +45,62 @@ class _CheckoutFormState extends State<CheckoutForm> {
 
   /// Puts the field a little below the top, with its label in view.
   static const double _scrollAlignment = 0.15;
+
+  /// Where each step of the header begins on this one scrolling screen.
+  final ScrollController _scroll = ScrollController();
+  final Map<CheckoutStep, GlobalKey> _stepStarts = {
+    CheckoutStep.address: GlobalKey(),
+    CheckoutStep.personalise: GlobalKey(),
+    CheckoutStep.payment: GlobalKey(),
+  };
+  StreamSubscription<CheckoutStep>? _jumps;
+
+  /// A step is the current one once its start passes this share of the
+  /// screen's height: the section the customer is reading, not the one
+  /// peeking in at the bottom.
+  static const double _readingLine = 0.35;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_followScroll);
+    _jumps = context.read<CheckoutStepCubit>().jumps.listen(_scrollTo);
+  }
+
+  @override
+  void dispose() {
+    _jumps?.cancel();
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  /// The header's step follows what is on screen. At the very end it is
+  /// Payment, however short the last sections are.
+  void _followScroll() {
+    final steps = context.read<CheckoutStepCubit>();
+    final position = _scroll.position;
+    if (position.pixels >= position.maxScrollExtent - 1 && position.maxScrollExtent > 0) {
+      steps.reached(CheckoutStep.payment);
+      return;
+    }
+    final viewport = context.findRenderObject() as RenderBox?;
+    if (viewport == null) return;
+    final line = viewport.localToGlobal(Offset.zero).dy + viewport.size.height * _readingLine;
+    var current = CheckoutStep.address;
+    for (final entry in _stepStarts.entries) {
+      final start = entry.value.currentContext?.findRenderObject() as RenderBox?;
+      if (start != null && start.attached && start.localToGlobal(Offset.zero).dy <= line) {
+        current = entry.key;
+      }
+    }
+    steps.reached(current);
+  }
+
+  void _scrollTo(CheckoutStep step) {
+    final start = _stepStarts[step]?.currentContext;
+    if (start == null) return;
+    Scrollable.ensureVisible(start, duration: AppDurations.scrollToField);
+  }
 
   void _submit() {
     FocusManager.instance.primaryFocus?.unfocus();
@@ -112,6 +172,7 @@ class _CheckoutFormState extends State<CheckoutForm> {
         children: [
           Expanded(
             child: SingleChildScrollView(
+              controller: _scroll,
               padding: const EdgeInsets.all(AppSpacing.lg),
               child: ContentWidth(
                 child: Form(
@@ -120,12 +181,21 @@ class _CheckoutFormState extends State<CheckoutForm> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const AddressSection(),
+                        KeyedSubtree(
+                          key: _stepStarts[CheckoutStep.address],
+                          child: const AddressSection(),
+                        ),
                         const LocationSection(),
                         const DeliverySection(),
-                        const PersonaliseSection(),
+                        KeyedSubtree(
+                          key: _stepStarts[CheckoutStep.personalise],
+                          child: const PersonaliseSection(),
+                        ),
                         const ExtrasSection(),
-                        const PaymentSection(),
+                        KeyedSubtree(
+                          key: _stepStarts[CheckoutStep.payment],
+                          child: const PaymentSection(),
+                        ),
                         const PriceSummary(),
                         const MinimumOrderAlert(),
                         TermsSection(key: _termsKey),

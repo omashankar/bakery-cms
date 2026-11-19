@@ -53,6 +53,26 @@ void main() {
       expect(cart.subtotal, 700);
     });
 
+    test("savings come only from the shop's own compare-at prices", () {
+      CartItem was(double compareAt, {String slug = 'c', int quantity = 1, double price = 500}) =>
+          CartItem(
+            id: slug,
+            productSlug: slug,
+            name: slug,
+            image: '',
+            unitPrice: price,
+            quantity: quantity,
+            compareAtPrice: compareAt,
+          );
+      final cart = Cart([
+        was(700, slug: 'a', quantity: 2), // 200 off each, twice
+        was(400, slug: 'b'), // a compare-at BELOW the price saves nothing
+        line(slug: 'd'), // no compare-at: nothing
+      ]);
+      expect(cart.compareAtSavings, 400);
+      expect(Cart([line()]).compareAtSavings, 0);
+    });
+
     test('COD only when every product allows it', () {
       expect(Cart([line(), line(slug: 'b')]).codAllowed, isTrue);
       expect(Cart([line(), line(slug: 'b', cod: false)]).codAllowed, isFalse);

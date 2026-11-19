@@ -13,6 +13,16 @@ class Cart extends Equatable {
   int get itemCount => items.fold(0, (sum, item) => sum + item.quantity);
   double get subtotal => items.fold(0, (sum, item) => sum + item.lineTotal);
 
+  /// What the shop's own compare-at prices take off, line by line: "You save"
+  /// on the website's cart. Only a compare-at the SHOP set counts; a line
+  /// without one saves nothing, rather than a saving nobody claimed.
+  double get compareAtSavings => items.fold(0, (sum, item) {
+    final was = item.compareAtPrice;
+    return was != null && was > item.unitPrice
+        ? sum + (was - item.unitPrice) * item.quantity
+        : sum;
+  });
+
   /// Cash on delivery only when every product in the cart allows it.
   bool get codAllowed => items.every((item) => item.codAllowed);
 

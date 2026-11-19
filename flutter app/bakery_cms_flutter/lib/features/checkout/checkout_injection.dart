@@ -21,6 +21,7 @@ import 'domain/usecases/estimate_quote.dart';
 import 'domain/usecases/get_current_location.dart';
 import 'domain/usecases/place_order.dart';
 import 'presentation/bloc/checkout_bloc.dart';
+import 'presentation/bloc/checkout_step_cubit.dart';
 import 'presentation/bloc/map_picker_cubit.dart';
 
 /// Checkout's dependencies. Needs `ApiClient`, the addresses feature
@@ -64,5 +65,6 @@ void registerCheckoutFeature(GetIt sl) {
     )
     ..registerFactoryParam<MapPickerCubit, GeoPoint?, void>(
       (initial, _) => MapPickerCubit(sl(), initial: initial),
-    );
+    )
+    ..registerFactory(CheckoutStepCubit.new);
 }

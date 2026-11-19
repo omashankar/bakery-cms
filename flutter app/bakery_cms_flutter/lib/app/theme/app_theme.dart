@@ -119,9 +119,26 @@ abstract final class AppTheme {
       ),
       dividerTheme: DividerThemeData(color: scheme.outline, space: AppSpacing.xl),
       snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
+      // The footer as the reference draws it: the tab you are on in the
+      // shop's colour, icon and name, the others quiet grey; no pill behind
+      // it, and no tint over the bar.
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: scheme.surface,
-        indicatorColor: scheme.surfaceContainerHighest,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        height: AppSpacing.navigationBarHeight,
+        indicatorColor: Colors.transparent,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            color: states.contains(WidgetState.selected) ? scheme.primary : scheme.onSurfaceVariant,
+          ),
+        ),
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? text.labelMedium?.copyWith(color: scheme.primary, fontWeight: FontWeight.w600)
+              : text.labelMedium?.copyWith(color: scheme.onSurfaceVariant),
+        ),
       ),
     );
   }

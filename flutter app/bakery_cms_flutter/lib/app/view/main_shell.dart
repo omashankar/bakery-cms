@@ -22,7 +22,12 @@ class MainShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: navigationShell,
-      bottomNavigationBar: NavigationBar(
+      // A hairline above the footer, as the reference has it.
+      bottomNavigationBar: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant)),
+        ),
+        child: NavigationBar(
         selectedIndex: navigationShell.currentIndex,
         onDestinationSelected: _select,
         destinations: const [
@@ -52,6 +57,7 @@ class MainShell extends StatelessWidget {
             label: AppStrings.navAccount,
           ),
         ],
+      ),
       ),
     );
   }
