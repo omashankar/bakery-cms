@@ -134,6 +134,30 @@ void main() {
       expect(find.text(DeliveryAreaStrings.notDelivered), findsOneWidget);
     });
 
+    testWidgets('on a phone the place keeps most of the row; the tag never takes half', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      given(const DeliveryAreaState(status: DeliveryAreaStatus.delivers, area: kota));
+      await pump(tester, const DeliveryAreaBar());
+
+      // The bar's own side padding (16 each side) is not the row.
+      final row = tester.getSize(find.byType(DeliveryAreaBar)).width - 32;
+      final tag = tester.getSize(
+        find.ancestor(
+          of: find.text(DeliveryAreaStrings.delivers),
+          matching: find.byType(FittedBox),
+        ),
+      );
+      final place = tester.getSize(
+        find.ancestor(of: find.byIcon(Icons.location_on_outlined), matching: find.byType(Expanded)),
+      );
+      expect(tag.width, lessThanOrEqualTo(row * 0.4));
+      expect(place.width, greaterThanOrEqualTo(row * 0.55));
+    });
+
     testWidgets('parts of a PIN: says so', (tester) async {
       given(
         const DeliveryAreaState(

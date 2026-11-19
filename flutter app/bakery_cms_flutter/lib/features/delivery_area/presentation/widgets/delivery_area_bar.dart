@@ -22,6 +22,9 @@ class DeliveryAreaBar extends StatelessWidget {
   /// Below this width the status goes under the place instead of beside it.
   static const double _sideBySideMinWidth = 310;
 
+  /// The most of the row the status tag may take beside the place.
+  static const double _tagMaxShare = 0.4;
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<DeliveryAreaCubit, DeliveryAreaState>(
@@ -70,9 +73,11 @@ class DeliveryAreaBar extends StatelessWidget {
                 children: [
                   Expanded(child: destination),
                   const SizedBox(width: AppSpacing.sm),
-                  // Shrunk rather than pushed past the edge at a large text
-                  // size.
-                  Flexible(
+                  // Its own width, capped, and shrunk past the cap at a large
+                  // text size. Not Flexible: that split the row in half and
+                  // cut the place to "324002 · K…" on a phone.
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: constraints.maxWidth * _tagMaxShare),
                     child: FittedBox(
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.centerRight,
