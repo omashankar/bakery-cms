@@ -1,0 +1,14 @@
+# The screen shown while the app starts. Generated from assets/branding.
+# To rebrand: replace splash_logo.png / icon_foreground.png, then run
+#   dart run flutter_native_splash:create
+flutter_native_splash:
+  color: "#FFFFFF"
+  image: assets/branding/splash_logo.png
+  color_dark: "#241810"
+  image_dark: assets/branding/splash_logo.png
+  android_12:
+    image: assets/branding/icon_foreground.png
+    icon_background_color: "#FFFFFF"
+    image_dark: assets/branding/icon_foreground.png
+    icon_background_color_dark: "#241810"
+  web: false

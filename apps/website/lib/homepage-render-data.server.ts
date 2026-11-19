@@ -23,7 +23,27 @@ import type { Banner } from "@/types/media";
  * matching the 12 that categories and offers already used keeps one number in
  * play instead of three.
  */
-const ROW_CAP = 12;
+export const ROW_CAP = 12;
+
+/**
+ * The two category lists every category band reads — the automatic row and the
+ * full list a shop picks from. One function, so the homepage and the app's
+ * `/api/storefront/home` cannot select them differently.
+ */
+export function homepageCategoryLists(
+  products: Parameters<typeof selectHomepageCategories>[0],
+  catalogCategories: unknown,
+): Pick<HomepageRenderData, "categories" | "categoryChoices"> {
+  const categories = (catalogCategories ?? []) as unknown as Parameters<
+    typeof selectHomepageCategories
+  >[1];
+  return {
+    categories: selectHomepageCategories(products, categories, ROW_CAP),
+    // A shop cannot pick from a list it cannot see; 200 is a ceiling on a
+    // payload, not a limit anybody is expected to reach.
+    categoryChoices: selectHomepageCategories(products, categories, 200, { requirePicture: false }),
+  };
+}
 
 export interface HomepageRenderData {
   rails: Awaited<ReturnType<typeof getHomepageRails>>["rails"];
@@ -159,20 +179,8 @@ export async function getHomepageRenderData(): Promise<HomepageRenderData> {
     // here made the admin's Visibility field inert: a banner scoped to
     // "Collections pages" was rendered on the homepage anyway.
     banners: selectActiveHeroBanners((bannersRaw ?? []) as Banner[], "homepage"),
-    categories: selectHomepageCategories(
-      products,
-      (catalog.categories ?? []) as unknown as Parameters<typeof selectHomepageCategories>[1],
-      ROW_CAP,
-    ),
+    ...homepageCategoryLists(products, catalog.categories),
     catalog: storefrontCards,
-    categoryChoices: selectHomepageCategories(
-      products,
-      (catalog.categories ?? []) as unknown as Parameters<typeof selectHomepageCategories>[1],
-      // A shop cannot pick from a list it cannot see; 200 is a ceiling on a
-      // payload, not a limit anybody is expected to reach.
-      200,
-      { requirePicture: false },
-    ),
     testimonials: publishedOnly(testimonialsRaw as Testimonial[] | null),
     faqs: publishedOnly(faqsRaw as FaqItem[] | null),
     instagram,

@@ -90,6 +90,23 @@ export const customerMeController = withErrorHandler(async () => {
   );
 });
 
+/**
+ * The customer deletes their own account. Same-site only, like the photo
+ * upload: it cannot be undone, so another site must not be able to ask.
+ * The cookie goes with it, so this device is signed out at once; any other
+ * device's token stops working on its next request (`getCustomerAccount`
+ * re-reads the account, which is no longer there).
+ */
+export const deleteMyAccountController = withErrorHandler(async (request: Request) => {
+  if (isCrossSite(request)) {
+    throw new AppError("Accounts can only be deleted from this shop.", 403);
+  }
+  const customer = await requireCustomer();
+  await service.deleteAccount(customer.id, requestContext(request));
+  await clearCustomerCookie();
+  return ok({ deleted: true }, "Your account has been deleted");
+});
+
 export const customerLogoutController = withErrorHandler(async () => {
   await clearCustomerCookie();
   return ok({ signedOut: true }, "Signed out");

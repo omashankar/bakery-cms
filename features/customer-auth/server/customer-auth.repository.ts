@@ -4,6 +4,7 @@ import {
   type CustomerAccountDoc,
 } from "@/lib/server/db/models/customer-account.model";
 import { CustomerLoginCodeModel } from "@/lib/server/db/models/customer-login-code.model";
+import { CustomerMetaModel } from "@/lib/server/db/models/customer-meta.model";
 
 /** Every read and write here takes an already-normalised email. See the service. */
 
@@ -148,4 +149,29 @@ export async function countWrongGuess(id: string): Promise<number> {
 export async function consumeLoginCode(email: string): Promise<void> {
   await connectDB();
   await CustomerLoginCodeModel.deleteMany({ email });
+}
+
+/**
+ * Remove the account itself: profile, address book and photo pointer go with
+ * the row, and any live sign-in code with them. Answers what the caller still
+ * has to clean up elsewhere (the photo on Cloudinary), or null when there was
+ * no such account.
+ *
+ * Orders are not touched — they are the shop's tax record, keyed by email.
+ * The admin's note row (`customermetas`) is kept too, so a block on ordering
+ * survives a fresh sign-up; only its marketing consent is withdrawn, and only
+ * where a row already exists — a deletion must not create a record.
+ */
+export async function deleteAccount(
+  id: string,
+): Promise<{ email: string; avatarPublicId: string } | null> {
+  await connectDB();
+  const gone = (await CustomerAccountModel.findOneAndDelete(
+    { _id: id },
+    { projection: { email: 1, avatarPublicId: 1 } },
+  ).lean()) as { email: string; avatarPublicId?: string } | null;
+  if (!gone) return null;
+  await CustomerLoginCodeModel.deleteMany({ email: gone.email });
+  await CustomerMetaModel.updateOne({ email: gone.email }, { $set: { marketingOptIn: false } });
+  return { email: gone.email, avatarPublicId: gone.avatarPublicId ?? "" };
 }

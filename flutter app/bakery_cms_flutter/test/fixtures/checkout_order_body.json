@@ -1,0 +1,59 @@
+{
+  "id": "uuid-1",
+  "draftId": "draft-1",
+  "items": [
+    {
+      "productSlug": "truffle-cake",
+      "name": "Truffle Cake",
+      "image": "",
+      "price": 999.0,
+      "quantity": 1,
+      "weight": "1.5 Kg",
+      "message": "Happy Birthday Riya",
+      "deliveryDate": "2026-11-17",
+      "deliveryTime": "6:00 PM – 8:00 PM",
+      "variantSelections": { "egg": "eggless" }
+    }
+  ],
+  "totals": {
+    "subtotal": 999.0,
+    "delivery": 0.0,
+    "tax": 49.95,
+    "discount": 0.0,
+    "platformCharge": 0.0,
+    "giftWrapFee": 0.0,
+    "deliveryTierFee": 0.0,
+    "total": 1048.95,
+    "itemCount": 1
+  },
+  "address": {
+    "fullName": "Asha Verma",
+    "email": "asha@example.com",
+    "phone": "9876543210",
+    "altPhone": "9123456780",
+    "addressLine1": "12 Park Road",
+    "addressLine2": "Talwandi",
+    "landmark": "Opposite the water tank",
+    "city": "Kota",
+    "state": "Rajasthan",
+    "pincode": "324001",
+    "country": "India",
+    "addressLabel": "Home",
+    "location": { "lat": 25.18, "lng": 75.83 }
+  },
+  "paymentMethod": "razorpay",
+  "deliverySlot": {
+    "date": "2026-11-16",
+    "timeSlot": "12:00 PM – 2:00 PM",
+    "tierId": "standard",
+    "tierLabel": "Standard Delivery"
+  },
+  "paymentReference": "pay_123",
+  "orderNotes": "Ring twice",
+  "personalisation": {
+    "occasion": "Birthday",
+    "message": "Many happy returns!",
+    "sender": { "name": "Ravi", "phone": "9000000001", "hideFromRecipient": true },
+    "termsAcceptedAt": "2026-11-16T03:30:00.000Z"
+  }
+}

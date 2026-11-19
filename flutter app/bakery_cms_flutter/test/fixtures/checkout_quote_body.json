@@ -1,0 +1,44 @@
+{
+  "items": [
+    {
+      "productSlug": "truffle-cake",
+      "quantity": 1,
+      "weight": "1.5 Kg",
+      "message": "Happy Birthday Riya",
+      "deliveryDate": "2026-11-17",
+      "deliveryTime": "6:00 PM – 8:00 PM",
+      "variantSelections": { "egg": "eggless" }
+    }
+  ],
+  "couponCode": "SWEET",
+  "giftWrap": true,
+  "deliveryTierId": "standard",
+  "address": {
+    "fullName": "Asha Verma",
+    "email": "asha@example.com",
+    "phone": "9876543210",
+    "altPhone": "9123456780",
+    "addressLine1": "12 Park Road",
+    "addressLine2": "Talwandi",
+    "landmark": "Opposite the water tank",
+    "city": "Kota",
+    "state": "Rajasthan",
+    "pincode": "324001",
+    "country": "India",
+    "addressLabel": "Home",
+    "location": { "lat": 25.18, "lng": 75.83 }
+  },
+  "deliverySlot": {
+    "date": "2026-11-16",
+    "timeSlot": "12:00 PM – 2:00 PM",
+    "tierId": "standard",
+    "tierLabel": "Standard Delivery"
+  },
+  "orderNotes": "Ring twice",
+  "personalisation": {
+    "occasion": "Birthday",
+    "message": "Many happy returns!",
+    "sender": { "name": "Ravi", "phone": "9000000001", "hideFromRecipient": true },
+    "termsAcceptedAt": "2026-11-16T03:30:00.000Z"
+  }
+}

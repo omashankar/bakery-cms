@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { answerPinByArea, forgetPincodeAnswers } from "@/components/storefront/pin-area-answer";
 import type { DeliveryLookup } from "@/features/commerce/lib/delivery-location";
-import { answerPincode } from "@/features/commerce/server/pincode-answer.server";
+import { answerPincode, pincodePlaceName } from "@/features/commerce/server/pincode-answer.server";
 import type { DeliveryZone } from "@/types/delivery";
 
 /**
@@ -129,6 +129,11 @@ describe("answerPincode — the server's side, on India Post's real offices", ()
 
   it("does not know a PIN India Post has never had", async () => {
     expect(await answerPincode("325600", [kotaCity], false)).toEqual({ status: "unknown" });
+  });
+
+  it("names the PIN's place as India Post does, and nothing for a PIN it has never had", () => {
+    expect(pincodePlaceName("324002")).toEqual({ city: "Kota", state: "Rajasthan" });
+    expect(pincodePlaceName("325600")).toBeNull();
   });
 
   it("ignores a switched-off zone", async () => {

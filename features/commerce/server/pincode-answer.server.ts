@@ -44,6 +44,19 @@ export type PincodeAnswer =
       at?: LatLng;
     };
 
+/**
+ * "Kota, Rajasthan" for a PIN — India Post's own district (the first, where a
+ * PIN spans two) and state — so an answer can say WHERE it is about: the app's
+ * "Deliver to 324002 · Kota". Null for a PIN India Post has never had. Public
+ * data, the same the /api/pincodes lookup already serves.
+ */
+export function pincodePlaceName(pincode: string): { city: string; state: string } | null {
+  const place = lookUpPincode(pincode);
+  const city = place?.districts[0]?.trim() ?? "";
+  if (!place || !city) return null;
+  return { city, state: place.state };
+}
+
 /** The share of a PIN's offices that must be delivered for a plain yes. */
 const MOSTLY = 0.75;
 

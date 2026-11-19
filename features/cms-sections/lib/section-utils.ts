@@ -69,6 +69,20 @@ export function getVisibleSections<T extends { isVisible: boolean; order: number
 }
 
 /**
+ * The sections a homepage DRAWS, in the order it draws them: sorted, the
+ * hidden ones dropped, and no FAQ — FAQs live only on the dedicated FAQ page,
+ * even when an older saved snapshot still contains one.
+ *
+ * One rule for the storefront page and for `/api/storefront/home`, so the
+ * phone app cannot list a band the website leaves out.
+ */
+export function homepageSectionsToRender<
+  T extends { isVisible: boolean; order: number; type: string },
+>(sections: T[]): T[] {
+  return getVisibleSections(sortSections(sections)).filter((section) => section.type !== "faq");
+}
+
+/**
  * The newsletter and the CTA share one band when both are on the page.
  *
  * The storefront pairs them: it renders both `embedded`, side by side, at

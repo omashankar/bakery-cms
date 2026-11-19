@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import {
   Camera,
@@ -21,6 +22,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/lib/lazy-toast";
 import { EditableAvatar } from "@/apps/website/account/components/account-avatar";
+import { DeleteAccountDialog } from "@/apps/website/account/components/delete-account-dialog";
 import { displayNameOf, useAccountProfile } from "@/apps/website/account/components/account-context";
 import { useAvatarEditor } from "@/apps/website/account/hooks/use-avatar-editor";
 import { ACCOUNT_ACTION, ACCOUNT_CARD_FOOTER } from "@/apps/website/account/lib/account-buttons";
@@ -81,6 +83,8 @@ export function AccountDashboardPage() {
   // session takes over once it is read (after an edit, for one).
   const profile = useAccountProfile();
   const avatar = useAvatarEditor();
+  const router = useRouter();
+  const [deleting, setDeleting] = useState(false);
   const { register, handleSubmit, formState, reset } = useForm<ProfileForm>({
     defaultValues: profile
       ? { ...splitName(profile.name), email: profile.email, phone: profile.phone }
@@ -361,6 +365,43 @@ export function AccountDashboardPage() {
           ))}
         </div>
       </div>
+      {/*
+        DELETE ACCOUNT, last and quiet: a plain row, not a red banner, so it is
+        findable (app stores require it) without inviting a slip. The dialog
+        says what goes and what stays before anything is sent.
+      */}
+      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-6">
+        <div className="min-w-0">
+          <h2 className={cn(storefrontHeading.card, "text-foreground")}>Delete account</h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Removes your profile, saved addresses and photo. Past orders stay with the shop.
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setDeleting(true)}
+          className={cn(
+            ACCOUNT_ACTION,
+            "shrink-0 border-destructive/30 bg-card text-destructive hover:bg-destructive/10 hover:text-destructive",
+          )}
+        >
+          <Trash2 className="size-4" aria-hidden />
+          Delete account
+        </Button>
+      </div>
+      <DeleteAccountDialog
+        open={deleting}
+        onOpenChange={setDeleting}
+        onDeleted={() => {
+          setDeleting(false);
+          toast.success("Your account has been deleted");
+          router.replace(routes.store.home);
+          // The account layout rendered this profile on the server; refresh
+          // so nothing of it is left in the next paint.
+          router.refresh();
+        }}
+      />
     </>
   );
 }
