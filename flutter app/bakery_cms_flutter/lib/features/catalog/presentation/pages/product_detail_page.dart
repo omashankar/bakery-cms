@@ -44,6 +44,10 @@ import '../widgets/product_quantity_row.dart';
 import '../widgets/product_section.dart';
 import '../widgets/product_summary.dart';
 import '../widgets/related_products_rail.dart';
+import '../widgets/header_cart_button.dart';
+import '../widgets/header_search_button.dart';
+import '../widgets/header_wishlist_button.dart';
+import '../widgets/shop_title.dart';
 
 class ProductDetailPage extends StatelessWidget {
   const ProductDetailPage({super.key, required this.slug});
@@ -122,7 +126,10 @@ class _ProductDetailView extends StatelessWidget {
         builder: (context, state) {
           final selection = state.selection;
           return Scaffold(
-            appBar: const AppAppBar(),
+            appBar: const AppAppBar(
+              titleWidget: ShopTitle(),
+              actions: [HeaderSearchButton(), HeaderWishlistButton(), HeaderCartButton()],
+            ),
             bottomNavigationBar: selection == null
                 ? null
                 : AddToCartBar(selection: selection, photoPending: state.photoPending),

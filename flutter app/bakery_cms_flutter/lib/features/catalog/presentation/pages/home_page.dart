@@ -29,6 +29,8 @@ import '../widgets/product_rail_view.dart';
 import '../widgets/product_sliver_grid.dart';
 import '../widgets/search_entry_bar.dart';
 import '../widgets/shop_title.dart';
+import '../widgets/header_cart_button.dart';
+import '../widgets/header_wishlist_button.dart';
 
 /// The dashboard: browse by category and occasion, the shop's collections,
 /// then everything.
@@ -50,7 +52,12 @@ class _HomeView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const AppAppBar(titleWidget: ShopTitle()),
+      // The shop's mark and name, then the wishlist and the cart: the home
+      // page has its own search box under the header.
+      appBar: const AppAppBar(
+        titleWidget: ShopTitle(),
+        actions: [HeaderWishlistButton(), HeaderCartButton()],
+      ),
       body: BlocListener<StoreConfigCubit, StoreConfigState>(
         // The shop came back (its settings finally loaded after a failure):
         // reload the products too, rather than leaving the error on screen.

@@ -1,4 +1,6 @@
 import 'package:bakery_cms_flutter/core/utils/view_status.dart';
+import 'package:bakery_cms_flutter/features/cart/presentation/bloc/cart_cubit.dart';
+import 'package:bakery_cms_flutter/features/cart/presentation/bloc/cart_state.dart';
 import 'package:bakery_cms_flutter/features/delivery_area/presentation/bloc/delivery_area_cubit.dart';
 import 'package:bakery_cms_flutter/features/delivery_area/presentation/bloc/delivery_area_state.dart';
 import 'package:bakery_cms_flutter/features/store/domain/entities/store_config.dart';
@@ -15,12 +17,14 @@ import '../checkout/checkout_fixtures.dart' as checkout;
 
 class MockStoreConfigCubit extends MockCubit<StoreConfigState> implements StoreConfigCubit {}
 
+class MockCartCubit extends MockCubit<CartState> implements CartCubit {}
+
 class MockWishlistCubit extends MockCubit<WishlistState> implements WishlistCubit {}
 
 class MockDeliveryAreaCubit extends MockCubit<DeliveryAreaState> implements DeliveryAreaCubit {}
 
-/// The app-wide cubits a product card reads (the shop's settings, the
-/// wishlist, the delivery PIN code), as stubs made INSIDE the widget tree: a
+/// The app-wide cubits a product card and a page header read (the shop's
+/// settings, the cart, the wishlist, the delivery PIN code), as stubs made INSIDE the widget tree: a
 /// cubit made in setUp lives outside the test's fake-async zone.
 ///
 /// [settingsLoaded] false is the moment before the shop's settings arrive.
@@ -44,6 +48,13 @@ Widget withAppCubits(
             ),
           );
           return store;
+        },
+      ),
+      BlocProvider<CartCubit>(
+        create: (_) {
+          final cart = MockCartCubit();
+          when(() => cart.state).thenReturn(const CartState());
+          return cart;
         },
       ),
       BlocProvider<WishlistCubit>(

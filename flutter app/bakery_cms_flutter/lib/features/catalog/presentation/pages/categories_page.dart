@@ -13,6 +13,9 @@ import '../bloc/categories/categories_cubit.dart';
 import '../bloc/categories/categories_state.dart';
 import '../widgets/categories_promo_banner.dart';
 import '../widgets/group_grid_section.dart';
+import '../widgets/header_cart_button.dart';
+import '../widgets/header_search_button.dart';
+import '../widgets/shop_title.dart';
 
 /// The Categories tab: the home page's promo picture when the app already
 /// has it, then the shop's categories as square tiles, its occasions and
@@ -36,7 +39,10 @@ class _CategoriesView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       // Not "Categories": the first section below is already called that.
-      appBar: const AppAppBar(title: CatalogStrings.browseTitle),
+      appBar: const AppAppBar(
+        titleWidget: ShopTitle(),
+        actions: [HeaderSearchButton(), HeaderCartButton()],
+      ),
       body: FailureSnackbarListener<CategoriesCubit, CategoriesState>(
         statusOf: (s) => s.status,
         messageOf: (s) => s.errorMessage,

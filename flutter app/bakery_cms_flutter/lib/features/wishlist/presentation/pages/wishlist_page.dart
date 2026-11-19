@@ -12,6 +12,7 @@ import '../../../../core/widgets/state_view.dart';
 import '../../../catalog/presentation/widgets/product_sliver_grid.dart';
 import '../bloc/wishlist_page_cubit.dart';
 import '../bloc/wishlist_page_state.dart';
+import '../../../catalog/presentation/widgets/header_cart_button.dart';
 
 /// The products saved on this phone, newest first.
 class WishlistPage extends StatelessWidget {
@@ -32,7 +33,7 @@ class _WishlistView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const AppAppBar(title: WishlistStrings.title),
+      appBar: const AppAppBar(title: WishlistStrings.title, actions: [HeaderCartButton()]),
       body: FailureSnackbarListener<WishlistPageCubit, WishlistPageState>(
         statusOf: (s) => s.status,
         messageOf: (s) => s.errorMessage,
