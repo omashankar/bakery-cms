@@ -19,6 +19,7 @@ import '../widgets/listing_products_sliver.dart';
 import '../widgets/header_cart_button.dart';
 import '../widgets/header_search_button.dart';
 import '../widgets/header_wishlist_button.dart';
+import '../widgets/shop_title.dart';
 
 /// Every product in one category, occasion or collection: where it is
 /// delivered, the group's name and a line about it, a two-column grid, and
@@ -48,12 +49,11 @@ class _ProductListView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppAppBar(
-        titleWidget: BlocSelector<ProductListCubit, ProductListState, String>(
-          selector: (state) => state.listing?.group.name ?? '',
-          builder: (_, name) => Text(name, overflow: TextOverflow.ellipsis),
-        ),
-        actions: const [HeaderSearchButton(), HeaderWishlistButton(), HeaderCartButton()],
+      // The shop's brand, as on every page: the group's name is the page's
+      // own heading, under the delivery bar.
+      appBar: const AppAppBar(
+        titleWidget: ShopTitle(),
+        actions: [HeaderSearchButton(), HeaderWishlistButton(), HeaderCartButton()],
       ),
       bottomNavigationBar: BlocSelector<ProductListCubit, ProductListState, List<Product>>(
         selector: (state) => state.listing?.products ?? const [],

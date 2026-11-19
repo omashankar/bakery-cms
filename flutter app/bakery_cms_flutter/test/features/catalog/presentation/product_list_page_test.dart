@@ -16,6 +16,7 @@ import 'package:bakery_cms_flutter/features/catalog/presentation/bloc/listing_co
 import 'package:bakery_cms_flutter/features/catalog/presentation/bloc/product_list/product_list_cubit.dart';
 import 'package:bakery_cms_flutter/features/catalog/presentation/pages/product_list_page.dart';
 import 'package:bakery_cms_flutter/features/catalog/presentation/widgets/product_card.dart';
+import 'package:bakery_cms_flutter/features/catalog/presentation/widgets/shop_title.dart';
 import 'package:bakery_cms_flutter/features/store/domain/entities/payment_methods.dart';
 import 'package:bakery_cms_flutter/features/store/domain/entities/store_config.dart';
 import 'package:bakery_cms_flutter/features/store/domain/entities/store_modules.dart';
@@ -178,7 +179,12 @@ void main() {
     await pumpPage(tester, products);
 
     expect(find.text(DeliveryAreaStrings.addPincode), findsOneWidget);
-    expect(find.text(_group.name), findsWidgets); // the app bar and the page
+    // The header carries the shop's brand, as on every page; the group's
+    // name is the page's own heading, once.
+    final header = find.byType(AppBar);
+    expect(find.descendant(of: header, matching: find.byType(ShopTitle)), findsOneWidget);
+    expect(find.descendant(of: header, matching: find.text(_group.name)), findsNothing);
+    expect(find.text(_group.name), findsOneWidget);
     expect(find.text(_group.headline), findsOneWidget);
     expect(find.text(ListingStrings.productCount(3)), findsOneWidget);
     expect(find.text('Sort by · Popularity'), findsOneWidget);
