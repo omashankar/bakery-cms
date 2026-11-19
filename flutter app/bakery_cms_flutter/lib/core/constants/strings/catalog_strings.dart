@@ -1,6 +1,7 @@
 abstract final class CatalogStrings {
   // Home
   static const String searchHint = 'Search cakes, flowers, gifts…';
+  static const String clearSearch = 'Clear search';
 
   /// Before one of the shop's own category or occasion names, in the
   /// search box's turning hint: "Search for Cakes".

@@ -58,10 +58,15 @@ void main() {
     when(() => cart.add(any(), announce: any(named: 'announce'))).thenAnswer((_) async {});
   });
 
-  Future<void> pumpCart(WidgetTester tester, Cart lines, {List<String> saved = const []}) async {
+  Future<void> pumpCart(
+    WidgetTester tester,
+    Cart lines, {
+    List<String> saved = const [],
+    double width = 400,
+  }) async {
     when(() => cart.state).thenReturn(CartState(status: ViewStatus.success, cart: lines));
     tester.view
-      ..physicalSize = const Size(400, 2000)
+      ..physicalSize = Size(width, 2000)
       ..devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
@@ -113,6 +118,15 @@ void main() {
     expect(find.textContaining('% off'), findsNothing);
     expect(find.textContaining('You save'), findsNothing);
     expect(find.textContaining('each'), findsNothing);
+  });
+
+  testWidgets("the button runs to the bar's end, no empty gap beside it", (tester) async {
+    // Wide enough that the amount is narrower than a third of the bar, as
+    // it is on a phone with real letters (the test font's are a full em).
+    await pumpCart(tester, const Cart([_pastry]), width: 800);
+    // 16 of padding: the button ends at 784, as the amount starts at 16. A
+    // flex share held for the amount left it ending well short.
+    expect(tester.getTopRight(find.byType(FilledButton)).dx, closeTo(784, 0.5));
   });
 
   testWidgets('the button says it signs in first, until the customer is signed in', (tester) async {

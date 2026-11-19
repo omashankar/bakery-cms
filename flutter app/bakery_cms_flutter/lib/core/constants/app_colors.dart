@@ -29,6 +29,20 @@ abstract final class AppColors {
   static const Color borderDark = Color(0xFF5C4638);
   static const Color errorDark = Color(0xFFF87171);
 
+  // Soft grounds for notices, tags and badges, each with its own ink (the
+  // website's red-50/red-800, green-50/green-800 and a brown tint). Without
+  // them Flutter fell back to the solid colours, and a cancelled-order
+  // notice was a slab of bright red.
+  static const Color errorSoft = Color(0xFFFEF2F2);
+  static const Color onErrorSoft = Color(0xFF991B1B);
+  static const Color successSoft = Color(0xFFF0FDF4);
+  static const Color onSuccessSoft = Color(0xFF166534);
+  static const Color primarySoft = Color(0xFFF3EAE2);
+  static const Color errorSoftDark = Color(0xFF4C1D1D);
+  static const Color onErrorSoftDark = Color(0xFFFECACA);
+  static const Color successSoftDark = Color(0xFF14532D);
+  static const Color onSuccessSoftDark = Color(0xFFDCFCE7);
+
   // Home section grounds (the website's --surface-cream and --band-* tones),
   // read through SectionTones, never directly.
   static const Color bandCream = Color(0xFFFAF8F4);

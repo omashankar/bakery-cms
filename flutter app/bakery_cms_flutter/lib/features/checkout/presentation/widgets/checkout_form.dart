@@ -60,6 +60,10 @@ class _CheckoutFormState extends State<CheckoutForm> {
   /// peeking in at the bottom.
   static const double _readingLine = 0.35;
 
+  /// A step scrolled to stops a little below the header, its heading clear
+  /// of the line rather than pressed against it.
+  static const double _jumpAlignment = 0.02;
+
   @override
   void initState() {
     super.initState();
@@ -99,7 +103,7 @@ class _CheckoutFormState extends State<CheckoutForm> {
   void _scrollTo(CheckoutStep step) {
     final start = _stepStarts[step]?.currentContext;
     if (start == null) return;
-    Scrollable.ensureVisible(start, duration: AppDurations.scrollToField);
+    Scrollable.ensureVisible(start, alignment: _jumpAlignment, duration: AppDurations.scrollToField);
   }
 
   void _submit() {

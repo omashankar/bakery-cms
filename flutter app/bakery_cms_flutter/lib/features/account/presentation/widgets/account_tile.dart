@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/utils/context_extensions.dart';
 
 class AccountTile extends StatelessWidget {
@@ -22,10 +23,16 @@ class AccountTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = destructive ? context.colors.error : null;
     return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(icon, color: color),
+      // Inside an [AccountTileGroup]'s card: its own side margins.
+      contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+      leading: Icon(icon, color: color ?? context.colors.onSurfaceVariant),
       title: Text(title, style: context.text.bodyLarge?.copyWith(color: color)),
-      subtitle: subtitle == null ? null : Text(subtitle!),
+      subtitle: subtitle == null
+          ? null
+          : Text(
+              subtitle!,
+              style: context.text.bodySmall?.copyWith(color: context.colors.onSurfaceVariant),
+            ),
       trailing: destructive ? null : const Icon(Icons.chevron_right),
       onTap: onTap,
     );

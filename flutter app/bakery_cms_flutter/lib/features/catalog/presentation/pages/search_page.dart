@@ -6,7 +6,6 @@ import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/strings/catalog_strings.dart';
 import '../../../../core/widgets/app_app_bar.dart';
 import '../../../../core/widgets/app_loader.dart';
-import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/empty_view.dart';
 import '../../../../core/widgets/error_view.dart';
 import '../bloc/search/search_bloc.dart';
@@ -16,6 +15,7 @@ import '../../domain/entities/product.dart';
 import '../../domain/services/listing_arranger.dart';
 import '../bloc/listing_controls/listing_controls_cubit.dart';
 import '../widgets/listing_bottom_bar.dart';
+import '../widgets/search_field.dart';
 import '../widgets/listing_products_sliver.dart';
 
 class SearchPage extends StatelessWidget {
@@ -54,13 +54,9 @@ class _SearchView extends StatelessWidget {
       appBar: AppAppBar(
         titleWidget: Padding(
           padding: const EdgeInsets.only(right: AppSpacing.lg),
-          child: AppTextField(
-            label: CatalogStrings.searchTitle,
-            hint: CatalogStrings.searchHint,
-            initialValue: initialQuery,
+          child: SearchField(
+            initialQuery: initialQuery,
             autofocus: initialQuery.isEmpty,
-            prefixIcon: Icons.search,
-            textInputAction: TextInputAction.search,
             onChanged: (query) => context.read<SearchBloc>().add(SearchQueryChanged(query)),
           ),
         ),

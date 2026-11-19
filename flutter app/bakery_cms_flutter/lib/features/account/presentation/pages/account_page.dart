@@ -13,8 +13,11 @@ import '../../../../core/widgets/app_app_bar.dart';
 import '../../../../core/widgets/app_dialog.dart';
 import '../../../../core/widgets/app_loader.dart';
 import '../../../../core/widgets/app_snackbar.dart';
-import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/content_width.dart';
+import '../../../../core/widgets/page_heading.dart';
+import '../../../catalog/presentation/widgets/header_cart_button.dart';
+import '../../../catalog/presentation/widgets/header_search_button.dart';
+import '../../../catalog/presentation/widgets/shop_title.dart';
 import '../../../auth/domain/entities/customer.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_event.dart';
@@ -24,6 +27,7 @@ import '../bloc/delete_account_cubit.dart';
 import '../bloc/delete_account_state.dart';
 import '../bloc/profile_cubit.dart';
 import '../widgets/account_tile.dart';
+import '../widgets/account_tile_group.dart';
 import '../widgets/customer_card.dart';
 import '../widgets/edit_profile_sheet.dart';
 
@@ -84,7 +88,11 @@ class _AccountView extends StatelessWidget {
       listener: (context, state) =>
           AppSnackbar.error(context, state.errorMessage ?? AccountStrings.deleteAccountFailed),
       child: Scaffold(
-        appBar: const AppAppBar(title: AccountStrings.title),
+        // The shop's brand, as on every tab; the page's name is its heading.
+        appBar: const AppAppBar(
+          titleWidget: ShopTitle(),
+          actions: [HeaderSearchButton(), HeaderCartButton()],
+        ),
         body: BlocSelector<AuthBloc, AuthState, Customer?>(
           selector: (state) => state.customer,
           builder: (context, customer) {
@@ -96,72 +104,86 @@ class _AccountView extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      const PageHeading(AccountStrings.title, padded: false),
+                      const SizedBox(height: AppSpacing.md),
                       CustomerCard(customer: customer),
                       const SizedBox(height: AppSpacing.xl),
-                      AccountTile(
-                        icon: Icons.receipt_long_outlined,
-                        title: AccountStrings.myOrders,
-                        subtitle: AccountStrings.myOrdersHint,
-                        onTap: () => context.go(AppRoutes.orders),
+                      AccountTileGroup(
+                        children: [
+                          AccountTile(
+                            icon: Icons.receipt_long_outlined,
+                            title: AccountStrings.myOrders,
+                            subtitle: AccountStrings.myOrdersHint,
+                            onTap: () => context.go(AppRoutes.orders),
+                          ),
+                          AccountTile(
+                            icon: Icons.favorite_border,
+                            title: WishlistStrings.accountTile,
+                            subtitle: WishlistStrings.accountTileHint,
+                            onTap: () => context.push(AppRoutes.wishlist),
+                          ),
+                          AccountTile(
+                            icon: Icons.location_on_outlined,
+                            title: AddressesStrings.accountTile,
+                            subtitle: AddressesStrings.accountTileHint,
+                            onTap: () => context.go(AppRoutes.addresses),
+                          ),
+                          AccountTile(
+                            icon: Icons.edit_outlined,
+                            title: AccountStrings.editProfile,
+                            subtitle: AccountStrings.editProfileHint,
+                            onTap: () => EditProfileSheet.show(context, customer),
+                          ),
+                        ],
                       ),
-                      AccountTile(
-                        icon: Icons.favorite_border,
-                        title: WishlistStrings.accountTile,
-                        subtitle: WishlistStrings.accountTileHint,
-                        onTap: () => context.push(AppRoutes.wishlist),
+                      const SizedBox(height: AppSpacing.xl),
+                      AccountTileGroup(
+                        title: SupportStrings.sectionTitle,
+                        children: [
+                          AccountTile(
+                            icon: Icons.support_agent_outlined,
+                            title: SupportStrings.contactTile,
+                            subtitle: SupportStrings.contactTileHint,
+                            onTap: () => context.push(AppRoutes.contact),
+                          ),
+                          AccountTile(
+                            icon: Icons.help_outline,
+                            title: SupportStrings.faqTile,
+                            subtitle: SupportStrings.faqTileHint,
+                            onTap: () => context.push(AppRoutes.faq),
+                          ),
+                          AccountTile(
+                            icon: Icons.privacy_tip_outlined,
+                            title: SupportStrings.privacyTile,
+                            onTap: () => context.push(AppRoutes.page(ShopPage.privacySlug)),
+                          ),
+                          AccountTile(
+                            icon: Icons.gavel_outlined,
+                            title: SupportStrings.termsTile,
+                            onTap: () => context.push(AppRoutes.page(ShopPage.termsSlug)),
+                          ),
+                        ],
                       ),
-                      AccountTile(
-                        icon: Icons.location_on_outlined,
-                        title: AddressesStrings.accountTile,
-                        subtitle: AddressesStrings.accountTileHint,
-                        onTap: () => context.go(AppRoutes.addresses),
-                      ),
-                      AccountTile(
-                        icon: Icons.edit_outlined,
-                        title: AccountStrings.editProfile,
-                        subtitle: AccountStrings.editProfileHint,
-                        onTap: () => EditProfileSheet.show(context, customer),
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                      Text(SupportStrings.sectionTitle, style: context.text.titleSmall),
-                      AccountTile(
-                        icon: Icons.support_agent_outlined,
-                        title: SupportStrings.contactTile,
-                        subtitle: SupportStrings.contactTileHint,
-                        onTap: () => context.push(AppRoutes.contact),
-                      ),
-                      AccountTile(
-                        icon: Icons.help_outline,
-                        title: SupportStrings.faqTile,
-                        subtitle: SupportStrings.faqTileHint,
-                        onTap: () => context.push(AppRoutes.faq),
-                      ),
-                      AccountTile(
-                        icon: Icons.privacy_tip_outlined,
-                        title: SupportStrings.privacyTile,
-                        onTap: () => context.push(AppRoutes.page(ShopPage.privacySlug)),
-                      ),
-                      AccountTile(
-                        icon: Icons.gavel_outlined,
-                        title: SupportStrings.termsTile,
-                        onTap: () => context.push(AppRoutes.page(ShopPage.termsSlug)),
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                      AccountTile(
-                        icon: Icons.logout,
-                        title: AccountStrings.signOut,
-                        destructive: true,
-                        onTap: () => _signOut(context),
-                      ),
-                      BlocSelector<DeleteAccountCubit, DeleteAccountState, bool>(
-                        selector: (state) => state.status.isLoading,
-                        builder: (context, deleting) => AccountTile(
-                          icon: Icons.delete_outline,
-                          title: AccountStrings.deleteAccount,
-                          subtitle: AccountStrings.deleteAccountHint,
-                          destructive: true,
-                          onTap: deleting ? null : () => _deleteAccount(context),
-                        ),
+                      const SizedBox(height: AppSpacing.xl),
+                      AccountTileGroup(
+                        children: [
+                          AccountTile(
+                            icon: Icons.logout,
+                            title: AccountStrings.signOut,
+                            destructive: true,
+                            onTap: () => _signOut(context),
+                          ),
+                          BlocSelector<DeleteAccountCubit, DeleteAccountState, bool>(
+                            selector: (state) => state.status.isLoading,
+                            builder: (context, deleting) => AccountTile(
+                              icon: Icons.delete_outline,
+                              title: AccountStrings.deleteAccount,
+                              subtitle: AccountStrings.deleteAccountHint,
+                              destructive: true,
+                              onTap: deleting ? null : () => _deleteAccount(context),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),

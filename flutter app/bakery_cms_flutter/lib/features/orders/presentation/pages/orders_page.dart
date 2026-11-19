@@ -9,7 +9,11 @@ import '../../../../core/constants/strings/orders_strings.dart';
 import '../../../../core/widgets/app_app_bar.dart';
 import '../../../../core/widgets/app_snackbar.dart';
 import '../../../../core/widgets/empty_view.dart';
+import '../../../../core/widgets/page_heading.dart';
 import '../../../../core/widgets/state_view.dart';
+import '../../../catalog/presentation/widgets/header_cart_button.dart';
+import '../../../catalog/presentation/widgets/header_search_button.dart';
+import '../../../catalog/presentation/widgets/shop_title.dart';
 import '../bloc/orders_bloc.dart';
 import '../bloc/orders_event.dart';
 import '../bloc/orders_state.dart';
@@ -38,7 +42,11 @@ class _OrdersView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const AppAppBar(title: OrderStrings.title),
+      // The shop's brand, as on every tab; the page's name is its heading.
+      appBar: const AppAppBar(
+        titleWidget: ShopTitle(),
+        actions: [HeaderSearchButton(), HeaderCartButton()],
+      ),
       body: BlocConsumer<OrdersBloc, OrdersState>(
         // A refresh that fails over a list already shown keeps the list.
         listenWhen: (previous, current) =>
@@ -61,10 +69,12 @@ class _OrdersView extends StatelessWidget {
             child: ListView.separated(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(AppSpacing.lg),
-              itemCount: state.orders.length,
-              separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.md),
+              itemCount: state.orders.length + 1,
+              separatorBuilder: (_, index) =>
+                  SizedBox(height: index == 0 ? AppSpacing.sm : AppSpacing.md),
               itemBuilder: (context, index) {
-                final order = state.orders[index];
+                if (index == 0) return const PageHeading(OrderStrings.title, padded: false);
+                final order = state.orders[index - 1];
                 return OrderListTile(
                   order: order,
                   onTap: () => context.push(AppRoutes.orderDetail(order.orderNumber)),

@@ -8,11 +8,14 @@ import '../../../../core/constants/strings/wishlist_strings.dart';
 import '../../../../core/widgets/app_app_bar.dart';
 import '../../../../core/widgets/empty_view.dart';
 import '../../../../core/widgets/failure_snackbar_listener.dart';
+import '../../../../core/widgets/page_heading.dart';
 import '../../../../core/widgets/state_view.dart';
 import '../../../catalog/presentation/widgets/product_sliver_grid.dart';
 import '../bloc/wishlist_page_cubit.dart';
 import '../bloc/wishlist_page_state.dart';
 import '../../../catalog/presentation/widgets/header_cart_button.dart';
+import '../../../catalog/presentation/widgets/header_search_button.dart';
+import '../../../catalog/presentation/widgets/shop_title.dart';
 
 /// The products saved on this phone, newest first.
 class WishlistPage extends StatelessWidget {
@@ -33,7 +36,12 @@ class _WishlistView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const AppAppBar(title: WishlistStrings.title, actions: [HeaderCartButton()]),
+      // The shop's brand, as on every shopping page; the page's name, with
+      // its count, is its heading, as the website's "My Wishlist (3)".
+      appBar: const AppAppBar(
+        titleWidget: ShopTitle(),
+        actions: [HeaderSearchButton(), HeaderCartButton()],
+      ),
       body: FailureSnackbarListener<WishlistPageCubit, WishlistPageState>(
         statusOf: (s) => s.status,
         messageOf: (s) => s.errorMessage,
@@ -52,7 +60,14 @@ class _WishlistView extends StatelessWidget {
               onAction: () => context.go(AppRoutes.home),
             ),
             builder: (_) =>
-                CustomScrollView(slivers: [ProductSliverGrid(products: state.products)]),
+CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: PageHeading(WishlistStrings.heading(state.products.length)),
+                ),
+                ProductSliverGrid(products: state.products),
+              ],
+            ),
           ),
         ),
       ),

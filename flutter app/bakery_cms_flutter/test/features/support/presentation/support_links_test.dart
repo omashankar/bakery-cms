@@ -21,6 +21,7 @@ import 'package:get_it/get_it.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../auth/auth_fixtures.dart';
+import '../../catalog/app_cubits_harness.dart';
 
 class _MockAuthBloc extends MockBloc<AuthEvent, AuthState> implements AuthBloc {}
 
@@ -78,9 +79,12 @@ void main() {
       ],
     );
     await tester.pumpWidget(
-      BlocProvider<AuthBloc>.value(
-        value: auth,
-        child: MaterialApp.router(theme: AppTheme.light, routerConfig: router),
+      // The shop's settings and the cart: the Account header's brand and bag.
+      withAppCubits(
+        BlocProvider<AuthBloc>.value(
+          value: auth,
+          child: MaterialApp.router(theme: AppTheme.light, routerConfig: router),
+        ),
       ),
     );
     await tester.pumpAndSettle();

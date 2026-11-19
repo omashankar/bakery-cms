@@ -22,6 +22,9 @@ class CartCheckoutBar extends StatelessWidget {
 
   final Cart cart;
 
+  /// The most of the bar the amount may take, at a large text size.
+  static const double _amountMaxShare = 0.45;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
@@ -39,7 +42,10 @@ class CartCheckoutBar extends StatelessWidget {
           padding: const EdgeInsets.all(AppSpacing.lg),
           child: Row(
             children: [
-              Flexible(
+              // Its own width, no more: a flex share here was held empty
+              // beside the button, leaving a gap at the bar's end.
+              ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * _amountMaxShare),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -67,7 +73,6 @@ class CartCheckoutBar extends StatelessWidget {
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
-                flex: 2,
                 child: AppButton(
                   label: signedIn ? CartStrings.proceedToCheckout : CartStrings.signInToCheckout,
                   onPressed: () => context.push(AppRoutes.checkout),

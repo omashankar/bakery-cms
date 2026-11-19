@@ -26,6 +26,12 @@ abstract final class AppTheme {
       outlineVariant: AppColors.border,
       tertiary: AppColors.success,
       onTertiary: AppColors.onPrimary,
+      errorContainer: AppColors.errorSoft,
+      onErrorContainer: AppColors.onErrorSoft,
+      tertiaryContainer: AppColors.successSoft,
+      onTertiaryContainer: AppColors.onSuccessSoft,
+      primaryContainer: AppColors.primarySoft,
+      onPrimaryContainer: AppColors.primary,
     ),
   );
 
@@ -47,6 +53,12 @@ abstract final class AppTheme {
       outlineVariant: AppColors.borderDark,
       tertiary: AppColors.success,
       onTertiary: AppColors.foregroundDark,
+      errorContainer: AppColors.errorSoftDark,
+      onErrorContainer: AppColors.onErrorSoftDark,
+      tertiaryContainer: AppColors.successSoftDark,
+      onTertiaryContainer: AppColors.onSuccessSoftDark,
+      primaryContainer: AppColors.secondaryDark,
+      onPrimaryContainer: AppColors.foregroundDark,
     ),
   );
 

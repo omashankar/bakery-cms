@@ -5,10 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/router/app_routes.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/strings/cart_strings.dart';
-import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/app_app_bar.dart';
 import '../../../../core/widgets/content_width.dart';
 import '../../../../core/widgets/empty_view.dart';
+import '../../../../core/widgets/page_heading.dart';
 import '../../../../core/widgets/state_view.dart';
 import '../../../checkout/presentation/bloc/checkout_step.dart';
 import '../../../checkout/presentation/widgets/checkout_flow_app_bar.dart';
@@ -57,18 +57,7 @@ class CartPage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          AppSpacing.lg,
-                          AppSpacing.lg,
-                          AppSpacing.lg,
-                          AppSpacing.xs,
-                        ),
-                        child: Text(
-                          CartStrings.heading(cart.itemCount),
-                          style: context.text.titleLarge,
-                        ),
-                      ),
+                      PageHeading(CartStrings.heading(cart.itemCount)),
                       // WHERE IT IS GOING, before anything else: a customer
                       // outside every zone finds out here, not at the address.
                       const DeliveryAreaBar(),
