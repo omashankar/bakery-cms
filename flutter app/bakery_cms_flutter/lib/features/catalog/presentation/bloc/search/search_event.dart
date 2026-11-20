@@ -1,0 +1,14 @@
+import 'package:equatable/equatable.dart';
+
+sealed class SearchEvent extends Equatable {
+  const SearchEvent();
+}
+
+final class SearchQueryChanged extends SearchEvent {
+  const SearchQueryChanged(this.query);
+
+  final String query;
+
+  @override
+  List<Object?> get props => [query];
+}

@@ -257,6 +257,34 @@ export async function signOutCustomer(): Promise<boolean> {
   return endedOnServer;
 }
 
+/**
+ * Delete the signed-in customer's account, on the server, for good.
+ *
+ * Unlike sign-out, this device is wiped only once the server says it is done:
+ * a customer told "deleted" while the account survived would believe
+ * something untrue about their data. The server clears the cookie itself.
+ */
+export async function deleteCustomerAccount(): Promise<{ deleted: true } | { error: string }> {
+  try {
+    const res = await fetch("/api/customer-auth/me", {
+      method: "DELETE",
+      credentials: "same-origin",
+    });
+    const parsed = (await res.json().catch(() => null)) as {
+      data?: { deleted?: boolean };
+      message?: string;
+    } | null;
+    if (!res.ok || parsed?.data?.deleted !== true) {
+      return { error: parsed?.message || "Your account could not be deleted. Please try again." };
+    }
+  } catch {
+    return { error: "Your account could not be deleted. Check your connection and try again." };
+  }
+  clearLocalCustomerData();
+  settled = true;
+  return { deleted: true };
+}
+
 export function getCustomerDisplayName(): string {
   const session = getCustomerSession();
   if (!session) return "";

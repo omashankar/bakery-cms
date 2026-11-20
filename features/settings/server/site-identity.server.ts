@@ -61,6 +61,21 @@ function supported(
   return trimmed && options.some((option) => option.value === trimmed) ? trimmed : fallback;
 }
 
+/**
+ * The currency and timezone a page formats with, from a `general` block already
+ * in hand — the rule `getSiteIdentity` applies, for a caller that has read the
+ * settings itself (a route handler, where `cache()` does not dedupe a second read).
+ */
+export function supportedLocaleOf(general: { currency?: string; timezone?: string } | undefined): {
+  currency: string;
+  timezone: string;
+} {
+  return {
+    currency: supported(general?.currency, currencyOptions, FALLBACK.currency),
+    timezone: supported(general?.timezone, timezoneOptions, FALLBACK.timezone),
+  };
+}
+
 export const getSiteIdentity = cache(async (): Promise<SiteIdentity> => {
   // Read per request, not at build time. Without this the pages Next can
   // prerender — the login screen, the cart, the FAQ — bake in whatever the
@@ -88,8 +103,7 @@ export const getSiteIdentity = cache(async (): Promise<SiteIdentity> => {
       // only constrains FUTURE writes, and both are handed to `Intl`, which
       // throws a RangeError on a code it does not know — from a settings value,
       // that would take down every rendered page.
-      currency: supported(general.currency, currencyOptions, FALLBACK.currency),
-      timezone: supported(general.timezone, timezoneOptions, FALLBACK.timezone),
+      ...supportedLocaleOf(general),
       resolved: true,
     };
   } catch {

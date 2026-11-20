@@ -1,0 +1,11 @@
+# App icon, generated from assets/branding (made from the shop's logo).
+# To rebrand for another shop: replace the two PNGs, then run
+#   dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  image_path: "assets/branding/icon.png"
+  adaptive_icon_background: "#6F4E37"
+  adaptive_icon_foreground: "assets/branding/icon_foreground.png"
+  min_sdk_android: 21

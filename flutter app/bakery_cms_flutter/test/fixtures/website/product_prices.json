@@ -1,0 +1,3803 @@
+{
+ "synthetic": [
+  {
+   "slug": "synthetic-shape-cake",
+   "price": 800,
+   "compareAtPrice": 1000,
+   "weights": [
+    {
+     "label": "0.5 kg",
+     "price": 800
+    },
+    {
+     "label": "1 kg",
+     "price": 1400
+    }
+   ],
+   "variantGroups": [
+    {
+     "id": "g-shape",
+     "name": "Shape",
+     "type": "shape",
+     "required": true,
+     "options": [
+      {
+       "id": "round",
+       "label": "Round",
+       "priceAdjustment": 0,
+       "isDefault": true
+      },
+      {
+       "id": "heart",
+       "label": "Heart",
+       "priceAdjustment": 150,
+       "isDefault": false
+      }
+     ]
+    },
+    {
+     "id": "g-egg",
+     "name": "Eggless",
+     "type": "custom",
+     "required": false,
+     "options": [
+      {
+       "id": "eggless",
+       "label": "Eggless",
+       "priceAdjustment": 80,
+       "isDefault": true
+      }
+     ]
+    },
+    {
+     "id": "g-wrap",
+     "name": "Gift wrap",
+     "type": "custom",
+     "required": true,
+     "options": [
+      {
+       "id": "plain",
+       "label": "Plain",
+       "priceAdjustment": 0,
+       "isDefault": false
+      },
+      {
+       "id": "box",
+       "label": "Box",
+       "priceAdjustment": 60,
+       "isDefault": false
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "cases": [
+  {
+   "slug": "dark-chocolate-mousse-pastry",
+   "shapeModule": true,
+   "weight": null,
+   "selections": {},
+   "unitPrice": 179,
+   "compareAt": 229,
+   "summary": []
+  },
+  {
+   "slug": "dark-chocolate-mousse-pastry",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 179,
+   "compareAt": 229
+  },
+  {
+   "slug": "dark-chocolate-mousse-pastry",
+   "shapeModule": false,
+   "weight": null,
+   "selections": {},
+   "unitPrice": 179,
+   "compareAt": 229,
+   "summary": []
+  },
+  {
+   "slug": "dark-chocolate-mousse-pastry",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 179,
+   "compareAt": 229
+  },
+  {
+   "slug": "classic-italian-tiramisu-pastry",
+   "shapeModule": true,
+   "weight": null,
+   "selections": {},
+   "unitPrice": 199,
+   "compareAt": 259,
+   "summary": []
+  },
+  {
+   "slug": "classic-italian-tiramisu-pastry",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 199,
+   "compareAt": 259
+  },
+  {
+   "slug": "classic-italian-tiramisu-pastry",
+   "shapeModule": false,
+   "weight": null,
+   "selections": {},
+   "unitPrice": 199,
+   "compareAt": 259,
+   "summary": []
+  },
+  {
+   "slug": "classic-italian-tiramisu-pastry",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 199,
+   "compareAt": 259
+  },
+  {
+   "slug": "tropical-pineapple-cream-pastry",
+   "shapeModule": true,
+   "weight": null,
+   "selections": {},
+   "unitPrice": 129,
+   "compareAt": 179,
+   "summary": []
+  },
+  {
+   "slug": "tropical-pineapple-cream-pastry",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 129,
+   "compareAt": 179
+  },
+  {
+   "slug": "tropical-pineapple-cream-pastry",
+   "shapeModule": false,
+   "weight": null,
+   "selections": {},
+   "unitPrice": 129,
+   "compareAt": 179,
+   "summary": []
+  },
+  {
+   "slug": "tropical-pineapple-cream-pastry",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 129,
+   "compareAt": 179
+  },
+  {
+   "slug": "blueberry-cheesecake-pastry",
+   "shapeModule": true,
+   "weight": null,
+   "selections": {},
+   "unitPrice": 189,
+   "compareAt": 249,
+   "summary": []
+  },
+  {
+   "slug": "blueberry-cheesecake-pastry",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 189,
+   "compareAt": 249
+  },
+  {
+   "slug": "blueberry-cheesecake-pastry",
+   "shapeModule": false,
+   "weight": null,
+   "selections": {},
+   "unitPrice": 189,
+   "compareAt": 249,
+   "summary": []
+  },
+  {
+   "slug": "blueberry-cheesecake-pastry",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 189,
+   "compareAt": 249
+  },
+  {
+   "slug": "caramel-butterscotch-crunch-pastry",
+   "shapeModule": true,
+   "weight": null,
+   "selections": {},
+   "unitPrice": 149,
+   "compareAt": 199,
+   "summary": []
+  },
+  {
+   "slug": "caramel-butterscotch-crunch-pastry",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 149,
+   "compareAt": 199
+  },
+  {
+   "slug": "caramel-butterscotch-crunch-pastry",
+   "shapeModule": false,
+   "weight": null,
+   "selections": {},
+   "unitPrice": 149,
+   "compareAt": 199,
+   "summary": []
+  },
+  {
+   "slug": "caramel-butterscotch-crunch-pastry",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 149,
+   "compareAt": 199
+  },
+  {
+   "slug": "strawberry-cream-layer-pastry",
+   "shapeModule": true,
+   "weight": null,
+   "selections": {},
+   "unitPrice": 139,
+   "compareAt": 189,
+   "summary": []
+  },
+  {
+   "slug": "strawberry-cream-layer-pastry",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 139,
+   "compareAt": 189
+  },
+  {
+   "slug": "strawberry-cream-layer-pastry",
+   "shapeModule": false,
+   "weight": null,
+   "selections": {},
+   "unitPrice": 139,
+   "compareAt": 189,
+   "summary": []
+  },
+  {
+   "slug": "strawberry-cream-layer-pastry",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 139,
+   "compareAt": 189
+  },
+  {
+   "slug": "fresh-mixed-fruit-danish-pastry",
+   "shapeModule": true,
+   "weight": null,
+   "selections": {},
+   "unitPrice": 169,
+   "compareAt": 219,
+   "summary": []
+  },
+  {
+   "slug": "fresh-mixed-fruit-danish-pastry",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 169,
+   "compareAt": 219
+  },
+  {
+   "slug": "fresh-mixed-fruit-danish-pastry",
+   "shapeModule": false,
+   "weight": null,
+   "selections": {},
+   "unitPrice": 169,
+   "compareAt": 219,
+   "summary": []
+  },
+  {
+   "slug": "fresh-mixed-fruit-danish-pastry",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 169,
+   "compareAt": 219
+  },
+  {
+   "slug": "red-velvet-cream-cheese-pastry",
+   "shapeModule": true,
+   "weight": null,
+   "selections": {},
+   "unitPrice": 159,
+   "compareAt": 209,
+   "summary": []
+  },
+  {
+   "slug": "red-velvet-cream-cheese-pastry",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 159,
+   "compareAt": 209
+  },
+  {
+   "slug": "red-velvet-cream-cheese-pastry",
+   "shapeModule": false,
+   "weight": null,
+   "selections": {},
+   "unitPrice": 159,
+   "compareAt": 209,
+   "summary": []
+  },
+  {
+   "slug": "red-velvet-cream-cheese-pastry",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 159,
+   "compareAt": 209
+  },
+  {
+   "slug": "classic-black-forest-pastry",
+   "shapeModule": true,
+   "weight": null,
+   "selections": {},
+   "unitPrice": 129,
+   "compareAt": 169,
+   "summary": []
+  },
+  {
+   "slug": "classic-black-forest-pastry",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 129,
+   "compareAt": 169
+  },
+  {
+   "slug": "classic-black-forest-pastry",
+   "shapeModule": false,
+   "weight": null,
+   "selections": {},
+   "unitPrice": 129,
+   "compareAt": 169,
+   "summary": []
+  },
+  {
+   "slug": "classic-black-forest-pastry",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 129,
+   "compareAt": 169
+  },
+  {
+   "slug": "belgian-chocolate-truffle-pastry",
+   "shapeModule": true,
+   "weight": null,
+   "selections": {},
+   "unitPrice": 149,
+   "compareAt": 199,
+   "summary": []
+  },
+  {
+   "slug": "belgian-chocolate-truffle-pastry",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 149,
+   "compareAt": 199
+  },
+  {
+   "slug": "belgian-chocolate-truffle-pastry",
+   "shapeModule": false,
+   "weight": null,
+   "selections": {},
+   "unitPrice": 149,
+   "compareAt": 199,
+   "summary": []
+  },
+  {
+   "slug": "belgian-chocolate-truffle-pastry",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 149,
+   "compareAt": 199
+  },
+  {
+   "slug": "luxurious-caramel-toffee-birthday-cake",
+   "shapeModule": true,
+   "weight": "1.5 Kg",
+   "selections": {},
+   "unitPrice": 999,
+   "compareAt": 1249,
+   "summary": []
+  },
+  {
+   "slug": "luxurious-caramel-toffee-birthday-cake",
+   "shapeModule": true,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 1299,
+   "compareAt": 1549,
+   "summary": []
+  },
+  {
+   "slug": "luxurious-caramel-toffee-birthday-cake",
+   "shapeModule": true,
+   "weight": "3.5 Kg",
+   "selections": {},
+   "unitPrice": 1599,
+   "compareAt": 1849,
+   "summary": []
+  },
+  {
+   "slug": "luxurious-caramel-toffee-birthday-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 999,
+   "compareAt": 1249
+  },
+  {
+   "slug": "luxurious-caramel-toffee-birthday-cake",
+   "shapeModule": false,
+   "weight": "1.5 Kg",
+   "selections": {},
+   "unitPrice": 999,
+   "compareAt": 1249,
+   "summary": []
+  },
+  {
+   "slug": "luxurious-caramel-toffee-birthday-cake",
+   "shapeModule": false,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 1299,
+   "compareAt": 1549,
+   "summary": []
+  },
+  {
+   "slug": "luxurious-caramel-toffee-birthday-cake",
+   "shapeModule": false,
+   "weight": "3.5 Kg",
+   "selections": {},
+   "unitPrice": 1599,
+   "compareAt": 1849,
+   "summary": []
+  },
+  {
+   "slug": "luxurious-caramel-toffee-birthday-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 999,
+   "compareAt": 1249
+  },
+  {
+   "slug": "mango-cream-birthday-cake-with-pistachios",
+   "shapeModule": true,
+   "weight": "1 kg",
+   "selections": {},
+   "unitPrice": 899,
+   "compareAt": 1149,
+   "summary": []
+  },
+  {
+   "slug": "mango-cream-birthday-cake-with-pistachios",
+   "shapeModule": true,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1299,
+   "compareAt": 1549,
+   "summary": []
+  },
+  {
+   "slug": "mango-cream-birthday-cake-with-pistachios",
+   "shapeModule": true,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 1799,
+   "compareAt": 2049,
+   "summary": []
+  },
+  {
+   "slug": "mango-cream-birthday-cake-with-pistachios",
+   "shapeModule": true,
+   "weight": "4 kg",
+   "selections": {},
+   "unitPrice": 2099,
+   "compareAt": 2349,
+   "summary": []
+  },
+  {
+   "slug": "mango-cream-birthday-cake-with-pistachios",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 899,
+   "compareAt": 1149
+  },
+  {
+   "slug": "mango-cream-birthday-cake-with-pistachios",
+   "shapeModule": false,
+   "weight": "1 kg",
+   "selections": {},
+   "unitPrice": 899,
+   "compareAt": 1149,
+   "summary": []
+  },
+  {
+   "slug": "mango-cream-birthday-cake-with-pistachios",
+   "shapeModule": false,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1299,
+   "compareAt": 1549,
+   "summary": []
+  },
+  {
+   "slug": "mango-cream-birthday-cake-with-pistachios",
+   "shapeModule": false,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 1799,
+   "compareAt": 2049,
+   "summary": []
+  },
+  {
+   "slug": "mango-cream-birthday-cake-with-pistachios",
+   "shapeModule": false,
+   "weight": "4 kg",
+   "selections": {},
+   "unitPrice": 2099,
+   "compareAt": 2349,
+   "summary": []
+  },
+  {
+   "slug": "mango-cream-birthday-cake-with-pistachios",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 899,
+   "compareAt": 1149
+  },
+  {
+   "slug": "decadent-black-forest-cherry-cake",
+   "shapeModule": true,
+   "weight": "1 kg",
+   "selections": {},
+   "unitPrice": 799,
+   "compareAt": 999,
+   "summary": []
+  },
+  {
+   "slug": "decadent-black-forest-cherry-cake",
+   "shapeModule": true,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1199,
+   "compareAt": 1399,
+   "summary": []
+  },
+  {
+   "slug": "decadent-black-forest-cherry-cake",
+   "shapeModule": true,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 1699,
+   "compareAt": 1899,
+   "summary": []
+  },
+  {
+   "slug": "decadent-black-forest-cherry-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 799,
+   "compareAt": 999
+  },
+  {
+   "slug": "decadent-black-forest-cherry-cake",
+   "shapeModule": false,
+   "weight": "1 kg",
+   "selections": {},
+   "unitPrice": 799,
+   "compareAt": 999,
+   "summary": []
+  },
+  {
+   "slug": "decadent-black-forest-cherry-cake",
+   "shapeModule": false,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1199,
+   "compareAt": 1399,
+   "summary": []
+  },
+  {
+   "slug": "decadent-black-forest-cherry-cake",
+   "shapeModule": false,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 1699,
+   "compareAt": 1899,
+   "summary": []
+  },
+  {
+   "slug": "decadent-black-forest-cherry-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 799,
+   "compareAt": 999
+  },
+  {
+   "slug": "elegant-red-velvet-birthday-cake",
+   "shapeModule": true,
+   "weight": "1 kg",
+   "selections": {},
+   "unitPrice": 949,
+   "compareAt": 1199,
+   "summary": []
+  },
+  {
+   "slug": "elegant-red-velvet-birthday-cake",
+   "shapeModule": true,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1549,
+   "compareAt": 1799,
+   "summary": []
+  },
+  {
+   "slug": "elegant-red-velvet-birthday-cake",
+   "shapeModule": true,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 2049,
+   "compareAt": 2299,
+   "summary": []
+  },
+  {
+   "slug": "elegant-red-velvet-birthday-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 949,
+   "compareAt": 1199
+  },
+  {
+   "slug": "elegant-red-velvet-birthday-cake",
+   "shapeModule": false,
+   "weight": "1 kg",
+   "selections": {},
+   "unitPrice": 949,
+   "compareAt": 1199,
+   "summary": []
+  },
+  {
+   "slug": "elegant-red-velvet-birthday-cake",
+   "shapeModule": false,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1549,
+   "compareAt": 1799,
+   "summary": []
+  },
+  {
+   "slug": "elegant-red-velvet-birthday-cake",
+   "shapeModule": false,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 2049,
+   "compareAt": 2299,
+   "summary": []
+  },
+  {
+   "slug": "elegant-red-velvet-birthday-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 949,
+   "compareAt": 1199
+  },
+  {
+   "slug": "mango-drip-fruit-celebration-cake",
+   "shapeModule": true,
+   "weight": "1 Kg",
+   "selections": {},
+   "unitPrice": 849,
+   "compareAt": 1049,
+   "summary": []
+  },
+  {
+   "slug": "mango-drip-fruit-celebration-cake",
+   "shapeModule": true,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1249,
+   "compareAt": 1449,
+   "summary": []
+  },
+  {
+   "slug": "mango-drip-fruit-celebration-cake",
+   "shapeModule": true,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 1843,
+   "compareAt": 2043,
+   "summary": []
+  },
+  {
+   "slug": "mango-drip-fruit-celebration-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 849,
+   "compareAt": 1049
+  },
+  {
+   "slug": "mango-drip-fruit-celebration-cake",
+   "shapeModule": false,
+   "weight": "1 Kg",
+   "selections": {},
+   "unitPrice": 849,
+   "compareAt": 1049,
+   "summary": []
+  },
+  {
+   "slug": "mango-drip-fruit-celebration-cake",
+   "shapeModule": false,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1249,
+   "compareAt": 1449,
+   "summary": []
+  },
+  {
+   "slug": "mango-drip-fruit-celebration-cake",
+   "shapeModule": false,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 1843,
+   "compareAt": 2043,
+   "summary": []
+  },
+  {
+   "slug": "mango-drip-fruit-celebration-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 849,
+   "compareAt": 1049
+  },
+  {
+   "slug": "dreamy-pastel-unicorn-birthday-cake",
+   "shapeModule": true,
+   "weight": "1.5 Kg",
+   "selections": {},
+   "unitPrice": 1299,
+   "compareAt": 1599,
+   "summary": []
+  },
+  {
+   "slug": "dreamy-pastel-unicorn-birthday-cake",
+   "shapeModule": true,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 1799,
+   "compareAt": 2099,
+   "summary": []
+  },
+  {
+   "slug": "dreamy-pastel-unicorn-birthday-cake",
+   "shapeModule": true,
+   "weight": "3.5 Kg",
+   "selections": {},
+   "unitPrice": 2299,
+   "compareAt": 2599,
+   "summary": []
+  },
+  {
+   "slug": "dreamy-pastel-unicorn-birthday-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 1299,
+   "compareAt": 1599
+  },
+  {
+   "slug": "dreamy-pastel-unicorn-birthday-cake",
+   "shapeModule": false,
+   "weight": "1.5 Kg",
+   "selections": {},
+   "unitPrice": 1299,
+   "compareAt": 1599,
+   "summary": []
+  },
+  {
+   "slug": "dreamy-pastel-unicorn-birthday-cake",
+   "shapeModule": false,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 1799,
+   "compareAt": 2099,
+   "summary": []
+  },
+  {
+   "slug": "dreamy-pastel-unicorn-birthday-cake",
+   "shapeModule": false,
+   "weight": "3.5 Kg",
+   "selections": {},
+   "unitPrice": 2299,
+   "compareAt": 2599,
+   "summary": []
+  },
+  {
+   "slug": "dreamy-pastel-unicorn-birthday-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 1299,
+   "compareAt": 1599
+  },
+  {
+   "slug": "elegant-blue-floral-birthday-cake",
+   "shapeModule": true,
+   "weight": "1.5 Kg",
+   "selections": {},
+   "unitPrice": 1199,
+   "compareAt": 1499,
+   "summary": []
+  },
+  {
+   "slug": "elegant-blue-floral-birthday-cake",
+   "shapeModule": true,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 1999,
+   "compareAt": 2299,
+   "summary": []
+  },
+  {
+   "slug": "elegant-blue-floral-birthday-cake",
+   "shapeModule": true,
+   "weight": "3.5 Kg",
+   "selections": {},
+   "unitPrice": 2499,
+   "compareAt": 2799,
+   "summary": []
+  },
+  {
+   "slug": "elegant-blue-floral-birthday-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 1199,
+   "compareAt": 1499
+  },
+  {
+   "slug": "elegant-blue-floral-birthday-cake",
+   "shapeModule": false,
+   "weight": "1.5 Kg",
+   "selections": {},
+   "unitPrice": 1199,
+   "compareAt": 1499,
+   "summary": []
+  },
+  {
+   "slug": "elegant-blue-floral-birthday-cake",
+   "shapeModule": false,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 1999,
+   "compareAt": 2299,
+   "summary": []
+  },
+  {
+   "slug": "elegant-blue-floral-birthday-cake",
+   "shapeModule": false,
+   "weight": "3.5 Kg",
+   "selections": {},
+   "unitPrice": 2499,
+   "compareAt": 2799,
+   "summary": []
+  },
+  {
+   "slug": "elegant-blue-floral-birthday-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 1199,
+   "compareAt": 1499
+  },
+  {
+   "slug": "rainbow-funfetti-birthday-cake",
+   "shapeModule": true,
+   "weight": "1.5 Kg",
+   "selections": {},
+   "unitPrice": 999,
+   "compareAt": 1249,
+   "summary": []
+  },
+  {
+   "slug": "rainbow-funfetti-birthday-cake",
+   "shapeModule": true,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1299,
+   "compareAt": 1549,
+   "summary": []
+  },
+  {
+   "slug": "rainbow-funfetti-birthday-cake",
+   "shapeModule": true,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 1799,
+   "compareAt": 2049,
+   "summary": []
+  },
+  {
+   "slug": "rainbow-funfetti-birthday-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 999,
+   "compareAt": 1249
+  },
+  {
+   "slug": "rainbow-funfetti-birthday-cake",
+   "shapeModule": false,
+   "weight": "1.5 Kg",
+   "selections": {},
+   "unitPrice": 999,
+   "compareAt": 1249,
+   "summary": []
+  },
+  {
+   "slug": "rainbow-funfetti-birthday-cake",
+   "shapeModule": false,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1299,
+   "compareAt": 1549,
+   "summary": []
+  },
+  {
+   "slug": "rainbow-funfetti-birthday-cake",
+   "shapeModule": false,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 1799,
+   "compareAt": 2049,
+   "summary": []
+  },
+  {
+   "slug": "rainbow-funfetti-birthday-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 999,
+   "compareAt": 1249
+  },
+  {
+   "slug": "strawberry-cream-birthday-celebration-cake",
+   "shapeModule": true,
+   "weight": "1 Kg",
+   "selections": {},
+   "unitPrice": 749,
+   "compareAt": 949,
+   "summary": []
+  },
+  {
+   "slug": "strawberry-cream-birthday-celebration-cake",
+   "shapeModule": true,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 849,
+   "compareAt": 1049,
+   "summary": []
+  },
+  {
+   "slug": "strawberry-cream-birthday-celebration-cake",
+   "shapeModule": true,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 1149,
+   "compareAt": 1349,
+   "summary": []
+  },
+  {
+   "slug": "strawberry-cream-birthday-celebration-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 749,
+   "compareAt": 949
+  },
+  {
+   "slug": "strawberry-cream-birthday-celebration-cake",
+   "shapeModule": false,
+   "weight": "1 Kg",
+   "selections": {},
+   "unitPrice": 749,
+   "compareAt": 949,
+   "summary": []
+  },
+  {
+   "slug": "strawberry-cream-birthday-celebration-cake",
+   "shapeModule": false,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 849,
+   "compareAt": 1049,
+   "summary": []
+  },
+  {
+   "slug": "strawberry-cream-birthday-celebration-cake",
+   "shapeModule": false,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 1149,
+   "compareAt": 1349,
+   "summary": []
+  },
+  {
+   "slug": "strawberry-cream-birthday-celebration-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 749,
+   "compareAt": 949
+  },
+  {
+   "slug": "decadent-chocolate-cherry-birthday-cake",
+   "shapeModule": true,
+   "weight": "1 Kg",
+   "selections": {},
+   "unitPrice": 799,
+   "compareAt": 999,
+   "summary": []
+  },
+  {
+   "slug": "decadent-chocolate-cherry-birthday-cake",
+   "shapeModule": true,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1099,
+   "compareAt": 1299,
+   "summary": []
+  },
+  {
+   "slug": "decadent-chocolate-cherry-birthday-cake",
+   "shapeModule": true,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 1297,
+   "compareAt": 1497,
+   "summary": []
+  },
+  {
+   "slug": "decadent-chocolate-cherry-birthday-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 799,
+   "compareAt": 999
+  },
+  {
+   "slug": "decadent-chocolate-cherry-birthday-cake",
+   "shapeModule": false,
+   "weight": "1 Kg",
+   "selections": {},
+   "unitPrice": 799,
+   "compareAt": 999,
+   "summary": []
+  },
+  {
+   "slug": "decadent-chocolate-cherry-birthday-cake",
+   "shapeModule": false,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1099,
+   "compareAt": 1299,
+   "summary": []
+  },
+  {
+   "slug": "decadent-chocolate-cherry-birthday-cake",
+   "shapeModule": false,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 1297,
+   "compareAt": 1497,
+   "summary": []
+  },
+  {
+   "slug": "decadent-chocolate-cherry-birthday-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 799,
+   "compareAt": 999
+  },
+  {
+   "slug": "elegant-blue-baby-shower-cake",
+   "shapeModule": true,
+   "weight": "2 Kg",
+   "selections": {},
+   "unitPrice": 2249,
+   "compareAt": 2749,
+   "summary": []
+  },
+  {
+   "slug": "elegant-blue-baby-shower-cake",
+   "shapeModule": true,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 3249,
+   "compareAt": 3749,
+   "summary": []
+  },
+  {
+   "slug": "elegant-blue-baby-shower-cake",
+   "shapeModule": true,
+   "weight": "4 kg",
+   "selections": {},
+   "unitPrice": 4249,
+   "compareAt": 4749,
+   "summary": []
+  },
+  {
+   "slug": "elegant-blue-baby-shower-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 2249,
+   "compareAt": 2749
+  },
+  {
+   "slug": "elegant-blue-baby-shower-cake",
+   "shapeModule": false,
+   "weight": "2 Kg",
+   "selections": {},
+   "unitPrice": 2249,
+   "compareAt": 2749,
+   "summary": []
+  },
+  {
+   "slug": "elegant-blue-baby-shower-cake",
+   "shapeModule": false,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 3249,
+   "compareAt": 3749,
+   "summary": []
+  },
+  {
+   "slug": "elegant-blue-baby-shower-cake",
+   "shapeModule": false,
+   "weight": "4 kg",
+   "selections": {},
+   "unitPrice": 4249,
+   "compareAt": 4749,
+   "summary": []
+  },
+  {
+   "slug": "elegant-blue-baby-shower-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 2249,
+   "compareAt": 2749
+  },
+  {
+   "slug": "woodland-welcome-little-one-cake",
+   "shapeModule": true,
+   "weight": "2 Kg",
+   "selections": {},
+   "unitPrice": 2349,
+   "compareAt": 2899,
+   "summary": []
+  },
+  {
+   "slug": "woodland-welcome-little-one-cake",
+   "shapeModule": true,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 3349,
+   "compareAt": 3899,
+   "summary": []
+  },
+  {
+   "slug": "woodland-welcome-little-one-cake",
+   "shapeModule": true,
+   "weight": "4 kg",
+   "selections": {},
+   "unitPrice": 4349,
+   "compareAt": 4899,
+   "summary": []
+  },
+  {
+   "slug": "woodland-welcome-little-one-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 2349,
+   "compareAt": 2899
+  },
+  {
+   "slug": "woodland-welcome-little-one-cake",
+   "shapeModule": false,
+   "weight": "2 Kg",
+   "selections": {},
+   "unitPrice": 2349,
+   "compareAt": 2899,
+   "summary": []
+  },
+  {
+   "slug": "woodland-welcome-little-one-cake",
+   "shapeModule": false,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 3349,
+   "compareAt": 3899,
+   "summary": []
+  },
+  {
+   "slug": "woodland-welcome-little-one-cake",
+   "shapeModule": false,
+   "weight": "4 kg",
+   "selections": {},
+   "unitPrice": 4349,
+   "compareAt": 4899,
+   "summary": []
+  },
+  {
+   "slug": "woodland-welcome-little-one-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 2349,
+   "compareAt": 2899
+  },
+  {
+   "slug": "elegant-baby-shower-cake",
+   "shapeModule": true,
+   "weight": "1.5 kg",
+   "selections": {},
+   "unitPrice": 2149,
+   "compareAt": 2649,
+   "summary": []
+  },
+  {
+   "slug": "elegant-baby-shower-cake",
+   "shapeModule": true,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 3149,
+   "compareAt": 3649,
+   "summary": []
+  },
+  {
+   "slug": "elegant-baby-shower-cake",
+   "shapeModule": true,
+   "weight": "3.5 Kg",
+   "selections": {},
+   "unitPrice": 4149,
+   "compareAt": 4649,
+   "summary": []
+  },
+  {
+   "slug": "elegant-baby-shower-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 2149,
+   "compareAt": 2649
+  },
+  {
+   "slug": "elegant-baby-shower-cake",
+   "shapeModule": false,
+   "weight": "1.5 kg",
+   "selections": {},
+   "unitPrice": 2149,
+   "compareAt": 2649,
+   "summary": []
+  },
+  {
+   "slug": "elegant-baby-shower-cake",
+   "shapeModule": false,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 3149,
+   "compareAt": 3649,
+   "summary": []
+  },
+  {
+   "slug": "elegant-baby-shower-cake",
+   "shapeModule": false,
+   "weight": "3.5 Kg",
+   "selections": {},
+   "unitPrice": 4149,
+   "compareAt": 4649,
+   "summary": []
+  },
+  {
+   "slug": "elegant-baby-shower-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 2149,
+   "compareAt": 2649
+  },
+  {
+   "slug": "sweet-baby-shower-celebration-cake",
+   "shapeModule": true,
+   "weight": "1.5 kg",
+   "selections": {},
+   "unitPrice": 1999,
+   "compareAt": 2399,
+   "summary": []
+  },
+  {
+   "slug": "sweet-baby-shower-celebration-cake",
+   "shapeModule": true,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 2999,
+   "compareAt": 3399,
+   "summary": []
+  },
+  {
+   "slug": "sweet-baby-shower-celebration-cake",
+   "shapeModule": true,
+   "weight": "3.5 Kg",
+   "selections": {},
+   "unitPrice": 3999,
+   "compareAt": 4399,
+   "summary": []
+  },
+  {
+   "slug": "sweet-baby-shower-celebration-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 1999,
+   "compareAt": 2399
+  },
+  {
+   "slug": "sweet-baby-shower-celebration-cake",
+   "shapeModule": false,
+   "weight": "1.5 kg",
+   "selections": {},
+   "unitPrice": 1999,
+   "compareAt": 2399,
+   "summary": []
+  },
+  {
+   "slug": "sweet-baby-shower-celebration-cake",
+   "shapeModule": false,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 2999,
+   "compareAt": 3399,
+   "summary": []
+  },
+  {
+   "slug": "sweet-baby-shower-celebration-cake",
+   "shapeModule": false,
+   "weight": "3.5 Kg",
+   "selections": {},
+   "unitPrice": 3999,
+   "compareAt": 4399,
+   "summary": []
+  },
+  {
+   "slug": "sweet-baby-shower-celebration-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 1999,
+   "compareAt": 2399
+  },
+  {
+   "slug": "dreamy-welcome-baby-moon-cake",
+   "shapeModule": true,
+   "weight": "2 Kg",
+   "selections": {},
+   "unitPrice": 2299,
+   "compareAt": 2799,
+   "summary": []
+  },
+  {
+   "slug": "dreamy-welcome-baby-moon-cake",
+   "shapeModule": true,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 3299,
+   "compareAt": 3799,
+   "summary": []
+  },
+  {
+   "slug": "dreamy-welcome-baby-moon-cake",
+   "shapeModule": true,
+   "weight": "4 kg",
+   "selections": {},
+   "unitPrice": 4099,
+   "compareAt": 4599,
+   "summary": []
+  },
+  {
+   "slug": "dreamy-welcome-baby-moon-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 2299,
+   "compareAt": 2799
+  },
+  {
+   "slug": "dreamy-welcome-baby-moon-cake",
+   "shapeModule": false,
+   "weight": "2 Kg",
+   "selections": {},
+   "unitPrice": 2299,
+   "compareAt": 2799,
+   "summary": []
+  },
+  {
+   "slug": "dreamy-welcome-baby-moon-cake",
+   "shapeModule": false,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 3299,
+   "compareAt": 3799,
+   "summary": []
+  },
+  {
+   "slug": "dreamy-welcome-baby-moon-cake",
+   "shapeModule": false,
+   "weight": "4 kg",
+   "selections": {},
+   "unitPrice": 4099,
+   "compareAt": 4599,
+   "summary": []
+  },
+  {
+   "slug": "dreamy-welcome-baby-moon-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 2299,
+   "compareAt": 2799
+  },
+  {
+   "slug": "pastel-bundles-of-joy-cake",
+   "shapeModule": true,
+   "weight": "1.5 Kg",
+   "selections": {},
+   "unitPrice": 2099,
+   "compareAt": 2599,
+   "summary": []
+  },
+  {
+   "slug": "pastel-bundles-of-joy-cake",
+   "shapeModule": true,
+   "weight": "2 Kg",
+   "selections": {},
+   "unitPrice": 2699,
+   "compareAt": 3199,
+   "summary": []
+  },
+  {
+   "slug": "pastel-bundles-of-joy-cake",
+   "shapeModule": true,
+   "weight": "2.5 Kg",
+   "selections": {},
+   "unitPrice": 3099,
+   "compareAt": 3599,
+   "summary": []
+  },
+  {
+   "slug": "pastel-bundles-of-joy-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 2099,
+   "compareAt": 2599
+  },
+  {
+   "slug": "pastel-bundles-of-joy-cake",
+   "shapeModule": false,
+   "weight": "1.5 Kg",
+   "selections": {},
+   "unitPrice": 2099,
+   "compareAt": 2599,
+   "summary": []
+  },
+  {
+   "slug": "pastel-bundles-of-joy-cake",
+   "shapeModule": false,
+   "weight": "2 Kg",
+   "selections": {},
+   "unitPrice": 2699,
+   "compareAt": 3199,
+   "summary": []
+  },
+  {
+   "slug": "pastel-bundles-of-joy-cake",
+   "shapeModule": false,
+   "weight": "2.5 Kg",
+   "selections": {},
+   "unitPrice": 3099,
+   "compareAt": 3599,
+   "summary": []
+  },
+  {
+   "slug": "pastel-bundles-of-joy-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 2099,
+   "compareAt": 2599
+  },
+  {
+   "slug": "lavender-hot-air-balloon-baby-shower-cake",
+   "shapeModule": true,
+   "weight": "1.5 Kg",
+   "selections": {},
+   "unitPrice": 2199,
+   "compareAt": 2699,
+   "summary": []
+  },
+  {
+   "slug": "lavender-hot-air-balloon-baby-shower-cake",
+   "shapeModule": true,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 2799,
+   "compareAt": 3299,
+   "summary": []
+  },
+  {
+   "slug": "lavender-hot-air-balloon-baby-shower-cake",
+   "shapeModule": true,
+   "weight": "2.5 Kg",
+   "selections": {},
+   "unitPrice": 3199,
+   "compareAt": 3699,
+   "summary": []
+  },
+  {
+   "slug": "lavender-hot-air-balloon-baby-shower-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 2199,
+   "compareAt": 2699
+  },
+  {
+   "slug": "lavender-hot-air-balloon-baby-shower-cake",
+   "shapeModule": false,
+   "weight": "1.5 Kg",
+   "selections": {},
+   "unitPrice": 2199,
+   "compareAt": 2699,
+   "summary": []
+  },
+  {
+   "slug": "lavender-hot-air-balloon-baby-shower-cake",
+   "shapeModule": false,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 2799,
+   "compareAt": 3299,
+   "summary": []
+  },
+  {
+   "slug": "lavender-hot-air-balloon-baby-shower-cake",
+   "shapeModule": false,
+   "weight": "2.5 Kg",
+   "selections": {},
+   "unitPrice": 3199,
+   "compareAt": 3699,
+   "summary": []
+  },
+  {
+   "slug": "lavender-hot-air-balloon-baby-shower-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 2199,
+   "compareAt": 2699
+  },
+  {
+   "slug": "luxurious-chocolate-engagement-cake",
+   "shapeModule": true,
+   "weight": "2 Kg",
+   "selections": {},
+   "unitPrice": 2699,
+   "compareAt": 3199,
+   "summary": []
+  },
+  {
+   "slug": "luxurious-chocolate-engagement-cake",
+   "shapeModule": true,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 3699,
+   "compareAt": 4199,
+   "summary": []
+  },
+  {
+   "slug": "luxurious-chocolate-engagement-cake",
+   "shapeModule": true,
+   "weight": "3 Kg",
+   "selections": {},
+   "unitPrice": 4699,
+   "compareAt": 5199,
+   "summary": []
+  },
+  {
+   "slug": "luxurious-chocolate-engagement-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 2699,
+   "compareAt": 3199
+  },
+  {
+   "slug": "luxurious-chocolate-engagement-cake",
+   "shapeModule": false,
+   "weight": "2 Kg",
+   "selections": {},
+   "unitPrice": 2699,
+   "compareAt": 3199,
+   "summary": []
+  },
+  {
+   "slug": "luxurious-chocolate-engagement-cake",
+   "shapeModule": false,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 3699,
+   "compareAt": 4199,
+   "summary": []
+  },
+  {
+   "slug": "luxurious-chocolate-engagement-cake",
+   "shapeModule": false,
+   "weight": "3 Kg",
+   "selections": {},
+   "unitPrice": 4699,
+   "compareAt": 5199,
+   "summary": []
+  },
+  {
+   "slug": "luxurious-chocolate-engagement-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 2699,
+   "compareAt": 3199
+  },
+  {
+   "slug": "elegant-engaged-cake-with-roses-and-pearls",
+   "shapeModule": true,
+   "weight": "2 Kg",
+   "selections": {},
+   "unitPrice": 2599,
+   "compareAt": 3099,
+   "summary": []
+  },
+  {
+   "slug": "elegant-engaged-cake-with-roses-and-pearls",
+   "shapeModule": true,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 3599,
+   "compareAt": 4099,
+   "summary": []
+  },
+  {
+   "slug": "elegant-engaged-cake-with-roses-and-pearls",
+   "shapeModule": true,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 4599,
+   "compareAt": 5099,
+   "summary": []
+  },
+  {
+   "slug": "elegant-engaged-cake-with-roses-and-pearls",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 2599,
+   "compareAt": 3099
+  },
+  {
+   "slug": "elegant-engaged-cake-with-roses-and-pearls",
+   "shapeModule": false,
+   "weight": "2 Kg",
+   "selections": {},
+   "unitPrice": 2599,
+   "compareAt": 3099,
+   "summary": []
+  },
+  {
+   "slug": "elegant-engaged-cake-with-roses-and-pearls",
+   "shapeModule": false,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 3599,
+   "compareAt": 4099,
+   "summary": []
+  },
+  {
+   "slug": "elegant-engaged-cake-with-roses-and-pearls",
+   "shapeModule": false,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 4599,
+   "compareAt": 5099,
+   "summary": []
+  },
+  {
+   "slug": "elegant-engaged-cake-with-roses-and-pearls",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 2599,
+   "compareAt": 3099
+  },
+  {
+   "slug": "romantic-pink-floral-engagement-cake",
+   "shapeModule": true,
+   "weight": "1.5 kg",
+   "selections": {},
+   "unitPrice": 2149,
+   "compareAt": 2649,
+   "summary": []
+  },
+  {
+   "slug": "romantic-pink-floral-engagement-cake",
+   "shapeModule": true,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 3149,
+   "compareAt": 3649,
+   "summary": []
+  },
+  {
+   "slug": "romantic-pink-floral-engagement-cake",
+   "shapeModule": true,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 4147,
+   "compareAt": 4647,
+   "summary": []
+  },
+  {
+   "slug": "romantic-pink-floral-engagement-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 2149,
+   "compareAt": 2649
+  },
+  {
+   "slug": "romantic-pink-floral-engagement-cake",
+   "shapeModule": false,
+   "weight": "1.5 kg",
+   "selections": {},
+   "unitPrice": 2149,
+   "compareAt": 2649,
+   "summary": []
+  },
+  {
+   "slug": "romantic-pink-floral-engagement-cake",
+   "shapeModule": false,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 3149,
+   "compareAt": 3649,
+   "summary": []
+  },
+  {
+   "slug": "romantic-pink-floral-engagement-cake",
+   "shapeModule": false,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 4147,
+   "compareAt": 4647,
+   "summary": []
+  },
+  {
+   "slug": "romantic-pink-floral-engagement-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 2149,
+   "compareAt": 2649
+  },
+  {
+   "slug": "lavender-marble-engagement-cake",
+   "shapeModule": true,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 2299,
+   "compareAt": 2799,
+   "summary": []
+  },
+  {
+   "slug": "lavender-marble-engagement-cake",
+   "shapeModule": true,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 3299,
+   "compareAt": 3799,
+   "summary": []
+  },
+  {
+   "slug": "lavender-marble-engagement-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 2299,
+   "compareAt": 2799
+  },
+  {
+   "slug": "lavender-marble-engagement-cake",
+   "shapeModule": false,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 2299,
+   "compareAt": 2799,
+   "summary": []
+  },
+  {
+   "slug": "lavender-marble-engagement-cake",
+   "shapeModule": false,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 3299,
+   "compareAt": 3799,
+   "summary": []
+  },
+  {
+   "slug": "lavender-marble-engagement-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 2299,
+   "compareAt": 2799
+  },
+  {
+   "slug": "ivory-engagement-cake-with-gold-monogram",
+   "shapeModule": true,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 2399,
+   "compareAt": 2899,
+   "summary": []
+  },
+  {
+   "slug": "ivory-engagement-cake-with-gold-monogram",
+   "shapeModule": true,
+   "weight": "3 Kg",
+   "selections": {},
+   "unitPrice": 3399,
+   "compareAt": 3899,
+   "summary": []
+  },
+  {
+   "slug": "ivory-engagement-cake-with-gold-monogram",
+   "shapeModule": true,
+   "weight": "3.5 Kg",
+   "selections": {},
+   "unitPrice": 3999,
+   "compareAt": 4499,
+   "summary": []
+  },
+  {
+   "slug": "ivory-engagement-cake-with-gold-monogram",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 2399,
+   "compareAt": 2899
+  },
+  {
+   "slug": "ivory-engagement-cake-with-gold-monogram",
+   "shapeModule": false,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 2399,
+   "compareAt": 2899,
+   "summary": []
+  },
+  {
+   "slug": "ivory-engagement-cake-with-gold-monogram",
+   "shapeModule": false,
+   "weight": "3 Kg",
+   "selections": {},
+   "unitPrice": 3399,
+   "compareAt": 3899,
+   "summary": []
+  },
+  {
+   "slug": "ivory-engagement-cake-with-gold-monogram",
+   "shapeModule": false,
+   "weight": "3.5 Kg",
+   "selections": {},
+   "unitPrice": 3999,
+   "compareAt": 4499,
+   "summary": []
+  },
+  {
+   "slug": "ivory-engagement-cake-with-gold-monogram",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 2399,
+   "compareAt": 2899
+  },
+  {
+   "slug": "navy-and-gold-engagement-cake",
+   "shapeModule": true,
+   "weight": "2 Kg",
+   "selections": {},
+   "unitPrice": 2499,
+   "compareAt": 2999,
+   "summary": []
+  },
+  {
+   "slug": "navy-and-gold-engagement-cake",
+   "shapeModule": true,
+   "weight": "3 Kg",
+   "selections": {},
+   "unitPrice": 3699,
+   "compareAt": 4199,
+   "summary": []
+  },
+  {
+   "slug": "navy-and-gold-engagement-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 2499,
+   "compareAt": 2999
+  },
+  {
+   "slug": "navy-and-gold-engagement-cake",
+   "shapeModule": false,
+   "weight": "2 Kg",
+   "selections": {},
+   "unitPrice": 2499,
+   "compareAt": 2999,
+   "summary": []
+  },
+  {
+   "slug": "navy-and-gold-engagement-cake",
+   "shapeModule": false,
+   "weight": "3 Kg",
+   "selections": {},
+   "unitPrice": 3699,
+   "compareAt": 4199,
+   "summary": []
+  },
+  {
+   "slug": "navy-and-gold-engagement-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 2499,
+   "compareAt": 2999
+  },
+  {
+   "slug": "elegant-orchid-engagement-cake",
+   "shapeModule": true,
+   "weight": "2 Kg",
+   "selections": {},
+   "unitPrice": 2299,
+   "compareAt": 2799,
+   "summary": []
+  },
+  {
+   "slug": "elegant-orchid-engagement-cake",
+   "shapeModule": true,
+   "weight": "3 Kg",
+   "selections": {},
+   "unitPrice": 3299,
+   "compareAt": 3799,
+   "summary": []
+  },
+  {
+   "slug": "elegant-orchid-engagement-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 2299,
+   "compareAt": 2799
+  },
+  {
+   "slug": "elegant-orchid-engagement-cake",
+   "shapeModule": false,
+   "weight": "2 Kg",
+   "selections": {},
+   "unitPrice": 2299,
+   "compareAt": 2799,
+   "summary": []
+  },
+  {
+   "slug": "elegant-orchid-engagement-cake",
+   "shapeModule": false,
+   "weight": "3 Kg",
+   "selections": {},
+   "unitPrice": 3299,
+   "compareAt": 3799,
+   "summary": []
+  },
+  {
+   "slug": "elegant-orchid-engagement-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 2299,
+   "compareAt": 2799
+  },
+  {
+   "slug": "forever-starts-here-engagement-cake",
+   "shapeModule": true,
+   "weight": "2 Kg",
+   "selections": {},
+   "unitPrice": 2199,
+   "compareAt": 2699,
+   "summary": []
+  },
+  {
+   "slug": "forever-starts-here-engagement-cake",
+   "shapeModule": true,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 3199,
+   "compareAt": 3699,
+   "summary": []
+  },
+  {
+   "slug": "forever-starts-here-engagement-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 2199,
+   "compareAt": 2699
+  },
+  {
+   "slug": "forever-starts-here-engagement-cake",
+   "shapeModule": false,
+   "weight": "2 Kg",
+   "selections": {},
+   "unitPrice": 2199,
+   "compareAt": 2699,
+   "summary": []
+  },
+  {
+   "slug": "forever-starts-here-engagement-cake",
+   "shapeModule": false,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 3199,
+   "compareAt": 3699,
+   "summary": []
+  },
+  {
+   "slug": "forever-starts-here-engagement-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 2199,
+   "compareAt": 2699
+  },
+  {
+   "slug": "she-said-yes-celebration-cake",
+   "shapeModule": true,
+   "weight": "1.5 Kg",
+   "selections": {},
+   "unitPrice": 2099,
+   "compareAt": 2499,
+   "summary": []
+  },
+  {
+   "slug": "she-said-yes-celebration-cake",
+   "shapeModule": true,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 2599,
+   "compareAt": 2999,
+   "summary": []
+  },
+  {
+   "slug": "she-said-yes-celebration-cake",
+   "shapeModule": true,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 3099,
+   "compareAt": 3499,
+   "summary": []
+  },
+  {
+   "slug": "she-said-yes-celebration-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 2099,
+   "compareAt": 2499
+  },
+  {
+   "slug": "she-said-yes-celebration-cake",
+   "shapeModule": false,
+   "weight": "1.5 Kg",
+   "selections": {},
+   "unitPrice": 2099,
+   "compareAt": 2499,
+   "summary": []
+  },
+  {
+   "slug": "she-said-yes-celebration-cake",
+   "shapeModule": false,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 2599,
+   "compareAt": 2999,
+   "summary": []
+  },
+  {
+   "slug": "she-said-yes-celebration-cake",
+   "shapeModule": false,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 3099,
+   "compareAt": 3499,
+   "summary": []
+  },
+  {
+   "slug": "she-said-yes-celebration-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 2099,
+   "compareAt": 2499
+  },
+  {
+   "slug": "romantic-strawberry-engagement-cake",
+   "shapeModule": true,
+   "weight": "1.5 Kg",
+   "selections": {},
+   "unitPrice": 1899,
+   "compareAt": 2299,
+   "summary": []
+  },
+  {
+   "slug": "romantic-strawberry-engagement-cake",
+   "shapeModule": true,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 2599,
+   "compareAt": 2999,
+   "summary": []
+  },
+  {
+   "slug": "romantic-strawberry-engagement-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 1899,
+   "compareAt": 2299
+  },
+  {
+   "slug": "romantic-strawberry-engagement-cake",
+   "shapeModule": false,
+   "weight": "1.5 Kg",
+   "selections": {},
+   "unitPrice": 1899,
+   "compareAt": 2299,
+   "summary": []
+  },
+  {
+   "slug": "romantic-strawberry-engagement-cake",
+   "shapeModule": false,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 2599,
+   "compareAt": 2999,
+   "summary": []
+  },
+  {
+   "slug": "romantic-strawberry-engagement-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 1899,
+   "compareAt": 2299
+  },
+  {
+   "slug": "regal-burgundy-and-gold-wedding-cake",
+   "shapeModule": true,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 3399,
+   "compareAt": 3999,
+   "summary": []
+  },
+  {
+   "slug": "regal-burgundy-and-gold-wedding-cake",
+   "shapeModule": true,
+   "weight": "5 kg",
+   "selections": {},
+   "unitPrice": 5399,
+   "compareAt": 5999,
+   "summary": []
+  },
+  {
+   "slug": "regal-burgundy-and-gold-wedding-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 3399,
+   "compareAt": 3999
+  },
+  {
+   "slug": "regal-burgundy-and-gold-wedding-cake",
+   "shapeModule": false,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 3399,
+   "compareAt": 3999,
+   "summary": []
+  },
+  {
+   "slug": "regal-burgundy-and-gold-wedding-cake",
+   "shapeModule": false,
+   "weight": "5 kg",
+   "selections": {},
+   "unitPrice": 5399,
+   "compareAt": 5999,
+   "summary": []
+  },
+  {
+   "slug": "regal-burgundy-and-gold-wedding-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 3399,
+   "compareAt": 3999
+  },
+  {
+   "slug": "opulent-ivory-blush-wedding-cake",
+   "shapeModule": true,
+   "weight": "2.5 Kg",
+   "selections": {},
+   "unitPrice": 3099,
+   "compareAt": 3699,
+   "summary": []
+  },
+  {
+   "slug": "opulent-ivory-blush-wedding-cake",
+   "shapeModule": true,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 4099,
+   "compareAt": 4699,
+   "summary": []
+  },
+  {
+   "slug": "opulent-ivory-blush-wedding-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 3099,
+   "compareAt": 3699
+  },
+  {
+   "slug": "opulent-ivory-blush-wedding-cake",
+   "shapeModule": false,
+   "weight": "2.5 Kg",
+   "selections": {},
+   "unitPrice": 3099,
+   "compareAt": 3699,
+   "summary": []
+  },
+  {
+   "slug": "opulent-ivory-blush-wedding-cake",
+   "shapeModule": false,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 4099,
+   "compareAt": 4699,
+   "summary": []
+  },
+  {
+   "slug": "opulent-ivory-blush-wedding-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 3099,
+   "compareAt": 3699
+  },
+  {
+   "slug": "elegant-cascading-orchid-wedding-cake",
+   "shapeModule": true,
+   "weight": "2.5 Kg",
+   "selections": {},
+   "unitPrice": 3199,
+   "compareAt": 3799,
+   "summary": []
+  },
+  {
+   "slug": "elegant-cascading-orchid-wedding-cake",
+   "shapeModule": true,
+   "weight": "3.5 Kg",
+   "selections": {},
+   "unitPrice": 4199,
+   "compareAt": 4799,
+   "summary": []
+  },
+  {
+   "slug": "elegant-cascading-orchid-wedding-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 3199,
+   "compareAt": 3799
+  },
+  {
+   "slug": "elegant-cascading-orchid-wedding-cake",
+   "shapeModule": false,
+   "weight": "2.5 Kg",
+   "selections": {},
+   "unitPrice": 3199,
+   "compareAt": 3799,
+   "summary": []
+  },
+  {
+   "slug": "elegant-cascading-orchid-wedding-cake",
+   "shapeModule": false,
+   "weight": "3.5 Kg",
+   "selections": {},
+   "unitPrice": 4199,
+   "compareAt": 4799,
+   "summary": []
+  },
+  {
+   "slug": "elegant-cascading-orchid-wedding-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 3199,
+   "compareAt": 3799
+  },
+  {
+   "slug": "lavender-ivory-floral-wedding-cake",
+   "shapeModule": true,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 2849,
+   "compareAt": 3349,
+   "summary": []
+  },
+  {
+   "slug": "lavender-ivory-floral-wedding-cake",
+   "shapeModule": true,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 3249,
+   "compareAt": 3749,
+   "summary": []
+  },
+  {
+   "slug": "lavender-ivory-floral-wedding-cake",
+   "shapeModule": true,
+   "weight": "3 Kg",
+   "selections": {},
+   "unitPrice": 3549,
+   "compareAt": 4049,
+   "summary": []
+  },
+  {
+   "slug": "lavender-ivory-floral-wedding-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 2849,
+   "compareAt": 3349
+  },
+  {
+   "slug": "lavender-ivory-floral-wedding-cake",
+   "shapeModule": false,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 2849,
+   "compareAt": 3349,
+   "summary": []
+  },
+  {
+   "slug": "lavender-ivory-floral-wedding-cake",
+   "shapeModule": false,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 3249,
+   "compareAt": 3749,
+   "summary": []
+  },
+  {
+   "slug": "lavender-ivory-floral-wedding-cake",
+   "shapeModule": false,
+   "weight": "3 Kg",
+   "selections": {},
+   "unitPrice": 3549,
+   "compareAt": 4049,
+   "summary": []
+  },
+  {
+   "slug": "lavender-ivory-floral-wedding-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 2849,
+   "compareAt": 3349
+  },
+  {
+   "slug": "elegant-ivory-arch-pattern-wedding-cake",
+   "shapeModule": true,
+   "weight": "2 Kg",
+   "selections": {},
+   "unitPrice": 2599,
+   "compareAt": 3099,
+   "summary": []
+  },
+  {
+   "slug": "elegant-ivory-arch-pattern-wedding-cake",
+   "shapeModule": true,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 3099,
+   "compareAt": 3599,
+   "summary": []
+  },
+  {
+   "slug": "elegant-ivory-arch-pattern-wedding-cake",
+   "shapeModule": true,
+   "weight": "3 Kg",
+   "selections": {},
+   "unitPrice": 3399,
+   "compareAt": 3899,
+   "summary": []
+  },
+  {
+   "slug": "elegant-ivory-arch-pattern-wedding-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 2599,
+   "compareAt": 3099
+  },
+  {
+   "slug": "elegant-ivory-arch-pattern-wedding-cake",
+   "shapeModule": false,
+   "weight": "2 Kg",
+   "selections": {},
+   "unitPrice": 2599,
+   "compareAt": 3099,
+   "summary": []
+  },
+  {
+   "slug": "elegant-ivory-arch-pattern-wedding-cake",
+   "shapeModule": false,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 3099,
+   "compareAt": 3599,
+   "summary": []
+  },
+  {
+   "slug": "elegant-ivory-arch-pattern-wedding-cake",
+   "shapeModule": false,
+   "weight": "3 Kg",
+   "selections": {},
+   "unitPrice": 3399,
+   "compareAt": 3899,
+   "summary": []
+  },
+  {
+   "slug": "elegant-ivory-arch-pattern-wedding-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 2599,
+   "compareAt": 3099
+  },
+  {
+   "slug": "rustic-berry-crowned-wedding-cake",
+   "shapeModule": true,
+   "weight": "2 Kg",
+   "selections": {},
+   "unitPrice": 2899,
+   "compareAt": 3399,
+   "summary": []
+  },
+  {
+   "slug": "rustic-berry-crowned-wedding-cake",
+   "shapeModule": true,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 3299,
+   "compareAt": 3799,
+   "summary": []
+  },
+  {
+   "slug": "rustic-berry-crowned-wedding-cake",
+   "shapeModule": true,
+   "weight": "3 Kg",
+   "selections": {},
+   "unitPrice": 3599,
+   "compareAt": 4099,
+   "summary": []
+  },
+  {
+   "slug": "rustic-berry-crowned-wedding-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 2899,
+   "compareAt": 3399
+  },
+  {
+   "slug": "rustic-berry-crowned-wedding-cake",
+   "shapeModule": false,
+   "weight": "2 Kg",
+   "selections": {},
+   "unitPrice": 2899,
+   "compareAt": 3399,
+   "summary": []
+  },
+  {
+   "slug": "rustic-berry-crowned-wedding-cake",
+   "shapeModule": false,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 3299,
+   "compareAt": 3799,
+   "summary": []
+  },
+  {
+   "slug": "rustic-berry-crowned-wedding-cake",
+   "shapeModule": false,
+   "weight": "3 Kg",
+   "selections": {},
+   "unitPrice": 3599,
+   "compareAt": 4099,
+   "summary": []
+  },
+  {
+   "slug": "rustic-berry-crowned-wedding-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 2899,
+   "compareAt": 3399
+  },
+  {
+   "slug": "romantic-ivory-pearl-wedding-cake",
+   "shapeModule": true,
+   "weight": "2 Kg",
+   "selections": {},
+   "unitPrice": 2799,
+   "compareAt": 3299,
+   "summary": []
+  },
+  {
+   "slug": "romantic-ivory-pearl-wedding-cake",
+   "shapeModule": true,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 3299,
+   "compareAt": 3799,
+   "summary": []
+  },
+  {
+   "slug": "romantic-ivory-pearl-wedding-cake",
+   "shapeModule": true,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 3899,
+   "compareAt": 4399,
+   "summary": []
+  },
+  {
+   "slug": "romantic-ivory-pearl-wedding-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 2799,
+   "compareAt": 3299
+  },
+  {
+   "slug": "romantic-ivory-pearl-wedding-cake",
+   "shapeModule": false,
+   "weight": "2 Kg",
+   "selections": {},
+   "unitPrice": 2799,
+   "compareAt": 3299,
+   "summary": []
+  },
+  {
+   "slug": "romantic-ivory-pearl-wedding-cake",
+   "shapeModule": false,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 3299,
+   "compareAt": 3799,
+   "summary": []
+  },
+  {
+   "slug": "romantic-ivory-pearl-wedding-cake",
+   "shapeModule": false,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 3899,
+   "compareAt": 4399,
+   "summary": []
+  },
+  {
+   "slug": "romantic-ivory-pearl-wedding-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 2799,
+   "compareAt": 3299
+  },
+  {
+   "slug": "romantic-blush-wedding-cake",
+   "shapeModule": true,
+   "weight": "1.5 Kg",
+   "selections": {},
+   "unitPrice": 2399,
+   "compareAt": 2899,
+   "summary": []
+  },
+  {
+   "slug": "romantic-blush-wedding-cake",
+   "shapeModule": true,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 2999,
+   "compareAt": 3499,
+   "summary": []
+  },
+  {
+   "slug": "romantic-blush-wedding-cake",
+   "shapeModule": true,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 3599,
+   "compareAt": 4099,
+   "summary": []
+  },
+  {
+   "slug": "romantic-blush-wedding-cake",
+   "shapeModule": true,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 4099,
+   "compareAt": 4599,
+   "summary": []
+  },
+  {
+   "slug": "romantic-blush-wedding-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 2399,
+   "compareAt": 2899
+  },
+  {
+   "slug": "romantic-blush-wedding-cake",
+   "shapeModule": false,
+   "weight": "1.5 Kg",
+   "selections": {},
+   "unitPrice": 2399,
+   "compareAt": 2899,
+   "summary": []
+  },
+  {
+   "slug": "romantic-blush-wedding-cake",
+   "shapeModule": false,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 2999,
+   "compareAt": 3499,
+   "summary": []
+  },
+  {
+   "slug": "romantic-blush-wedding-cake",
+   "shapeModule": false,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 3599,
+   "compareAt": 4099,
+   "summary": []
+  },
+  {
+   "slug": "romantic-blush-wedding-cake",
+   "shapeModule": false,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 4099,
+   "compareAt": 4599,
+   "summary": []
+  },
+  {
+   "slug": "romantic-blush-wedding-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 2399,
+   "compareAt": 2899
+  },
+  {
+   "slug": "golden-floral-wedding-cake",
+   "shapeModule": true,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 2699,
+   "compareAt": 3199,
+   "summary": []
+  },
+  {
+   "slug": "golden-floral-wedding-cake",
+   "shapeModule": true,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 3099,
+   "compareAt": 3599,
+   "summary": []
+  },
+  {
+   "slug": "golden-floral-wedding-cake",
+   "shapeModule": true,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 3499,
+   "compareAt": 3999,
+   "summary": []
+  },
+  {
+   "slug": "golden-floral-wedding-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 2699,
+   "compareAt": 3199
+  },
+  {
+   "slug": "golden-floral-wedding-cake",
+   "shapeModule": false,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 2699,
+   "compareAt": 3199,
+   "summary": []
+  },
+  {
+   "slug": "golden-floral-wedding-cake",
+   "shapeModule": false,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 3099,
+   "compareAt": 3599,
+   "summary": []
+  },
+  {
+   "slug": "golden-floral-wedding-cake",
+   "shapeModule": false,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 3499,
+   "compareAt": 3999,
+   "summary": []
+  },
+  {
+   "slug": "golden-floral-wedding-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 2699,
+   "compareAt": 3199
+  },
+  {
+   "slug": "elegant-pearl-trimmed-ivory-wedding-cake",
+   "shapeModule": true,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 2499,
+   "compareAt": 2999,
+   "summary": []
+  },
+  {
+   "slug": "elegant-pearl-trimmed-ivory-wedding-cake",
+   "shapeModule": true,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 2899,
+   "compareAt": 3399,
+   "summary": []
+  },
+  {
+   "slug": "elegant-pearl-trimmed-ivory-wedding-cake",
+   "shapeModule": true,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 3299,
+   "compareAt": 3799,
+   "summary": []
+  },
+  {
+   "slug": "elegant-pearl-trimmed-ivory-wedding-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 2499,
+   "compareAt": 2999
+  },
+  {
+   "slug": "elegant-pearl-trimmed-ivory-wedding-cake",
+   "shapeModule": false,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 2499,
+   "compareAt": 2999,
+   "summary": []
+  },
+  {
+   "slug": "elegant-pearl-trimmed-ivory-wedding-cake",
+   "shapeModule": false,
+   "weight": "2.5 kg",
+   "selections": {},
+   "unitPrice": 2899,
+   "compareAt": 3399,
+   "summary": []
+  },
+  {
+   "slug": "elegant-pearl-trimmed-ivory-wedding-cake",
+   "shapeModule": false,
+   "weight": "3 kg",
+   "selections": {},
+   "unitPrice": 3299,
+   "compareAt": 3799,
+   "summary": []
+  },
+  {
+   "slug": "elegant-pearl-trimmed-ivory-wedding-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 2499,
+   "compareAt": 2999
+  },
+  {
+   "slug": "lavender-floral-glamour-photo-cake",
+   "shapeModule": true,
+   "weight": "500 gm",
+   "selections": {},
+   "unitPrice": 899,
+   "compareAt": 1099,
+   "summary": []
+  },
+  {
+   "slug": "lavender-floral-glamour-photo-cake",
+   "shapeModule": true,
+   "weight": "1 kg",
+   "selections": {},
+   "unitPrice": 1099,
+   "compareAt": 1299,
+   "summary": []
+  },
+  {
+   "slug": "lavender-floral-glamour-photo-cake",
+   "shapeModule": true,
+   "weight": "1.5 kg",
+   "selections": {},
+   "unitPrice": 1299,
+   "compareAt": 1499,
+   "summary": []
+  },
+  {
+   "slug": "lavender-floral-glamour-photo-cake",
+   "shapeModule": true,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1499,
+   "compareAt": 1699,
+   "summary": []
+  },
+  {
+   "slug": "lavender-floral-glamour-photo-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 899,
+   "compareAt": 1099
+  },
+  {
+   "slug": "lavender-floral-glamour-photo-cake",
+   "shapeModule": false,
+   "weight": "500 gm",
+   "selections": {},
+   "unitPrice": 899,
+   "compareAt": 1099,
+   "summary": []
+  },
+  {
+   "slug": "lavender-floral-glamour-photo-cake",
+   "shapeModule": false,
+   "weight": "1 kg",
+   "selections": {},
+   "unitPrice": 1099,
+   "compareAt": 1299,
+   "summary": []
+  },
+  {
+   "slug": "lavender-floral-glamour-photo-cake",
+   "shapeModule": false,
+   "weight": "1.5 kg",
+   "selections": {},
+   "unitPrice": 1299,
+   "compareAt": 1499,
+   "summary": []
+  },
+  {
+   "slug": "lavender-floral-glamour-photo-cake",
+   "shapeModule": false,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1499,
+   "compareAt": 1699,
+   "summary": []
+  },
+  {
+   "slug": "lavender-floral-glamour-photo-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 899,
+   "compareAt": 1099
+  },
+  {
+   "slug": "fresh-fruit-friendship-photo-cake",
+   "shapeModule": true,
+   "weight": "500 gm",
+   "selections": {},
+   "unitPrice": 799,
+   "compareAt": 999,
+   "summary": []
+  },
+  {
+   "slug": "fresh-fruit-friendship-photo-cake",
+   "shapeModule": true,
+   "weight": "1 kg",
+   "selections": {},
+   "unitPrice": 999,
+   "compareAt": 1199,
+   "summary": []
+  },
+  {
+   "slug": "fresh-fruit-friendship-photo-cake",
+   "shapeModule": true,
+   "weight": "1.5 kg",
+   "selections": {},
+   "unitPrice": 1199,
+   "compareAt": 1399,
+   "summary": []
+  },
+  {
+   "slug": "fresh-fruit-friendship-photo-cake",
+   "shapeModule": true,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1399,
+   "compareAt": 1599,
+   "summary": []
+  },
+  {
+   "slug": "fresh-fruit-friendship-photo-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 799,
+   "compareAt": 999
+  },
+  {
+   "slug": "fresh-fruit-friendship-photo-cake",
+   "shapeModule": false,
+   "weight": "500 gm",
+   "selections": {},
+   "unitPrice": 799,
+   "compareAt": 999,
+   "summary": []
+  },
+  {
+   "slug": "fresh-fruit-friendship-photo-cake",
+   "shapeModule": false,
+   "weight": "1 kg",
+   "selections": {},
+   "unitPrice": 999,
+   "compareAt": 1199,
+   "summary": []
+  },
+  {
+   "slug": "fresh-fruit-friendship-photo-cake",
+   "shapeModule": false,
+   "weight": "1.5 kg",
+   "selections": {},
+   "unitPrice": 1199,
+   "compareAt": 1399,
+   "summary": []
+  },
+  {
+   "slug": "fresh-fruit-friendship-photo-cake",
+   "shapeModule": false,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1399,
+   "compareAt": 1599,
+   "summary": []
+  },
+  {
+   "slug": "fresh-fruit-friendship-photo-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 799,
+   "compareAt": 999
+  },
+  {
+   "slug": "red-rose-anniversary-couple-photo-cake",
+   "shapeModule": true,
+   "weight": "500 gm",
+   "selections": {},
+   "unitPrice": 1049,
+   "compareAt": 1249,
+   "summary": []
+  },
+  {
+   "slug": "red-rose-anniversary-couple-photo-cake",
+   "shapeModule": true,
+   "weight": "1 kg",
+   "selections": {},
+   "unitPrice": 1249,
+   "compareAt": 1449,
+   "summary": []
+  },
+  {
+   "slug": "red-rose-anniversary-couple-photo-cake",
+   "shapeModule": true,
+   "weight": "1.5 kg",
+   "selections": {},
+   "unitPrice": 1449,
+   "compareAt": 1649,
+   "summary": []
+  },
+  {
+   "slug": "red-rose-anniversary-couple-photo-cake",
+   "shapeModule": true,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1645,
+   "compareAt": 1845,
+   "summary": []
+  },
+  {
+   "slug": "red-rose-anniversary-couple-photo-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 1049,
+   "compareAt": 1249
+  },
+  {
+   "slug": "red-rose-anniversary-couple-photo-cake",
+   "shapeModule": false,
+   "weight": "500 gm",
+   "selections": {},
+   "unitPrice": 1049,
+   "compareAt": 1249,
+   "summary": []
+  },
+  {
+   "slug": "red-rose-anniversary-couple-photo-cake",
+   "shapeModule": false,
+   "weight": "1 kg",
+   "selections": {},
+   "unitPrice": 1249,
+   "compareAt": 1449,
+   "summary": []
+  },
+  {
+   "slug": "red-rose-anniversary-couple-photo-cake",
+   "shapeModule": false,
+   "weight": "1.5 kg",
+   "selections": {},
+   "unitPrice": 1449,
+   "compareAt": 1649,
+   "summary": []
+  },
+  {
+   "slug": "red-rose-anniversary-couple-photo-cake",
+   "shapeModule": false,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1645,
+   "compareAt": 1845,
+   "summary": []
+  },
+  {
+   "slug": "red-rose-anniversary-couple-photo-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 1049,
+   "compareAt": 1249
+  },
+  {
+   "slug": "royal-golden-portrait-photo-cake",
+   "shapeModule": true,
+   "weight": "500 gm",
+   "selections": {},
+   "unitPrice": 999,
+   "compareAt": 1199,
+   "summary": []
+  },
+  {
+   "slug": "royal-golden-portrait-photo-cake",
+   "shapeModule": true,
+   "weight": "1 kg",
+   "selections": {},
+   "unitPrice": 1199,
+   "compareAt": 1399,
+   "summary": []
+  },
+  {
+   "slug": "royal-golden-portrait-photo-cake",
+   "shapeModule": true,
+   "weight": "1.5 kg",
+   "selections": {},
+   "unitPrice": 1399,
+   "compareAt": 1599,
+   "summary": []
+  },
+  {
+   "slug": "royal-golden-portrait-photo-cake",
+   "shapeModule": true,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1599,
+   "compareAt": 1799,
+   "summary": []
+  },
+  {
+   "slug": "royal-golden-portrait-photo-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 999,
+   "compareAt": 1199
+  },
+  {
+   "slug": "royal-golden-portrait-photo-cake",
+   "shapeModule": false,
+   "weight": "500 gm",
+   "selections": {},
+   "unitPrice": 999,
+   "compareAt": 1199,
+   "summary": []
+  },
+  {
+   "slug": "royal-golden-portrait-photo-cake",
+   "shapeModule": false,
+   "weight": "1 kg",
+   "selections": {},
+   "unitPrice": 1199,
+   "compareAt": 1399,
+   "summary": []
+  },
+  {
+   "slug": "royal-golden-portrait-photo-cake",
+   "shapeModule": false,
+   "weight": "1.5 kg",
+   "selections": {},
+   "unitPrice": 1399,
+   "compareAt": 1599,
+   "summary": []
+  },
+  {
+   "slug": "royal-golden-portrait-photo-cake",
+   "shapeModule": false,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1599,
+   "compareAt": 1799,
+   "summary": []
+  },
+  {
+   "slug": "royal-golden-portrait-photo-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 999,
+   "compareAt": 1199
+  },
+  {
+   "slug": "blue-star-boys-birthday-photo-cake",
+   "shapeModule": true,
+   "weight": "500 gm",
+   "selections": {},
+   "unitPrice": 949,
+   "compareAt": 1149,
+   "summary": []
+  },
+  {
+   "slug": "blue-star-boys-birthday-photo-cake",
+   "shapeModule": true,
+   "weight": "1 kg",
+   "selections": {},
+   "unitPrice": 1149,
+   "compareAt": 1349,
+   "summary": []
+  },
+  {
+   "slug": "blue-star-boys-birthday-photo-cake",
+   "shapeModule": true,
+   "weight": "1.5 kg",
+   "selections": {},
+   "unitPrice": 1349,
+   "compareAt": 1549,
+   "summary": []
+  },
+  {
+   "slug": "blue-star-boys-birthday-photo-cake",
+   "shapeModule": true,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1549,
+   "compareAt": 1749,
+   "summary": []
+  },
+  {
+   "slug": "blue-star-boys-birthday-photo-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 949,
+   "compareAt": 1149
+  },
+  {
+   "slug": "blue-star-boys-birthday-photo-cake",
+   "shapeModule": false,
+   "weight": "500 gm",
+   "selections": {},
+   "unitPrice": 949,
+   "compareAt": 1149,
+   "summary": []
+  },
+  {
+   "slug": "blue-star-boys-birthday-photo-cake",
+   "shapeModule": false,
+   "weight": "1 kg",
+   "selections": {},
+   "unitPrice": 1149,
+   "compareAt": 1349,
+   "summary": []
+  },
+  {
+   "slug": "blue-star-boys-birthday-photo-cake",
+   "shapeModule": false,
+   "weight": "1.5 kg",
+   "selections": {},
+   "unitPrice": 1349,
+   "compareAt": 1549,
+   "summary": []
+  },
+  {
+   "slug": "blue-star-boys-birthday-photo-cake",
+   "shapeModule": false,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1549,
+   "compareAt": 1749,
+   "summary": []
+  },
+  {
+   "slug": "blue-star-boys-birthday-photo-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 949,
+   "compareAt": 1149
+  },
+  {
+   "slug": "cute-baby-teddy-bear-photo-cake",
+   "shapeModule": true,
+   "weight": "500 gm",
+   "selections": {},
+   "unitPrice": 1099,
+   "compareAt": 1299,
+   "summary": []
+  },
+  {
+   "slug": "cute-baby-teddy-bear-photo-cake",
+   "shapeModule": true,
+   "weight": "1 kg",
+   "selections": {},
+   "unitPrice": 1299,
+   "compareAt": 1499,
+   "summary": []
+  },
+  {
+   "slug": "cute-baby-teddy-bear-photo-cake",
+   "shapeModule": true,
+   "weight": "1.5 kg",
+   "selections": {},
+   "unitPrice": 1499,
+   "compareAt": 1699,
+   "summary": []
+  },
+  {
+   "slug": "cute-baby-teddy-bear-photo-cake",
+   "shapeModule": true,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1699,
+   "compareAt": 1899,
+   "summary": []
+  },
+  {
+   "slug": "cute-baby-teddy-bear-photo-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 1099,
+   "compareAt": 1299
+  },
+  {
+   "slug": "cute-baby-teddy-bear-photo-cake",
+   "shapeModule": false,
+   "weight": "500 gm",
+   "selections": {},
+   "unitPrice": 1099,
+   "compareAt": 1299,
+   "summary": []
+  },
+  {
+   "slug": "cute-baby-teddy-bear-photo-cake",
+   "shapeModule": false,
+   "weight": "1 kg",
+   "selections": {},
+   "unitPrice": 1299,
+   "compareAt": 1499,
+   "summary": []
+  },
+  {
+   "slug": "cute-baby-teddy-bear-photo-cake",
+   "shapeModule": false,
+   "weight": "1.5 kg",
+   "selections": {},
+   "unitPrice": 1499,
+   "compareAt": 1699,
+   "summary": []
+  },
+  {
+   "slug": "cute-baby-teddy-bear-photo-cake",
+   "shapeModule": false,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1699,
+   "compareAt": 1899,
+   "summary": []
+  },
+  {
+   "slug": "cute-baby-teddy-bear-photo-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 1099,
+   "compareAt": 1299
+  },
+  {
+   "slug": "princess-pink-birthday-photo-cake",
+   "shapeModule": true,
+   "weight": "500 gm",
+   "selections": {},
+   "unitPrice": 849,
+   "compareAt": 1049,
+   "summary": []
+  },
+  {
+   "slug": "princess-pink-birthday-photo-cake",
+   "shapeModule": true,
+   "weight": "1 kg",
+   "selections": {},
+   "unitPrice": 1049,
+   "compareAt": 1249,
+   "summary": []
+  },
+  {
+   "slug": "princess-pink-birthday-photo-cake",
+   "shapeModule": true,
+   "weight": "1.5 kg",
+   "selections": {},
+   "unitPrice": 1249,
+   "compareAt": 1449,
+   "summary": []
+  },
+  {
+   "slug": "princess-pink-birthday-photo-cake",
+   "shapeModule": true,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1449,
+   "compareAt": 1649,
+   "summary": []
+  },
+  {
+   "slug": "princess-pink-birthday-photo-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 849,
+   "compareAt": 1049
+  },
+  {
+   "slug": "princess-pink-birthday-photo-cake",
+   "shapeModule": false,
+   "weight": "500 gm",
+   "selections": {},
+   "unitPrice": 849,
+   "compareAt": 1049,
+   "summary": []
+  },
+  {
+   "slug": "princess-pink-birthday-photo-cake",
+   "shapeModule": false,
+   "weight": "1 kg",
+   "selections": {},
+   "unitPrice": 1049,
+   "compareAt": 1249,
+   "summary": []
+  },
+  {
+   "slug": "princess-pink-birthday-photo-cake",
+   "shapeModule": false,
+   "weight": "1.5 kg",
+   "selections": {},
+   "unitPrice": 1249,
+   "compareAt": 1449,
+   "summary": []
+  },
+  {
+   "slug": "princess-pink-birthday-photo-cake",
+   "shapeModule": false,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1449,
+   "compareAt": 1649,
+   "summary": []
+  },
+  {
+   "slug": "princess-pink-birthday-photo-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 849,
+   "compareAt": 1049
+  },
+  {
+   "slug": "romantic-heart-shaped-couple-photo-cake",
+   "shapeModule": true,
+   "weight": "500 gm",
+   "selections": {},
+   "unitPrice": 899,
+   "compareAt": 1099,
+   "summary": []
+  },
+  {
+   "slug": "romantic-heart-shaped-couple-photo-cake",
+   "shapeModule": true,
+   "weight": "1 kg",
+   "selections": {},
+   "unitPrice": 1099,
+   "compareAt": 1299,
+   "summary": []
+  },
+  {
+   "slug": "romantic-heart-shaped-couple-photo-cake",
+   "shapeModule": true,
+   "weight": "1.5 kg",
+   "selections": {},
+   "unitPrice": 1299,
+   "compareAt": 1499,
+   "summary": []
+  },
+  {
+   "slug": "romantic-heart-shaped-couple-photo-cake",
+   "shapeModule": true,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1499,
+   "compareAt": 1699,
+   "summary": []
+  },
+  {
+   "slug": "romantic-heart-shaped-couple-photo-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 899,
+   "compareAt": 1099
+  },
+  {
+   "slug": "romantic-heart-shaped-couple-photo-cake",
+   "shapeModule": false,
+   "weight": "500 gm",
+   "selections": {},
+   "unitPrice": 899,
+   "compareAt": 1099,
+   "summary": []
+  },
+  {
+   "slug": "romantic-heart-shaped-couple-photo-cake",
+   "shapeModule": false,
+   "weight": "1 kg",
+   "selections": {},
+   "unitPrice": 1099,
+   "compareAt": 1299,
+   "summary": []
+  },
+  {
+   "slug": "romantic-heart-shaped-couple-photo-cake",
+   "shapeModule": false,
+   "weight": "1.5 kg",
+   "selections": {},
+   "unitPrice": 1299,
+   "compareAt": 1499,
+   "summary": []
+  },
+  {
+   "slug": "romantic-heart-shaped-couple-photo-cake",
+   "shapeModule": false,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1499,
+   "compareAt": 1699,
+   "summary": []
+  },
+  {
+   "slug": "romantic-heart-shaped-couple-photo-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 899,
+   "compareAt": 1099
+  },
+  {
+   "slug": "chocolate-family-memories-photo-cake",
+   "shapeModule": true,
+   "weight": "500 gm",
+   "selections": {},
+   "unitPrice": 799,
+   "compareAt": 999,
+   "summary": []
+  },
+  {
+   "slug": "chocolate-family-memories-photo-cake",
+   "shapeModule": true,
+   "weight": "1 kg",
+   "selections": {},
+   "unitPrice": 999,
+   "compareAt": 1199,
+   "summary": []
+  },
+  {
+   "slug": "chocolate-family-memories-photo-cake",
+   "shapeModule": true,
+   "weight": "1.5 kg",
+   "selections": {},
+   "unitPrice": 1199,
+   "compareAt": 1399,
+   "summary": []
+  },
+  {
+   "slug": "chocolate-family-memories-photo-cake",
+   "shapeModule": true,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1399,
+   "compareAt": 1599,
+   "summary": []
+  },
+  {
+   "slug": "chocolate-family-memories-photo-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 799,
+   "compareAt": 999
+  },
+  {
+   "slug": "chocolate-family-memories-photo-cake",
+   "shapeModule": false,
+   "weight": "500 gm",
+   "selections": {},
+   "unitPrice": 799,
+   "compareAt": 999,
+   "summary": []
+  },
+  {
+   "slug": "chocolate-family-memories-photo-cake",
+   "shapeModule": false,
+   "weight": "1 kg",
+   "selections": {},
+   "unitPrice": 999,
+   "compareAt": 1199,
+   "summary": []
+  },
+  {
+   "slug": "chocolate-family-memories-photo-cake",
+   "shapeModule": false,
+   "weight": "1.5 kg",
+   "selections": {},
+   "unitPrice": 1199,
+   "compareAt": 1399,
+   "summary": []
+  },
+  {
+   "slug": "chocolate-family-memories-photo-cake",
+   "shapeModule": false,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1399,
+   "compareAt": 1599,
+   "summary": []
+  },
+  {
+   "slug": "chocolate-family-memories-photo-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 799,
+   "compareAt": 999
+  },
+  {
+   "slug": "pink-rose-personalized-photo-cake",
+   "shapeModule": true,
+   "weight": "500 gm",
+   "selections": {},
+   "unitPrice": 699,
+   "compareAt": 899,
+   "summary": []
+  },
+  {
+   "slug": "pink-rose-personalized-photo-cake",
+   "shapeModule": true,
+   "weight": "1 kg",
+   "selections": {},
+   "unitPrice": 899,
+   "compareAt": 1099,
+   "summary": []
+  },
+  {
+   "slug": "pink-rose-personalized-photo-cake",
+   "shapeModule": true,
+   "weight": "1.5 kg",
+   "selections": {},
+   "unitPrice": 1099,
+   "compareAt": 1299,
+   "summary": []
+  },
+  {
+   "slug": "pink-rose-personalized-photo-cake",
+   "shapeModule": true,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1299,
+   "compareAt": 1499,
+   "summary": []
+  },
+  {
+   "slug": "pink-rose-personalized-photo-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 699,
+   "compareAt": 899
+  },
+  {
+   "slug": "pink-rose-personalized-photo-cake",
+   "shapeModule": false,
+   "weight": "500 gm",
+   "selections": {},
+   "unitPrice": 699,
+   "compareAt": 899,
+   "summary": []
+  },
+  {
+   "slug": "pink-rose-personalized-photo-cake",
+   "shapeModule": false,
+   "weight": "1 kg",
+   "selections": {},
+   "unitPrice": 899,
+   "compareAt": 1099,
+   "summary": []
+  },
+  {
+   "slug": "pink-rose-personalized-photo-cake",
+   "shapeModule": false,
+   "weight": "1.5 kg",
+   "selections": {},
+   "unitPrice": 1099,
+   "compareAt": 1299,
+   "summary": []
+  },
+  {
+   "slug": "pink-rose-personalized-photo-cake",
+   "shapeModule": false,
+   "weight": "2 kg",
+   "selections": {},
+   "unitPrice": 1299,
+   "compareAt": 1499,
+   "summary": []
+  },
+  {
+   "slug": "pink-rose-personalized-photo-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 699,
+   "compareAt": 899
+  },
+  {
+   "slug": "synthetic-shape-cake",
+   "shapeModule": true,
+   "weight": "0.5 kg",
+   "selections": {
+    "g-shape": "round",
+    "g-egg": "eggless"
+   },
+   "unitPrice": 880,
+   "compareAt": 1080,
+   "summary": [
+    "Shape: Round",
+    "Eggless"
+   ]
+  },
+  {
+   "slug": "synthetic-shape-cake",
+   "shapeModule": true,
+   "weight": "1 kg",
+   "selections": {
+    "g-shape": "round",
+    "g-egg": "eggless"
+   },
+   "unitPrice": 1480,
+   "compareAt": 1680,
+   "summary": [
+    "Shape: Round",
+    "Eggless"
+   ]
+  },
+  {
+   "slug": "synthetic-shape-cake",
+   "shapeModule": true,
+   "weight": "0.5 kg",
+   "selections": {
+    "g-shape": "heart",
+    "g-egg": "eggless",
+    "g-wrap": "box"
+   },
+   "unitPrice": 1090,
+   "compareAt": 1290,
+   "summary": [
+    "Shape: Heart",
+    "Eggless",
+    "Gift wrap: Box"
+   ]
+  },
+  {
+   "slug": "synthetic-shape-cake",
+   "shapeModule": true,
+   "weight": "1 kg",
+   "selections": {
+    "g-shape": "heart",
+    "g-egg": "eggless",
+    "g-wrap": "box"
+   },
+   "unitPrice": 1690,
+   "compareAt": 1890,
+   "summary": [
+    "Shape: Heart",
+    "Eggless",
+    "Gift wrap: Box"
+   ]
+  },
+  {
+   "slug": "synthetic-shape-cake",
+   "shapeModule": true,
+   "card": true,
+   "unitPrice": 880,
+   "compareAt": 1080
+  },
+  {
+   "slug": "synthetic-shape-cake",
+   "shapeModule": false,
+   "weight": "0.5 kg",
+   "selections": {
+    "g-shape": "round",
+    "g-egg": "eggless"
+   },
+   "unitPrice": 880,
+   "compareAt": 1080,
+   "summary": [
+    "Eggless"
+   ]
+  },
+  {
+   "slug": "synthetic-shape-cake",
+   "shapeModule": false,
+   "weight": "1 kg",
+   "selections": {
+    "g-shape": "round",
+    "g-egg": "eggless"
+   },
+   "unitPrice": 1480,
+   "compareAt": 1680,
+   "summary": [
+    "Eggless"
+   ]
+  },
+  {
+   "slug": "synthetic-shape-cake",
+   "shapeModule": false,
+   "weight": "0.5 kg",
+   "selections": {
+    "g-shape": "heart",
+    "g-egg": "eggless",
+    "g-wrap": "box"
+   },
+   "unitPrice": 940,
+   "compareAt": 1140,
+   "summary": [
+    "Eggless",
+    "Gift wrap: Box"
+   ]
+  },
+  {
+   "slug": "synthetic-shape-cake",
+   "shapeModule": false,
+   "weight": "1 kg",
+   "selections": {
+    "g-shape": "heart",
+    "g-egg": "eggless",
+    "g-wrap": "box"
+   },
+   "unitPrice": 1540,
+   "compareAt": 1740,
+   "summary": [
+    "Eggless",
+    "Gift wrap: Box"
+   ]
+  },
+  {
+   "slug": "synthetic-shape-cake",
+   "shapeModule": false,
+   "card": true,
+   "unitPrice": 880,
+   "compareAt": 1080
+  }
+ ]
+}

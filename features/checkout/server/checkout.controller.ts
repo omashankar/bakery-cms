@@ -18,7 +18,7 @@ import { createDraft } from "./draft.repository";
 import { deliveryPinCheckSchema, pincodeCheckSchema, quoteSchema } from "./checkout.validators";
 import { getZones } from "@/features/commerce/server/commerce.service";
 import { verifyDeliveryPin } from "@/features/commerce/server/delivery-pin-check.server";
-import { answerPincode } from "@/features/commerce/server/pincode-answer.server";
+import { answerPincode, pincodePlaceName } from "@/features/commerce/server/pincode-answer.server";
 import { AddressSearchUnavailableError, searchAddresses } from "@/features/commerce/server/osm-search.server";
 import { isValidLatLng } from "@/features/commerce/lib/delivery-area";
 import type { CommerceSettings } from "@/types/settings";
@@ -289,15 +289,20 @@ export const checkDeliveryPinController = withErrorHandler(async (request: Reque
   const [settings, zones] = await Promise.all([getSettings(), getZones()]);
   const commerce = ((settings as unknown as { commerce?: CommerceSettings }).commerce ?? {}) as CommerceSettings;
 
+  // Additive, a PIN alone only: where the answer is about ("324002 · Kota"),
+  // from India Post's directory — absent for a PIN it does not list.
+  const place = byPincode ? (pincodePlaceName(byPincode.pincode) ?? {}) : {};
+
   // A shop without delivery areas takes every address at its flat fee.
-  if (!commerce.useZoneBasedDelivery) return ok({ required: false, status: "eligible", charge: commerce.deliveryFee });
+  if (!commerce.useZoneBasedDelivery) return ok({ required: false, status: "eligible", charge: commerce.deliveryFee, ...place });
 
   if (byPincode) {
     const answer = await answerPincode(byPincode.pincode, zones as DeliveryZone[], commerce.deliverOutsideZones !== false);
-    if (answer.status !== "eligible") return ok({ required: true, status: answer.status });
+    if (answer.status !== "eligible") return ok({ required: true, status: answer.status, ...place });
     return ok({
       required: true,
       status: "eligible",
+      ...place,
       charge: answer.zone ? answer.zone.deliveryCharge : (commerce.zoneFallbackDeliveryFee ?? commerce.deliveryFee),
       minDeliveryDays: answer.zone ? answer.zone.minDeliveryDays : null,
       freeDeliveryThreshold: commerce.freeDeliveryThreshold,

@@ -244,6 +244,29 @@ export async function updateProfile(
   return identityAfterWrite(id);
 }
 
+/**
+ * The customer deletes their own account — the in-app deletion app stores
+ * require of anything that lets a person sign up.
+ *
+ * The account, its address book, its photo and any live sign-in code go;
+ * past orders stay, because the shop must keep its invoices. Signing in
+ * again with the same email starts a new, empty account.
+ */
+export async function deleteAccount(id: string, ctx: RequestCtx): Promise<void> {
+  const gone = await repo.deleteAccount(id);
+  if (!gone) throw new AuthError();
+  // After the row, never before: a photo removed from an account that then
+  // failed to delete would leave the profile pointing at nothing.
+  if (gone.avatarPublicId) await deleteFromCloudinary(gone.avatarPublicId);
+  await writeAuditLog({
+    action: "customer.account.deleted",
+    actorEmail: gone.email,
+    target: { type: "customer", id },
+    ip: ctx.ip,
+    userAgent: ctx.userAgent,
+  });
+}
+
 /** Re-read after a write, so what the browser caches is what was stored. */
 async function identityAfterWrite(id: string): Promise<CustomerIdentity> {
   const identity = await repo.findIdentity(id);

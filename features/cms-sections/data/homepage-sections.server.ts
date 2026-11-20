@@ -1,6 +1,6 @@
 import { createDefaultHomepageSections } from "@/constants/section-registry";
 import { createMongoStore } from "@/lib/server/db/cms-store";
-import { getVisibleSections, sortSections } from "@/features/cms-sections/lib/section-utils";
+import { homepageSectionsToRender, sortSections } from "@/features/cms-sections/lib/section-utils";
 import {
   appendRevision,
   findRevisionSections,
@@ -98,11 +98,8 @@ export async function getHomepageState(): Promise<HomepageBuilderState> {
 /** Published sections, ready to render: registry-ordered and visibility-filtered. */
 export async function getPublishedHomepageSections(): Promise<HomepageSectionInstance[]> {
   const { published } = await readWithSchedule();
-  // FAQs live only on the dedicated FAQ page — never render a home FAQ section,
-  // even if an older saved snapshot still contains one.
-  return getVisibleSections(sortSections(published.sections)).filter(
-    (section) => section.type !== "faq"
-  );
+  // FAQs live only on the dedicated FAQ page — see homepageSectionsToRender.
+  return homepageSectionsToRender(published.sections);
 }
 
 /**
@@ -126,9 +123,8 @@ export async function getPublishedSectionContent(
 
 export async function getDraftHomepageSections(): Promise<HomepageSectionInstance[]> {
   const { draft } = await readWithSchedule();
-  return getVisibleSections(sortSections(draft.sections)).filter(
-    (section) => section.type !== "faq"
-  );
+  // FAQs live only on the dedicated FAQ page — see homepageSectionsToRender.
+  return homepageSectionsToRender(draft.sections);
 }
 
 /** Newest-first publish revisions for the Version History panel. */
