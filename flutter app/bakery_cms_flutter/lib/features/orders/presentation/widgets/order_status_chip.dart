@@ -16,7 +16,9 @@ class OrderStatusChip extends StatelessWidget {
     final (background, foreground) = switch (status) {
       OrderStatus.cancelled ||
       OrderStatus.refunded => (colors.errorContainer, colors.onErrorContainer),
-      OrderStatus.delivered => (colors.tertiary, colors.onTertiary),
+      // Soft, as cancelled and the rest are: one solid green chip in a list
+      // of soft ones read as a different kind of thing.
+      OrderStatus.delivered => (colors.tertiaryContainer, colors.onTertiaryContainer),
       _ => (colors.surfaceContainerHighest, colors.onSurface),
     };
     return DecoratedBox(
